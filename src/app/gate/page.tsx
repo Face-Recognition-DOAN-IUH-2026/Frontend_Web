@@ -21,6 +21,7 @@ let toastId = 0;
 export default function GatePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [step, setStep] = useState<Step>("idle");
   const [mssv, setMssv] = useState("");
   const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
@@ -39,40 +40,111 @@ export default function GatePage() {
     phone: "",
   });
 
+  const [cameraReady, setCameraReady] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [statusText, setStatusText] = useState("");
+  const [camStatus, setCamStatus] = useState<"checking" | "available" | "unavailable" | "blocked">("checking");
+  const [entryCamOk, setEntryCamOk] = useState<boolean | null>(null);
+  const [exitCamOk, setExitCamOk] = useState<boolean | null>(null);
+
   const addToast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastId;
-    setToasts((prev) => [Object.assign(t, { id }), ...prev.slice(0, 4)]);
+    setToasts((prev) => [{ ...t, id }, ...prev.slice(0, 4)]);
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
   }, []);
 
-  const startCamera = useCallback(async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    if (videoRef.current) videoRef.current.srcObject = stream;
-    streamRef.current = stream;
-  }, []);
-
   const stopCamera = useCallback(() => {
+    if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    setIsCameraOn(false);
+    setCameraReady(false);
   }, []);
 
+  useEffect(() => {
+    return () => stopCamera();
+  }, [stopCamera]);
+
+  const startCamera = useCallback(async () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      setCameraReady(false);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 640, min: 320 },
+          height: { ideal: 480, min: 240 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      setIsCameraOn(true);
+    } catch (err: any) {
+      if (err.name === "NotAllowedError") {
+        addToast({ type: "error", message: "Không có quyền truy cập camera. Vui lòng cho phép camera trong trình duyệt." });
+      } else if (err.name === "NotFoundError") {
+        addToast({ type: "error", message: "Không tìm thấy camera trên thiết bị." });
+      } else {
+        addToast({ type: "error", message: `Lỗi camera: ${err.message}` });
+      }
+      setIsCameraOn(false);
+    }
+  }, [addToast]);
+
+  // Gán stream vào video element sau khi video đã render (giống enroll page)
+  useEffect(() => {
+    if (!isCameraOn || !videoRef.current || !streamRef.current) return;
+
+    const video = videoRef.current;
+    const stream = streamRef.current;
+
+    const onReady = () => setCameraReady(true);
+
+    video.onloadedmetadata = onReady;
+    video.onplaying = onReady;
+    video.onerror = () => addToast({ type: "error", message: "Lỗi camera" });
+    video.srcObject = stream;
+
+    if (video.readyState >= 2) onReady();
+
+    readyTimeoutRef.current = setTimeout(() => setCameraReady(true), 1500);
+
+    return () => {
+      if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+    };
+  }, [isCameraOn, addToast]);
+
   const captureImage = useCallback((): Promise<File> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const video = videoRef.current;
-      if (!video) return;
+      if (!video || !video.videoWidth) {
+        reject(new Error("Camera chưa sẵn sàng"));
+        return;
+      }
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      canvas.getContext("2d")!.drawImage(video, 0, 0);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Không thể tạo canvas"));
+        return;
+      }
+      ctx.drawImage(video, 0, 0);
       canvas.toBlob((blob) => {
         if (blob) {
-          const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+          const file = new File([blob], "face_capture.jpg", { type: "image/jpeg" });
           setCaptured(canvas.toDataURL("image/jpeg"));
           resolve(file);
+        } else {
+          reject(new Error("Không thể tạo ảnh"));
         }
-      }, "image/jpeg");
+      }, "image/jpeg", 0.9);
     });
   }, []);
 
@@ -100,31 +172,82 @@ export default function GatePage() {
     }
   };
 
+  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      try {
+        const task = await api.getTaskStatus(jobId);
+        if (task.status === "SUCCESS") return task.result;
+        if (task.status === "FAILURE") throw new Error(task.result?.error || "Task failed");
+        setStatusText(task.result?.status === "granted" ? "Đã ghi nhận..." : "Đang xử lý...");
+      } catch {
+        // continue polling
+      }
+    }
+    throw new Error("Timeout waiting for result");
+  }, []);
+
   const handleEnroll = async () => {
     if (!form.full_name) return;
     setLoading(true);
+    setStatusText("Đang chụp ảnh...");
     try {
       const imageFile = await captureImage();
-      const res = await api.kioskEnroll(imageFile, form.full_name, mssv, mssv, "2027-12-31", form.identity_number || undefined, form.email || undefined, form.phone || undefined);
+      stopCamera();
+      setStatusText("Đang gửi dữ liệu...");
+      const res = await api.kioskEnroll(imageFile, form.full_name, mssv, `CARD-${mssv || Date.now()}`,
+        "2027-12-31", form.identity_number || undefined, form.email || undefined, form.phone || undefined);
+      if (res.job_id) {
+        setStatusText("Đang xử lý ảnh...");
+        await pollTask(res.job_id);
+      }
       setResult(res);
       setStep("result");
-      stopCamera();
-      addToast({ type: "info", message: `Đăng ký thành công cho ${form.full_name}` });
+      setForm({ full_name: "", identity_number: "", email: "", phone: "" });
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err.message || "Đăng ký thất bại";
+      setResult({ success: false, message: msg, patron: null, job_id: null });
+      setStep("result");
+      addToast({ type: "error", message: msg });
     } finally {
       setLoading(false);
+      setStatusText("");
     }
   };
 
   const handleVerify = async () => {
     setLoading(true);
+    setStatusText("Đang chụp ảnh...");
     try {
       const imageFile = await captureImage();
-      const res = await api.kioskEnter(imageFile, mssv);
-      setResult(res);
-      setStep("result");
       stopCamera();
+      setStatusText("Đang gửi dữ liệu...");
+      const res = await api.kioskEnter(imageFile, mssv);
+      if (res.job_id) {
+        setStatusText("Đang xác thực khuôn mặt...");
+        const taskResult = await pollTask(res.job_id);
+        const success = taskResult?.status === "success";
+        setResult({
+          success,
+          message: success
+            ? `Xác thực thành công — ${taskResult?.access_type === "exit" ? "Ra" : "Vào"} thư viện`
+            : (taskResult?.error || "Xác thực thất bại"),
+          patron: res.patron,
+          job_id: res.job_id,
+        });
+      } else {
+        setResult(res);
+      }
+      setStep("result");
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err.message || "Xác thực thất bại";
+      setResult({ success: false, message: msg, patron: null, job_id: null });
+      setStep("result");
+      addToast({ type: "error", message: msg });
     } finally {
       setLoading(false);
+      setStatusText("");
     }
   };
 
@@ -163,17 +286,33 @@ export default function GatePage() {
           return [newLog, ...prev.slice(0, 19)];
         });
       } else if (event.status === "no_match") {
-        addToast({ type: "info", message: "Khuôn mặt mới — không nhận diện được" });
+        addToast({ type: "info", message: event.full_name ? `${event.full_name} — chưa có lượt vào, bỏ qua` : "Khuôn mặt mới — không nhận diện được" });
       } else if (event.status === "expired") {
         addToast({ type: "error", message: `${event.full_name} — thẻ đã hết hạn` });
       } else if (event.status === "spoof") {
         addToast({ type: "error", message: "Phát hiện giả mạo!" });
+      } else if (event.status === "error") {
+        addToast({ type: "error", message: `Lỗi xử lý: ${event.error || "không xác định"}` });
+      } else {
+        addToast({ type: "info", message: `${event.status} — ${event.full_name || ""}` });
       }
     });
     return cleanup;
-  }, [addToast]);
+  }, [addToast, step]);
 
-  // Load recent history (public endpoint, no auth needed)
+  // Check camera availability
+  useEffect(() => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setCamStatus("unavailable");
+      return;
+    }
+    navigator.mediaDevices.enumerateDevices().then((devices) => {
+      const hasCam = devices.some((d) => d.kind === "videoinput");
+      setCamStatus(hasCam ? "available" : "unavailable");
+    }).catch(() => setCamStatus("blocked"));
+  }, []);
+
+  // Load recent history
   useEffect(() => {
     api.getRecentLogs().then((data) => setRecentLogs(data.items)).catch(() => {});
   }, []);
@@ -205,32 +344,66 @@ export default function GatePage() {
       {/* Camera feeds */}
       <div className="grid grid-cols-2 gap-4">
         <div className="border rounded-lg overflow-hidden bg-black">
-          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium">Cổng vào — Camera 1</div>
-          <img src={`${ENTRY_CAM}?_t=${entryTs}`} className="w-full h-64 object-contain" alt="Entry cam" />
+          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
+            <span>Cổng vào — Camera 1</span>
+            <span className={`inline-block w-2 h-2 rounded-full ${entryCamOk === null ? "bg-yellow-400" : entryCamOk ? "bg-green-400" : "bg-red-400"}`} />
+          </div>
+          <img src={`${ENTRY_CAM}?_t=${entryTs}`} className="w-full h-64 object-contain" alt="Entry cam"
+            onLoad={() => setEntryCamOk(true)} onError={() => setEntryCamOk(false)} />
         </div>
         <div className="border rounded-lg overflow-hidden bg-black">
-          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium">Cổng ra — Camera 2</div>
-          <img src={`${EXIT_CAM}?_t=${exitTs}`} className="w-full h-64 object-contain" alt="Exit cam" />
+          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
+            <span>Cổng ra — Camera 2</span>
+            <span className={`inline-block w-2 h-2 rounded-full ${exitCamOk === null ? "bg-yellow-400" : exitCamOk ? "bg-green-400" : "bg-red-400"}`} />
+          </div>
+          <img src={`${EXIT_CAM}?_t=${exitTs}`} className="w-full h-64 object-contain" alt="Exit cam"
+            onLoad={() => setExitCamOk(true)} onError={() => setExitCamOk(false)} />
         </div>
       </div>
 
       {/* Kiosk form */}
       {step === "idle" && (
         <div className="max-w-md space-y-4">
+          {/* Camera status */}
+          <div className="flex items-center gap-2 text-sm p-2 rounded-md bg-gray-50 border">
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${
+              camStatus === "checking" ? "bg-yellow-400 animate-pulse" :
+              camStatus === "available" ? "bg-green-500" : "bg-red-500"
+            }`} />
+            <span>
+              {camStatus === "checking" && "Đang kiểm tra camera..."}
+              {camStatus === "available" && "Camera sẵn sàng"}
+              {camStatus === "unavailable" && "Không tìm thấy camera — dùng upload ảnh"}
+              {camStatus === "blocked" && "Camera bị chặn — cho phép camera trong trình duyệt"}
+            </span>
+          </div>
+
           <label className="block">
             <span className="text-sm font-medium">Nhập MSSV:</span>
             <input className="mt-1 block w-full px-3 py-2 border rounded-md" value={mssv} onChange={(e) => setMssv(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLookup()} placeholder="MSSV" />
           </label>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleLookup} disabled={loading}>
-            {loading ? "Đang kiểm tra..." : "Tra cứu"}
-          </button>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleLookup} disabled={loading}>
+              {loading ? "Đang kiểm tra..." : "Tra cứu"}
+            </button>
+            {camStatus === "checking" && (
+              <button className="px-4 py-2 bg-gray-200 text-gray-600 rounded-md text-sm" onClick={() => setCamStatus("unavailable")}>Bỏ qua</button>
+            )}
+          </div>
         </div>
       )}
 
       {(step === "enroll_form" || step === "verify") && (
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg border" />
+            <div className="relative bg-black rounded-lg overflow-hidden">
+              <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-lg" />
+              {!cameraReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+                  Đang mở camera...
+                </div>
+              )}
+            </div>
             {captured && <img src={captured} className="w-full mt-2 rounded-lg border" />}
           </div>
           <div className="space-y-4">
@@ -258,6 +431,7 @@ export default function GatePage() {
                 <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleVerify} disabled={loading}>
                   {loading ? "Đang xác thực..." : "Vào cổng"}
                 </button>
+                {statusText && <p className="text-blue-600 text-sm animate-pulse">{statusText}</p>}
               </>
             )}
           </div>
@@ -266,6 +440,7 @@ export default function GatePage() {
 
       {step === "result" && (
         <div className="space-y-4">
+          {statusText && <p className="text-blue-600 text-sm animate-pulse">{statusText}</p>}
           <div className={`p-4 rounded-lg ${result?.success ? "bg-green-100" : "bg-red-100"}`}>
             <p className="text-lg font-semibold">{result?.success ? "Thành công" : "Thất bại"}</p>
             <p>{result?.message}</p>
@@ -276,7 +451,7 @@ export default function GatePage() {
               </>
             )}
           </div>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={reset}>Làm lại</button>
+          <button onClick={reset} className="px-4 py-2 bg-blue-600 text-white rounded-md">Làm lại</button>
         </div>
       )}
 

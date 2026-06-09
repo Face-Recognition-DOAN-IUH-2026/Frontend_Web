@@ -70,6 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   };
 
+  const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role: string = "user") => {
+    localStorage.setItem("access_token", accessToken);
+    if (refreshToken) {
+      localStorage.setItem("refresh_token", refreshToken);
+    }
+    const userData: AuthUser = { id: "", email, role };
+    localStorage.setItem("user", JSON.stringify(userData));
+    setAccessToken(accessToken);
+    setUser(userData);
+  };
+
   const logout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
@@ -97,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         accessToken,
         login,
+        setAuthFromToken,
         register,
         logout,
         refreshAccessToken,
