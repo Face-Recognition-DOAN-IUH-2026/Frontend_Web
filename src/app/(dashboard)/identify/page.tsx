@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
+import api from "@/lib/api-client";
 
 export default function IdentifyPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -29,27 +30,10 @@ export default function IdentifyPage() {
     setMatches(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", imageFile);
-      formData.append("consent_given", String(consent));
-
-      const response = await fetch("/api/face/identify", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Identification failed");
-      }
-
-      const data = await response.json();
+      const data = await api.identifyFace(imageFile, consent);
       setJobId(data.job_id);
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      setError(err.response?.data?.detail || err.message || "Identification failed");
       setIsLoading(false);
     }
   };

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
+import api from "@/lib/api-client";
 import type { LivenessBreakdown } from "@/lib/types";
 
 const breakdownLabels: Record<keyof LivenessBreakdown, string> = {
@@ -97,27 +98,10 @@ export default function LivenessPage() {
     setResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", imageFile);
-      formData.append("consent_given", String(consent));
-
-      const response = await fetch("/api/face/liveness", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Liveness check failed");
-      }
-
-      const data = await response.json();
+      const data = await api.livenessCheck(imageFile, consent);
       setJobId(data.job_id);
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      setError(err.response?.data?.detail || err.message || "Liveness check failed");
       setIsLoading(false);
     }
   };
