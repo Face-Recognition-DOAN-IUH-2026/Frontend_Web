@@ -286,7 +286,7 @@ export default function GatePage() {
           return [newLog, ...prev.slice(0, 19)];
         });
       } else if (event.status === "no_match") {
-        addToast({ type: "info", message: "Khuôn mặt mới — không nhận diện được" });
+        addToast({ type: "info", message: event.full_name ? `${event.full_name} — chưa có lượt vào, bỏ qua` : "Khuôn mặt mới — không nhận diện được" });
       } else if (event.status === "expired") {
         addToast({ type: "error", message: `${event.full_name} — thẻ đã hết hạn` });
       } else if (event.status === "spoof") {
