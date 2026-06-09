@@ -76,15 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("refresh_token", response.refresh_token);
     }
 
-    // Decode JWT to get user id and role
-    const payload = decodeJwtPayload(response.access_token);
-    const userId = (payload?.sub as string) || "";
-    const role = ((payload?.roles as string[])?.[0]) || "user";
-
+    // Use user info from user-service response directly
     const userData: AuthUser = {
-      id: userId,
-      email,
-      role,
+      id: response.user.id,
+      email: response.user.email,
+      role: response.user.role,
     };
     localStorage.setItem("user", JSON.stringify(userData));
 
@@ -95,7 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string, role: string = "user") => {
-    const data: RegisterRequest = { email, password, role };
+    // user-service only accepts email, password, full_name
+    // role is set internally by user-service (default "user")
+    const data: RegisterRequest = { email, password };
     await api.register(data);
     router.push("/login");
   };

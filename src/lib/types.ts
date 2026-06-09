@@ -7,7 +7,15 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string;
   password: string;
+  full_name?: string;
   role?: string;
+}
+
+// User-service returns user info along with tokens
+export interface UserServiceAuthResponse {
+  user: UserPublic;
+  access_token: string;
+  refresh_token?: string;
 }
 
 export interface TokenResponse {

@@ -16,6 +16,7 @@ import type {
   TokenResponse,
   UserListResponse,
   UserPublic,
+  UserServiceAuthResponse,
 } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -96,26 +97,36 @@ class ApiClient {
     }
   }
 
-  // === Auth ===
-  async login(data: LoginRequest): Promise<TokenResponse> {
-    const response = await this.client.post<TokenResponse>("/auth/login", data);
+  // === Auth (via user-service) ===
+  async login(data: LoginRequest): Promise<UserServiceAuthResponse> {
+    // /users/login routes to user-service via gateway
+    const response = await this.client.post<UserServiceAuthResponse>("/users/login", data);
     return response.data;
   }
 
   async register(data: RegisterRequest): Promise<UserPublic> {
-    const response = await this.client.post<UserPublic>("/auth/register", data);
+    // /users/register routes to user-service via gateway
+    const response = await this.client.post<UserPublic>("/users/register", data);
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<UserPublic> {
+    // This goes to user-service's /users/me via gateway
+    // user-service verifies JWT and returns user info
+    const response = await this.client.get<UserPublic>("/users/me");
+    return response.data;
+  }
+
+  // Face enrollment status from face-recognition-api
+  async getFaceEnrollmentStatus(): Promise<{ has_face: boolean; full_name: string | null; role: string }> {
+    // /api/users/me routes to face-recognition-api via gateway
+    const response = await this.client.get<{ has_face: boolean; full_name: string | null; role: string }>("/users/me");
     return response.data;
   }
 
   // === Tasks ===
   async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
     const response = await this.client.get<TaskStatusResponse>(`/tasks/${taskId}`);
-    return response.data;
-  }
-
-  // === Users ===
-  async getCurrentUser(): Promise<UserPublic> {
-    const response = await this.client.get<UserPublic>("/users/me");
     return response.data;
   }
 
