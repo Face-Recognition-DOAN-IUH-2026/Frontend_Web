@@ -5,9 +5,20 @@ node_modules/
 .next/
 out/
 
-# === Environment ===
-.env.local
-.env.*.local
+# Next.js build cache
+.next/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
 # === OS ===
 .DS_Store
