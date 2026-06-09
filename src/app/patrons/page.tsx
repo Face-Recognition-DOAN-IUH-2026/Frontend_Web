@@ -169,6 +169,7 @@ export default function PatronsPage() {
 
   return (
     <div className="space-y-6">
+      <button onClick={() => router.push("/dashboard")} className="text-blue-600 hover:underline text-sm mb-2">&larr; Quay lại Dashboard</button>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Quản lý độc giả</h1>
         <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={() => setShowCreate(!showCreate)}>
