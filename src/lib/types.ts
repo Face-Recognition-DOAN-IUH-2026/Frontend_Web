@@ -193,6 +193,18 @@ export interface KioskResult {
   job_id: string | null;
 }
 
+export interface CameraStatus {
+  camera_id: string;
+  url: string;
+  running: boolean;
+  connected: boolean;
+  frames_processed: number;
+  last_frame_time: string | null;
+  last_error: string | null;
+  retry_count: number;
+  next_retry_in: number | null;
+}
+
 export interface CameraEvent {
   camera_id: string;
   status: "granted" | "no_match" | "expired" | "spoof" | "error";

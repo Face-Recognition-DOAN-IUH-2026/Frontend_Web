@@ -3,6 +3,7 @@ import type {
   AccessLogList,
   ActivePatron,
   CameraEvent,
+  CameraStatus,
   LoginRequest,
   KioskResult,
   PatronCreate,
@@ -361,6 +362,22 @@ class ApiClient {
     const response = await this.client.post<KioskResult>("/kiosk/enter", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
+    return response.data;
+  }
+
+  // === Camera ===
+  async getCameraStatus(): Promise<CameraStatus[]> {
+    const response = await this.client.get<CameraStatus[]>("/camera/status");
+    return response.data;
+  }
+
+  async reconnectCamera(cameraId: string): Promise<{ message: string }> {
+    const response = await this.client.post(`/camera/reconnect/${cameraId}`);
+    return response.data;
+  }
+
+  async reconnectAllCameras(): Promise<{ message: string; cameras: string[] }> {
+    const response = await this.client.post("/camera/reconnect-all");
     return response.data;
   }
 }
