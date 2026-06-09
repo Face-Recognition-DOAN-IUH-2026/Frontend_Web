@@ -42,6 +42,7 @@ export default function GatePage() {
 
   const [cameraReady, setCameraReady] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   const addToast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastId;
@@ -168,38 +169,82 @@ export default function GatePage() {
     }
   };
 
+  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      try {
+        const task = await api.getTaskStatus(jobId);
+        if (task.status === "SUCCESS") return task.result;
+        if (task.status === "FAILURE") throw new Error(task.result?.error || "Task failed");
+        setStatusText(task.result?.status === "granted" ? "Đã ghi nhận..." : "Đang xử lý...");
+      } catch {
+        // continue polling
+      }
+    }
+    throw new Error("Timeout waiting for result");
+  }, []);
+
   const handleEnroll = async () => {
     if (!form.full_name) return;
     setLoading(true);
+    setStatusText("Đang chụp ảnh...");
     try {
       const imageFile = await captureImage();
+      stopCamera();
+      setStatusText("Đang gửi dữ liệu...");
       const res = await api.kioskEnroll(imageFile, form.full_name, mssv, `CARD-${mssv || Date.now()}`,
         "2027-12-31", form.identity_number || undefined, form.email || undefined, form.phone || undefined);
+      if (res.job_id) {
+        setStatusText("Đang xử lý ảnh...");
+        await pollTask(res.job_id);
+      }
       setResult(res);
       setStep("result");
-      stopCamera();
       setForm({ full_name: "", identity_number: "", email: "", phone: "" });
-      addToast({ type: "info", message: `Đăng ký thành công cho ${form.full_name}` });
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err.message || "Đăng ký thất bại";
+      setResult({ success: false, message: msg, patron: null, job_id: null });
+      setStep("result");
       addToast({ type: "error", message: msg });
     } finally {
       setLoading(false);
+      setStatusText("");
     }
   };
 
   const handleVerify = async () => {
     setLoading(true);
+    setStatusText("Đang chụp ảnh...");
     try {
       const imageFile = await captureImage();
-      const res = await api.kioskEnter(imageFile, mssv);
-      setResult(res);
-      setStep("result");
       stopCamera();
+      setStatusText("Đang gửi dữ liệu...");
+      const res = await api.kioskEnter(imageFile, mssv);
+      if (res.job_id) {
+        setStatusText("Đang xác thực khuôn mặt...");
+        const taskResult = await pollTask(res.job_id);
+        const success = taskResult?.status === "success";
+        setResult({
+          success,
+          message: success
+            ? `Xác thực thành công — ${taskResult?.access_type === "exit" ? "Ra" : "Vào"} thư viện`
+            : (taskResult?.error || "Xác thực thất bại"),
+          patron: res.patron,
+          job_id: res.job_id,
+        });
+      } else {
+        setResult(res);
+      }
+      setStep("result");
     } catch (err: any) {
-      addToast({ type: "error", message: "Xác thực thất bại" });
+      const msg = err?.response?.data?.detail || err.message || "Xác thực thất bại";
+      setResult({ success: false, message: msg, patron: null, job_id: null });
+      setStep("result");
+      addToast({ type: "error", message: msg });
     } finally {
       setLoading(false);
+      setStatusText("");
     }
   };
 
@@ -344,6 +389,7 @@ export default function GatePage() {
                 <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleVerify} disabled={loading}>
                   {loading ? "Đang xác thực..." : "Vào cổng"}
                 </button>
+                {statusText && <p className="text-blue-600 text-sm animate-pulse">{statusText}</p>}
               </>
             )}
           </div>
@@ -352,6 +398,7 @@ export default function GatePage() {
 
       {step === "result" && (
         <div className="space-y-4">
+          {statusText && <p className="text-blue-600 text-sm animate-pulse">{statusText}</p>}
           <div className={`p-4 rounded-lg ${result?.success ? "bg-green-100" : "bg-red-100"}`}>
             <p className="text-lg font-semibold">{result?.success ? "Thành công" : "Thất bại"}</p>
             <p>{result?.message}</p>
