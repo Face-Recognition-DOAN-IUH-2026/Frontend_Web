@@ -43,6 +43,9 @@ export default function GatePage() {
   const [cameraReady, setCameraReady] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [statusText, setStatusText] = useState("");
+  const [camStatus, setCamStatus] = useState<"checking" | "available" | "unavailable" | "blocked">("checking");
+  const [entryCamOk, setEntryCamOk] = useState<boolean | null>(null);
+  const [exitCamOk, setExitCamOk] = useState<boolean | null>(null);
 
   const addToast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastId;
@@ -297,6 +300,18 @@ export default function GatePage() {
     return cleanup;
   }, [addToast, step]);
 
+  // Check camera availability
+  useEffect(() => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setCamStatus("unavailable");
+      return;
+    }
+    navigator.mediaDevices.enumerateDevices().then((devices) => {
+      const hasCam = devices.some((d) => d.kind === "videoinput");
+      setCamStatus(hasCam ? "available" : "unavailable");
+    }).catch(() => setCamStatus("blocked"));
+  }, []);
+
   // Load recent history
   useEffect(() => {
     api.getRecentLogs().then((data) => setRecentLogs(data.items)).catch(() => {});
@@ -329,25 +344,52 @@ export default function GatePage() {
       {/* Camera feeds */}
       <div className="grid grid-cols-2 gap-4">
         <div className="border rounded-lg overflow-hidden bg-black">
-          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium">Cổng vào — Camera 1</div>
-          <img src={`${ENTRY_CAM}?_t=${entryTs}`} className="w-full h-64 object-contain" alt="Entry cam" />
+          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
+            <span>Cổng vào — Camera 1</span>
+            <span className={`inline-block w-2 h-2 rounded-full ${entryCamOk === null ? "bg-yellow-400" : entryCamOk ? "bg-green-400" : "bg-red-400"}`} />
+          </div>
+          <img src={`${ENTRY_CAM}?_t=${entryTs}`} className="w-full h-64 object-contain" alt="Entry cam"
+            onLoad={() => setEntryCamOk(true)} onError={() => setEntryCamOk(false)} />
         </div>
         <div className="border rounded-lg overflow-hidden bg-black">
-          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium">Cổng ra — Camera 2</div>
-          <img src={`${EXIT_CAM}?_t=${exitTs}`} className="w-full h-64 object-contain" alt="Exit cam" />
+          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
+            <span>Cổng ra — Camera 2</span>
+            <span className={`inline-block w-2 h-2 rounded-full ${exitCamOk === null ? "bg-yellow-400" : exitCamOk ? "bg-green-400" : "bg-red-400"}`} />
+          </div>
+          <img src={`${EXIT_CAM}?_t=${exitTs}`} className="w-full h-64 object-contain" alt="Exit cam"
+            onLoad={() => setExitCamOk(true)} onError={() => setExitCamOk(false)} />
         </div>
       </div>
 
       {/* Kiosk form */}
       {step === "idle" && (
         <div className="max-w-md space-y-4">
+          {/* Camera status */}
+          <div className="flex items-center gap-2 text-sm p-2 rounded-md bg-gray-50 border">
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${
+              camStatus === "checking" ? "bg-yellow-400 animate-pulse" :
+              camStatus === "available" ? "bg-green-500" : "bg-red-500"
+            }`} />
+            <span>
+              {camStatus === "checking" && "Đang kiểm tra camera..."}
+              {camStatus === "available" && "Camera sẵn sàng"}
+              {camStatus === "unavailable" && "Không tìm thấy camera — dùng upload ảnh"}
+              {camStatus === "blocked" && "Camera bị chặn — cho phép camera trong trình duyệt"}
+            </span>
+          </div>
+
           <label className="block">
             <span className="text-sm font-medium">Nhập MSSV:</span>
             <input className="mt-1 block w-full px-3 py-2 border rounded-md" value={mssv} onChange={(e) => setMssv(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLookup()} placeholder="MSSV" />
           </label>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleLookup} disabled={loading}>
-            {loading ? "Đang kiểm tra..." : "Tra cứu"}
-          </button>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleLookup} disabled={loading}>
+              {loading ? "Đang kiểm tra..." : "Tra cứu"}
+            </button>
+            {camStatus === "checking" && (
+              <button className="px-4 py-2 bg-gray-200 text-gray-600 rounded-md text-sm" onClick={() => setCamStatus("unavailable")}>Bỏ qua</button>
+            )}
+          </div>
         </div>
       )}
 
