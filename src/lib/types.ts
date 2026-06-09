@@ -7,7 +7,15 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string;
   password: string;
+  full_name?: string;
   role?: string;
+}
+
+// User-service returns user info along with tokens
+export interface UserServiceAuthResponse {
+  user: UserPublic;
+  access_token: string;
+  refresh_token?: string;
 }
 
 export interface TokenResponse {
@@ -19,7 +27,9 @@ export interface TokenResponse {
 export interface UserPublic {
   id: string;
   email: string;
+  full_name: string | null;
   role: string;
+  has_face?: boolean;
 }
 
 export interface RefreshRequest {
@@ -191,6 +201,18 @@ export interface KioskResult {
   message: string;
   patron: PatronPublic | null;
   job_id: string | null;
+}
+
+export interface CameraStatus {
+  camera_id: string;
+  url: string;
+  running: boolean;
+  connected: boolean;
+  frames_processed: number;
+  last_frame_time: string | null;
+  last_error: string | null;
+  retry_count: number;
+  next_retry_in: number | null;
 }
 
 export interface CameraEvent {

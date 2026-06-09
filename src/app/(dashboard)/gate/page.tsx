@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api-client";
-import type { AccessLogPublic, CameraEvent, KioskResult, PatronLookupResult } from "@/lib/types";
+import type { AccessLogPublic, CameraEvent, CameraStatus, KioskResult, PatronLookupResult } from "@/lib/types";
 
 const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || "http://192.168.1.121:8080/video";
 const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || "http://192.168.1.240:8080/video";
@@ -19,6 +20,7 @@ interface Toast {
 let toastId = 0;
 
 export default function GatePage() {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -46,6 +48,9 @@ export default function GatePage() {
   const [camStatus, setCamStatus] = useState<"checking" | "available" | "unavailable" | "blocked">("checking");
   const [entryCamOk, setEntryCamOk] = useState<boolean | null>(null);
   const [exitCamOk, setExitCamOk] = useState<boolean | null>(null);
+  const [cameraStatusList, setCameraStatusList] = useState<CameraStatus[]>([]);
+  const [todayCounts, setTodayCounts] = useState({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
+  const [showCamDetail, setShowCamDetail] = useState(false);
 
   const addToast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastId;
@@ -97,7 +102,6 @@ export default function GatePage() {
     }
   }, [addToast]);
 
-  // Gán stream vào video element sau khi video đã render (giống enroll page)
   useEffect(() => {
     if (!isCameraOn || !videoRef.current || !streamRef.current) return;
 
@@ -182,7 +186,6 @@ export default function GatePage() {
         if (task.status === "FAILURE") throw new Error(task.result?.error || "Task failed");
         setStatusText(task.result?.status === "granted" ? "Đã ghi nhận..." : "Đang xử lý...");
       } catch {
-        // continue polling
       }
     }
     throw new Error("Timeout waiting for result");
@@ -260,7 +263,6 @@ export default function GatePage() {
     stopCamera();
   };
 
-  // SSE real-time events
   useEffect(() => {
     const cleanup = api.connectAccessSSE((event: CameraEvent) => {
       if (event.status === "granted") {
@@ -270,6 +272,7 @@ export default function GatePage() {
           message: `${event.full_name} — ${type === "entry" ? "Vào" : "Ra"} thư viện`,
           patron_name: event.full_name,
         });
+        setTodayCounts((c) => ({ ...c, [type === "entry" ? "entries" : "exits"]: c[type === "entry" ? "entries" : "exits"] + 1 }));
         setRecentLogs((prev) => {
           const newLog: AccessLogPublic = {
             id: `sse-${Date.now()}`,
@@ -286,10 +289,12 @@ export default function GatePage() {
           return [newLog, ...prev.slice(0, 19)];
         });
       } else if (event.status === "no_match") {
+        setTodayCounts((c) => ({ ...c, no_match: c.no_match + 1 }));
         addToast({ type: "info", message: event.full_name ? `${event.full_name} — chưa có lượt vào, bỏ qua` : "Khuôn mặt mới — không nhận diện được" });
       } else if (event.status === "expired") {
         addToast({ type: "error", message: `${event.full_name} — thẻ đã hết hạn` });
       } else if (event.status === "spoof") {
+        setTodayCounts((c) => ({ ...c, spoof: c.spoof + 1 }));
         addToast({ type: "error", message: "Phát hiện giả mạo!" });
       } else if (event.status === "error") {
         addToast({ type: "error", message: `Lỗi xử lý: ${event.error || "không xác định"}` });
@@ -300,7 +305,6 @@ export default function GatePage() {
     return cleanup;
   }, [addToast, step]);
 
-  // Check camera availability
   useEffect(() => {
     if (!navigator.mediaDevices?.enumerateDevices) {
       setCamStatus("unavailable");
@@ -312,16 +316,24 @@ export default function GatePage() {
     }).catch(() => setCamStatus("blocked"));
   }, []);
 
-  // Load recent history
   useEffect(() => {
     api.getRecentLogs().then((data) => setRecentLogs(data.items)).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const poll = async () => {
+      try { setCameraStatusList(await api.getCameraStatus()); } catch {}
+    };
+    poll();
+    const iv = setInterval(poll, 10000);
+    return () => clearInterval(iv);
+  }, []);
+
   return (
     <div className="space-y-6">
+      <button onClick={() => router.push("/dashboard")} className="text-blue-600 hover:underline text-sm">&larr; Quay lại Dashboard</button>
       <h1 className="text-3xl font-bold">Gate Kiosk</h1>
 
-      {/* Toast notifications */}
       {toasts.length > 0 && (
         <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
           {toasts.map((t) => (
@@ -333,15 +345,12 @@ export default function GatePage() {
                 t.type === "error" ? "bg-red-600" : "bg-blue-600"
               }`}
             >
-              {t.type === "entry" && "🚪"}
-              {t.type === "exit" && "🚶"}
               {t.patron_name && <strong>{t.patron_name}</strong>} {t.message}
             </div>
           ))}
         </div>
       )}
 
-      {/* Camera feeds */}
       <div className="grid grid-cols-2 gap-4">
         <div className="border rounded-lg overflow-hidden bg-black">
           <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
@@ -361,10 +370,61 @@ export default function GatePage() {
         </div>
       </div>
 
-      {/* Kiosk form */}
+      {/* Camera stats bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-green-700">{todayCounts.entries}</p>
+          <p className="text-xs text-green-600">Vào hôm nay</p>
+        </div>
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-orange-700">{todayCounts.exits}</p>
+          <p className="text-xs text-orange-600">Ra hôm nay</p>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-gray-700">{todayCounts.no_match}</p>
+          <p className="text-xs text-gray-600">Không nhận diện</p>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-red-700">{todayCounts.spoof}</p>
+          <p className="text-xs text-red-600">Giả mạo</p>
+        </div>
+      </div>
+
+      {/* Camera status detail */}
+      {cameraStatusList.length > 0 && (
+        <div>
+          <button className="text-sm text-blue-600 hover:underline" onClick={() => setShowCamDetail(!showCamDetail)}>
+            {showCamDetail ? "Ẩn" : "Chi tiết"} trạng thái camera
+          </button>
+          {showCamDetail && (
+            <div className="mt-2 space-y-2">
+              {cameraStatusList.map((cs) => (
+                <div key={cs.camera_id} className="border rounded-lg p-3 bg-white text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{cs.camera_id}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      cs.connected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                    }`}>{cs.connected ? "Online" : "Offline"}</span>
+                  </div>
+                  <div className="mt-1 text-gray-500 grid grid-cols-3 gap-2 text-xs">
+                    <span>Frames: {cs.frames_processed}</span>
+                    <span>Lần thử lại: {cs.retry_count}</span>
+                    <span>{cs.last_frame_time ? `Cuối: ${new Date(cs.last_frame_time).toLocaleTimeString("vi-VN")}` : "Chưa có frame"}</span>
+                  </div>
+                  {cs.last_error && <p className="text-red-500 text-xs mt-1">{cs.last_error}</p>}
+                  {!cs.connected && (
+                    <button className="mt-2 text-xs text-blue-600 hover:underline"
+                      onClick={() => api.reconnectCamera(cs.camera_id)}>Reconnect</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {step === "idle" && (
         <div className="max-w-md space-y-4">
-          {/* Camera status */}
           <div className="flex items-center gap-2 text-sm p-2 rounded-md bg-gray-50 border">
             <span className={`inline-block w-2.5 h-2.5 rounded-full ${
               camStatus === "checking" ? "bg-yellow-400 animate-pulse" :
@@ -455,7 +515,6 @@ export default function GatePage() {
         </div>
       )}
 
-      {/* Recent history */}
       <div>
         <h2 className="text-xl font-semibold mb-3">Lịch sử ra vào gần đây</h2>
         {recentLogs.length === 0 ? (

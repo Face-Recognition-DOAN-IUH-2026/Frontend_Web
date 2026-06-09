@@ -16,11 +16,9 @@ export default function PatronDetailPage() {
   const [logsSkip, setLogsSkip] = useState(0);
   const logsLimit = 20;
 
-  // Edit modal
   const [editForm, setEditForm] = useState<PatronUpdate>({});
   const [showEdit, setShowEdit] = useState(false);
 
-  // Face enroll
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const enrollReadyRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -44,7 +42,7 @@ export default function PatronDetailPage() {
       if (append) setLogs((prev) => [...prev, ...data.items]);
       else setLogs(data.items);
       setLogsTotal(data.total);
-    } catch { /* ignore */ }
+    } catch { }
   }, [id, logsSkip]);
 
   useEffect(() => {
@@ -79,7 +77,6 @@ export default function PatronDetailPage() {
     router.push("/patrons");
   };
 
-  // Camera
   const startEnrollCam = async () => {
     try {
       setEnrollError("");
@@ -158,10 +155,8 @@ export default function PatronDetailPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      {/* Back */}
       <button onClick={() => router.push("/patrons")} className="text-blue-600 hover:underline text-sm">&larr; Quay lại danh sách</button>
 
-      {/* Patron info card */}
       <div className="border rounded-lg p-6 bg-white">
         <div className="flex items-start justify-between">
           <div>
@@ -207,7 +202,6 @@ export default function PatronDetailPage() {
         </div>
       </div>
 
-      {/* Face enroll inline */}
       {enrollPreview ? (
         <div className="border rounded-lg p-4 space-y-3 bg-white">
           <h3 className="font-semibold">Xác nhận ảnh khuôn mặt</h3>
@@ -242,7 +236,6 @@ export default function PatronDetailPage() {
         </div>
       ) : null}
 
-      {/* Edit modal */}
       {showEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
           <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
@@ -276,7 +269,6 @@ export default function PatronDetailPage() {
         </div>
       )}
 
-      {/* Access history */}
       <div className="border rounded-lg bg-white">
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">Lịch sử ra vào</h2>
