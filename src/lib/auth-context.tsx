@@ -12,6 +12,22 @@ import { useRouter } from "next/navigation";
 import api from "./api-client";
 import type { AuthContextType, AuthUser, LoginRequest, RegisterRequest } from "./types";
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -42,19 +58,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
 
+  const setTokenCookie = (token: string) => {
+    document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=lax`;
+  };
+
+  const clearTokenCookie = () => {
+    document.cookie = "access_token=; path=/; max-age=0";
+  };
+
   const login = async (email: string, password: string) => {
     const data: LoginRequest = { email, password };
     const response = await api.login(data);
 
     localStorage.setItem("access_token", response.access_token);
+    setTokenCookie(response.access_token);
     if (response.refresh_token) {
       localStorage.setItem("refresh_token", response.refresh_token);
     }
 
+    // Decode JWT to get user id and role
+    const payload = decodeJwtPayload(response.access_token);
+    const userId = (payload?.sub as string) || "";
+    const role = ((payload?.roles as string[])?.[0]) || "user";
+
     const userData: AuthUser = {
-      id: "",
+      id: userId,
       email,
-      role: "user",
+      role,
     };
     localStorage.setItem("user", JSON.stringify(userData));
 
@@ -70,12 +100,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   };
 
-  const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role: string = "user") => {
+  const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
     localStorage.setItem("access_token", accessToken);
+    setTokenCookie(accessToken);
     if (refreshToken) {
       localStorage.setItem("refresh_token", refreshToken);
     }
-    const userData: AuthUser = { id: "", email, role };
+
+    // Decode JWT to get user id and role if not provided
+    const payload = decodeJwtPayload(accessToken);
+    const userId = (payload?.sub as string) || "";
+    const userRole = role || ((payload?.roles as string[])?.[0]) || "user";
+
+    const userData: AuthUser = { id: userId, email, role: userRole };
     localStorage.setItem("user", JSON.stringify(userData));
     setAccessToken(accessToken);
     setUser(userData);
@@ -85,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
+    clearTokenCookie();
     setUser(null);
     setAccessToken(null);
     router.push("/login");

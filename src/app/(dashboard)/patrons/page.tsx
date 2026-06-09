@@ -11,17 +11,14 @@ export default function PatronsPage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Create form
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<PatronCreate>({
     full_name: "", student_code: "", card_number: "", membership_expiry: "",
   });
 
-  // Edit modal
   const [editTarget, setEditTarget] = useState<PatronPublic | null>(null);
   const [editForm, setEditForm] = useState<PatronUpdate>({});
 
-  // Face enroll modal
   const [enrollTarget, setEnrollTarget] = useState<PatronPublic | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -87,7 +84,6 @@ export default function PatronsPage() {
     load();
   };
 
-  // Face enrollment camera
   const startEnrollCam = async () => {
     try {
       setEnrollError("");
@@ -169,7 +165,6 @@ export default function PatronsPage() {
 
   return (
     <div className="space-y-6">
-      <button onClick={() => router.push("/dashboard")} className="text-blue-600 hover:underline text-sm mb-2">&larr; Quay lại Dashboard</button>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Quản lý độc giả</h1>
         <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={() => setShowCreate(!showCreate)}>
@@ -177,7 +172,6 @@ export default function PatronsPage() {
         </button>
       </div>
 
-      {/* Create form */}
       {showCreate && (
         <div className="p-4 border rounded-lg space-y-3 max-w-md bg-white">
           {[["full_name", "Họ tên"], ["student_code", "MSSV"], ["card_number", "Mã thẻ"], ["membership_expiry", "Hạn thẻ"]].map(([key, label]) => (
@@ -192,7 +186,6 @@ export default function PatronsPage() {
         </div>
       )}
 
-      {/* Search */}
       <div className="flex gap-2">
         <input className="flex-1 px-3 py-2 border rounded-md" value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -201,7 +194,6 @@ export default function PatronsPage() {
         <button className="px-4 py-2 bg-gray-600 text-white rounded-md" onClick={() => load()}>Tìm</button>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto border rounded-lg">
         {loading && patrons.length === 0 ? (
           <p className="p-4 text-gray-500">Đang tải...</p>
@@ -259,7 +251,6 @@ export default function PatronsPage() {
         )}
       </div>
 
-      {/* Edit modal */}
       {editTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditTarget(null)}>
           <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
@@ -293,7 +284,6 @@ export default function PatronsPage() {
         </div>
       )}
 
-      {/* Face enroll modal */}
       {enrollTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={closeEnroll}>
           <div className="bg-white rounded-lg p-6 w-full max-w-lg space-y-4" onClick={(e) => e.stopPropagation()}>

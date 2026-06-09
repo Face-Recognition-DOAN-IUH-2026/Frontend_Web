@@ -19,7 +19,9 @@ export interface TokenResponse {
 export interface UserPublic {
   id: string;
   email: string;
+  full_name: string | null;
   role: string;
+  has_face?: boolean;
 }
 
 export interface RefreshRequest {
