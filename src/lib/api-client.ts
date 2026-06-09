@@ -1,9 +1,18 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import type {
+  AccessLogList,
+  ActivePatron,
+  CameraEvent,
   LoginRequest,
+  KioskResult,
+  PatronCreate,
+  PatronLookupResult,
+  PatronPublic,
+  PatronUpdate,
   RegisterRequest,
-  TokenResponse,
+  StatsResponse,
   TaskStatusResponse,
+  TokenResponse,
   UserListResponse,
   UserPublic,
 } from "./types";
@@ -11,7 +20,7 @@ import type {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 class ApiClient {
-  private client: AxiosInstance;
+  client: AxiosInstance;
   private refreshPromise: Promise<boolean> | null = null;
 
   constructor() {
@@ -163,6 +172,17 @@ class ApiClient {
     return response.data;
   }
 
+  async faceLogin(email: string, imageFile: File): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("file", imageFile);
+
+    const response = await this.client.post("/auth/face-login", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
   async livenessCheck(
     imageFile: File,
     consentGiven: boolean = true
@@ -179,6 +199,156 @@ class ApiClient {
 
   async deleteFaceData(userId: string): Promise<{ job_id: string }> {
     const response = await this.client.delete(`/face/${userId}`);
+    return response.data;
+  }
+
+  // === Patrons ===
+  async searchPatrons(
+    query?: string,
+    status?: string,
+    skip: number = 0,
+    limit: number = 20
+  ): Promise<PatronPublic[]> {
+    const params: any = { skip, limit };
+    if (query) params.q = query;
+    if (status) params.status = status;
+    const response = await this.client.get<PatronPublic[]>("/patrons/search", { params });
+    return response.data;
+  }
+
+  async lookupPatron(
+    studentCode?: string,
+    cardNumber?: string
+  ): Promise<PatronLookupResult> {
+    const params: any = {};
+    if (studentCode) params.student_code = studentCode;
+    if (cardNumber) params.card_number = cardNumber;
+    const response = await this.client.get<PatronLookupResult>("/patrons/lookup", { params });
+    return response.data;
+  }
+
+  async getPatron(id: string): Promise<PatronPublic> {
+    const response = await this.client.get<PatronPublic>(`/patrons/${id}`);
+    return response.data;
+  }
+
+  async createPatron(data: PatronCreate): Promise<PatronPublic> {
+    const response = await this.client.post<PatronPublic>("/patrons", data);
+    return response.data;
+  }
+
+  async updatePatron(id: string, data: PatronUpdate): Promise<PatronPublic> {
+    const response = await this.client.put<PatronPublic>(`/patrons/${id}`, data);
+    return response.data;
+  }
+
+  async deletePatron(id: string): Promise<void> {
+    await this.client.delete(`/patrons/${id}`);
+  }
+
+  // === Access ===
+  async getAccessLogs(
+    params?: {
+      patronId?: string;
+      cameraId?: string;
+      status?: string;
+      accessType?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      search?: string;
+      skip?: number;
+      limit?: number;
+    }
+  ): Promise<AccessLogList> {
+    const query: any = {};
+    if (params) {
+      if (params.patronId) query.patron_id = params.patronId;
+      if (params.cameraId) query.camera_id = params.cameraId;
+      if (params.status) query.status = params.status;
+      if (params.accessType) query.access_type = params.accessType;
+      if (params.dateFrom) query.date_from = params.dateFrom;
+      if (params.dateTo) query.date_to = params.dateTo;
+      if (params.search) query.search = params.search;
+      query.skip = params.skip ?? 0;
+      query.limit = params.limit ?? 50;
+    }
+    const response = await this.client.get<AccessLogList>("/access/logs", { params: query });
+    return response.data;
+  }
+
+  connectAccessSSE(onEvent: (event: CameraEvent) => void): () => void {
+    const es = new EventSource(`${API_BASE_URL}/access/events`);
+    es.addEventListener("camera_event", (msg: MessageEvent) => {
+      try {
+        const data = JSON.parse(msg.data) as CameraEvent;
+        onEvent(data);
+      } catch { /* ignore parse errors */ }
+    });
+    es.addEventListener("error", () => { /* will auto-reconnect */ });
+    return () => es.close();
+  }
+
+  async getRecentLogs(): Promise<AccessLogList> {
+    const response = await this.client.get<AccessLogList>("/access/recent");
+    return response.data;
+  }
+
+  async getActivePatrons(): Promise<{ items: ActivePatron[]; total: number }> {
+    const response = await this.client.get<{ items: ActivePatron[]; total: number }>("/access/active");
+    return response.data;
+  }
+
+  async getStats(): Promise<StatsResponse> {
+    const response = await this.client.get<StatsResponse>("/access/stats");
+    return response.data;
+  }
+
+  // === Kiosk ===
+  async kioskLookup(
+    studentCode?: string,
+    cardNumber?: string
+  ): Promise<PatronLookupResult> {
+    const params: any = {};
+    if (studentCode) params.student_code = studentCode;
+    if (cardNumber) params.card_number = cardNumber;
+    const response = await this.client.post<PatronLookupResult>("/kiosk/lookup", null, { params });
+    return response.data;
+  }
+
+  async kioskEnroll(
+    imageFile: File,
+    fullName: string,
+    studentCode: string,
+    cardNumber: string,
+    membershipExpiry: string,
+    identityNumber?: string,
+    email?: string,
+    phone?: string,
+    issueDate?: string
+  ): Promise<KioskResult> {
+    const formData = new FormData();
+    formData.append("image", imageFile);
+    formData.append("full_name", fullName);
+    formData.append("student_code", studentCode);
+    formData.append("card_number", cardNumber);
+    formData.append("membership_expiry", membershipExpiry);
+    if (identityNumber) formData.append("identity_number", identityNumber);
+    if (email) formData.append("email", email);
+    if (phone) formData.append("phone", phone);
+    if (issueDate) formData.append("issue_date", issueDate);
+    const response = await this.client.post<KioskResult>("/kiosk/enroll", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async kioskEnter(imageFile: File, studentCode: string): Promise<KioskResult> {
+    const formData = new FormData();
+    formData.append("image", imageFile);
+    formData.append("student_code", studentCode);
+    const response = await this.client.post<KioskResult>("/kiosk/enter", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data;
   }
 }

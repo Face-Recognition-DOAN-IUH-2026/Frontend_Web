@@ -11,6 +11,11 @@ import {
   Eye,
   Shield,
   LogOut,
+  Users,
+  BookOpen,
+  History,
+  BarChart3,
+  DoorOpen,
 } from "lucide-react";
 
 const navItems = [
@@ -19,10 +24,15 @@ const navItems = [
   { href: "/verify", label: "Verify Face", icon: UserCheck },
   { href: "/identify", label: "Identify Face", icon: Search },
   { href: "/liveness", label: "Liveness Check", icon: Eye },
+  { href: "/gate", label: "Gate Kiosk", icon: DoorOpen },
 ];
 
 const adminItems = [
   { href: "/dashboard/admin", label: "Admin", icon: Shield },
+  { href: "/patrons", label: "Patrons", icon: Users },
+  { href: "/active", label: "In Library", icon: BookOpen },
+  { href: "/history", label: "Access Logs", icon: History },
+  { href: "/stats", label: "Statistics", icon: BarChart3 },
 ];
 
 export default function Sidebar() {
