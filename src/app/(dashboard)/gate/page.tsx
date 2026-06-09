@@ -317,12 +317,12 @@ export default function GatePage() {
   }, []);
 
   useEffect(() => {
-    api.getRecentLogs().then((data) => setRecentLogs(data.items)).catch(() => {});
+    api.getRecentLogs().then((data) => setRecentLogs(data.items ?? [])).catch(() => {});
   }, []);
 
   useEffect(() => {
     const poll = async () => {
-      try { setCameraStatusList(await api.getCameraStatus()); } catch {}
+      try { setCameraStatusList(Array.isArray(await api.getCameraStatus()) ? await api.getCameraStatus() : []); } catch {}
     };
     poll();
     const iv = setInterval(poll, 10000);
