@@ -303,6 +303,18 @@ class ApiClient {
     return response.data;
   }
 
+  async enrollPatronFace(
+    patronId: string,
+    imageFile: File
+  ): Promise<{ success: boolean; job_id: string; message: string }> {
+    const formData = new FormData();
+    formData.append("image", imageFile);
+    const response = await this.client.post(`/patrons/${patronId}/enroll-face`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
   // === Kiosk ===
   async kioskLookup(
     studentCode?: string,
