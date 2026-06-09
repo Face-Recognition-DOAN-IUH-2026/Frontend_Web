@@ -1,31 +1,9 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# === Node.js ===
 node_modules/
-SkillAgent/
-repomix-output.xml/
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-.env*.local
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# testing
-/coverage
+# === Next.js ===
+.next/
+out/
 
 # Next.js build cache
 .next/
@@ -42,19 +20,22 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
+# === OS ===
 .DS_Store
-*.pem
+Thumbs.db
 
-# local env files
-.env*.local
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
-/ios
-/android
+# === Generated / Agent files ===
+repomix-output.xml/
+SkillAgent/
 CLAUDE.md
+AGENTS.md
+
+# === TypeScript ===
+*.tsbuildinfo
+next-env.d.ts
