@@ -119,7 +119,7 @@ export default function IdentifyPage() {
               <tbody>
                 {matches.map((m, i) => {
                   const score = m.score ?? 0;
-                  const pct = (score * 100).toFixed(1);
+                  const pct = Number((score * 100).toFixed(1));
                   const color =
                     score > 0.6
                       ? "bg-green-50"

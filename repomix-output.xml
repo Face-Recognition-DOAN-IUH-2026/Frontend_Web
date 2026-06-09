@@ -1,0 +1,2850 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+next-env.d.ts
+next.config.js
+package.json
+postcss.config.js
+README.md
+src/app/(dashboard)/admin/page.tsx
+src/app/(dashboard)/enroll/page.tsx
+src/app/(dashboard)/identify/page.tsx
+src/app/(dashboard)/layout.tsx
+src/app/(dashboard)/liveness/page.tsx
+src/app/(dashboard)/page.tsx
+src/app/(dashboard)/verify/page.tsx
+src/app/dashboard/page.tsx
+src/app/globals.css
+src/app/layout.tsx
+src/app/login/page.tsx
+src/app/page.tsx
+src/app/register/page.tsx
+src/components/camera-capture.tsx
+src/components/job-poll.tsx
+src/components/sidebar.tsx
+src/lib/api-client.ts
+src/lib/auth-context.tsx
+src/lib/types.ts
+src/middleware.ts
+tailwind.config.ts
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".gitignore">
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+SkillAgent/
+repomix-output.xml/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.env*.local
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# testing
+/coverage
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+# generated native folders
+/ios
+/android
+CLAUDE.md
+</file>
+
+<file path="next-env.d.ts">
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/building-your-application/configuring/typescript for more information.
+</file>
+
+<file path="next.config.js">
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: "standalone",
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://localhost/api/:path*",
+      },
+      {
+        source: "/auth/:path*",
+        destination: "http://localhost/auth/:path*",
+      },
+      {
+        source: "/users/:path*",
+        destination: "http://localhost/users/:path*",
+      },
+      {
+        source: "/docs/:path*",
+        destination: "http://localhost/docs/:path*",
+      },
+      {
+        source: "/tasks/:path*",
+        destination: "http://localhost/tasks/:path*",
+      },
+      {
+        source: "/openapi.json",
+        destination: "http://localhost/openapi.json",
+      },
+      {
+        source: "/healthz",
+        destination: "http://localhost/healthz",
+      },
+    ];
+  },
+};
+
+module.exports = nextConfig;
+</file>
+
+<file path="package.json">
+{
+  "name": "face-recognition-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
+    "next": "15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.53.2",
+    "react-webcam": "^7.2.0",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
+  }
+}
+</file>
+
+<file path="postcss.config.js">
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+</file>
+
+<file path="README.md">
+# Face Recognition Platform - Frontend
+
+Next.js 15 frontend for the Face Recognition Platform.
+
+## Architecture
+
+```
+Frontend_web/
+├── src/
+│   ├── app/                    # Next.js App Router pages
+│   │   ├── (dashboard)/        # Protected dashboard routes
+│   │   ├── login/
+│   │   ├── register/
+│   │   └── page.tsx            # Landing page
+│   ├── components/
+│   │   ├── camera-capture.tsx  # Webcam capture component
+│   │   ├── job-poll.tsx        # Celery job polling
+│   │   └── sidebar.tsx          # Dashboard navigation
+│   └── lib/
+│       ├── api-client.ts       # Axios API client with JWT
+│       ├── auth-context.tsx    # Auth context provider
+│       └── types.ts            # TypeScript interfaces
+├── docker-compose.yml
+├── Dockerfile
+└── next.config.js
+```
+
+## Quick Start
+
+### Development
+```bash
+npm install
+npm run dev
+```
+Visit http://localhost:3000
+
+### Production (Docker)
+```bash
+docker compose up -d
+```
+Frontend runs at http://localhost:3000
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NEXT_PUBLIC_API_URL` | `/api` | API Gateway URL |
+
+For local development with Docker backend:
+```env
+NEXT_PUBLIC_API_URL=http://localhost/api
+```
+
+## Pages
+
+| Route | Auth | Description |
+|-------|------|-------------|
+| `/` | No | Landing page |
+| `/login` | No | Login form |
+| `/register` | No | Registration form |
+| `/dashboard` | Yes | Dashboard overview |
+| `/dashboard/enroll` | Yes | Enroll face |
+| `/dashboard/verify` | Yes | Verify face |
+| `/dashboard/identify` | Yes | Identify face |
+| `/dashboard/liveness` | Yes | Liveness check |
+| `/dashboard/admin` | Admin | User management |
+
+## API Integration
+
+The frontend communicates with the backend via the API Gateway (http://localhost/api).
+
+### Authentication Flow
+1. User logs in via `/auth/login`
+2. Backend returns `access_token` + `refresh_token`
+3. Frontend stores tokens in localStorage
+4. API client auto-attaches `Authorization: Bearer <token>` to requests
+5. On 401 response, client auto-refreshes the access token
+
+## Backend Repository
+
+The backend code is in a separate repository: `Backend/`
+
+For the full stack to work:
+1. Start backend: `cd Backend && docker compose up -d`
+2. Start frontend: `docker compose up -d`
+
+## Tech Stack
+
+- Next.js 15 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS
+- Axios
+- react-webcam
+
+## Build for Production
+
+```bash
+npm run build
+npm start
+```
+
+Or use Docker:
+```bash
+docker build -t face-recognition-web .
+docker run -p 3000:3000 face-recognition-web
+```
+</file>
+
+<file path="src/app/(dashboard)/admin/page.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { Trash2, Users } from "lucide-react";
+import api from "@/lib/api-client";
+import type { UserPublic } from "@/lib/types";
+
+export default function AdminPage() {
+  const { user } = useAuth();
+  const [users, setUsers] = useState<UserPublic[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.role !== "admin") {
+      setError("Access denied. Admin only.");
+      setIsLoading(false);
+      return;
+    }
+    loadUsers();
+  }, [user]);
+
+  const loadUsers = async () => {
+    try {
+      const response = await api.listUsers();
+      setUsers(response.users);
+    } catch (err: any) {
+      setError(err.message || "Failed to load users");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+
+    setDeletingId(userId);
+    try {
+      await api.deleteUser(userId);
+      await loadUsers();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete user");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (user?.role !== "admin") {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+          Access denied. This page is for administrators only.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        <Users className="w-8 h-8" />
+        <h1 className="text-2xl font-bold">User Management</h1>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  Email
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  Role
+                </th>
+                <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {users.map((u) => (
+                <tr key={u.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">{u.email}</td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        u.role === "admin"
+                          ? "bg-purple-100 text-purple-800"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() => handleDeleteUser(u.id)}
+                      disabled={deletingId === u.id || u.id === user.id}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-md disabled:opacity-50"
+                      title="Delete user"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {users.length === 0 && (
+            <div className="text-center py-12 text-gray-500">No users found.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/enroll/page.tsx">
+"use client";
+
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Camera, Upload, CheckCircle } from "lucide-react";
+
+export default function EnrollPage() {
+  const [image, setImage] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState("");
+  const [cameraReady, setCameraReady] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const router = useRouter();
+
+  const startCamera = useCallback(async () => {
+    try {
+      setError("");
+      setCameraReady(false);
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 640, min: 320 },
+          height: { ideal: 480, min: 240 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      setIsCameraOn(true);
+    } catch (err: any) {
+      if (err.name === "NotAllowedError") {
+        setError("Camera access denied. Please allow camera permission in browser settings.");
+      } else if (err.name === "NotFoundError") {
+        setError("No camera found on this device. Please use Upload instead.");
+      } else {
+        setError("Could not start camera. Try clicking Start Camera again.");
+      }
+      setIsCameraOn(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isCameraOn || !videoRef.current || !streamRef.current) return;
+
+    const video = videoRef.current;
+    const stream = streamRef.current;
+
+    const onReady = () => {
+      setCameraReady(true);
+    };
+
+    video.onloadedmetadata = onReady;
+    video.onplaying = onReady;
+    video.onerror = () => setError("Camera error occurred");
+    video.srcObject = stream;
+
+    if (video.readyState >= 2) onReady();
+
+    readyTimeoutRef.current = setTimeout(() => {
+      setCameraReady(true);
+    }, 3000);
+
+    return () => {
+      if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+    };
+  }, [isCameraOn]);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraOn(false);
+    setCameraReady(false);
+  }, []);
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !streamRef.current || !cameraReady) {
+      setError("Camera is not ready. Please wait and try again.");
+      return;
+    }
+
+    const video = videoRef.current;
+
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      setError("Camera not ready. Please wait and try again.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setError("Could not capture image");
+      return;
+    }
+
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          const capturedFile = new File([blob], "face_capture.jpg", {
+            type: "image/jpeg",
+          });
+          setFile(capturedFile);
+          setImage(canvas.toDataURL("image/jpeg"));
+          stopCamera();
+        }
+      },
+      "image/jpeg",
+      0.9
+    );
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImage(event.target?.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) return;
+
+    setError("");
+    setIsLoading(true);
+    setJobId(null);
+    setResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("consent_given", String(consent));
+
+      const response = await fetch("/api/face/enroll", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Enrollment failed");
+      }
+
+      const data = await response.json();
+      setJobId(data.job_id);
+
+      // Poll for result
+      pollForResult(data.job_id);
+    } catch (err: any) {
+      setError(err.message || "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const pollForResult = async (taskId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/tasks/${taskId}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          },
+        });
+
+        if (!response.ok) {
+          clearInterval(interval);
+          setError("Failed to get task status");
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.status === "SUCCESS") {
+          clearInterval(interval);
+          setResult(data.result);
+        } else if (data.status === "FAILURE") {
+          clearInterval(interval);
+          setError("Enrollment failed");
+        }
+      } catch {
+        clearInterval(interval);
+        setError("Failed to poll task status");
+      }
+    }, 2000);
+  };
+
+  const handleReset = () => {
+    setImage(null);
+    setFile(null);
+    setConsent(false);
+    setJobId(null);
+    setResult(null);
+    setError("");
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">Enroll Face</h1>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>
+      )}
+
+      {result ? (
+        <div className="bg-white p-6 rounded-lg border">
+          <div className="flex items-center gap-3 text-green-600 mb-4">
+            <CheckCircle className="w-8 h-8" />
+            <h2 className="text-xl font-semibold">Enrollment Successful!</h2>
+          </div>
+          <p className="text-gray-600 mb-4">
+            Your face has been enrolled successfully.
+          </p>
+          <button
+            onClick={handleReset}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Enroll Another
+          </button>
+        </div>
+      ) : jobId ? (
+        <div className="bg-white p-6 rounded-lg border text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+          <h2 className="text-lg font-semibold mb-2">Processing...</h2>
+          <p className="text-gray-600 text-sm">Job ID: {jobId}</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg border space-y-6">
+          {!image ? (
+            <>
+              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                {isCameraOn ? (
+                  <>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-contain"
+                    />
+                    {!cameraReady && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+                        Loading camera...
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-center p-4">
+                    {error || "Click 'Start Camera' to begin, or use 'Upload'"}
+                  </div>
+                )}
+              </div>
+
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+
+              <div className="flex gap-3">
+                {!isCameraOn ? (
+                  <button
+                    type="button"
+                    onClick={startCamera}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
+                  >
+                    <Camera className="w-5 h-5" />
+                    Start Camera
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={capturePhoto}
+                    disabled={!cameraReady}
+                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+                  >
+                    Capture
+                  </button>
+                )}
+
+                <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
+                  <Upload className="w-5 h-5" />
+                  Upload
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+
+                {isCameraOn && (
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="px-4 py-2 text-red-600 bg-red-50 rounded-md hover:bg-red-100"
+                  >
+                    Stop
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                <img
+                  src={image}
+                  alt="Captured"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div className="flex gap-3">
+                <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
+                  <Upload className="w-5 h-5" />
+                  Change
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </>
+          )}
+
+          {image && (
+            <>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="consent"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="w-5 h-5"
+                />
+                <label htmlFor="consent" className="text-sm text-gray-600">
+                  I consent to the processing of my facial data for identification
+                  purposes.
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!consent || isLoading}
+                className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+              >
+                {isLoading ? "Enrolling..." : "Enroll Face"}
+              </button>
+            </>
+          )}
+        </form>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/identify/page.tsx">
+"use client";
+
+import { useState } from "react";
+import CameraCapture from "@/components/camera-capture";
+import JobPoll from "@/components/job-poll";
+
+export default function IdentifyPage() {
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [dataUrl, setDataUrl] = useState<string>("");
+  const [consent, setConsent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [matches, setMatches] = useState<any[] | null>(null);
+
+  const handleCapture = (file: File, url: string) => {
+    setImageFile(file);
+    setDataUrl(url);
+    setMatches(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!imageFile) return;
+
+    setError("");
+    setIsLoading(true);
+    setJobId(null);
+    setMatches(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", imageFile);
+      formData.append("consent_given", String(consent));
+
+      const response = await fetch("/api/face/identify", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Identification failed");
+      }
+
+      const data = await response.json();
+      setJobId(data.job_id);
+    } catch (err: any) {
+      setError(err.message || "An error occurred");
+      setIsLoading(false);
+    }
+  };
+
+  const handleComplete = (result: any) => {
+    setIsLoading(false);
+    setJobId(null);
+    if (result?.matches) {
+      setMatches(result.matches);
+    }
+  };
+
+  const handleError = (msg: string) => {
+    setError(msg);
+    setIsLoading(false);
+    setJobId(null);
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">Identify Face</h1>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>
+      )}
+
+      {jobId ? (
+        <JobPoll
+          jobId={jobId}
+          onComplete={handleComplete}
+          onError={handleError}
+        />
+      ) : matches ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">
+              Found {matches.length} match(es)
+            </h2>
+            <button
+              onClick={() => { setMatches(null); setDataUrl(""); setImageFile(null); }}
+              className="text-sm text-primary hover:underline"
+            >
+              Try another
+            </button>
+          </div>
+
+          {dataUrl && (
+            <img
+              src={dataUrl}
+              alt="Captured"
+              className="w-48 h-48 object-cover rounded-lg border mx-auto"
+            />
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-2 text-left border">Score</th>
+                  <th className="p-2 text-left border">User ID</th>
+                  <th className="p-2 text-left border">Email</th>
+                  <th className="p-2 text-left border">Name</th>
+                  <th className="p-2 text-left border">Role</th>
+                  <th className="p-2 text-left border">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matches.map((m, i) => {
+                  const score = m.score ?? 0;
+                  const pct = (score * 100).toFixed(1);
+                  const color =
+                    score > 0.6
+                      ? "bg-green-50"
+                      : score > 0.3
+                      ? "bg-yellow-50"
+                      : "bg-red-50";
+                  return (
+                    <tr key={i} className={color}>
+                      <td className="p-2 border font-mono">
+                        {pct}%
+                        <div className="w-full bg-gray-200 rounded h-1.5 mt-1">
+                          <div
+                            className={`h-1.5 rounded ${
+                              score > 0.6 ? "bg-green-500" : score > 0.3 ? "bg-yellow-500" : "bg-red-500"
+                            }`}
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
+                      </td>
+                      <td className="p-2 border font-mono text-xs">{m.user_id}</td>
+                      <td className="p-2 border">{m.email || "—"}</td>
+                      <td className="p-2 border">{m.full_name || "—"}</td>
+                      <td className="p-2 border">{m.role || "—"}</td>
+                      <td className="p-2 border text-xs">
+                        {m.created_at ? new Date(m.created_at).toLocaleString() : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white p-6 rounded-lg border space-y-6"
+        >
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Capture Face
+            </label>
+            <CameraCapture onCapture={handleCapture} />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="consent"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="w-5 h-5"
+            />
+            <label htmlFor="consent" className="text-sm text-gray-600">
+              I consent to the identification of facial data.
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!imageFile || !consent || isLoading}
+            className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+          >
+            {isLoading ? "Identifying..." : "Identify Face"}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/layout.tsx">
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import Sidebar from "@/components/sidebar";
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 p-6 bg-gray-50">{children}</main>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/liveness/page.tsx">
+"use client";
+
+import { useState } from "react";
+import CameraCapture from "@/components/camera-capture";
+import JobPoll from "@/components/job-poll";
+
+export default function LivenessPage() {
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [dataUrl, setDataUrl] = useState<string>("");
+  const [consent, setConsent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const handleCapture = (file: File, url: string) => {
+    setImageFile(file);
+    setDataUrl(url);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!imageFile) return;
+
+    setError("");
+    setIsLoading(true);
+    setJobId(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", imageFile);
+      formData.append("consent_given", String(consent));
+
+      const response = await fetch("/api/face/liveness", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Liveness check failed");
+      }
+
+      const data = await response.json();
+      setJobId(data.job_id);
+    } catch (err: any) {
+      setError(err.message || "An error occurred");
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">Liveness Check</h1>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>
+      )}
+
+      {jobId ? (
+        <JobPoll
+          jobId={jobId}
+          onComplete={(result) => console.log("Liveness result:", result)}
+          onError={(err) => setError(err)}
+        />
+      ) : (
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white p-6 rounded-lg border space-y-6"
+        >
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Capture Face for Liveness Check
+            </label>
+            <CameraCapture onCapture={handleCapture} />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="consent"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="w-5 h-5"
+            />
+            <label htmlFor="consent" className="text-sm text-gray-600">
+              I consent to the liveness check of my facial data.
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!imageFile || !consent || isLoading}
+            className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+          >
+            {isLoading ? "Checking..." : "Check Liveness"}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/page.tsx">
+"use client";
+
+import { useAuth } from "@/lib/auth-context";
+import { UserPlus, UserCheck, Search, Eye } from "lucide-react";
+
+export default function DashboardPage() {
+  const { user } = useAuth();
+
+  const features = [
+    {
+      title: "Enroll Face",
+      description: "Register your face for future authentication",
+      icon: UserPlus,
+      href: "/enroll",
+      color: "bg-blue-500",
+    },
+    {
+      title: "Verify Face",
+      description: "Verify your identity against a registered user",
+      icon: UserCheck,
+      href: "/verify",
+      color: "bg-green-500",
+    },
+    {
+      title: "Identify Face",
+      description: "Find a person from the database",
+      icon: Search,
+      href: "/identify",
+      color: "bg-purple-500",
+    },
+    {
+      title: "Liveness Check",
+      description: "Verify if the face is real and alive",
+      icon: Eye,
+      href: "/liveness",
+      color: "bg-orange-500",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Welcome, {user?.email}</h1>
+        <p className="text-gray-600">
+          Choose a face recognition feature to get started
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {features.map((feature) => {
+          const Icon = feature.icon;
+          return (
+            <a
+              key={feature.href}
+              href={feature.href}
+              className="block p-6 bg-white rounded-lg border hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start gap-4">
+                <div
+                  className={`${feature.color} p-3 rounded-lg text-white`}
+                >
+                  <Icon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg mb-1">
+                    {feature.title}
+                  </h3>
+                  <p className="text-gray-600 text-sm">
+                    {feature.description}
+                  </p>
+                </div>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/verify/page.tsx">
+"use client";
+
+import { useState, useEffect } from "react";
+import CameraCapture from "@/components/camera-capture";
+import JobPoll from "@/components/job-poll";
+import { useAuth } from "@/lib/auth-context";
+
+function decodeJwt(token: string): { sub: string } | null {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+export default function VerifyPage() {
+  const { accessToken } = useAuth();
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [dataUrl, setDataUrl] = useState<string>("");
+  const [targetUserId, setTargetUserId] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (accessToken) {
+      const payload = decodeJwt(accessToken);
+      if (payload?.sub) {
+        setTargetUserId(payload.sub);
+      }
+    }
+  }, [accessToken]);
+
+  const handleCapture = (file: File, url: string) => {
+    setImageFile(file);
+    setDataUrl(url);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!imageFile || !targetUserId) return;
+
+    setError("");
+    setIsLoading(true);
+    setJobId(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", imageFile);
+      formData.append("target_user_id", targetUserId);
+      formData.append("consent_given", String(consent));
+
+      const response = await fetch("/api/face/verify", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Verification failed");
+      }
+
+      const data = await response.json();
+      setJobId(data.job_id);
+    } catch (err: any) {
+      setError(err.message || "An error occurred");
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">Verify Face</h1>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>
+      )}
+
+      {jobId ? (
+        <JobPoll
+          jobId={jobId}
+          onComplete={(result) => console.log("Verification result:", result)}
+          onError={(err) => setError(err)}
+        />
+      ) : (
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white p-6 rounded-lg border space-y-6"
+        >
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Capture Face
+            </label>
+            <CameraCapture onCapture={handleCapture} />
+          </div>
+
+          <div>
+            <label
+              htmlFor="targetUserId"
+              className="block text-sm font-medium mb-1"
+            >
+              Your User ID (auto-filled from login)
+            </label>
+            <input
+              id="targetUserId"
+              type="text"
+              value={targetUserId}
+              onChange={(e) => setTargetUserId(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Enter user ID"
+              required
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="consent"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="w-5 h-5"
+            />
+            <label htmlFor="consent" className="text-sm text-gray-600">
+              I consent to the verification of my facial data.
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!imageFile || !targetUserId || !consent || isLoading}
+            className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+          >
+            {isLoading ? "Verifying..." : "Verify Face"}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/dashboard/page.tsx">
+"use client";
+
+import { useAuth } from "@/lib/auth-context";
+import { UserPlus, UserCheck, Search, Eye } from "lucide-react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function DashboardPage() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  const features = [
+    {
+      title: "Enroll Face",
+      description: "Register your face for future authentication",
+      icon: UserPlus,
+      href: "/enroll",
+      color: "bg-blue-500",
+    },
+    {
+      title: "Verify Face",
+      description: "Verify your identity against a registered user",
+      icon: UserCheck,
+      href: "/verify",
+      color: "bg-green-500",
+    },
+    {
+      title: "Identify Face",
+      description: "Find a person from the database",
+      icon: Search,
+      href: "/identify",
+      color: "bg-purple-500",
+    },
+    {
+      title: "Liveness Check",
+      description: "Verify if the face is real and alive",
+      icon: Eye,
+      href: "/liveness",
+      color: "bg-orange-500",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Welcome, {user?.email}</h1>
+        <p className="text-gray-600">
+          Choose a face recognition feature to get started
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {features.map((feature) => {
+          const Icon = feature.icon;
+          return (
+            <a
+              key={feature.href}
+              href={feature.href}
+              className="block p-6 bg-white rounded-lg border hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start gap-4">
+                <div
+                  className={`${feature.color} p-3 rounded-lg text-white`}
+                >
+                  <Icon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg mb-1">
+                    {feature.title}
+                  </h3>
+                  <p className="text-gray-600 text-sm">
+                    {feature.description}
+                  </p>
+                </div>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/globals.css">
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+</file>
+
+<file path="src/app/layout.tsx">
+import type { Metadata } from "next";
+import { AuthProvider } from "@/lib/auth-context";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Face Recognition Platform",
+  description: "Face Recognition Platform with FastAPI and Next.js",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
+    </html>
+  );
+}
+</file>
+
+<file path="src/app/login/page.tsx">
+"use client";
+
+import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    try {
+      await login(email, password);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-md">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold">Welcome Back</h1>
+          <p className="text-gray-600">Sign in to your account</p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium mb-1">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+          >
+            {isLoading ? "Signing in..." : "Sign In"}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="text-primary hover:underline">
+            Register
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/page.tsx">
+import Link from "next/link";
+
+export default function HomePage() {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="border-b">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <h1 className="text-xl font-bold">Face Recognition Platform</h1>
+          <div className="flex gap-4">
+            <Link
+              href="/login"
+              className="px-4 py-2 text-sm font-medium hover:bg-accent rounded-md"
+            >
+              Login
+            </Link>
+            <Link
+              href="/register"
+              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90"
+            >
+              Register
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <h2 className="text-4xl font-bold mb-4">
+            Face Recognition Platform
+          </h2>
+          <p className="text-muted-foreground mb-8">
+            Secure face enrollment, verification, and identification powered by
+            AI and microservices architecture.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <Link
+              href="/login"
+              className="px-6 py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90"
+            >
+              Get Started
+            </Link>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/register/page.tsx">
+"use client";
+
+import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export default function RegisterPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { register } = useAuth();
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await register(email, password);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Registration failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-md">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold">Create Account</h1>
+          <p className="text-gray-600">Register for a new account</p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium mb-1">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium mb-1">
+              Confirm Password
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+          >
+            {isLoading ? "Creating account..." : "Create Account"}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <Link href="/login" className="text-primary hover:underline">
+            Sign In
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/camera-capture.tsx">
+"use client";
+
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Camera, Upload } from "lucide-react";
+
+export default function CameraCapture({
+  onCapture,
+}: {
+  onCapture: (file: File, dataUrl: string) => void;
+}) {
+  const [image, setImage] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [error, setError] = useState<string>("");
+  const [cameraReady, setCameraReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const startCamera = useCallback(async () => {
+    try {
+      setError("");
+      setCameraReady(false);
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: "user", 
+          width: { ideal: 640, min: 320 },
+          height: { ideal: 480, min: 240 }
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      setIsCameraOn(true);
+    } catch (err: any) {
+      if (err.name === "NotAllowedError") {
+        setError("Camera access denied. Please allow camera permission in browser settings.");
+      } else if (err.name === "NotFoundError") {
+        setError("No camera found on this device. Please use Upload instead.");
+      } else {
+        setError("Could not start camera. Try clicking Start Camera again.");
+      }
+      setIsCameraOn(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isCameraOn || !videoRef.current || !streamRef.current) return;
+
+    const video = videoRef.current;
+    const stream = streamRef.current;
+
+    const onReady = () => {
+      setCameraReady(true);
+    };
+
+    video.onloadedmetadata = onReady;
+    video.onplaying = onReady;
+    video.onerror = () => setError("Camera error occurred");
+    video.srcObject = stream;
+
+    if (video.readyState >= 2) onReady();
+
+    readyTimeoutRef.current = setTimeout(() => {
+      setCameraReady(true);
+    }, 3000);
+
+    return () => {
+      if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+    };
+  }, [isCameraOn]);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraOn(false);
+    setCameraReady(false);
+  }, []);
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !streamRef.current || !cameraReady) {
+      setError("Camera is not ready. Please wait a moment and try again.");
+      return;
+    }
+
+    const video = videoRef.current;
+    
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      setError("Camera not ready. Please wait and try again.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setError("Could not capture image");
+      return;
+    }
+    
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          const capturedFile = new File([blob], "face_capture.jpg", {
+            type: "image/jpeg",
+          });
+          setFile(capturedFile);
+          const dataUrl = canvas.toDataURL("image/jpeg");
+          setImage(dataUrl);
+          onCapture(capturedFile, dataUrl);
+          stopCamera();
+        }
+      },
+      "image/jpeg",
+      0.9
+    );
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        setImage(dataUrl);
+        onCapture(selectedFile, dataUrl);
+      };
+      reader.readAsDataURL(selectedFile);
+    }
+  };
+
+  const reset = () => {
+    setImage(null);
+    setFile(null);
+    setError("");
+    stopCamera();
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  if (image) {
+    return (
+      <div className="space-y-4">
+        <div className="aspect-video bg-black rounded-lg overflow-hidden">
+          <img
+            src={image}
+            alt="Captured"
+            className="w-full h-full object-contain"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={reset}
+          className="w-full px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
+        >
+          Retake Photo
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+        {isCameraOn ? (
+          <>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-contain"
+            />
+            {!cameraReady && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+                Loading camera...
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-full text-gray-400 text-center p-4">
+            {error || "Click 'Start Camera' to begin, or use 'Upload'"}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="text-red-500 text-sm">{error}</div>
+      )}
+
+      <div className="flex gap-3">
+        {!isCameraOn ? (
+          <button
+            type="button"
+            onClick={startCamera}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
+          >
+            <Camera className="w-5 h-5" />
+            Start Camera
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={capturePhoto}
+            disabled={!cameraReady}
+            className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+          >
+            Capture
+          </button>
+        )}
+
+        <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
+          <Upload className="w-5 h-5" />
+          Upload
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </label>
+
+        {isCameraOn && (
+          <button
+            type="button"
+            onClick={stopCamera}
+            className="px-4 py-2 text-red-600 bg-red-50 rounded-md hover:bg-red-100"
+          >
+            Stop
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/job-poll.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import api from "@/lib/api-client";
+import type { TaskStatusResponse } from "@/lib/types";
+
+interface JobPollProps {
+  jobId: string;
+  onComplete?: (result: any) => void;
+  onError?: (error: string) => void;
+}
+
+export default function JobPoll({ jobId, onComplete, onError }: JobPollProps) {
+  const [status, setStatus] = useState<string>("PENDING");
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const response = await api.getTaskStatus(jobId);
+        setStatus(response.status);
+
+        if (response.status === "SUCCESS") {
+          setResult(response.result);
+          onComplete?.(response.result);
+        } else if (response.status === "FAILURE") {
+          const errorMsg = response.result?.error || response.result?.detail || "Task failed";
+          setError(errorMsg);
+          onError?.(errorMsg);
+        }
+      } catch (err: any) {
+        const msg = err.message || "Failed to get task status";
+        setError(msg);
+        onError?.(msg);
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 2000);
+
+    return () => clearInterval(interval);
+  }, [jobId, onComplete, onError]);
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-3 p-4 bg-red-50 text-red-600 rounded-lg">
+        <XCircle className="w-6 h-6" />
+        <div>
+          <p className="font-semibold">Error</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "SUCCESS") {
+    return (
+      <div className="flex items-center gap-3 p-4 bg-green-50 text-green-600 rounded-lg">
+        <CheckCircle className="w-6 h-6" />
+        <div>
+          <p className="font-semibold">Success</p>
+          {result && (
+            <p className="text-sm">
+              {result.verified !== undefined && (
+                <span>
+                  Verified: {result.verified ? "Yes" : "No"} (Score:{" "}
+                  {result.score?.toFixed(4)})
+                </span>
+              )}
+              {result.matches && (
+                <span>
+                  Found {result.matches.length} match(es)
+                </span>
+              )}
+              {result.is_live !== undefined && (
+                <span>
+                  Live: {result.is_live ? "Yes" : "No"} (Score:{" "}
+                  {result.liveness_score?.toFixed(4)})
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 p-4 bg-blue-50 text-blue-600 rounded-lg">
+      <Loader2 className="w-6 h-6 animate-spin" />
+      <div>
+        <p className="font-semibold">Processing...</p>
+        <p className="text-sm">Job ID: {jobId}</p>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/sidebar.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import {
+  Home,
+  UserPlus,
+  UserCheck,
+  Search,
+  Eye,
+  Shield,
+  LogOut,
+} from "lucide-react";
+
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: Home },
+  { href: "/enroll", label: "Enroll Face", icon: UserPlus },
+  { href: "/verify", label: "Verify Face", icon: UserCheck },
+  { href: "/identify", label: "Identify Face", icon: Search },
+  { href: "/liveness", label: "Liveness Check", icon: Eye },
+];
+
+const adminItems = [
+  { href: "/dashboard/admin", label: "Admin", icon: Shield },
+];
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const { user, logout } = useAuth();
+
+  return (
+    <aside className="w-64 min-h-screen bg-white border-r flex flex-col">
+      <div className="p-4 border-b">
+        <h2 className="text-lg font-bold">Face Recognition</h2>
+        <p className="text-sm text-gray-500">{user?.email}</p>
+      </div>
+
+      <nav className="flex-1 p-4 space-y-1">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-accent"
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              {item.label}
+            </Link>
+          );
+        })}
+
+        {user?.role === "admin" && (
+          <>
+            <div className="my-4 border-t" />
+            {adminItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-accent"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </>
+        )}
+      </nav>
+
+      <div className="p-4 border-t">
+        <button
+          onClick={logout}
+          className="flex items-center gap-3 px-3 py-2 w-full rounded-md hover:bg-accent text-red-600 transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+          Logout
+        </button>
+      </div>
+    </aside>
+  );
+}
+</file>
+
+<file path="src/lib/api-client.ts">
+import axios, { AxiosInstance, AxiosError } from "axios";
+import type {
+  LoginRequest,
+  RegisterRequest,
+  TokenResponse,
+  TaskStatusResponse,
+  UserListResponse,
+  UserPublic,
+} from "./types";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+
+class ApiClient {
+  private client: AxiosInstance;
+  private refreshPromise: Promise<boolean> | null = null;
+
+  constructor() {
+    this.client = axios.create({
+      baseURL: API_BASE_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    this.client.interceptors.request.use(
+      (config) => {
+        if (typeof window !== "undefined") {
+          const token = localStorage.getItem("access_token");
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        const originalRequest = error.config;
+        if (error.response?.status === 401 && originalRequest) {
+          return this.handleUnauthorized(originalRequest);
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  private async handleUnauthorized(originalRequest: any): Promise<any> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.refreshToken();
+    }
+
+    const refreshed = await this.refreshPromise;
+    this.refreshPromise = null;
+
+    if (refreshed) {
+      return this.client(originalRequest);
+    }
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+    }
+
+    return Promise.reject(new Error("Session expired"));
+  }
+
+  private async refreshToken(): Promise<boolean> {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken) return false;
+
+    try {
+      const response = await axios.post<TokenResponse>(
+        `${API_BASE_URL}/auth/refresh`,
+        { refresh_token: refreshToken }
+      );
+      const { access_token } = response.data;
+      localStorage.setItem("access_token", access_token);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // === Auth ===
+  async login(data: LoginRequest): Promise<TokenResponse> {
+    const response = await this.client.post<TokenResponse>("/auth/login", data);
+    return response.data;
+  }
+
+  async register(data: RegisterRequest): Promise<UserPublic> {
+    const response = await this.client.post<UserPublic>("/auth/register", data);
+    return response.data;
+  }
+
+  // === Tasks ===
+  async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+    const response = await this.client.get<TaskStatusResponse>(`/tasks/${taskId}`);
+    return response.data;
+  }
+
+  // === Users ===
+  async getCurrentUser(): Promise<UserPublic> {
+    const response = await this.client.get<UserPublic>("/users/me");
+    return response.data;
+  }
+
+  async listUsers(): Promise<UserListResponse> {
+    const response = await this.client.get<UserListResponse>("/users");
+    return response.data;
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    await this.client.delete(`/users/${userId}`);
+  }
+
+  // === Face Operations ===
+  async enrollFace(
+    imageFile: File,
+    consentGiven: boolean = true
+  ): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+    formData.append("consent_given", String(consentGiven));
+
+    const response = await this.client.post("/face/enroll", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async verifyFace(
+    imageFile: File,
+    targetUserId: string,
+    consentGiven: boolean = true
+  ): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+    formData.append("target_user_id", targetUserId);
+    formData.append("consent_given", String(consentGiven));
+
+    const response = await this.client.post("/face/verify", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async identifyFace(
+    imageFile: File,
+    consentGiven: boolean = true
+  ): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+    formData.append("consent_given", String(consentGiven));
+
+    const response = await this.client.post("/face/identify", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async livenessCheck(
+    imageFile: File,
+    consentGiven: boolean = true
+  ): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+    formData.append("consent_given", String(consentGiven));
+
+    const response = await this.client.post("/face/liveness", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async deleteFaceData(userId: string): Promise<{ job_id: string }> {
+    const response = await this.client.delete(`/face/${userId}`);
+    return response.data;
+  }
+}
+
+export const api = new ApiClient();
+export default api;
+</file>
+
+<file path="src/lib/auth-context.tsx">
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
+import { useRouter } from "next/navigation";
+import api from "./api-client";
+import type { AuthContextType, AuthUser, LoginRequest, RegisterRequest } from "./types";
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadUserFromStorage = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const storedToken = localStorage.getItem("access_token");
+    const storedUser = localStorage.getItem("user");
+
+    if (storedToken && storedUser) {
+      try {
+        setAccessToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadUserFromStorage();
+  }, [loadUserFromStorage]);
+
+  const login = async (email: string, password: string) => {
+    const data: LoginRequest = { email, password };
+    const response = await api.login(data);
+
+    localStorage.setItem("access_token", response.access_token);
+    if (response.refresh_token) {
+      localStorage.setItem("refresh_token", response.refresh_token);
+    }
+
+    const userData: AuthUser = {
+      id: "",
+      email,
+      role: "user",
+    };
+    localStorage.setItem("user", JSON.stringify(userData));
+
+    setAccessToken(response.access_token);
+    setUser(userData);
+
+    router.push("/dashboard");
+  };
+
+  const register = async (email: string, password: string, role: string = "user") => {
+    const data: RegisterRequest = { email, password, role };
+    await api.register(data);
+    router.push("/login");
+  };
+
+  const logout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
+    setUser(null);
+    setAccessToken(null);
+    router.push("/login");
+  };
+
+  const refreshAccessToken = async (): Promise<boolean> => {
+    try {
+      const refreshToken = localStorage.getItem("refresh_token");
+      if (!refreshToken) return false;
+
+      await api.client.post("/auth/refresh", { refresh_token: refreshToken });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        accessToken,
+        login,
+        register,
+        logout,
+        refreshAccessToken,
+        isAuthenticated: !!user && !!accessToken,
+        isLoading,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
+</file>
+
+<file path="src/lib/types.ts">
+// === Auth ===
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  role?: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string | null;
+  token_type: string;
+}
+
+export interface UserPublic {
+  id: string;
+  email: string;
+  role: string;
+}
+
+export interface RefreshRequest {
+  refresh_token: string;
+}
+
+// === Tasks ===
+export interface TaskStatusResponse {
+  task_id: string;
+  status: "PENDING" | "SUCCESS" | "FAILURE" | "RETRY" | "STARTED" | "ERROR";
+  result: TaskResult | null;
+}
+
+export interface TaskResult {
+  status: string;
+  user_id?: string;
+  verified?: boolean;
+  score?: number;
+  matches?: Array<{ user_id: string; score: number }>;
+  liveness_score?: number;
+  is_live?: boolean;
+  error?: string;
+  type?: string;
+}
+
+// === Users ===
+export interface UserListResponse {
+  users: UserPublic[];
+  total: number;
+}
+
+// === Face Operations ===
+export interface EnrollmentResult {
+  job_id: string;
+}
+
+export interface VerificationResult {
+  job_id: string;
+}
+
+export interface IdentificationResult {
+  job_id: string;
+}
+
+export interface LivenessResult {
+  job_id: string;
+}
+
+// === API Error ===
+export interface ApiError {
+  detail: string;
+}
+
+// === Auth Context ===
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+}
+
+export interface AuthContextType {
+  user: AuthUser | null;
+  accessToken: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, role?: string) => Promise<void>;
+  logout: () => void;
+  refreshAccessToken: () => Promise<boolean>;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+</file>
+
+<file path="src/middleware.ts">
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+const publicPaths = ["/login", "/register", "/"];
+
+export function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  if (publicPaths.some((p) => path.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
+</file>
+
+<file path="tailwind.config.ts">
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+</file>
+
+</files>
