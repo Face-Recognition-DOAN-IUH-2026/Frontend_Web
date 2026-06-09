@@ -21,6 +21,7 @@ let toastId = 0;
 export default function GatePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [step, setStep] = useState<Step>("idle");
   const [mssv, setMssv] = useState("");
   const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
@@ -39,40 +40,107 @@ export default function GatePage() {
     phone: "",
   });
 
+  const [cameraReady, setCameraReady] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+
   const addToast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastId;
-    setToasts((prev) => [Object.assign(t, { id }), ...prev.slice(0, 4)]);
+    setToasts((prev) => [{ ...t, id }, ...prev.slice(0, 4)]);
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
   }, []);
 
-  const startCamera = useCallback(async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    if (videoRef.current) videoRef.current.srcObject = stream;
-    streamRef.current = stream;
-  }, []);
-
   const stopCamera = useCallback(() => {
+    if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    setIsCameraOn(false);
+    setCameraReady(false);
   }, []);
 
+  useEffect(() => {
+    return () => stopCamera();
+  }, [stopCamera]);
+
+  const startCamera = useCallback(async () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      setCameraReady(false);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 640, min: 320 },
+          height: { ideal: 480, min: 240 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      setIsCameraOn(true);
+    } catch (err: any) {
+      if (err.name === "NotAllowedError") {
+        addToast({ type: "error", message: "Không có quyền truy cập camera. Vui lòng cho phép camera trong trình duyệt." });
+      } else if (err.name === "NotFoundError") {
+        addToast({ type: "error", message: "Không tìm thấy camera trên thiết bị." });
+      } else {
+        addToast({ type: "error", message: `Lỗi camera: ${err.message}` });
+      }
+      setIsCameraOn(false);
+    }
+  }, [addToast]);
+
+  // Gán stream vào video element sau khi video đã render (giống enroll page)
+  useEffect(() => {
+    if (!isCameraOn || !videoRef.current || !streamRef.current) return;
+
+    const video = videoRef.current;
+    const stream = streamRef.current;
+
+    const onReady = () => setCameraReady(true);
+
+    video.onloadedmetadata = onReady;
+    video.onplaying = onReady;
+    video.onerror = () => addToast({ type: "error", message: "Lỗi camera" });
+    video.srcObject = stream;
+
+    if (video.readyState >= 2) onReady();
+
+    readyTimeoutRef.current = setTimeout(() => setCameraReady(true), 1500);
+
+    return () => {
+      if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+    };
+  }, [isCameraOn, addToast]);
+
   const captureImage = useCallback((): Promise<File> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const video = videoRef.current;
-      if (!video) return;
+      if (!video || !video.videoWidth) {
+        reject(new Error("Camera chưa sẵn sàng"));
+        return;
+      }
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      canvas.getContext("2d")!.drawImage(video, 0, 0);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Không thể tạo canvas"));
+        return;
+      }
+      ctx.drawImage(video, 0, 0);
       canvas.toBlob((blob) => {
         if (blob) {
-          const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+          const file = new File([blob], "face_capture.jpg", { type: "image/jpeg" });
           setCaptured(canvas.toDataURL("image/jpeg"));
           resolve(file);
+        } else {
+          reject(new Error("Không thể tạo ảnh"));
         }
-      }, "image/jpeg");
+      }, "image/jpeg", 0.9);
     });
   }, []);
 
@@ -105,11 +173,16 @@ export default function GatePage() {
     setLoading(true);
     try {
       const imageFile = await captureImage();
-      const res = await api.kioskEnroll(imageFile, form.full_name, mssv, mssv, "2027-12-31", form.identity_number || undefined, form.email || undefined, form.phone || undefined);
+      const res = await api.kioskEnroll(imageFile, form.full_name, mssv, `CARD-${mssv || Date.now()}`,
+        "2027-12-31", form.identity_number || undefined, form.email || undefined, form.phone || undefined);
       setResult(res);
       setStep("result");
       stopCamera();
+      setForm({ full_name: "", identity_number: "", email: "", phone: "" });
       addToast({ type: "info", message: `Đăng ký thành công cho ${form.full_name}` });
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err.message || "Đăng ký thất bại";
+      addToast({ type: "error", message: msg });
     } finally {
       setLoading(false);
     }
@@ -123,6 +196,8 @@ export default function GatePage() {
       setResult(res);
       setStep("result");
       stopCamera();
+    } catch (err: any) {
+      addToast({ type: "error", message: "Xác thực thất bại" });
     } finally {
       setLoading(false);
     }
@@ -168,12 +243,16 @@ export default function GatePage() {
         addToast({ type: "error", message: `${event.full_name} — thẻ đã hết hạn` });
       } else if (event.status === "spoof") {
         addToast({ type: "error", message: "Phát hiện giả mạo!" });
+      } else if (event.status === "error") {
+        addToast({ type: "error", message: `Lỗi xử lý: ${event.error || "không xác định"}` });
+      } else {
+        addToast({ type: "info", message: `${event.status} — ${event.full_name || ""}` });
       }
     });
     return cleanup;
-  }, [addToast]);
+  }, [addToast, step]);
 
-  // Load recent history (public endpoint, no auth needed)
+  // Load recent history
   useEffect(() => {
     api.getRecentLogs().then((data) => setRecentLogs(data.items)).catch(() => {});
   }, []);
@@ -230,7 +309,14 @@ export default function GatePage() {
       {(step === "enroll_form" || step === "verify") && (
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg border" />
+            <div className="relative bg-black rounded-lg overflow-hidden">
+              <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-lg" />
+              {!cameraReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+                  Đang mở camera...
+                </div>
+              )}
+            </div>
             {captured && <img src={captured} className="w-full mt-2 rounded-lg border" />}
           </div>
           <div className="space-y-4">
@@ -276,7 +362,7 @@ export default function GatePage() {
               </>
             )}
           </div>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={reset}>Làm lại</button>
+          <button onClick={reset} className="px-4 py-2 bg-blue-600 text-white rounded-md">Làm lại</button>
         </div>
       )}
 
