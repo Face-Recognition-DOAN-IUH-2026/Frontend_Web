@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
 import { useAuth } from "@/lib/auth-context";
+import api from "@/lib/api-client";
 
 function decodeJwt(token: string): { sub: string } | null {
   try {
@@ -54,26 +55,8 @@ export default function VerifyPage() {
     setJobId(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", imageFile);
-      formData.append("target_user_id", targetUserId);
-      formData.append("consent_given", String(consent));
-
-      const response = await fetch("/api/face/verify", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Verification failed");
-      }
-
-      const data = await response.json();
-      setJobId(data.job_id);
+      const result = await api.verifyFace(imageFile, targetUserId, consent);
+      setJobId(result.job_id);
     } catch (err: any) {
       setError(err.message || "An error occurred");
       setIsLoading(false);

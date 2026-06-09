@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Upload, CheckCircle } from "lucide-react";
+import api from "@/lib/api-client";
 
 export default function EnrollPage() {
   const [image, setImage] = useState<string | null>(null);
@@ -155,30 +156,11 @@ export default function EnrollPage() {
     setResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("consent_given", String(consent));
-
-      const response = await fetch("/api/face/enroll", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Enrollment failed");
-      }
-
-      const data = await response.json();
+      const data = await api.enrollFace(file, consent);
       setJobId(data.job_id);
-
-      // Poll for result
       pollForResult(data.job_id);
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      setError(err.response?.data?.detail || err.message || "Enrollment failed");
     } finally {
       setIsLoading(false);
     }
@@ -187,19 +169,7 @@ export default function EnrollPage() {
   const pollForResult = async (taskId: string) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/tasks/${taskId}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-        });
-
-        if (!response.ok) {
-          clearInterval(interval);
-          setError("Failed to get task status");
-          return;
-        }
-
-        const data = await response.json();
+        const data = await api.getTaskStatus(taskId);
 
         if (data.status === "SUCCESS") {
           clearInterval(interval);

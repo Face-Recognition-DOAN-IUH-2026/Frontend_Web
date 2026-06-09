@@ -19,7 +19,7 @@ import type {
   UserServiceAuthResponse,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
 
 class ApiClient {
   client: AxiosInstance;
@@ -120,23 +120,23 @@ class ApiClient {
   // Face enrollment status from face-recognition-api
   async getFaceEnrollmentStatus(): Promise<{ has_face: boolean; full_name: string | null; role: string }> {
     // /api/users/me routes to face-recognition-api via gateway
-    const response = await this.client.get<{ has_face: boolean; full_name: string | null; role: string }>("/users/me");
+    const response = await this.client.get<{ has_face: boolean; full_name: string | null; role: string }>("/api/users/me");
     return response.data;
   }
 
   // === Tasks ===
   async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
-    const response = await this.client.get<TaskStatusResponse>(`/tasks/${taskId}`);
+    const response = await this.client.get<TaskStatusResponse>(`/api/tasks/${taskId}`);
     return response.data;
   }
 
   async listUsers(): Promise<UserListResponse> {
-    const response = await this.client.get<UserListResponse>("/users");
+    const response = await this.client.get<UserListResponse>("/api/users");
     return response.data;
   }
 
   async deleteUser(userId: string): Promise<void> {
-    await this.client.delete(`/users/${userId}`);
+    await this.client.delete(`/api/users/${userId}`);
   }
 
   // === Face Operations ===
@@ -148,7 +148,7 @@ class ApiClient {
     formData.append("file", imageFile);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/face/enroll", formData, {
+    const response = await this.client.post("/api/face/enroll", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
@@ -164,7 +164,7 @@ class ApiClient {
     formData.append("target_user_id", targetUserId);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/face/verify", formData, {
+    const response = await this.client.post("/api/face/verify", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
@@ -178,7 +178,7 @@ class ApiClient {
     formData.append("file", imageFile);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/face/identify", formData, {
+    const response = await this.client.post("/api/face/identify", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
@@ -189,7 +189,7 @@ class ApiClient {
     formData.append("email", email);
     formData.append("file", imageFile);
 
-    const response = await this.client.post("/auth/face-login", formData, {
+    const response = await this.client.post("/api/auth/face-login", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
@@ -203,14 +203,14 @@ class ApiClient {
     formData.append("file", imageFile);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/face/liveness", formData, {
+    const response = await this.client.post("/api/face/liveness", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   }
 
   async deleteFaceData(userId: string): Promise<{ job_id: string }> {
-    const response = await this.client.delete(`/face/${userId}`);
+    const response = await this.client.delete(`/api/face/${userId}`);
     return response.data;
   }
 
@@ -224,7 +224,7 @@ class ApiClient {
     const params: any = { skip, limit };
     if (query) params.q = query;
     if (status) params.status = status;
-    const response = await this.client.get<PatronPublic[]>("/patrons/search", { params });
+    const response = await this.client.get<PatronPublic[]>("/api/patrons/search", { params });
     return response.data;
   }
 
@@ -235,27 +235,27 @@ class ApiClient {
     const params: any = {};
     if (studentCode) params.student_code = studentCode;
     if (cardNumber) params.card_number = cardNumber;
-    const response = await this.client.get<PatronLookupResult>("/patrons/lookup", { params });
+    const response = await this.client.get<PatronLookupResult>("/api/patrons/lookup", { params });
     return response.data;
   }
 
   async getPatron(id: string): Promise<PatronPublic> {
-    const response = await this.client.get<PatronPublic>(`/patrons/${id}`);
+    const response = await this.client.get<PatronPublic>(`/api/patrons/${id}`);
     return response.data;
   }
 
   async createPatron(data: PatronCreate): Promise<PatronPublic> {
-    const response = await this.client.post<PatronPublic>("/patrons", data);
+    const response = await this.client.post<PatronPublic>("/api/patrons", data);
     return response.data;
   }
 
   async updatePatron(id: string, data: PatronUpdate): Promise<PatronPublic> {
-    const response = await this.client.put<PatronPublic>(`/patrons/${id}`, data);
+    const response = await this.client.put<PatronPublic>(`/api/patrons/${id}`, data);
     return response.data;
   }
 
   async deletePatron(id: string): Promise<void> {
-    await this.client.delete(`/patrons/${id}`);
+    await this.client.delete(`/api/patrons/${id}`);
   }
 
   // === Access ===
@@ -284,7 +284,7 @@ class ApiClient {
       query.skip = params.skip ?? 0;
       query.limit = params.limit ?? 50;
     }
-    const response = await this.client.get<AccessLogList>("/access/logs", { params: query });
+    const response = await this.client.get<AccessLogList>("/api/access/logs", { params: query });
     return response.data;
   }
 
@@ -321,7 +321,7 @@ class ApiClient {
   ): Promise<{ success: boolean; job_id: string; message: string }> {
     const formData = new FormData();
     formData.append("image", imageFile);
-    const response = await this.client.post(`/patrons/${patronId}/enroll-face`, formData, {
+    const response = await this.client.post(`/api/patrons/${patronId}/enroll-face`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
