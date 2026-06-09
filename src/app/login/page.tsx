@@ -10,7 +10,7 @@ import api from "@/lib/api-client";
 type LoginMode = "password" | "face";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, setAuthFromToken } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<LoginMode>("password");
   const [email, setEmail] = useState("");
@@ -142,16 +142,11 @@ export default function LoginPage() {
               setIsLoading(false);
               setJobId(null);
             } else if (resp.result.access_token) {
-              localStorage.setItem("access_token", resp.result.access_token);
-              if (resp.result.refresh_token) {
-                localStorage.setItem("refresh_token", resp.result.refresh_token);
-              }
-              const userData = { id: "", email, role: "user" };
-              localStorage.setItem("user", JSON.stringify(userData));
+              setAuthFromToken(resp.result.access_token, resp.result.refresh_token || null, email, "user");
               setSuccess(true);
               setJobId(null);
               setIsLoading(false);
-              setTimeout(() => router.push("/dashboard"), 1500);
+              setTimeout(() => router.push("/dashboard"), 500);
             }
           } else if (resp.status === "FAILURE") {
             clearInterval(interval);

@@ -98,6 +98,7 @@ export interface AuthContextType {
   user: AuthUser | null;
   accessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
+  setAuthFromToken: (accessToken: string, refreshToken: string | null, email: string, role?: string) => void;
   register: (email: string, password: string, role?: string) => Promise<void>;
   logout: () => void;
   refreshAccessToken: () => Promise<boolean>;

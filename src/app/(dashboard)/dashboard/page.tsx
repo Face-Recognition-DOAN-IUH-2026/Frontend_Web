@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
-import { UserPlus, UserCheck, Search, Eye } from "lucide-react";
+import { UserPlus, UserCheck, Search, Eye, DoorOpen, Users } from "lucide-react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -56,6 +56,20 @@ export default function DashboardPage() {
       href: "/liveness",
       color: "bg-orange-500",
     },
+    {
+      title: "Gate Kiosk",
+      description: "Camera check-in/out for patrons",
+      icon: DoorOpen,
+      href: "/gate",
+      color: "bg-teal-500",
+    },
+    {
+      title: "Patrons",
+      description: "Manage library patrons",
+      icon: Users,
+      href: "/patrons",
+      color: "bg-rose-500",
+    },
   ];
 
   return (
@@ -63,11 +77,11 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.email}</h1>
         <p className="text-gray-600">
-          Choose a face recognition feature to get started
+          Face Recognition Management System
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {features.map((feature) => {
           const Icon = feature.icon;
           return (
