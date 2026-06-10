@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api-client";
-import type { AccessLogPublic, CameraEvent, CameraStatus, KioskResult, PatronLookupResult } from "@/lib/types";
+import FrequencyChart from "@/components/frequency-chart";
+import type { AccessFrequencyDay, AccessLogPublic, CameraEvent, CameraStatus, KioskResult, PatronLookupResult } from "@/lib/types";
 
 const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || "http://192.168.1.121:8080/video";
 const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || "http://192.168.1.240:8080/video";
@@ -34,6 +35,10 @@ export default function GatePage() {
   const [exitTs] = useState(Date.now());
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
+  const [historyDateFrom, setHistoryDateFrom] = useState("");
+  const [historyDateTo, setHistoryDateTo] = useState("");
+  const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
+  const [freqLoading, setFreqLoading] = useState(false);
 
   const [form, setForm] = useState({
     full_name: "",
@@ -231,6 +236,7 @@ export default function GatePage() {
         setStatusText("Đang xác thực khuôn mặt...");
         const taskResult = await pollTask(res.job_id);
         const success = taskResult?.status === "success";
+        const confidence = taskResult?.score ?? taskResult?.confidence;
         setResult({
           success,
           message: success
@@ -238,6 +244,7 @@ export default function GatePage() {
             : (taskResult?.error || "Xác thực thất bại"),
           patron: res.patron,
           job_id: res.job_id,
+          confidence,
         });
       } else {
         setResult(res);
@@ -316,8 +323,29 @@ export default function GatePage() {
     }).catch(() => setCamStatus("blocked"));
   }, []);
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const data = await api.getAccessLogs({
+        dateFrom: historyDateFrom || undefined,
+        dateTo: historyDateTo || undefined,
+        limit: 50,
+      });
+      setRecentLogs(data.items ?? []);
+    } catch {}
+  }, [historyDateFrom, historyDateTo]);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
   useEffect(() => {
-    api.getRecentLogs().then((data) => setRecentLogs(data.items ?? [])).catch(() => {});
+    (async () => {
+      setFreqLoading(true);
+      try {
+        const data = await api.getAccessFrequency();
+        setFrequency(data.daily);
+      } finally {
+        setFreqLoading(false);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -504,6 +532,9 @@ export default function GatePage() {
           <div className={`p-4 rounded-lg ${result?.success ? "bg-green-100" : "bg-red-100"}`}>
             <p className="text-lg font-semibold">{result?.success ? "Thành công" : "Thất bại"}</p>
             <p>{result?.message}</p>
+            {result?.success && result?.confidence && (
+              <p className="text-sm text-green-700">Độ chính xác: {(Number(result.confidence) * 100).toFixed(1)}%</p>
+            )}
             {result?.patron && (
               <>
                 <p><strong>Họ tên:</strong> {result.patron.full_name}</p>
@@ -515,8 +546,32 @@ export default function GatePage() {
         </div>
       )}
 
+      {frequency.length > 0 && (
+        <FrequencyChart data={frequency} loading={freqLoading} />
+      )}
+
       <div>
         <h2 className="text-xl font-semibold mb-3">Lịch sử ra vào gần đây</h2>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <label className="block">
+            <span className="text-xs font-medium text-gray-600">Từ ngày</span>
+            <input
+              type="date"
+              className="mt-1 block w-36 px-3 py-2 border rounded-md text-sm"
+              value={historyDateFrom}
+              onChange={(e) => setHistoryDateFrom(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-gray-600">Đến ngày</span>
+            <input
+              type="date"
+              className="mt-1 block w-36 px-3 py-2 border rounded-md text-sm"
+              value={historyDateTo}
+              onChange={(e) => setHistoryDateTo(e.target.value)}
+            />
+          </label>
+        </div>
         {recentLogs.length === 0 ? (
           <p className="text-gray-500 text-sm">Chưa có dữ liệu</p>
         ) : (

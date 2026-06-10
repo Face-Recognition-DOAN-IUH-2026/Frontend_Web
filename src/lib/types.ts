@@ -189,6 +189,16 @@ export interface ActivePatron {
   confidence: number | null;
 }
 
+export interface AccessFrequencyDay {
+  date: string;
+  entry: number;
+  exit: number;
+}
+
+export interface AccessFrequencyResponse {
+  daily: AccessFrequencyDay[];
+}
+
 export interface StatsResponse {
   total_patrons: number;
   active_patrons: number;
@@ -201,6 +211,7 @@ export interface KioskResult {
   message: string;
   patron: PatronPublic | null;
   job_id: string | null;
+  confidence?: number;
 }
 
 export interface CameraStatus {

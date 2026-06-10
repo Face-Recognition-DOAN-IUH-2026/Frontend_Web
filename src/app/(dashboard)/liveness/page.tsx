@@ -8,13 +8,13 @@ import api from "@/lib/api-client";
 import type { LivenessBreakdown } from "@/lib/types";
 
 const breakdownLabels: Record<keyof LivenessBreakdown, string> = {
-  lbp: "Texture (LBP)",
-  color: "Color Histogram",
-  noise: "Noise Variance",
-  fft: "Frequency (FFT)",
-  multi_scale: "Multi-scale",
-  bbox: "Face Ratio",
-  insightface: "Deep Learning",
+  lbp: "Kết cấu (LBP)",
+  color: "Màu sắc",
+  noise: "Nhiễu",
+  fft: "Tần số (FFT)",
+  multi_scale: "Đa tỷ lệ",
+  bbox: "Tỷ lệ khuôn mặt",
+  insightface: "Học sâu",
 };
 
 function BreakdownBar({ label, score }: { label: string; score: number }) {
@@ -50,10 +50,10 @@ function LivenessResultCard({ result }: { result: any }) {
         )}
         <div>
           <p className="text-xl font-bold">
-            {isLive ? "LIVE" : "SPOOF DETECTED"}
+            {isLive ? "KHUÔN MẶT THẬT" : "PHÁT HIỆN GIẢ MẠO"}
           </p>
           <p className="text-sm text-gray-500">
-            Confidence: {(score * 100).toFixed(1)}%
+            Độ tin cậy: {(score * 100).toFixed(1)}%
           </p>
         </div>
       </div>
@@ -61,7 +61,7 @@ function LivenessResultCard({ result }: { result: any }) {
       {breakdown && (
         <div className="space-y-2 pt-3 border-t">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Technique Breakdown
+            Chi tiết kỹ thuật
           </p>
           {Object.entries(breakdownLabels).map(([key, label]) => {
             const val = breakdown[key as keyof LivenessBreakdown];
@@ -101,7 +101,7 @@ export default function LivenessPage() {
       const data = await api.livenessCheck(imageFile, consent);
       setJobId(data.job_id);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || "Liveness check failed");
+      setError(err.response?.data?.detail || err.message || "Kiểm tra liveness thất bại");
       setIsLoading(false);
     }
   };
@@ -127,7 +127,7 @@ export default function LivenessPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Liveness Check</h1>
+      <h1 className="text-2xl font-bold mb-6">Kiểm tra Liveness</h1>
 
       {error && (
         <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>
@@ -141,7 +141,7 @@ export default function LivenessPage() {
               onClick={handleReset}
               className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
             >
-              Try Again
+              Thử lại
             </button>
           </div>
         </div>
@@ -158,7 +158,7 @@ export default function LivenessPage() {
         >
           <div>
             <label className="block text-sm font-medium mb-2">
-              Capture Face for Liveness Check
+              Chụp ảnh khuôn mặt để kiểm tra liveness
             </label>
             <CameraCapture onCapture={handleCapture} />
           </div>
@@ -172,7 +172,7 @@ export default function LivenessPage() {
               className="w-5 h-5"
             />
             <label htmlFor="consent" className="text-sm text-gray-600">
-              I consent to the liveness check of my facial data.
+              Tôi đồng ý với việc kiểm tra liveness trên dữ liệu khuôn mặt của mình.
             </label>
           </div>
 
@@ -181,7 +181,7 @@ export default function LivenessPage() {
             disabled={!imageFile || !consent || isLoading}
             className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
           >
-            {isLoading ? "Checking..." : "Check Liveness"}
+            {isLoading ? "Đang kiểm tra..." : "Kiểm tra Liveness"}
           </button>
         </form>
       )}

@@ -10,13 +10,13 @@ import type {
   PatronLookupResult,
   PatronPublic,
   PatronUpdate,
+  AccessFrequencyResponse,
   RegisterRequest,
   StatsResponse,
   TaskStatusResponse,
   TokenResponse,
   UserListResponse,
   UserPublic,
-  UserServiceAuthResponse,
 } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
@@ -97,22 +97,18 @@ class ApiClient {
     }
   }
 
-  // === Auth (via user-service) ===
-  async login(data: LoginRequest): Promise<UserServiceAuthResponse> {
-    // /users/login routes to user-service via gateway
-    const response = await this.client.post<UserServiceAuthResponse>("/users/login", data);
+  // === Auth (via face-recognition-api) ===
+  async login(data: LoginRequest): Promise<TokenResponse> {
+    const response = await this.client.post<TokenResponse>("/auth/login", data);
     return response.data;
   }
 
   async register(data: RegisterRequest): Promise<UserPublic> {
-    // /users/register routes to user-service via gateway
-    const response = await this.client.post<UserPublic>("/users/register", data);
+    const response = await this.client.post<UserPublic>("/auth/register", data);
     return response.data;
   }
 
   async getCurrentUser(): Promise<UserPublic> {
-    // This goes to user-service's /users/me via gateway
-    // user-service verifies JWT and returns user info
     const response = await this.client.get<UserPublic>("/users/me");
     return response.data;
   }
@@ -307,6 +303,14 @@ class ApiClient {
 
   async getActivePatrons(): Promise<{ items: ActivePatron[]; total: number }> {
     const response = await this.client.get<{ items: ActivePatron[]; total: number }>("/access/active");
+    return response.data;
+  }
+
+  async getAccessFrequency(params?: { dateFrom?: string; dateTo?: string }): Promise<AccessFrequencyResponse> {
+    const query: any = {};
+    if (params?.dateFrom) query.date_from = params.dateFrom;
+    if (params?.dateTo) query.date_to = params.dateTo;
+    const response = await this.client.get<AccessFrequencyResponse>("/api/access/frequency", { params: query });
     return response.data;
   }
 

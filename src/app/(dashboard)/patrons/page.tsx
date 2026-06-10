@@ -23,11 +23,13 @@ export default function PatronsPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const enrollReadyRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [enrollStreaming, setEnrollStreaming] = useState(false);
   const [enrollReady, setEnrollReady] = useState(false);
   const [enrollPreview, setEnrollPreview] = useState<string | null>(null);
   const [enrollFile, setEnrollFile] = useState<File | null>(null);
   const [enrollError, setEnrollError] = useState("");
+  const [enrollSuccess, setEnrollSuccess] = useState("");
   const [enrollLoading, setEnrollLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -42,11 +44,22 @@ export default function PatronsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const [createError, setCreateError] = useState("");
+
   const handleCreate = async () => {
-    await api.createPatron(createForm);
-    setShowCreate(false);
-    setCreateForm({ full_name: "", student_code: "", card_number: "", membership_expiry: "" });
-    load();
+    try {
+      await api.createPatron(createForm);
+      setShowCreate(false);
+      setCreateError("");
+      setCreateForm({ full_name: "", student_code: "", card_number: "", membership_expiry: "" });
+      load();
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        setCreateError("MSSV hoặc Mã thẻ đã tồn tại trong hệ thống");
+      } else {
+        setCreateError(err?.response?.data?.detail || "Tạo độc giả thất bại");
+      }
+    }
   };
 
   const openEdit = (p: PatronPublic) => {
@@ -139,17 +152,44 @@ export default function PatronsPage() {
     }, "image/jpeg", 0.9);
   };
 
+  const handleEnrollFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setEnrollError("Vui lòng chọn file ảnh");
+      return;
+    }
+    setEnrollFile(file);
+    setEnrollError("");
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setEnrollPreview(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const submitEnroll = async () => {
     if (!enrollTarget || !enrollFile) return;
     setEnrollLoading(true);
+    setEnrollError("");
+    setEnrollSuccess("");
     try {
       await api.enrollPatronFace(enrollTarget.id, enrollFile);
-      setEnrollTarget(null);
       setEnrollPreview(null);
       setEnrollFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       load();
+      setEnrollSuccess("Đăng ký khuôn mặt thành công!");
     } catch (err: any) {
-      setEnrollError(err?.response?.data?.detail || err.message || "Đăng ký thất bại");
+      const errCode = err?.response?.data?.error || err?.response?.data?.detail;
+      const errorMessages: Record<string, string> = {
+        LIVENESS_FAILED: "Ảnh không phải khuôn mặt thật, vui lòng chụp ảnh trực tiếp",
+        NO_FACE_DETECTED: "Không tìm thấy khuôn mặt trong ảnh, vui lòng thử lại",
+        MULTIPLE_FACES: "Có nhiều hơn 1 khuôn mặt trong ảnh, vui lòng chụp lại",
+        LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với điều kiện ánh sáng tốt hơn",
+        FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại",
+      };
+      setEnrollError(errorMessages[errCode] || err?.response?.data?.detail || err.message || "Đăng ký thất bại");
     } finally {
       setEnrollLoading(false);
     }
@@ -161,6 +201,8 @@ export default function PatronsPage() {
     setEnrollPreview(null);
     setEnrollFile(null);
     setEnrollError("");
+    setEnrollSuccess("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -174,11 +216,16 @@ export default function PatronsPage() {
 
       {showCreate && (
         <div className="p-4 border rounded-lg space-y-3 max-w-md bg-white">
+          {createError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {createError}
+            </div>
+          )}
           {[["full_name", "Họ tên"], ["student_code", "MSSV"], ["card_number", "Mã thẻ"], ["membership_expiry", "Hạn thẻ"]].map(([key, label]) => (
             <label key={key} className="block">
               <span className="text-sm font-medium">{label}:</span>
               <input className="mt-1 block w-full px-3 py-2 border rounded-md" value={(createForm as any)[key]}
-                onChange={(e) => setCreateForm({ ...createForm, [key]: e.target.value })}
+                onChange={(e) => { setCreateForm({ ...createForm, [key]: e.target.value }); setCreateError(""); }}
                 type={key === "membership_expiry" ? "date" : "text"} />
             </label>
           ))}
@@ -292,24 +339,41 @@ export default function PatronsPage() {
               <span className="text-sm text-gray-500">{enrollTarget.full_name} ({enrollTarget.student_code})</span>
             </div>
 
+            {enrollSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
+                <span className="text-lg">✓</span> {enrollSuccess}
+              </div>
+            )}
+
             {enrollPreview ? (
               <div className="space-y-3">
                 <img src={enrollPreview} className="w-full rounded-lg border" />
+                {enrollError && <p className="text-red-500 text-sm">{enrollError}</p>}
                 <div className="flex gap-3">
                   <button className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50"
                     onClick={submitEnroll} disabled={enrollLoading}>
                     {enrollLoading ? "Đang đăng ký..." : "Xác nhận & Gửi"}
                   </button>
                   <button className="px-4 py-2 bg-gray-200 rounded-md"
-                    onClick={() => { setEnrollPreview(null); setEnrollFile(null); }}>Chụp lại</button>
+                    onClick={() => { setEnrollPreview(null); setEnrollFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>Chụp lại</button>
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleEnrollFileChange}
+                />
                 <div className="relative bg-black rounded-lg overflow-hidden">
                   {enrollStreaming ? (
                     <>
                       <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-lg" />
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-48 h-64 border-4 border-dashed border-yellow-400 rounded-3xl opacity-80" />
+                      </div>
                       {!enrollReady && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
                           Đang mở camera...
@@ -318,20 +382,26 @@ export default function PatronsPage() {
                     </>
                   ) : (
                     <div className="flex items-center justify-center h-48 text-gray-400">
-                      {enrollError || "Nhấn 'Bật camera' để chụp ảnh"}
+                      {enrollError || "Bật camera hoặc tải ảnh lên từ máy"}
                     </div>
                   )}
                 </div>
+                <p className="text-sm text-gray-500">Đặt khuôn mặt vào khung bên dưới, đảm bảo đủ ánh sáng và nhìn thẳng vào camera.</p>
                 {enrollError && <p className="text-red-500 text-sm">{enrollError}</p>}
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
                   {!enrollStreaming ? (
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={startEnrollCam}>
-                      Bật camera
-                    </button>
+                    <>
+                      <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={startEnrollCam}>
+                        📷 Bật camera
+                      </button>
+                      <button className="px-4 py-2 bg-purple-600 text-white rounded-md" onClick={() => fileInputRef.current?.click()}>
+                        📁 Tải ảnh lên
+                      </button>
+                    </>
                   ) : (
                     <button className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50"
                       onClick={captureEnroll} disabled={!enrollReady}>
-                      Chụp ảnh
+                      📸 Chụp ảnh
                     </button>
                   )}
                   <button className="px-4 py-2 bg-gray-200 rounded-md" onClick={closeEnroll}>Đóng</button>

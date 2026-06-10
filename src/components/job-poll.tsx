@@ -12,13 +12,13 @@ interface JobPollProps {
 }
 
 const breakdownLabels: Record<keyof LivenessBreakdown, string> = {
-  lbp: "Texture (LBP)",
-  color: "Color Histogram",
-  noise: "Noise Variance",
-  fft: "Frequency (FFT)",
-  multi_scale: "Multi-scale",
-  bbox: "Face Ratio",
-  insightface: "Deep Learning",
+  lbp: "Kết cấu (LBP)",
+  color: "Màu sắc",
+  noise: "Nhiễu",
+  fft: "Tần số (FFT)",
+  multi_scale: "Đa tỷ lệ",
+  bbox: "Tỷ lệ khuôn mặt",
+  insightface: "Học sâu",
 };
 
 function BreakdownBar({ label, score }: { label: string; score: number }) {
@@ -54,10 +54,10 @@ function LivenessResultCard({ result }: { result: any }) {
         )}
         <div>
           <p className="text-xl font-bold">
-            {isLive ? "LIVE" : "SPOOF DETECTED"}
+            {isLive ? "KHUÔN MẶT THẬT" : "PHÁT HIỆN GIẢ MẠO"}
           </p>
           <p className="text-sm text-gray-500">
-            Confidence: {(score * 100).toFixed(1)}%
+            Độ tin cậy: {(score * 100).toFixed(1)}%
           </p>
         </div>
       </div>
@@ -65,7 +65,7 @@ function LivenessResultCard({ result }: { result: any }) {
       {breakdown && (
         <div className="space-y-2 pt-3 border-t">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Technique Breakdown
+            Chi tiết kỹ thuật
           </p>
           {Object.entries(breakdownLabels).map(([key, label]) => {
             const val = breakdown[key as keyof LivenessBreakdown];
@@ -84,30 +84,44 @@ export default function JobPoll({ jobId, onComplete, onError }: JobPollProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
     const poll = async () => {
       try {
         const response = await api.getTaskStatus(jobId);
         setStatus(response.status);
 
         if (response.status === "SUCCESS") {
-          setResult(response.result);
-          onComplete?.(response.result);
+          const taskResult = response.result;
+          if (taskResult?.status === "error") {
+            const errorMsg = taskResult.error || "Task failed";
+            setError(errorMsg);
+            onError?.(errorMsg);
+          } else {
+            setResult(taskResult);
+            onComplete?.(taskResult);
+          }
+          if (intervalId) clearInterval(intervalId);
         } else if (response.status === "FAILURE") {
           const errorMsg = response.result?.error || response.result?.detail || "Task failed";
           setError(errorMsg);
           onError?.(errorMsg);
+          if (intervalId) clearInterval(intervalId);
         }
       } catch (err: any) {
         const msg = err.message || "Failed to get task status";
         setError(msg);
         onError?.(msg);
+        if (intervalId) clearInterval(intervalId);
       }
     };
 
     poll();
-    const interval = setInterval(poll, 2000);
+    intervalId = setInterval(poll, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [jobId, onComplete, onError]);
 
   if (error) {
@@ -135,18 +149,18 @@ export default function JobPoll({ jobId, onComplete, onError }: JobPollProps) {
             <p className="text-sm">
               {result.verified !== undefined && (
                 <span>
-                  Verified: {result.verified ? "Yes" : "No"} (Score:{" "}
+                  Đã xác minh: {result.verified ? "Có" : "Không"} (Điểm:{" "}
                   {result.score?.toFixed(4)})
                 </span>
               )}
               {result.matches && (
                 <span>
-                  Found {result.matches.length} match(es)
+                  Tìm thấy {result.matches.length} kết quả
                 </span>
               )}
               {result.is_live !== undefined && (
                 <span>
-                  Live: {result.is_live ? "Yes" : "No"} (Score:{" "}
+                  Khuôn mặt thật: {result.is_live ? "Có" : "Không"} (Điểm:{" "}
                   {result.liveness_score?.toFixed(4)})
                 </span>
               )}
@@ -161,7 +175,7 @@ export default function JobPoll({ jobId, onComplete, onError }: JobPollProps) {
     <div className="flex items-center gap-3 p-4 bg-blue-50 text-blue-600 rounded-lg">
       <Loader2 className="w-6 h-6 animate-spin" />
       <div>
-        <p className="font-semibold">Processing...</p>
+        <p className="font-semibold">Đang xử lý...</p>
         <p className="text-sm">Job ID: {jobId}</p>
       </div>
     </div>

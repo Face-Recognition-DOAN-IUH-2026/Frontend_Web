@@ -5,6 +5,7 @@ import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
 import { useAuth } from "@/lib/auth-context";
 import api from "@/lib/api-client";
+import type { TaskResult } from "@/lib/types";
 
 function decodeJwt(token: string): { sub: string } | null {
   try {
@@ -31,6 +32,7 @@ export default function VerifyPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [result, setResult] = useState<TaskResult | null>(null);
 
   useEffect(() => {
     if (accessToken) {
@@ -74,9 +76,22 @@ export default function VerifyPage() {
       {jobId ? (
         <JobPoll
           jobId={jobId}
-          onComplete={(result) => console.log("Verification result:", result)}
+          onComplete={(r) => { setResult(r); setIsLoading(false); }}
           onError={(err) => setError(err)}
         />
+      ) : result ? (
+        <div className="space-y-4">
+          <div className={`p-4 rounded-lg ${result.verified ? "bg-green-100" : "bg-red-100"}`}>
+            <p className="text-lg font-semibold">{result.verified ? "Xác thực thành công" : "Xác thực thất bại"}</p>
+            {result.score != null && (
+              <p className="text-sm text-gray-700 mt-1">Score: {(Number(result.score) * 100).toFixed(1)}%</p>
+            )}
+            {result.error && <p className="text-sm text-red-600 mt-1">{result.error}</p>}
+          </div>
+          <button onClick={() => { setResult(null); setImageFile(null); setDataUrl(""); }} className="text-sm text-primary hover:underline">
+            Thử lại
+          </button>
+        </div>
       ) : (
         <form
           onSubmit={handleSubmit}

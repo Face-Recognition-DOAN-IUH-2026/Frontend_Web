@@ -226,7 +226,7 @@ export default function LoginPage() {
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
               <input
-                id="email" type="email" value={email}
+                id="email" type="email" value={email} autoComplete="email"
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" required
               />
@@ -234,7 +234,7 @@ export default function LoginPage() {
             <div>
               <label htmlFor="password" className="block text-sm font-medium mb-1">Password</label>
               <input
-                id="password" type="password" value={password}
+                id="password" type="password" value={password} autoComplete="current-password"
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" required
               />
