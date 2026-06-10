@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api-client";
-import type { AccessLogPublic, CameraEvent } from "@/lib/types";
+import FrequencyChart from "@/components/frequency-chart";
+import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
 
 const PAGE_SIZES = [20, 50, 100];
 
@@ -22,6 +23,9 @@ export default function HistoryPage() {
   const [limit, setLimit] = useState(50);
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const currentPage = Math.floor(skip / limit) + 1;
+
+  const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
+  const [freqLoading, setFreqLoading] = useState(false);
 
   const load = useCallback(async (append = false) => {
     setLoading(true);
@@ -47,6 +51,21 @@ export default function HistoryPage() {
   }, [search, accessType, status, dateFrom, dateTo, skip, limit]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    (async () => {
+      setFreqLoading(true);
+      try {
+        const data = await api.getAccessFrequency({
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        });
+        setFrequency(data.daily);
+      } finally {
+        setFreqLoading(false);
+      }
+    })();
+  }, [dateFrom, dateTo]);
 
   const liveCleanup = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -174,6 +193,11 @@ export default function HistoryPage() {
         </label>
       </div>
 
+      {/* Frequency chart */}
+      {frequency.length > 0 && (
+        <FrequencyChart data={frequency} loading={freqLoading} />
+      )}
+
       <div className="overflow-x-auto border rounded-lg">
         {loading && logs.length === 0 ? (
           <p className="p-4 text-gray-500">Đang tải...</p>
@@ -297,3 +321,4 @@ export default function HistoryPage() {
     </div>
   );
 }
+
