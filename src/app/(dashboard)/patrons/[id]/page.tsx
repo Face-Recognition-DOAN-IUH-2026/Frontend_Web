@@ -22,11 +22,13 @@ export default function PatronDetailPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const enrollReadyRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [enrollStreaming, setEnrollStreaming] = useState(false);
   const [enrollReady, setEnrollReady] = useState(false);
   const [enrollPreview, setEnrollPreview] = useState<string | null>(null);
   const [enrollFile, setEnrollFile] = useState<File | null>(null);
   const [enrollError, setEnrollError] = useState("");
+  const [enrollSuccess, setEnrollSuccess] = useState("");
   const [enrollLoading, setEnrollLoading] = useState(false);
 
   const loadPatron = useCallback(async () => {
@@ -132,16 +134,43 @@ export default function PatronDetailPage() {
     }, "image/jpeg", 0.9);
   };
 
+  const handleEnrollFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setEnrollError("Vui lòng chọn file ảnh");
+      return;
+    }
+    setEnrollFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setEnrollPreview(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const submitEnroll = async () => {
     if (!patron || !enrollFile) return;
     setEnrollLoading(true);
+    setEnrollError("");
+    setEnrollSuccess("");
     try {
       await api.enrollPatronFace(patron.id, enrollFile);
       setEnrollPreview(null);
       setEnrollFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       await loadPatron();
+      setEnrollSuccess("Đăng ký khuôn mặt thành công!");
     } catch (err: any) {
-      setEnrollError(err?.response?.data?.detail || err.message || "Đăng ký thất bại");
+      const errCode = err?.response?.data?.error || err?.response?.data?.detail;
+      const errorMessages: Record<string, string> = {
+        LIVENESS_FAILED: "Ảnh không phải khuôn mặt thật, vui lòng chụp ảnh trực tiếp",
+        NO_FACE_DETECTED: "Không tìm thấy khuôn mặt trong ảnh, vui lòng thử lại",
+        MULTIPLE_FACES: "Có nhiều hơn 1 khuôn mặt trong ảnh, vui lòng chụp lại",
+        LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với điều kiện ánh sáng tốt hơn",
+        FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại",
+      };
+      setEnrollError(errorMessages[errCode] || err?.response?.data?.detail || err.message || "Đăng ký thất bại");
     } finally {
       setEnrollLoading(false);
     }
@@ -195,11 +224,27 @@ export default function PatronDetailPage() {
           }); setShowEdit(true); }}>Sửa thông tin</button>
           <button className="px-4 py-2 bg-green-600 text-white rounded-md text-sm" onClick={handleRenew}>Gia hạn thẻ</button>
           {!patron.has_face && (
-            <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
-              onClick={startEnrollCam}>Đăng ký khuôn mặt</button>
+            <>
+              <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
+                onClick={startEnrollCam}>📷 Chụp ảnh</button>
+              <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
+                onClick={() => fileInputRef.current?.click()}>📁 Tải ảnh lên</button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleEnrollFileChange}
+              />
+            </>
           )}
           <button className="px-4 py-2 bg-red-600 text-white rounded-md text-sm ml-auto" onClick={handleDelete}>Xóa</button>
         </div>
+        {enrollSuccess && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
+            <span className="text-lg">✓</span> {enrollSuccess}
+          </div>
+        )}
       </div>
 
       {enrollPreview ? (
@@ -212,15 +257,19 @@ export default function PatronDetailPage() {
               {enrollLoading ? "Đang đăng ký..." : "Xác nhận & Gửi"}
             </button>
             <button className="px-4 py-2 bg-gray-200 rounded-md"
-              onClick={() => { setEnrollPreview(null); setEnrollFile(null); }}>Chụp lại</button>
+              onClick={() => { setEnrollPreview(null); setEnrollFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>Chụp lại</button>
           </div>
           {enrollError && <p className="text-red-500 text-sm">{enrollError}</p>}
         </div>
       ) : enrollStreaming ? (
         <div className="border rounded-lg p-4 space-y-3 bg-white">
           <h3 className="font-semibold">Đăng ký khuôn mặt</h3>
+          <p className="text-sm text-gray-500">Đặt khuôn mặt vào khung bên dưới, đảm bảo đủ ánh sáng và nhìn thẳng vào camera.</p>
           <div className="relative bg-black rounded-lg overflow-hidden max-w-md">
             <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-lg" />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-48 h-64 border-4 border-dashed border-yellow-400 rounded-3xl opacity-80" />
+            </div>
             {!enrollReady && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
                 Đang mở camera...

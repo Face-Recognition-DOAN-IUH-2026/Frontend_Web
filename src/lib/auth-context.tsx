@@ -75,25 +75,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (response.refresh_token) {
       localStorage.setItem("refresh_token", response.refresh_token);
     }
+    setAccessToken(response.access_token);
 
-    // Use user info from user-service response directly
+    const payload = decodeJwtPayload(response.access_token);
     const userData: AuthUser = {
-      id: response.user.id,
-      email: response.user.email,
-      role: response.user.role,
+      id: (payload?.sub as string) || "",
+      email,
+      role: ((payload?.roles as string[])?.[0]) || "user",
     };
     localStorage.setItem("user", JSON.stringify(userData));
-
-    setAccessToken(response.access_token);
     setUser(userData);
 
     router.push("/dashboard");
   };
 
   const register = async (email: string, password: string, role: string = "user") => {
-    // user-service only accepts email, password, full_name
-    // role is set internally by user-service (default "user")
-    const data: RegisterRequest = { email, password };
+    const data: RegisterRequest = { email, password, role };
     await api.register(data);
     router.push("/login");
   };
@@ -131,7 +128,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const refreshToken = localStorage.getItem("refresh_token");
       if (!refreshToken) return false;
 
-      await api.client.post("/auth/refresh", { refresh_token: refreshToken });
+      const resp = await api.client.post("/auth/refresh", { refresh_token: refreshToken });
+      const { access_token } = resp.data;
+      if (access_token) {
+        localStorage.setItem("access_token", access_token);
+        setTokenCookie(access_token);
+        setAccessToken(access_token);
+      }
       return true;
     } catch {
       return false;
