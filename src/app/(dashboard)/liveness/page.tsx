@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 import type { LivenessBreakdown } from "@/lib/types";
 
 const breakdownLabels: Record<keyof LivenessBreakdown, string> = {
@@ -101,7 +101,7 @@ export default function LivenessPage() {
       const data = await api.livenessCheck(imageFile, consent);
       setJobId(data.job_id);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || "Kiểm tra liveness thất bại");
+      setError(getErrorMessage(err) || "Kiểm tra liveness thất bại");
       setIsLoading(false);
     }
   };

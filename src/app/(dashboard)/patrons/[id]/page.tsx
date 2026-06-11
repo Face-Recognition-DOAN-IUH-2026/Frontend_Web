@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 import type { AccessLogPublic, PatronPublic, PatronUpdate } from "@/lib/types";
 
 export default function PatronDetailPage() {
@@ -170,7 +170,7 @@ export default function PatronDetailPage() {
         LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với điều kiện ánh sáng tốt hơn",
         FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại",
       };
-      setEnrollError(errorMessages[errCode] || err?.response?.data?.detail || err.message || "Đăng ký thất bại");
+      setEnrollError(errorMessages[errCode] || getErrorMessage(err) || "Đăng ký thất bại");
     } finally {
       setEnrollLoading(false);
     }

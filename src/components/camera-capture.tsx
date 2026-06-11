@@ -72,6 +72,10 @@ export default function CameraCapture({
 
     return () => {
       if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+      video.onloadedmetadata = null;
+      video.onplaying = null;
+      video.onerror = null;
+      video.srcObject = null;
     };
   }, [isCameraOn]);
 

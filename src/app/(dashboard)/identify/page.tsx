@@ -3,7 +3,7 @@
 import { useState } from "react";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 
 export default function IdentifyPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -33,7 +33,7 @@ export default function IdentifyPage() {
       const data = await api.identifyFace(imageFile, consent);
       setJobId(data.job_id);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || "Identification failed");
+      setError(getErrorMessage(err) || "Identification failed");
       setIsLoading(false);
     }
   };

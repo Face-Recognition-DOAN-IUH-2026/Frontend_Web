@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { getErrorMessage } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -33,7 +34,7 @@ export default function RegisterPage() {
     try {
       await register(email, password);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Registration failed. Please try again.");
+      setError(getErrorMessage(err) || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }

@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Upload, CheckCircle } from "lucide-react";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 
 export default function EnrollPage() {
   const [image, setImage] = useState<string | null>(null);
@@ -18,6 +18,7 @@ export default function EnrollPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const router = useRouter();
 
   const startCamera = useCallback(async () => {
@@ -75,6 +76,10 @@ export default function EnrollPage() {
 
     return () => {
       if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+      video.onloadedmetadata = null;
+      video.onplaying = null;
+      video.onerror = null;
+      video.srcObject = null;
     };
   }, [isCameraOn]);
 
@@ -143,6 +148,10 @@ export default function EnrollPage() {
   useEffect(() => {
     return () => {
       stopCamera();
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
     };
   }, [stopCamera]);
 
@@ -160,26 +169,30 @@ export default function EnrollPage() {
       setJobId(data.job_id);
       pollForResult(data.job_id);
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || "Enrollment failed");
+      setError(getErrorMessage(err) || "Enrollment failed");
     } finally {
       setIsLoading(false);
     }
   };
 
   const pollForResult = async (taskId: string) => {
-    const interval = setInterval(async () => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(async () => {
       try {
         const data = await api.getTaskStatus(taskId);
 
         if (data.status === "SUCCESS") {
-          clearInterval(interval);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
           setResult(data.result);
         } else if (data.status === "FAILURE") {
-          clearInterval(interval);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
           setError("Enrollment failed");
         }
       } catch {
-        clearInterval(interval);
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
         setError("Failed to poll task status");
       }
     }, 2000);
