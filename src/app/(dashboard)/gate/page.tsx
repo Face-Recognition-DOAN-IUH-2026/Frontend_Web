@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 import FrequencyChart from "@/components/frequency-chart";
 import type { AccessFrequencyDay, AccessLogPublic, CameraEvent, CameraStatus, KioskResult, PatronLookupResult } from "@/lib/types";
 
@@ -19,6 +19,7 @@ interface Toast {
 }
 
 let toastId = 0;
+const toastTimeoutsRef: Map<number, ReturnType<typeof setTimeout>> = new Map();
 
 export default function GatePage() {
   const router = useRouter();
@@ -31,8 +32,8 @@ export default function GatePage() {
   const [result, setResult] = useState<KioskResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [captured, setCaptured] = useState<string | null>(null);
-  const [entryTs] = useState(Date.now());
-  const [exitTs] = useState(Date.now());
+  const [entryTs] = useState(() => Date.now());
+  const [exitTs] = useState(() => Date.now());
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
   const [historyDateFrom, setHistoryDateFrom] = useState("");
@@ -40,11 +41,20 @@ export default function GatePage() {
   const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
   const [freqLoading, setFreqLoading] = useState(false);
 
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const defaultIssueDate = tomorrow.toISOString().split("T")[0];
+  const defaultExpiry = new Date();
+  defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
+  const defaultExpiryStr = defaultExpiry.toISOString().split("T")[0];
+
   const [form, setForm] = useState({
     full_name: "",
     identity_number: "",
     email: "",
     phone: "",
+    card_number: "",
+    issue_date: defaultIssueDate,
   });
 
   const [cameraReady, setCameraReady] = useState(false);
@@ -60,7 +70,11 @@ export default function GatePage() {
   const addToast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastId;
     setToasts((prev) => [{ ...t, id }, ...prev.slice(0, 4)]);
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
+    const timeout = setTimeout(() => {
+      setToasts((prev) => prev.filter((x) => x.id !== id));
+      toastTimeoutsRef.delete(id);
+    }, 6000);
+    toastTimeoutsRef.set(id, timeout);
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -126,6 +140,10 @@ export default function GatePage() {
 
     return () => {
       if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+      video.onloadedmetadata = null;
+      video.onplaying = null;
+      video.onerror = null;
+      video.srcObject = null;
     };
   }, [isCameraOn, addToast]);
 
@@ -181,6 +199,12 @@ export default function GatePage() {
     }
   };
 
+  const handleNewRegistration = async () => {
+    setMssv("");
+    setStep("enroll_form");
+    await startCamera();
+  };
+
   const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -204,17 +228,18 @@ export default function GatePage() {
       const imageFile = await captureImage();
       stopCamera();
       setStatusText("Đang gửi dữ liệu...");
-      const res = await api.kioskEnroll(imageFile, form.full_name, mssv, `CARD-${mssv || Date.now()}`,
-        "2027-12-31", form.identity_number || undefined, form.email || undefined, form.phone || undefined);
+      const cardNumber = form.card_number || `CARD-${mssv || Date.now()}`;
+      const res = await api.kioskEnroll(imageFile, form.full_name, mssv, cardNumber,
+        defaultExpiryStr, form.identity_number || undefined, form.email || undefined, form.phone || undefined, form.issue_date || undefined);
       if (res.job_id) {
         setStatusText("Đang xử lý ảnh...");
         await pollTask(res.job_id);
       }
       setResult(res);
       setStep("result");
-      setForm({ full_name: "", identity_number: "", email: "", phone: "" });
+      setForm({ full_name: "", identity_number: "", email: "", phone: "", card_number: "", issue_date: defaultIssueDate });
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err.message || "Đăng ký thất bại";
+      const msg = getErrorMessage(err) || "Đăng ký thất bại";
       setResult({ success: false, message: msg, patron: null, job_id: null });
       setStep("result");
       addToast({ type: "error", message: msg });
@@ -251,7 +276,7 @@ export default function GatePage() {
       }
       setStep("result");
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err.message || "Xác thực thất bại";
+      const msg = getErrorMessage(err) || "Xác thực thất bại";
       setResult({ success: false, message: msg, patron: null, job_id: null });
       setStep("result");
       addToast({ type: "error", message: msg });
@@ -270,7 +295,11 @@ export default function GatePage() {
     stopCamera();
   };
 
+  const sseConnectedRef = useRef(false);
+
   useEffect(() => {
+    if (sseConnectedRef.current) return;
+    sseConnectedRef.current = true;
     const cleanup = api.connectAccessSSE((event: CameraEvent) => {
       if (event.status === "granted") {
         const type = event.access_type === "entry" ? "entry" : "exit";
@@ -309,8 +338,11 @@ export default function GatePage() {
         addToast({ type: "info", message: `${event.status} — ${event.full_name || ""}` });
       }
     });
-    return cleanup;
-  }, [addToast, step]);
+    return () => {
+      sseConnectedRef.current = false;
+      cleanup();
+    };
+  }, [addToast]);
 
   useEffect(() => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -474,6 +506,9 @@ export default function GatePage() {
             <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleLookup} disabled={loading}>
               {loading ? "Đang kiểm tra..." : "Tra cứu"}
             </button>
+            <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleNewRegistration}>
+              Đăng ký thẻ mới
+            </button>
             {camStatus === "checking" && (
               <button className="px-4 py-2 bg-gray-200 text-gray-600 rounded-md text-sm" onClick={() => setCamStatus("unavailable")}>Bỏ qua</button>
             )}
@@ -499,12 +534,24 @@ export default function GatePage() {
               <>
                 <h2 className="text-xl font-semibold">Đăng ký mới</h2>
                 <p className="text-gray-600">Vui lòng nhìn vào camera và điền thông tin</p>
-                {[["full_name", "Họ tên"], ["identity_number", "MSSV"], ["email", "Email"], ["phone", "SĐT"]].map(([key, label]) => (
+                {[
+                  ["full_name", "Họ tên", "text"],
+                  ["card_number", "Số thẻ thư viện", "text"],
+                  ["identity_number", "CMND/CCCD", "text"],
+                  ["email", "Email", "email"],
+                  ["phone", "SĐT", "tel"],
+                  ["issue_date", "Ngày cấp", "date"],
+                ].map(([key, label, type]) => (
                   <label key={key} className="block">
                     <span className="text-sm font-medium">{label}:</span>
-                    <input className="mt-1 block w-full px-3 py-2 border rounded-md" value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+                    <input type={type as string}
+                      className="mt-1 block w-full px-3 py-2 border rounded-md"
+                      value={(form as any)[key]}
+                      onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                    />
                   </label>
                 ))}
+                <p className="text-xs text-gray-500">Hạn thẻ: <strong>{defaultExpiryStr}</strong> (1 năm kể từ hôm nay)</p>
                 <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleEnroll} disabled={loading}>
                   {loading ? "Đang đăng ký..." : "Đăng ký & Vào cổng"}
                 </button>

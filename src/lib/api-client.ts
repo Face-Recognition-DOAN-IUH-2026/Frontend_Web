@@ -21,6 +21,24 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
 
+export function getErrorMessage(err: any): string {
+  if (!err) return "Unknown error";
+  if (typeof err === "string") return err;
+  if (err.response?.data?.detail) {
+    const detail = err.response.data.detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail.map((d: any) => 
+        typeof d === "string" ? d : `${d.loc?.join(".")}: ${d.msg}`
+      ).join("; ");
+    }
+    if (typeof detail === "object") {
+      return detail.msg || detail.message || JSON.stringify(detail);
+    }
+  }
+  return err.message || err.msg || String(err);
+}
+
 class ApiClient {
   client: AxiosInstance;
   private refreshPromise: Promise<boolean> | null = null;
@@ -28,9 +46,6 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
     });
 
     this.client.interceptors.request.use(
@@ -144,9 +159,7 @@ class ApiClient {
     formData.append("file", imageFile);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/api/face/enroll", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post("/api/face/enroll", formData);
     return response.data;
   }
 
@@ -160,9 +173,7 @@ class ApiClient {
     formData.append("target_user_id", targetUserId);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/api/face/verify", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post("/api/face/verify", formData);
     return response.data;
   }
 
@@ -174,9 +185,7 @@ class ApiClient {
     formData.append("file", imageFile);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/api/face/identify", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post("/api/face/identify", formData);
     return response.data;
   }
 
@@ -185,9 +194,7 @@ class ApiClient {
     formData.append("email", email);
     formData.append("file", imageFile);
 
-    const response = await this.client.post("/api/auth/face-login", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post("/api/auth/face-login", formData);
     return response.data;
   }
 
@@ -199,9 +206,7 @@ class ApiClient {
     formData.append("file", imageFile);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/api/face/liveness", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post("/api/face/liveness", formData);
     return response.data;
   }
 
@@ -325,9 +330,7 @@ class ApiClient {
   ): Promise<{ success: boolean; job_id: string; message: string }> {
     const formData = new FormData();
     formData.append("image", imageFile);
-    const response = await this.client.post(`/api/patrons/${patronId}/enroll-face`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post(`/api/patrons/${patronId}/enroll-face`, formData);
     return response.data;
   }
 
@@ -364,9 +367,7 @@ class ApiClient {
     if (email) formData.append("email", email);
     if (phone) formData.append("phone", phone);
     if (issueDate) formData.append("issue_date", issueDate);
-    const response = await this.client.post<KioskResult>("/kiosk/enroll", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post<KioskResult>("/kiosk/enroll", formData);
     return response.data;
   }
 
@@ -374,9 +375,7 @@ class ApiClient {
     const formData = new FormData();
     formData.append("image", imageFile);
     formData.append("student_code", studentCode);
-    const response = await this.client.post<KioskResult>("/kiosk/enter", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post<KioskResult>("/kiosk/enter", formData);
     return response.data;
   }
 

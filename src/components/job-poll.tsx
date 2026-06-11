@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 import type { LivenessBreakdown } from "@/lib/types";
 
 interface JobPollProps {
@@ -109,7 +109,7 @@ export default function JobPoll({ jobId, onComplete, onError }: JobPollProps) {
           if (intervalId) clearInterval(intervalId);
         }
       } catch (err: any) {
-        const msg = err.message || "Failed to get task status";
+        const msg = getErrorMessage(err) || "Failed to get task status";
         setError(msg);
         onError?.(msg);
         if (intervalId) clearInterval(intervalId);

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 import type { PatronPublic, PatronCreate, PatronUpdate } from "@/lib/types";
 
 export default function PatronsPage() {
@@ -57,7 +57,7 @@ export default function PatronsPage() {
       if (err?.response?.status === 409) {
         setCreateError("MSSV hoặc Mã thẻ đã tồn tại trong hệ thống");
       } else {
-        setCreateError(err?.response?.data?.detail || "Tạo độc giả thất bại");
+        setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
       }
     }
   };
@@ -189,7 +189,7 @@ export default function PatronsPage() {
         LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với điều kiện ánh sáng tốt hơn",
         FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại",
       };
-      setEnrollError(errorMessages[errCode] || err?.response?.data?.detail || err.message || "Đăng ký thất bại");
+      setEnrollError(errorMessages[errCode] || getErrorMessage(err) || "Đăng ký thất bại");
     } finally {
       setEnrollLoading(false);
     }

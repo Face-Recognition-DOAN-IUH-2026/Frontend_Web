@@ -5,7 +5,7 @@ import { Eye, Camera, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 
 type LoginMode = "password" | "face";
 
@@ -27,6 +27,7 @@ export default function LoginPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startCamera = useCallback(async () => {
     try {
@@ -58,7 +59,13 @@ export default function LoginPage() {
     video.srcObject = stream;
     if (video.readyState >= 2) onReady();
     readyTimeoutRef.current = setTimeout(() => setCameraReady(true), 3000);
-    return () => { if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current); };
+    return () => {
+      if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+      video.onloadedmetadata = null;
+      video.onplaying = null;
+      video.onerror = null;
+      video.srcObject = null;
+    };
   }, [isCameraOn]);
 
   const stopCamera = useCallback(() => {
@@ -70,7 +77,15 @@ export default function LoginPage() {
     setCameraReady(false);
   }, []);
 
-  useEffect(() => () => stopCamera(), [stopCamera]);
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [stopCamera]);
 
   const capturePhoto = () => {
     if (!videoRef.current || !cameraReady) return;
@@ -98,7 +113,7 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Login failed");
+      setError(getErrorMessage(err) || "Login failed");
     } finally {
       setIsLoading(false);
     }
@@ -125,18 +140,20 @@ export default function LoginPage() {
       setJobId(job_id);
       pollFaceLogin(job_id);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Face login failed");
+      setError(getErrorMessage(err) || "Face login failed");
       setIsLoading(false);
     }
   };
 
   const pollFaceLogin = useCallback(
     async (taskId: string) => {
-      const interval = setInterval(async () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = setInterval(async () => {
         try {
           const resp = await api.getTaskStatus(taskId);
           if (resp.status === "SUCCESS" && resp.result) {
-            clearInterval(interval);
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
             if (resp.result.status === "error") {
               setError(resp.result.error || "Face login failed");
               setIsLoading(false);
@@ -149,13 +166,15 @@ export default function LoginPage() {
               setTimeout(() => router.push("/dashboard"), 500);
             }
           } else if (resp.status === "FAILURE") {
-            clearInterval(interval);
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
             setError(resp.result?.error || "Face login failed");
             setIsLoading(false);
             setJobId(null);
           }
         } catch {
-          clearInterval(interval);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
           setError("Failed to poll login status");
           setIsLoading(false);
           setJobId(null);
