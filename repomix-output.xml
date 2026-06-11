@@ -725,31 +725,6 @@ export default function StatsPage() {
 }
 </file>
 
-<file path="src/app/layout.tsx">
-import type { Metadata } from "next";
-import { AuthProvider } from "@/lib/auth-context";
-import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "Face Recognition Platform",
-  description: "Face Recognition Platform with FastAPI and Next.js",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
-      </body>
-    </html>
-  );
-}
-</file>
-
 <file path="src/app/page.tsx">
 import Link from "next/link";
 
@@ -796,6 +771,586 @@ export default function HomePage() {
         </div>
       </main>
     </div>
+  );
+}
+</file>
+
+<file path="src/components/frequency-chart.tsx">
+"use client";
+
+import { BarChart3 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
+import type { AccessFrequencyDay } from "@/lib/types";
+
+export default function FrequencyChart({ data, loading }: { data: AccessFrequencyDay[]; loading: boolean }) {
+  return (
+    <div className="bg-white rounded-lg border p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <BarChart3 className="w-5 h-5 text-gray-500" />
+        <h2 className="text-lg font-semibold">Thống kê tần suất ra vào</h2>
+      </div>
+      {loading ? (
+        <p className="text-gray-500 text-sm">Đang tải...</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="date"
+              tickFormatter={(d: string) => {
+                const date = new Date(d + "T00:00:00");
+                return date.toLocaleDateString("vi-VN", { day: "numeric", month: "numeric" });
+              }}
+              fontSize={12}
+            />
+            <YAxis allowDecimals={false} fontSize={12} />
+            <Tooltip
+              labelFormatter={(d: any) => {
+                if (!d) return "";
+                const date = new Date(String(d) + "T00:00:00");
+                return date.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+              }}
+            />
+            <Legend />
+            <Bar dataKey="entry" fill="#22c55e" name="Vào" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="exit" fill="#fb923c" name="Ra" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="tailwind.config.ts">
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+</file>
+
+<file path=".env.local">
+NEXT_PUBLIC_API_URL=http://localhost:80
+NEXT_PUBLIC_APP_NAME=Face Recognition Platform
+NEXT_PUBLIC_MAX_IMAGE_SIZE=5242880
+NEXT_PUBLIC_ENTRY_CAM=http://192.168.1.13:8080/video
+NEXT_PUBLIC_EXIT_CAM=http://192.168.1.240:8080/video
+</file>
+
+<file path="next.config.js">
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:80/api/:path*',
+      },
+      {
+        source: '/users/:path*',
+        destination: 'http://localhost:80/users/:path*',
+      },
+    ];
+  },
+};
+
+module.exports = nextConfig;
+</file>
+
+<file path="src/app/(dashboard)/history/page.tsx">
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import api from "@/lib/api-client";
+import FrequencyChart from "@/components/frequency-chart";
+import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
+
+const PAGE_SIZES = [20, 50, 100];
+
+export default function HistoryPage() {
+  const [logs, setLogs] = useState<AccessLogPublic[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [live, setLive] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [accessType, setAccessType] = useState("");
+  const [status, setStatus] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const [skip, setSkip] = useState(0);
+  const [limit, setLimit] = useState(50);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const currentPage = Math.floor(skip / limit) + 1;
+
+  const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
+  const [freqLoading, setFreqLoading] = useState(false);
+
+  const load = useCallback(async (append = false) => {
+    setLoading(true);
+    try {
+      const data = await api.getAccessLogs({
+        search: search || undefined,
+        accessType: accessType || undefined,
+        status: status || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        skip,
+        limit,
+      });
+      if (append) {
+        setLogs((prev) => [...prev, ...data.items]);
+      } else {
+        setLogs(data.items);
+      }
+      setTotal(data.total);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, accessType, status, dateFrom, dateTo, skip, limit]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    (async () => {
+      setFreqLoading(true);
+      try {
+        const data = await api.getAccessFrequency({
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        });
+        setFrequency(data.daily);
+      } finally {
+        setFreqLoading(false);
+      }
+    })();
+  }, [dateFrom, dateTo]);
+
+  const liveCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!live) {
+      if (liveCleanup.current) { liveCleanup.current(); liveCleanup.current = null; }
+      return;
+    }
+    if (skip !== 0) return;
+    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
+      if (search) {
+        const q = search.toLowerCase();
+        if (!event.full_name?.toLowerCase().includes(q) && !event.student_code?.toLowerCase().includes(q)) return;
+      }
+      if (status && event.status !== status) return;
+      if (accessType && event.access_type !== accessType) return;
+      const newLog: AccessLogPublic = {
+        id: `sse-${Date.now()}`,
+        patron_id: event.patron_id || null,
+        patron_name: event.full_name || null,
+        student_code: event.student_code || null,
+        access_type: event.access_type || "entry",
+        verify_method: "face",
+        confidence: event.score || null,
+        camera_id: event.camera_id,
+        access_time: new Date().toISOString(),
+        status: event.status === "granted" ? "success" : event.status,
+      };
+      setLogs((prev) => {
+        const idx = prev.findIndex((l) => l.id.startsWith("sse-"));
+        if (idx >= 0) return [newLog, ...prev.slice(0, idx)];
+        return [newLog, ...prev];
+      });
+      setTotal((prev) => prev + 1);
+    });
+    liveCleanup.current = cleanup;
+    return cleanup;
+  }, [live, skip, search, status, accessType]);
+
+  const handleSearch = () => {
+    setSkip(0);
+    load();
+  };
+
+  const goToPage = (page: number) => {
+    setSkip((page - 1) * limit);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Lịch sử ra vào</h1>
+        <span className="text-sm text-gray-500">Tổng: {total}</span>
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-end">
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">Tìm kiếm</span>
+          <input
+            className="mt-1 block w-40 px-3 py-2 border rounded-md text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            placeholder="MSSV hoặc tên..."
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">Loại</span>
+          <select
+            className="mt-1 block w-28 px-3 py-2 border rounded-md text-sm"
+            value={accessType}
+            onChange={(e) => setAccessType(e.target.value)}
+          >
+            <option value="">Tất cả</option>
+            <option value="entry">Vào</option>
+            <option value="exit">Ra</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">Kết quả</span>
+          <select
+            className="mt-1 block w-28 px-3 py-2 border rounded-md text-sm"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="">Tất cả</option>
+            <option value="success">Thành công</option>
+            <option value="failed">Thất bại</option>
+            <option value="expired">Hết hạn</option>
+            <option value="spoof">Giả mạo</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">Từ ngày</span>
+          <input
+            type="date"
+            className="mt-1 block w-36 px-3 py-2 border rounded-md text-sm"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">Đến ngày</span>
+          <input
+            type="date"
+            className="mt-1 block w-36 px-3 py-2 border rounded-md text-sm"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
+        </label>
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
+          onClick={handleSearch}
+          disabled={loading}
+        >
+          {loading ? "..." : "🔍 Lọc"}
+        </button>
+        <label className="flex items-center gap-2 text-sm ml-auto">
+          <span className="text-gray-600">Live</span>
+          <input
+            type="checkbox"
+            className="toggle"
+            checked={live}
+            onChange={(e) => setLive(e.target.checked)}
+          />
+        </label>
+      </div>
+
+      {/* Frequency chart */}
+      {frequency.length > 0 && (
+        <FrequencyChart data={frequency} loading={freqLoading} />
+      )}
+
+      <div className="overflow-x-auto border rounded-lg">
+        {loading && logs.length === 0 ? (
+          <p className="p-4 text-gray-500">Đang tải...</p>
+        ) : logs.length === 0 ? (
+          <p className="p-4 text-gray-500">Không có dữ liệu</p>
+        ) : (
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-100 text-left">
+                <th className="p-3 font-medium">Thời gian</th>
+                <th className="p-3 font-medium">Họ tên</th>
+                <th className="p-3 font-medium">MSSV</th>
+                <th className="p-3 font-medium">Loại</th>
+                <th className="p-3 font-medium">Phương thức</th>
+                <th className="p-3 font-medium">Cổng</th>
+                <th className="p-3 font-medium">Độ tin cậy</th>
+                <th className="p-3 font-medium">Kết quả</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id} className="border-t hover:bg-gray-50 transition-colors">
+                  <td className="p-3 whitespace-nowrap">{new Date(log.access_time).toLocaleString("vi-VN")}</td>
+                  <td className="p-3 font-medium">{log.patron_name || "-"}</td>
+                  <td className="p-3 text-gray-600">{log.student_code || "-"}</td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      log.access_type === "entry"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-orange-100 text-orange-800"
+                    }`}>
+                      {log.access_type === "entry" ? "Vào" : "Ra"}
+                    </span>
+                  </td>
+                  <td className="p-3 text-gray-600">{log.verify_method}</td>
+                  <td className="p-3 text-gray-600">{log.camera_id}</td>
+                  <td className="p-3">
+                    {log.confidence != null ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              log.confidence >= 0.8 ? "bg-green-500" : log.confidence >= 0.6 ? "bg-yellow-500" : "bg-red-500"
+                            }`}
+                            style={{ width: `${(log.confidence * 100).toFixed(0)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs">{(log.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      log.status === "success"
+                        ? "bg-green-100 text-green-800"
+                        : log.status === "expired"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : log.status === "spoof"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-red-100 text-red-800"
+                    }`}>
+                      {log.status === "success" ? "✓" : log.status === "expired" ? "!" : "✗"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-gray-600">Số dòng:</span>
+          <select
+            className="px-2 py-1 border rounded-md"
+            value={limit}
+            onChange={(e) => { setLimit(Number(e.target.value)); setSkip(0); }}
+          >
+            {PAGE_SIZES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="px-3 py-1 border rounded-md disabled:opacity-40"
+            disabled={currentPage <= 1}
+            onClick={() => goToPage(1)}
+          >
+            ««
+          </button>
+          <button
+            className="px-3 py-1 border rounded-md disabled:opacity-40"
+            disabled={currentPage <= 1}
+            onClick={() => goToPage(currentPage - 1)}
+          >
+            «
+          </button>
+          <span className="px-3 py-1">
+            Trang {currentPage} / {totalPages}
+          </span>
+          <button
+            className="px-3 py-1 border rounded-md disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            onClick={() => goToPage(currentPage + 1)}
+          >
+            »
+          </button>
+          <button
+            className="px-3 py-1 border rounded-md disabled:opacity-40"
+            disabled={currentPage >= totalPages}
+            onClick={() => goToPage(totalPages)}
+          >
+            »»
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/globals.css">
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+</file>
+
+<file path="src/app/layout.tsx">
+import type { Metadata } from "next";
+import { AuthProvider } from "@/lib/auth-context";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Face Recognition Platform",
+  description: "Face Recognition Platform with FastAPI and Next.js",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body suppressHydrationWarning>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
+    </html>
   );
 }
 </file>
@@ -1058,167 +1613,225 @@ export default function CameraCapture({
 }
 </file>
 
-<file path="src/components/frequency-chart.tsx">
+<file path="src/components/sidebar.tsx">
 "use client";
 
-import { BarChart3 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
-import type { AccessFrequencyDay } from "@/lib/types";
+  Home,
+  UserPlus,
+  UserCheck,
+  Search,
+  Eye,
+  Shield,
+  LogOut,
+  Users,
+  BookOpen,
+  History,
+  BarChart3,
+  DoorOpen,
+} from "lucide-react";
 
-export default function FrequencyChart({ data, loading }: { data: AccessFrequencyDay[]; loading: boolean }) {
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: Home },
+  { href: "/enroll", label: "Enroll Face", icon: UserPlus },
+  { href: "/verify", label: "Verify Face", icon: UserCheck },
+  { href: "/identify", label: "Identify Face", icon: Search },
+  { href: "/liveness", label: "Liveness Check", icon: Eye },
+  { href: "/gate", label: "Gate Kiosk", icon: DoorOpen },
+];
+
+const adminItems = [
+  { href: "/dashboard/admin", label: "Admin", icon: Shield },
+  { href: "/patrons", label: "Patrons", icon: Users },
+  { href: "/active", label: "In Library", icon: BookOpen },
+  { href: "/history", label: "Access Logs", icon: History },
+  { href: "/stats", label: "Statistics", icon: BarChart3 },
+];
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const { user, logout } = useAuth();
+
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <BarChart3 className="w-5 h-5 text-gray-500" />
-        <h2 className="text-lg font-semibold">Thống kê tần suất ra vào</h2>
+    <aside className="w-64 min-h-screen bg-white border-r flex flex-col">
+      <div className="p-4 border-b">
+        <h2 className="text-lg font-bold">Face Recognition</h2>
+        <p className="text-sm text-gray-500">{user?.email}</p>
       </div>
-      {loading ? (
-        <p className="text-gray-500 text-sm">Đang tải...</p>
-      ) : (
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(d: string) => {
-                const date = new Date(d + "T00:00:00");
-                return date.toLocaleDateString("vi-VN", { day: "numeric", month: "numeric" });
-              }}
-              fontSize={12}
-            />
-            <YAxis allowDecimals={false} fontSize={12} />
-            <Tooltip
-              labelFormatter={(d: any) => {
-                if (!d) return "";
-                const date = new Date(String(d) + "T00:00:00");
-                return date.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-              }}
-            />
-            <Legend />
-            <Bar dataKey="entry" fill="#22c55e" name="Vào" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="exit" fill="#fb923c" name="Ra" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-    </div>
+
+      <nav className="flex-1 p-4 space-y-1">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-accent"
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              {item.label}
+            </Link>
+          );
+        })}
+
+        {user?.role === "admin" && (
+          <>
+            <div className="my-4 border-t" />
+            {adminItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-accent"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </>
+        )}
+      </nav>
+
+      <div className="p-4 border-t">
+        <button
+          onClick={logout}
+          className="flex items-center gap-3 px-3 py-2 w-full rounded-md hover:bg-accent text-red-600 transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+          Logout
+        </button>
+      </div>
+    </aside>
   );
 }
 </file>
 
-<file path="tailwind.config.ts">
-import type { Config } from "tailwindcss";
+<file path="src/middleware.ts">
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-const config: Config = {
-  darkMode: ["class"],
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {
-    extend: {
-      colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-    },
-  },
-  plugins: [],
-};
+const publicPaths = ["/login", "/register", "/"];
 
-export default config;
-</file>
+export function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
 
-<file path="tsconfig.json">
-{
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  if (publicPaths.includes(path)) {
+    return NextResponse.next();
+  }
+
+  const token = request.cookies.get("access_token")?.value;
+  if (!token) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", path);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
 }
-</file>
 
-<file path=".env.local">
-NEXT_PUBLIC_API_URL=http://localhost:80
-NEXT_PUBLIC_APP_NAME=Face Recognition Platform
-NEXT_PUBLIC_MAX_IMAGE_SIZE=5242880
-NEXT_PUBLIC_ENTRY_CAM=http://192.168.1.13:8080/video
-NEXT_PUBLIC_EXIT_CAM=http://192.168.1.240:8080/video
-</file>
-
-<file path="next.config.js">
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:80/api/:path*',
-      },
-      {
-        source: '/users/:path*',
-        destination: 'http://localhost:80/users/:path*',
-      },
-    ];
-  },
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
+</file>
 
-module.exports = nextConfig;
+<file path=".gitignore">
+# === Node.js ===
+node_modules/
+
+# === Next.js ===
+.next/
+out/
+
+# Next.js build cache
+.next/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === Generated / Agent files ===
+repomix-output.xml/
+SkillAgent/
+CLAUDE.md
+AGENTS.md
+
+# === TypeScript ===
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="package.json">
+{
+  "name": "face-recognition-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
+    "next": "15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.53.2",
+    "react-is": "^19.2.7",
+    "react-webcam": "^7.2.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
+  }
+}
 </file>
 
 <file path="src/app/(dashboard)/enroll/page.tsx">
@@ -1584,332 +2197,6 @@ export default function EnrollPage() {
           )}
         </form>
       )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/history/page.tsx">
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import api from "@/lib/api-client";
-import FrequencyChart from "@/components/frequency-chart";
-import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
-
-const PAGE_SIZES = [20, 50, 100];
-
-export default function HistoryPage() {
-  const [logs, setLogs] = useState<AccessLogPublic[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [live, setLive] = useState(true);
-
-  const [search, setSearch] = useState("");
-  const [accessType, setAccessType] = useState("");
-  const [status, setStatus] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
-  const [skip, setSkip] = useState(0);
-  const [limit, setLimit] = useState(50);
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  const currentPage = Math.floor(skip / limit) + 1;
-
-  const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
-  const [freqLoading, setFreqLoading] = useState(false);
-
-  const load = useCallback(async (append = false) => {
-    setLoading(true);
-    try {
-      const data = await api.getAccessLogs({
-        search: search || undefined,
-        accessType: accessType || undefined,
-        status: status || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        skip,
-        limit,
-      });
-      if (append) {
-        setLogs((prev) => [...prev, ...data.items]);
-      } else {
-        setLogs(data.items);
-      }
-      setTotal(data.total);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, accessType, status, dateFrom, dateTo, skip, limit]);
-
-  useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    (async () => {
-      setFreqLoading(true);
-      try {
-        const data = await api.getAccessFrequency({
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-        });
-        setFrequency(data.daily);
-      } finally {
-        setFreqLoading(false);
-      }
-    })();
-  }, [dateFrom, dateTo]);
-
-  const liveCleanup = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    if (!live) {
-      if (liveCleanup.current) { liveCleanup.current(); liveCleanup.current = null; }
-      return;
-    }
-    if (skip !== 0) return;
-    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
-      if (search) {
-        const q = search.toLowerCase();
-        if (!event.full_name?.toLowerCase().includes(q) && !event.student_code?.toLowerCase().includes(q)) return;
-      }
-      if (status && event.status !== status) return;
-      if (accessType && event.access_type !== accessType) return;
-      const newLog: AccessLogPublic = {
-        id: `sse-${Date.now()}`,
-        patron_id: event.patron_id || null,
-        patron_name: event.full_name || null,
-        student_code: event.student_code || null,
-        access_type: event.access_type || "entry",
-        verify_method: "face",
-        confidence: event.score || null,
-        camera_id: event.camera_id,
-        access_time: new Date().toISOString(),
-        status: event.status === "granted" ? "success" : event.status,
-      };
-      setLogs((prev) => {
-        const idx = prev.findIndex((l) => l.id.startsWith("sse-"));
-        if (idx >= 0) return [newLog, ...prev.slice(0, idx)];
-        return [newLog, ...prev];
-      });
-      setTotal((prev) => prev + 1);
-    });
-    liveCleanup.current = cleanup;
-    return cleanup;
-  }, [live, skip, search, status, accessType]);
-
-  const handleSearch = () => {
-    setSkip(0);
-    load();
-  };
-
-  const goToPage = (page: number) => {
-    setSkip((page - 1) * limit);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Lịch sử ra vào</h1>
-        <span className="text-sm text-gray-500">Tổng: {total}</span>
-      </div>
-
-      <div className="flex flex-wrap gap-2 items-end">
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Tìm kiếm</span>
-          <input
-            className="mt-1 block w-40 px-3 py-2 border rounded-md text-sm"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="MSSV hoặc tên..."
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Loại</span>
-          <select
-            className="mt-1 block w-28 px-3 py-2 border rounded-md text-sm"
-            value={accessType}
-            onChange={(e) => setAccessType(e.target.value)}
-          >
-            <option value="">Tất cả</option>
-            <option value="entry">Vào</option>
-            <option value="exit">Ra</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Kết quả</span>
-          <select
-            className="mt-1 block w-28 px-3 py-2 border rounded-md text-sm"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="">Tất cả</option>
-            <option value="success">Thành công</option>
-            <option value="failed">Thất bại</option>
-            <option value="expired">Hết hạn</option>
-            <option value="spoof">Giả mạo</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Từ ngày</span>
-          <input
-            type="date"
-            className="mt-1 block w-36 px-3 py-2 border rounded-md text-sm"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Đến ngày</span>
-          <input
-            type="date"
-            className="mt-1 block w-36 px-3 py-2 border rounded-md text-sm"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-          />
-        </label>
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
-          onClick={handleSearch}
-          disabled={loading}
-        >
-          {loading ? "..." : "🔍 Lọc"}
-        </button>
-        <label className="flex items-center gap-2 text-sm ml-auto">
-          <span className="text-gray-600">Live</span>
-          <input
-            type="checkbox"
-            className="toggle"
-            checked={live}
-            onChange={(e) => setLive(e.target.checked)}
-          />
-        </label>
-      </div>
-
-      {/* Frequency chart */}
-      {frequency.length > 0 && (
-        <FrequencyChart data={frequency} loading={freqLoading} />
-      )}
-
-      <div className="overflow-x-auto border rounded-lg">
-        {loading && logs.length === 0 ? (
-          <p className="p-4 text-gray-500">Đang tải...</p>
-        ) : logs.length === 0 ? (
-          <p className="p-4 text-gray-500">Không có dữ liệu</p>
-        ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-100 text-left">
-                <th className="p-3 font-medium">Thời gian</th>
-                <th className="p-3 font-medium">Họ tên</th>
-                <th className="p-3 font-medium">MSSV</th>
-                <th className="p-3 font-medium">Loại</th>
-                <th className="p-3 font-medium">Phương thức</th>
-                <th className="p-3 font-medium">Cổng</th>
-                <th className="p-3 font-medium">Độ tin cậy</th>
-                <th className="p-3 font-medium">Kết quả</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <tr key={log.id} className="border-t hover:bg-gray-50 transition-colors">
-                  <td className="p-3 whitespace-nowrap">{new Date(log.access_time).toLocaleString("vi-VN")}</td>
-                  <td className="p-3 font-medium">{log.patron_name || "-"}</td>
-                  <td className="p-3 text-gray-600">{log.student_code || "-"}</td>
-                  <td className="p-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      log.access_type === "entry"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-orange-100 text-orange-800"
-                    }`}>
-                      {log.access_type === "entry" ? "Vào" : "Ra"}
-                    </span>
-                  </td>
-                  <td className="p-3 text-gray-600">{log.verify_method}</td>
-                  <td className="p-3 text-gray-600">{log.camera_id}</td>
-                  <td className="p-3">
-                    {log.confidence != null ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              log.confidence >= 0.8 ? "bg-green-500" : log.confidence >= 0.6 ? "bg-yellow-500" : "bg-red-500"
-                            }`}
-                            style={{ width: `${(log.confidence * 100).toFixed(0)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs">{(log.confidence * 100).toFixed(0)}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      log.status === "success"
-                        ? "bg-green-100 text-green-800"
-                        : log.status === "expired"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : log.status === "spoof"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-red-100 text-red-800"
-                    }`}>
-                      {log.status === "success" ? "✓" : log.status === "expired" ? "!" : "✗"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between text-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-gray-600">Số dòng:</span>
-          <select
-            className="px-2 py-1 border rounded-md"
-            value={limit}
-            onChange={(e) => { setLimit(Number(e.target.value)); setSkip(0); }}
-          >
-            {PAGE_SIZES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            className="px-3 py-1 border rounded-md disabled:opacity-40"
-            disabled={currentPage <= 1}
-            onClick={() => goToPage(1)}
-          >
-            ««
-          </button>
-          <button
-            className="px-3 py-1 border rounded-md disabled:opacity-40"
-            disabled={currentPage <= 1}
-            onClick={() => goToPage(currentPage - 1)}
-          >
-            «
-          </button>
-          <span className="px-3 py-1">
-            Trang {currentPage} / {totalPages}
-          </span>
-          <button
-            className="px-3 py-1 border rounded-md disabled:opacity-40"
-            disabled={currentPage >= totalPages}
-            onClick={() => goToPage(currentPage + 1)}
-          >
-            »
-          </button>
-          <button
-            className="px-3 py-1 border rounded-md disabled:opacity-40"
-            disabled={currentPage >= totalPages}
-            onClick={() => goToPage(totalPages)}
-          >
-            »»
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -2728,72 +3015,6 @@ export default function PatronsPage() {
 }
 </file>
 
-<file path="src/app/globals.css">
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-@keyframes slide-in {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-.animate-slide-in {
-  animation: slide-in 0.3s ease-out;
-}
-</file>
-
 <file path="src/app/register/page.tsx">
 "use client";
 
@@ -2915,227 +3136,6 @@ export default function RegisterPage() {
       </div>
     </div>
   );
-}
-</file>
-
-<file path="src/components/sidebar.tsx">
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import {
-  Home,
-  UserPlus,
-  UserCheck,
-  Search,
-  Eye,
-  Shield,
-  LogOut,
-  Users,
-  BookOpen,
-  History,
-  BarChart3,
-  DoorOpen,
-} from "lucide-react";
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/enroll", label: "Enroll Face", icon: UserPlus },
-  { href: "/verify", label: "Verify Face", icon: UserCheck },
-  { href: "/identify", label: "Identify Face", icon: Search },
-  { href: "/liveness", label: "Liveness Check", icon: Eye },
-  { href: "/gate", label: "Gate Kiosk", icon: DoorOpen },
-];
-
-const adminItems = [
-  { href: "/dashboard/admin", label: "Admin", icon: Shield },
-  { href: "/patrons", label: "Patrons", icon: Users },
-  { href: "/active", label: "In Library", icon: BookOpen },
-  { href: "/history", label: "Access Logs", icon: History },
-  { href: "/stats", label: "Statistics", icon: BarChart3 },
-];
-
-export default function Sidebar() {
-  const pathname = usePathname();
-  const { user, logout } = useAuth();
-
-  return (
-    <aside className="w-64 min-h-screen bg-white border-r flex flex-col">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-bold">Face Recognition</h2>
-        <p className="text-sm text-gray-500">{user?.email}</p>
-      </div>
-
-      <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-accent"
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              {item.label}
-            </Link>
-          );
-        })}
-
-        {user?.role === "admin" && (
-          <>
-            <div className="my-4 border-t" />
-            {adminItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-accent"
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </>
-        )}
-      </nav>
-
-      <div className="p-4 border-t">
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 px-3 py-2 w-full rounded-md hover:bg-accent text-red-600 transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-          Logout
-        </button>
-      </div>
-    </aside>
-  );
-}
-</file>
-
-<file path="src/middleware.ts">
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-
-const publicPaths = ["/login", "/register", "/"];
-
-export function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-
-  if (publicPaths.includes(path)) {
-    return NextResponse.next();
-  }
-
-  const token = request.cookies.get("access_token")?.value;
-  if (!token) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", path);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
-};
-</file>
-
-<file path=".gitignore">
-# === Node.js ===
-node_modules/
-
-# === Next.js ===
-.next/
-out/
-
-# Next.js build cache
-.next/
-out/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# === OS ===
-.DS_Store
-Thumbs.db
-
-# === IDE ===
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# === Generated / Agent files ===
-repomix-output.xml/
-SkillAgent/
-CLAUDE.md
-AGENTS.md
-
-# === TypeScript ===
-*.tsbuildinfo
-next-env.d.ts
-</file>
-
-<file path="package.json">
-{
-  "name": "face-recognition-frontend",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbo",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "axios": "^1.7.7",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.454.0",
-    "next": "15.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-hook-form": "^7.53.2",
-    "react-is": "^19.2.7",
-    "react-webcam": "^7.2.0",
-    "recharts": "^3.8.1",
-    "tailwind-merge": "^2.5.4",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@hookform/resolvers": "^3.9.1",
-    "@types/node": "^22.9.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3"
-  }
 }
 </file>
 
@@ -5041,6 +5041,249 @@ export function useAuth() {
 }
 </file>
 
+<file path="src/lib/types.ts">
+// === Auth ===
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  full_name?: string;
+  role?: string;
+}
+
+// User-service returns user info along with tokens
+export interface UserServiceAuthResponse {
+  user: UserPublic;
+  access_token: string;
+  refresh_token?: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string | null;
+  token_type: string;
+}
+
+export interface UserPublic {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: string;
+  has_face?: boolean;
+}
+
+export interface RefreshRequest {
+  refresh_token: string;
+}
+
+// === Tasks ===
+export interface TaskStatusResponse {
+  task_id: string;
+  status: "PENDING" | "SUCCESS" | "FAILURE" | "RETRY" | "STARTED" | "ERROR";
+  result: TaskResult | null;
+}
+
+export interface LivenessBreakdown {
+  lbp?: number;
+  color?: number;
+  noise?: number;
+  fft?: number;
+  multi_scale?: number;
+  bbox?: number;
+  insightface?: number;
+}
+
+export interface TaskResult {
+  status: string;
+  user_id?: string;
+  verified?: boolean;
+  score?: number;
+  matches?: Array<{ user_id: string; score: number }>;
+  liveness_score?: number;
+  is_live?: boolean;
+  breakdown?: LivenessBreakdown;
+  error?: string;
+  type?: string;
+  access_token?: string;
+  refresh_token?: string;
+  detail?: string;
+}
+
+// === Users ===
+export interface UserListResponse {
+  users: UserPublic[];
+  total: number;
+}
+
+// === Face Operations ===
+export interface EnrollmentResult {
+  job_id: string;
+}
+
+export interface VerificationResult {
+  job_id: string;
+}
+
+export interface IdentificationResult {
+  job_id: string;
+}
+
+export interface LivenessResult {
+  job_id: string;
+}
+
+// === API Error ===
+export interface ApiError {
+  detail: string;
+}
+
+// === Auth Context ===
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+}
+
+export interface AuthContextType {
+  user: AuthUser | null;
+  accessToken: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  setAuthFromToken: (accessToken: string, refreshToken: string | null, email: string, role?: string) => void;
+  register: (email: string, password: string, role?: string) => Promise<void>;
+  logout: () => void;
+  refreshAccessToken: () => Promise<boolean>;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+
+// === Patron ===
+export interface PatronPublic {
+  id: string;
+  full_name: string;
+  student_code: string;
+  identity_number: string | null;
+  email: string | null;
+  phone: string | null;
+  card_number: string;
+  issue_date: string | null;
+  membership_expiry: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  has_face: boolean;
+}
+
+export interface PatronCreate {
+  full_name: string;
+  student_code: string;
+  card_number: string;
+  membership_expiry: string;
+  identity_number?: string;
+  email?: string;
+  phone?: string;
+  issue_date?: string;
+}
+
+export interface PatronUpdate {
+  full_name?: string;
+  identity_number?: string;
+  email?: string;
+  phone?: string;
+  membership_expiry?: string;
+  status?: string;
+}
+
+export interface PatronLookupResult {
+  exists: boolean;
+  patron: PatronPublic | null;
+  has_face: boolean;
+  is_expired: boolean;
+}
+
+// === Access Log ===
+export interface AccessLogPublic {
+  id: string;
+  patron_id: string | null;
+  patron_name: string | null;
+  student_code: string | null;
+  access_type: string;
+  verify_method: string;
+  confidence: number | null;
+  camera_id: string;
+  access_time: string;
+  status: string;
+}
+
+export interface AccessLogList {
+  items: AccessLogPublic[];
+  total: number;
+}
+
+export interface ActivePatron {
+  id: string;
+  full_name: string;
+  student_code: string;
+  entered_at: string;
+  camera_id: string;
+  image_url: string | null;
+  confidence: number | null;
+}
+
+export interface AccessFrequencyDay {
+  date: string;
+  entry: number;
+  exit: number;
+}
+
+export interface AccessFrequencyResponse {
+  daily: AccessFrequencyDay[];
+}
+
+export interface StatsResponse {
+  total_patrons: number;
+  active_patrons: number;
+  today_entries: number;
+  today_exits: number;
+}
+
+export interface KioskResult {
+  success: boolean;
+  message: string;
+  patron: PatronPublic | null;
+  job_id: string | null;
+  confidence?: number;
+}
+
+export interface CameraStatus {
+  camera_id: string;
+  url: string;
+  running: boolean;
+  connected: boolean;
+  frames_processed: number;
+  last_frame_time: string | null;
+  last_error: string | null;
+  retry_count: number;
+  next_retry_in: number | null;
+}
+
+export interface CameraEvent {
+  camera_id: string;
+  status: "granted" | "no_match" | "expired" | "spoof" | "error";
+  patron_id?: string;
+  full_name?: string;
+  student_code?: string;
+  score?: number;
+  access_type?: string;
+  is_live?: boolean;
+  liveness_score?: number;
+  error?: string;
+}
+</file>
+
 <file path="src/lib/api-client.ts">
 import axios, { AxiosInstance, AxiosError } from "axios";
 import type {
@@ -5442,249 +5685,6 @@ class ApiClient {
 
 export const api = new ApiClient();
 export default api;
-</file>
-
-<file path="src/lib/types.ts">
-// === Auth ===
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  full_name?: string;
-  role?: string;
-}
-
-// User-service returns user info along with tokens
-export interface UserServiceAuthResponse {
-  user: UserPublic;
-  access_token: string;
-  refresh_token?: string;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  refresh_token: string | null;
-  token_type: string;
-}
-
-export interface UserPublic {
-  id: string;
-  email: string;
-  full_name: string | null;
-  role: string;
-  has_face?: boolean;
-}
-
-export interface RefreshRequest {
-  refresh_token: string;
-}
-
-// === Tasks ===
-export interface TaskStatusResponse {
-  task_id: string;
-  status: "PENDING" | "SUCCESS" | "FAILURE" | "RETRY" | "STARTED" | "ERROR";
-  result: TaskResult | null;
-}
-
-export interface LivenessBreakdown {
-  lbp?: number;
-  color?: number;
-  noise?: number;
-  fft?: number;
-  multi_scale?: number;
-  bbox?: number;
-  insightface?: number;
-}
-
-export interface TaskResult {
-  status: string;
-  user_id?: string;
-  verified?: boolean;
-  score?: number;
-  matches?: Array<{ user_id: string; score: number }>;
-  liveness_score?: number;
-  is_live?: boolean;
-  breakdown?: LivenessBreakdown;
-  error?: string;
-  type?: string;
-  access_token?: string;
-  refresh_token?: string;
-  detail?: string;
-}
-
-// === Users ===
-export interface UserListResponse {
-  users: UserPublic[];
-  total: number;
-}
-
-// === Face Operations ===
-export interface EnrollmentResult {
-  job_id: string;
-}
-
-export interface VerificationResult {
-  job_id: string;
-}
-
-export interface IdentificationResult {
-  job_id: string;
-}
-
-export interface LivenessResult {
-  job_id: string;
-}
-
-// === API Error ===
-export interface ApiError {
-  detail: string;
-}
-
-// === Auth Context ===
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: string;
-}
-
-export interface AuthContextType {
-  user: AuthUser | null;
-  accessToken: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  setAuthFromToken: (accessToken: string, refreshToken: string | null, email: string, role?: string) => void;
-  register: (email: string, password: string, role?: string) => Promise<void>;
-  logout: () => void;
-  refreshAccessToken: () => Promise<boolean>;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-}
-
-// === Patron ===
-export interface PatronPublic {
-  id: string;
-  full_name: string;
-  student_code: string;
-  identity_number: string | null;
-  email: string | null;
-  phone: string | null;
-  card_number: string;
-  issue_date: string | null;
-  membership_expiry: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  has_face: boolean;
-}
-
-export interface PatronCreate {
-  full_name: string;
-  student_code: string;
-  card_number: string;
-  membership_expiry: string;
-  identity_number?: string;
-  email?: string;
-  phone?: string;
-  issue_date?: string;
-}
-
-export interface PatronUpdate {
-  full_name?: string;
-  identity_number?: string;
-  email?: string;
-  phone?: string;
-  membership_expiry?: string;
-  status?: string;
-}
-
-export interface PatronLookupResult {
-  exists: boolean;
-  patron: PatronPublic | null;
-  has_face: boolean;
-  is_expired: boolean;
-}
-
-// === Access Log ===
-export interface AccessLogPublic {
-  id: string;
-  patron_id: string | null;
-  patron_name: string | null;
-  student_code: string | null;
-  access_type: string;
-  verify_method: string;
-  confidence: number | null;
-  camera_id: string;
-  access_time: string;
-  status: string;
-}
-
-export interface AccessLogList {
-  items: AccessLogPublic[];
-  total: number;
-}
-
-export interface ActivePatron {
-  id: string;
-  full_name: string;
-  student_code: string;
-  entered_at: string;
-  camera_id: string;
-  image_url: string | null;
-  confidence: number | null;
-}
-
-export interface AccessFrequencyDay {
-  date: string;
-  entry: number;
-  exit: number;
-}
-
-export interface AccessFrequencyResponse {
-  daily: AccessFrequencyDay[];
-}
-
-export interface StatsResponse {
-  total_patrons: number;
-  active_patrons: number;
-  today_entries: number;
-  today_exits: number;
-}
-
-export interface KioskResult {
-  success: boolean;
-  message: string;
-  patron: PatronPublic | null;
-  job_id: string | null;
-  confidence?: number;
-}
-
-export interface CameraStatus {
-  camera_id: string;
-  url: string;
-  running: boolean;
-  connected: boolean;
-  frames_processed: number;
-  last_frame_time: string | null;
-  last_error: string | null;
-  retry_count: number;
-  next_retry_in: number | null;
-}
-
-export interface CameraEvent {
-  camera_id: string;
-  status: "granted" | "no_match" | "expired" | "spoof" | "error";
-  patron_id?: string;
-  full_name?: string;
-  student_code?: string;
-  score?: number;
-  access_type?: string;
-  is_live?: boolean;
-  liveness_score?: number;
-  error?: string;
-}
 </file>
 
 </files>
