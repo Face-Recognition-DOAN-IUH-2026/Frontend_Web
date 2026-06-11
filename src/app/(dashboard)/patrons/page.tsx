@@ -13,7 +13,7 @@ export default function PatronsPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<PatronCreate>({
-    full_name: "", student_code: "", card_number: "", membership_expiry: "",
+    full_name: "", student_code: "", class_name: "", membership_expiry: "",
   });
 
   const [editTarget, setEditTarget] = useState<PatronPublic | null>(null);
@@ -51,7 +51,7 @@ export default function PatronsPage() {
       await api.createPatron(createForm);
       setShowCreate(false);
       setCreateError("");
-      setCreateForm({ full_name: "", student_code: "", card_number: "", membership_expiry: "" });
+      setCreateForm({ full_name: "", student_code: "", class_name: "", membership_expiry: "" });
       load();
     } catch (err: any) {
       if (err?.response?.status === 409) {
@@ -93,8 +93,17 @@ export default function PatronsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Xóa độc giả này?")) return;
-    await api.deletePatron(id);
-    load();
+    setPatrons((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await api.deletePatron(id);
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        alert("Độc giả đã bị xóa trước đó.");
+      } else {
+        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lỗi không xác định"));
+        load();
+      }
+    }
   };
 
   const startEnrollCam = async () => {
@@ -221,7 +230,7 @@ export default function PatronsPage() {
               {createError}
             </div>
           )}
-          {[["full_name", "Họ tên"], ["student_code", "MSSV"], ["card_number", "Mã thẻ"], ["membership_expiry", "Hạn thẻ"]].map(([key, label]) => (
+          {[["full_name", "Họ tên"], ["student_code", "MSSV"], ["class_name", "Lớp"]].map(([key, label]) => (
             <label key={key} className="block">
               <span className="text-sm font-medium">{label}:</span>
               <input className="mt-1 block w-full px-3 py-2 border rounded-md" value={(createForm as any)[key]}
@@ -229,6 +238,13 @@ export default function PatronsPage() {
                 type={key === "membership_expiry" ? "date" : "text"} />
             </label>
           ))}
+          <label className="block">
+            <span className="text-sm font-medium">Hạn thẻ:</span>
+            <input className="mt-1 block w-full px-3 py-2 border rounded-md" value={createForm.membership_expiry}
+              onChange={(e) => { setCreateForm({ ...createForm, membership_expiry: e.target.value }); setCreateError(""); }}
+              type="date" />
+          </label>
+          <p className="text-xs text-gray-500">Số thẻ thư viện sẽ được tự động sinh theo định dạng THV-MSSV</p>
           <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleCreate}>Tạo</button>
         </div>
       )}

@@ -85,11 +85,15 @@ class ApiClient {
       return this.client(originalRequest);
     }
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+    const hasAccessToken = typeof window !== "undefined" && !!localStorage.getItem("access_token");
+    const hasRefreshToken = typeof window !== "undefined" && !!localStorage.getItem("refresh_token");
+    if (!hasAccessToken && !hasRefreshToken) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
     }
 
     return Promise.reject(new Error("Session expired"));
@@ -153,11 +157,13 @@ class ApiClient {
   // === Face Operations ===
   async enrollFace(
     imageFile: File,
-    consentGiven: boolean = true
+    consentGiven: boolean = true,
+    angle: string = "frontal"
   ): Promise<{ job_id: string }> {
     const formData = new FormData();
     formData.append("file", imageFile);
     formData.append("consent_given", String(consentGiven));
+    formData.append("angle", angle);
 
     const response = await this.client.post("/api/face/enroll", formData);
     return response.data;
@@ -290,7 +296,7 @@ class ApiClient {
   }
 
   connectAccessSSE(onEvent: (event: CameraEvent) => void): () => void {
-    const es = new EventSource(`${API_BASE_URL}/access/events`);
+    const es = new EventSource(`${API_BASE_URL}/api/access/events`);
     es.addEventListener("camera_event", (msg: MessageEvent) => {
       try {
         const data = JSON.parse(msg.data) as CameraEvent;
@@ -302,12 +308,12 @@ class ApiClient {
   }
 
   async getRecentLogs(): Promise<AccessLogList> {
-    const response = await this.client.get<AccessLogList>("/access/recent");
+    const response = await this.client.get<AccessLogList>("/api/access/recent");
     return response.data;
   }
 
   async getActivePatrons(): Promise<{ items: ActivePatron[]; total: number }> {
-    const response = await this.client.get<{ items: ActivePatron[]; total: number }>("/access/active");
+    const response = await this.client.get<{ items: ActivePatron[]; total: number }>("/api/access/active");
     return response.data;
   }
 
@@ -320,16 +326,18 @@ class ApiClient {
   }
 
   async getStats(): Promise<StatsResponse> {
-    const response = await this.client.get<StatsResponse>("/access/stats");
+    const response = await this.client.get<StatsResponse>("/api/access/stats");
     return response.data;
   }
 
   async enrollPatronFace(
     patronId: string,
-    imageFile: File
+    imageFile: File,
+    angle: string = "frontal"
   ): Promise<{ success: boolean; job_id: string; message: string }> {
     const formData = new FormData();
     formData.append("image", imageFile);
+    formData.append("angle", angle);
     const response = await this.client.post(`/api/patrons/${patronId}/enroll-face`, formData);
     return response.data;
   }
@@ -342,7 +350,7 @@ class ApiClient {
     const params: any = {};
     if (studentCode) params.student_code = studentCode;
     if (cardNumber) params.card_number = cardNumber;
-    const response = await this.client.post<PatronLookupResult>("/kiosk/lookup", null, { params });
+    const response = await this.client.post<PatronLookupResult>("/api/kiosk/lookup", null, { params });
     return response.data;
   }
 
@@ -350,24 +358,18 @@ class ApiClient {
     imageFile: File,
     fullName: string,
     studentCode: string,
-    cardNumber: string,
     membershipExpiry: string,
-    identityNumber?: string,
-    email?: string,
-    phone?: string,
-    issueDate?: string
+    className?: string,
+    angle: string = "frontal"
   ): Promise<KioskResult> {
     const formData = new FormData();
     formData.append("image", imageFile);
     formData.append("full_name", fullName);
     formData.append("student_code", studentCode);
-    formData.append("card_number", cardNumber);
     formData.append("membership_expiry", membershipExpiry);
-    if (identityNumber) formData.append("identity_number", identityNumber);
-    if (email) formData.append("email", email);
-    if (phone) formData.append("phone", phone);
-    if (issueDate) formData.append("issue_date", issueDate);
-    const response = await this.client.post<KioskResult>("/kiosk/enroll", formData);
+    formData.append("angle", angle);
+    if (className) formData.append("class_name", className);
+    const response = await this.client.post<KioskResult>("/api/kiosk/enroll", formData);
     return response.data;
   }
 
@@ -375,23 +377,58 @@ class ApiClient {
     const formData = new FormData();
     formData.append("image", imageFile);
     formData.append("student_code", studentCode);
-    const response = await this.client.post<KioskResult>("/kiosk/enter", formData);
+    const response = await this.client.post<KioskResult>("/api/kiosk/enter", formData);
+    return response.data;
+  }
+
+  async kioskBatchEnroll(
+    imageFrontal: File,
+    imageRight: File,
+    imageLeft: File,
+    imageDown: File,
+    fullName: string,
+    studentCode: string,
+    membershipExpiry: string,
+    className?: string,
+  ): Promise<KioskResult> {
+    const formData = new FormData();
+    formData.append("image_frontal", imageFrontal);
+    formData.append("image_right", imageRight);
+    formData.append("image_left", imageLeft);
+    formData.append("image_down", imageDown);
+    formData.append("full_name", fullName);
+    formData.append("student_code", studentCode);
+    formData.append("membership_expiry", membershipExpiry);
+    if (className) formData.append("class_name", className);
+    const response = await this.client.post<KioskResult>("/api/kiosk/batch-enroll", formData);
+    return response.data;
+  }
+
+  async kioskEnrollFace(
+    patronId: string,
+    imageFile: File,
+    angle: string = "frontal"
+  ): Promise<{ success: boolean; message: string }> {
+    const formData = new FormData();
+    formData.append("image", imageFile);
+    formData.append("angle", angle);
+    const response = await this.client.post(`/api/kiosk/enroll-face/${patronId}`, formData);
     return response.data;
   }
 
   // === Camera ===
   async getCameraStatus(): Promise<CameraStatus[]> {
-    const response = await this.client.get<CameraStatus[]>("/camera/status");
+    const response = await this.client.get<CameraStatus[]>("/api/camera/status");
     return response.data;
   }
 
   async reconnectCamera(cameraId: string): Promise<{ message: string }> {
-    const response = await this.client.post(`/camera/reconnect/${cameraId}`);
+    const response = await this.client.post(`/api/camera/reconnect/${cameraId}`);
     return response.data;
   }
 
   async reconnectAllCameras(): Promise<{ message: string; cameras: string[] }> {
-    const response = await this.client.post("/camera/reconnect-all");
+    const response = await this.client.post("/api/camera/reconnect-all");
     return response.data;
   }
 }

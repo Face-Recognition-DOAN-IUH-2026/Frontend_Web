@@ -75,8 +75,17 @@ export default function PatronDetailPage() {
 
   const handleDelete = async () => {
     if (!patron || !confirm("Xóa độc giả này?")) return;
-    await api.deletePatron(patron.id);
-    router.push("/patrons");
+    try {
+      await api.deletePatron(patron.id);
+      router.push("/patrons");
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        alert("Độc giả không tồn tại hoặc đã bị xóa trước đó.");
+        router.push("/patrons");
+      } else {
+        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lỗi không xác định"));
+      }
+    }
   };
 
   const startEnrollCam = async () => {
@@ -177,7 +186,15 @@ export default function PatronDetailPage() {
   };
 
   if (loading) return <p className="text-gray-500">Đang tải...</p>;
-  if (!patron) return <p className="text-gray-500">Không tìm thấy độc giả</p>;
+  if (!patron) return (
+    <div className="text-center py-12">
+      <p className="text-gray-500 text-lg mb-4">Không tìm thấy độc giả</p>
+      <p className="text-gray-400 text-sm mb-6">Độc giả có thể đã bị xóa hoặc ID không hợp lệ.</p>
+      <button onClick={() => router.push("/patrons")} className="px-4 py-2 bg-blue-600 text-white rounded-md">
+        &larr; Quay lại danh sách
+      </button>
+    </div>
+  );
 
   const pageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
   const currentPage = Math.floor(logsSkip / logsLimit) + 1;
@@ -199,10 +216,8 @@ export default function PatronDetailPage() {
         <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
           <div><span className="text-gray-500">Họ tên:</span> <span className="font-medium">{patron.full_name}</span></div>
           <div><span className="text-gray-500">MSSV:</span> <span className="font-medium">{patron.student_code}</span></div>
-          <div><span className="text-gray-500">CMND/CCCD:</span> <span className="font-medium">{patron.identity_number || "-"}</span></div>
+          <div><span className="text-gray-500">Lớp:</span> <span className="font-medium">{patron.class_name || "-"}</span></div>
           <div><span className="text-gray-500">Mã thẻ:</span> <span className="font-medium">{patron.card_number}</span></div>
-          <div><span className="text-gray-500">Email:</span> <span className="font-medium">{patron.email || "-"}</span></div>
-          <div><span className="text-gray-500">SĐT:</span> <span className="font-medium">{patron.phone || "-"}</span></div>
           <div><span className="text-gray-500">Ngày cấp thẻ:</span> <span className="font-medium">{patron.issue_date || "-"}</span></div>
           <div><span className="text-gray-500">Hạn thẻ:</span>
             <span className={`font-medium ml-1 ${new Date(patron.membership_expiry) < new Date() ? "text-red-600" : "text-green-600"}`}>
@@ -218,8 +233,7 @@ export default function PatronDetailPage() {
         </div>
         <div className="flex gap-3 mt-6 pt-4 border-t">
           <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm" onClick={() => { setEditForm({
-            full_name: patron.full_name, identity_number: patron.identity_number || undefined,
-            email: patron.email || undefined, phone: patron.phone || undefined,
+            full_name: patron.full_name, class_name: patron.class_name || undefined,
             membership_expiry: patron.membership_expiry, status: patron.status,
           }); setShowEdit(true); }}>Sửa thông tin</button>
           <button className="px-4 py-2 bg-green-600 text-white rounded-md text-sm" onClick={handleRenew}>Gia hạn thẻ</button>
@@ -289,7 +303,7 @@ export default function PatronDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
           <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold">Sửa độc giả</h2>
-            {[["full_name", "Họ tên"], ["identity_number", "CMND/CCCD"], ["email", "Email"], ["phone", "SĐT"],
+            {[["full_name", "Họ tên"], ["class_name", "Lớp"],
               ["membership_expiry", "Hạn thẻ"], ["status", "Trạng thái"]
             ].map(([key, label]) => (
               <label key={key} className="block">

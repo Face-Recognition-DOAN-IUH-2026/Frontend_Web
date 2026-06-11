@@ -112,6 +112,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(email, password);
+      window.location.href = "/dashboard";
     } catch (err: any) {
       setError(getErrorMessage(err) || "Login failed");
     } finally {

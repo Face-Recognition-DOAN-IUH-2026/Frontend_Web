@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, ArrowLeft, ArrowDown, Eye } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api-client";
 import FrequencyChart from "@/components/frequency-chart";
 import type { AccessFrequencyDay, AccessLogPublic, CameraEvent, CameraStatus, KioskResult, PatronLookupResult } from "@/lib/types";
@@ -50,16 +51,18 @@ export default function GatePage() {
 
   const [form, setForm] = useState({
     full_name: "",
-    identity_number: "",
-    email: "",
-    phone: "",
-    card_number: "",
-    issue_date: defaultIssueDate,
+    student_code: "",
+    class_name: "",
   });
 
   const [cameraReady, setCameraReady] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [statusText, setStatusText] = useState("");
+
+  const [isMultiCapturing, setIsMultiCapturing] = useState(false);
+  const [captureAngles, setCaptureAngles] = useState<{ angle: string; label: string; file: File | null }[]>([]);
+  const [currentCaptureIdx, setCurrentCaptureIdx] = useState(-1);
+  const [captureCountdown, setCaptureCountdown] = useState<number | null>(null);
   const [camStatus, setCamStatus] = useState<"checking" | "available" | "unavailable" | "blocked">("checking");
   const [entryCamOk, setEntryCamOk] = useState<boolean | null>(null);
   const [exitCamOk, setExitCamOk] = useState<boolean | null>(null);
@@ -220,34 +223,109 @@ export default function GatePage() {
     throw new Error("Timeout waiting for result");
   }, []);
 
+  const CAPTURE_ANGLE_SEQUENCE = [
+    { angle: "frontal", label: "Nhìn thẳng", icon: Eye, tip: "Giữ mặt thẳng, mắt mở tự nhiên" },
+    { angle: "right", label: "Quay phải", icon: ArrowLeft, tip: "Xoay đầu phải 30°" },
+    { angle: "left", label: "Quay trái", icon: ArrowRight, tip: "Xoay đầu trái 30°" },
+    { angle: "down", label: "Cúi xuống", icon: ArrowDown, tip: "Cúi nhẹ cằm xuống" },
+  ];
+
+  useEffect(() => {
+    if (currentCaptureIdx < 0 || currentCaptureIdx >= CAPTURE_ANGLE_SEQUENCE.length) return;
+    if (!cameraReady || !isMultiCapturing) return;
+
+    let cancelled = false;
+    let c = 3;
+    setCaptureCountdown(c);
+
+    const timer = setInterval(async () => {
+      c--;
+      if (cancelled) { clearInterval(timer); return; }
+
+      if (c <= 0) {
+        clearInterval(timer);
+        setCaptureCountdown(null);
+
+        try {
+          const file = await captureImage();
+          if (!cancelled) {
+            setCaptureAngles((prev) => [...prev, { ...CAPTURE_ANGLE_SEQUENCE[currentCaptureIdx], file }]);
+            const nextIdx = currentCaptureIdx + 1;
+            if (nextIdx >= CAPTURE_ANGLE_SEQUENCE.length) {
+              setIsMultiCapturing(false);
+              setCurrentCaptureIdx(-1);
+            } else {
+              setTimeout(() => { if (!cancelled) setCurrentCaptureIdx(nextIdx); }, 600);
+            }
+          }
+        } catch (err: any) {
+          if (!cancelled) {
+            addToast({ type: "error", message: `Lỗi chụp: ${err.message}` });
+            setIsMultiCapturing(false);
+            setCurrentCaptureIdx(-1);
+            setCaptureCountdown(null);
+            setLoading(false);
+            setStatusText("");
+          }
+        }
+      } else {
+        setCaptureCountdown(c);
+      }
+    }, 1000);
+
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [currentCaptureIdx, cameraReady, isMultiCapturing, captureImage, addToast]);
+
   const handleEnroll = async () => {
     if (!form.full_name) return;
     setLoading(true);
-    setStatusText("Đang chụp ảnh...");
-    try {
-      const imageFile = await captureImage();
-      stopCamera();
-      setStatusText("Đang gửi dữ liệu...");
-      const cardNumber = form.card_number || `CARD-${mssv || Date.now()}`;
-      const res = await api.kioskEnroll(imageFile, form.full_name, mssv, cardNumber,
-        defaultExpiryStr, form.identity_number || undefined, form.email || undefined, form.phone || undefined, form.issue_date || undefined);
-      if (res.job_id) {
-        setStatusText("Đang xử lý ảnh...");
-        await pollTask(res.job_id);
-      }
-      setResult(res);
-      setStep("result");
-      setForm({ full_name: "", identity_number: "", email: "", phone: "", card_number: "", issue_date: defaultIssueDate });
-    } catch (err: any) {
-      const msg = getErrorMessage(err) || "Đăng ký thất bại";
-      setResult({ success: false, message: msg, patron: null, job_id: null });
-      setStep("result");
-      addToast({ type: "error", message: msg });
-    } finally {
-      setLoading(false);
-      setStatusText("");
-    }
+    setStatusText("Đang chuẩn bị chụp...");
+    setCaptureAngles([]);
+    setIsMultiCapturing(true);
+    setCurrentCaptureIdx(0);
   };
+
+  useEffect(() => {
+    if (captureAngles.length !== CAPTURE_ANGLE_SEQUENCE.length || isMultiCapturing) return;
+    if (captureAngles.length === 0) return;
+
+    (async () => {
+      setStatusText("Đang gửi dữ liệu...");
+      try {
+        const frontal = captureAngles.find((a) => a.angle === "frontal");
+        const right = captureAngles.find((a) => a.angle === "right");
+        const left = captureAngles.find((a) => a.angle === "left");
+        const down = captureAngles.find((a) => a.angle === "down");
+        if (!frontal?.file || !right?.file || !left?.file || !down?.file) {
+          throw new Error("Thiếu ảnh chụp");
+        }
+
+        stopCamera();
+        const studentCode = form.student_code || mssv;
+        const res = await api.kioskBatchEnroll(
+          frontal.file, right.file, left.file, down.file,
+          form.full_name, studentCode,
+          defaultExpiryStr,
+          form.class_name || undefined,
+        );
+
+        if (res.success) {
+          addToast({ type: "info", message: "Đã tạo độc giả với đầy đủ 4 góc khuôn mặt" });
+        }
+        setResult(res);
+        setStep("result");
+        setForm({ full_name: "", student_code: "", class_name: "" });
+      } catch (err: any) {
+        const msg = getErrorMessage(err) || "Đăng ký thất bại";
+        setResult({ success: false, message: msg, patron: null, job_id: null });
+        setStep("result");
+        addToast({ type: "error", message: msg });
+      } finally {
+        setLoading(false);
+        setStatusText("");
+      }
+    })();
+  }, [captureAngles, isMultiCapturing]);
 
   const handleVerify = async () => {
     setLoading(true);
@@ -292,6 +370,10 @@ export default function GatePage() {
     setLookup(null);
     setResult(null);
     setCaptured(null);
+    setIsMultiCapturing(false);
+    setCaptureAngles([]);
+    setCurrentCaptureIdx(-1);
+    setCaptureCountdown(null);
     stopCamera();
   };
 
@@ -374,6 +456,7 @@ export default function GatePage() {
       try {
         const data = await api.getAccessFrequency();
         setFrequency(data.daily);
+      } catch {
       } finally {
         setFreqLoading(false);
       }
@@ -521,13 +604,44 @@ export default function GatePage() {
           <div>
             <div className="relative bg-black rounded-lg overflow-hidden">
               <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-lg" />
-              {!cameraReady && (
+              {!cameraReady && !isMultiCapturing && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
                   Đang mở camera...
                 </div>
               )}
+              {captureCountdown !== null && (() => {
+                const cfg = CAPTURE_ANGLE_SEQUENCE[currentCaptureIdx];
+                const ArrowIcon = cfg?.icon;
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+                    <div className="text-center">
+                      {ArrowIcon && (
+                        <div className="animate-bounce mb-2">
+                          <ArrowIcon className="w-10 h-10 mx-auto text-yellow-400" />
+                        </div>
+                      )}
+                      <p className="text-white text-xl font-semibold mb-1">{cfg?.label}</p>
+                      <p className="text-gray-300 text-sm mb-4">{cfg?.tip}</p>
+                      <div className="flex justify-center gap-1 mb-2">
+                        {CAPTURE_ANGLE_SEQUENCE.map((_, i) => (
+                          <span
+                            key={i}
+                            className={`w-3 h-3 rounded-full ${i < captureAngles.length ? "bg-green-500" : i === currentCaptureIdx ? "bg-yellow-400" : "bg-gray-600"}`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-white text-5xl font-bold drop-shadow-lg">{captureCountdown}</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-            {captured && <img src={captured} className="w-full mt-2 rounded-lg border" />}
+            {captured && !isMultiCapturing && <img src={captured} className="w-full mt-2 rounded-lg border" />}
+            {captureAngles.length > 0 && captureAngles.length < CAPTURE_ANGLE_SEQUENCE.length && (
+              <div className="mt-2 text-sm text-green-600">
+                Đã chụp: {captureAngles.map((a) => a.label).join(", ")}
+              </div>
+            )}
           </div>
           <div className="space-y-4">
             {step === "enroll_form" && (
@@ -536,24 +650,21 @@ export default function GatePage() {
                 <p className="text-gray-600">Vui lòng nhìn vào camera và điền thông tin</p>
                 {[
                   ["full_name", "Họ tên", "text"],
-                  ["card_number", "Số thẻ thư viện", "text"],
-                  ["identity_number", "CMND/CCCD", "text"],
-                  ["email", "Email", "email"],
-                  ["phone", "SĐT", "tel"],
-                  ["issue_date", "Ngày cấp", "date"],
+                  ["student_code", "MSSV", "text"],
+                  ["class_name", "Lớp", "text"],
                 ].map(([key, label, type]) => (
                   <label key={key} className="block">
                     <span className="text-sm font-medium">{label}:</span>
                     <input type={type as string}
                       className="mt-1 block w-full px-3 py-2 border rounded-md"
-                      value={(form as any)[key]}
+                      value={(form as any)[key] || ""}
                       onChange={(e) => setForm({ ...form, [key]: e.target.value })}
                     />
                   </label>
                 ))}
                 <p className="text-xs text-gray-500">Hạn thẻ: <strong>{defaultExpiryStr}</strong> (1 năm kể từ hôm nay)</p>
-                <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleEnroll} disabled={loading}>
-                  {loading ? "Đang đăng ký..." : "Đăng ký & Vào cổng"}
+                <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleEnroll} disabled={loading || isMultiCapturing}>
+                  {loading ? "Đang đăng ký..." : isMultiCapturing ? "Đang chụp..." : "Đăng ký & Vào cổng"}
                 </button>
               </>
             )}

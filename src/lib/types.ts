@@ -121,6 +121,7 @@ export interface PatronPublic {
   id: string;
   full_name: string;
   student_code: string;
+  class_name: string | null;
   identity_number: string | null;
   email: string | null;
   phone: string | null;
@@ -136,16 +137,14 @@ export interface PatronPublic {
 export interface PatronCreate {
   full_name: string;
   student_code: string;
-  card_number: string;
+  class_name?: string;
   membership_expiry: string;
-  identity_number?: string;
-  email?: string;
-  phone?: string;
   issue_date?: string;
 }
 
 export interface PatronUpdate {
   full_name?: string;
+  class_name?: string;
   identity_number?: string;
   email?: string;
   phone?: string;

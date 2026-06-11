@@ -12,6 +12,7 @@ export default function ActivePage() {
     try {
       const data = await api.getActivePatrons();
       setPatrons(data.items);
+    } catch {
     } finally {
       setLoading(false);
     }

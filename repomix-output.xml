@@ -51,6 +51,7 @@ src/app/(dashboard)/active/page.tsx
 src/app/(dashboard)/dashboard/admin/page.tsx
 src/app/(dashboard)/dashboard/page.tsx
 src/app/(dashboard)/enroll/page.tsx
+src/app/(dashboard)/gate/layout.tsx
 src/app/(dashboard)/gate/page.tsx
 src/app/(dashboard)/history/page.tsx
 src/app/(dashboard)/identify/page.tsx
@@ -80,6 +81,12 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
+<file path="src/app/(dashboard)/gate/layout.tsx">
+export default function GateLayout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+</file>
+
 <file path="postcss.config.js">
 module.exports = {
   plugins: {
@@ -94,116 +101,6 @@ module.exports = {
   <rect width="100" height="100" rx="20" fill="#2563eb"/>
   <text x="50" y="68" font-family="Arial" font-size="55" font-weight="bold" fill="white" text-anchor="middle">F</text>
 </svg>
-</file>
-
-<file path="README.md">
-# Face Recognition Platform - Frontend
-
-Next.js 15 frontend for the Face Recognition Platform.
-
-## Architecture
-
-```
-Frontend_web/
-├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── (dashboard)/        # Protected dashboard routes
-│   │   ├── login/
-│   │   ├── register/
-│   │   └── page.tsx            # Landing page
-│   ├── components/
-│   │   ├── camera-capture.tsx  # Webcam capture component
-│   │   ├── job-poll.tsx        # Celery job polling
-│   │   └── sidebar.tsx          # Dashboard navigation
-│   └── lib/
-│       ├── api-client.ts       # Axios API client with JWT
-│       ├── auth-context.tsx    # Auth context provider
-│       └── types.ts            # TypeScript interfaces
-├── docker-compose.yml
-├── Dockerfile
-└── next.config.js
-```
-
-## Quick Start
-
-### Development
-```bash
-npm install
-npm run dev
-```
-Visit http://localhost:3000
-
-### Production (Docker)
-```bash
-docker compose up -d
-```
-Frontend runs at http://localhost:3000
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NEXT_PUBLIC_API_URL` | `/api` | API Gateway URL |
-
-For local development with Docker backend:
-```env
-NEXT_PUBLIC_API_URL=http://localhost/api
-```
-
-## Pages
-
-| Route | Auth | Description |
-|-------|------|-------------|
-| `/` | No | Landing page |
-| `/login` | No | Login form |
-| `/register` | No | Registration form |
-| `/dashboard` | Yes | Dashboard overview |
-| `/dashboard/enroll` | Yes | Enroll face |
-| `/dashboard/verify` | Yes | Verify face |
-| `/dashboard/identify` | Yes | Identify face |
-| `/dashboard/liveness` | Yes | Liveness check |
-| `/dashboard/admin` | Admin | User management |
-
-## API Integration
-
-The frontend communicates with the backend via the API Gateway (http://localhost/api).
-
-### Authentication Flow
-1. User logs in via `/auth/login`
-2. Backend returns `access_token` + `refresh_token`
-3. Frontend stores tokens in localStorage
-4. API client auto-attaches `Authorization: Bearer <token>` to requests
-5. On 401 response, client auto-refreshes the access token
-
-## Backend Repository
-
-The backend code is in a separate repository: `Backend/`
-
-For the full stack to work:
-1. Start backend: `cd Backend && docker compose up -d`
-2. Start frontend: `docker compose up -d`
-
-## Tech Stack
-
-- Next.js 15 (App Router)
-- React 19
-- TypeScript
-- Tailwind CSS
-- Axios
-- react-webcam
-
-## Build for Production
-
-```bash
-npm run build
-npm start
-```
-
-Or use Docker:
-```bash
-docker build -t face-recognition-web .
-docker run -p 3000:3000 face-recognition-web
-```
 </file>
 
 <file path="src/app/(dashboard)/active/page.tsx">
@@ -221,6 +118,7 @@ export default function ActivePage() {
     try {
       const data = await api.getActivePatrons();
       setPatrons(data.items);
+    } catch {
     } finally {
       setLoading(false);
     }
@@ -884,7 +782,11 @@ export default config;
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -894,7 +796,7 @@ export default config;
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
       {
@@ -902,11 +804,21 @@ export default config;
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
 </file>
 
@@ -936,6 +848,356 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+</file>
+
+<file path="README.md">
+# Face Recognition Platform - Frontend
+
+Next.js 15 frontend for the Face Recognition Platform.
+
+## Architecture
+
+```
+Frontend_web/
+├── src/
+│   ├── app/                    # Next.js App Router pages
+│   │   ├── (dashboard)/        # Protected dashboard routes
+│   │   ├── login/
+│   │   ├── register/
+│   │   └── page.tsx            # Landing page
+│   ├── components/
+│   │   ├── camera-capture.tsx  # Webcam capture component
+│   │   ├── job-poll.tsx        # Celery job polling
+│   │   └── sidebar.tsx          # Dashboard navigation
+│   └── lib/
+│       ├── api-client.ts       # Axios API client with JWT
+│       ├── auth-context.tsx    # Auth context provider
+│       └── types.ts            # TypeScript interfaces
+├── docker-compose.yml
+├── Dockerfile
+└── next.config.js
+```
+
+---
+
+## Installation
+
+### Prerequisites
+
+- Node.js 18+ (recommended: 20.x LTS)
+- npm or yarn
+- Docker Desktop (if running with Docker)
+
+### Option 1: Local Development
+
+#### Step 1: Install Dependencies
+
+```bash
+cd D:/IUH/test/Frontend_Web_Test
+npm install
+```
+
+#### Step 2: Setup Environment
+
+Create or edit `.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost/api
+```
+
+#### Step 3: Start Backend
+
+Make sure the backend is running first:
+
+```bash
+cd D:/IUH/test/Backend
+docker-compose up -d
+```
+
+#### Step 4: Start Frontend
+
+```bash
+cd D:/IUH/test/Frontend_Web_Test
+npm run dev
+```
+
+Visit http://localhost:3000
+
+### Option 2: Docker
+
+#### Step 1: Start Backend
+
+```bash
+cd D:/IUH/test/Backend
+docker-compose up -d
+```
+
+#### Step 2: Start Frontend
+
+```bash
+cd D:/IUH/test/Frontend_Web_Test
+docker-compose up -d
+```
+
+Frontend runs at http://localhost:3000
+
+---
+
+## Common Errors & Fixes
+
+### 1. "Cannot find module 'next'" or other dependency errors
+
+**Cause:** node_modules missing or corrupted.
+
+**Fix:**
+```bash
+cd D:/IUH/test/Frontend_Web_Test
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### 2. "NEXT_PUBLIC_API_URL is not set"
+
+**Cause:** Environment variable not configured.
+
+**Fix:** Create `.env.local` in the project root:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost/api
+```
+
+For Docker backend, ensure backend is running first.
+
+### 3. "Hydration failed" or "Content mismatch" errors
+
+**Cause:** SSR mismatch, usually with localStorage access during render.
+
+**Fix:** Ensure API calls are wrapped in `useEffect` or use dynamic imports for components using browser-only APIs.
+
+### 4. Port 3000 already in use
+
+**Fix:**
+```powershell
+# Find process using port 3000
+netstat -ano | findstr :3000
+taskkill /PID <pid> /F
+
+# Or change port
+npm run dev -- -p 3001
+```
+
+### 5. Webcam not working
+
+**Cause:** Browser permissions or HTTPS requirement.
+
+**Fix:**
+- Allow camera permissions in browser
+- For HTTPS: Use `https://localhost:3000` or Chrome flags:
+  ```
+  chrome://flags/#unsafely-treat-insecure-origin-as-secure
+  ```
+
+### 6. API requests failing (CORS errors)
+
+**Cause:** Backend CORS not configured or backend not running.
+
+**Fix:**
+```bash
+# Check if backend is running
+cd D:/IUH/test/Backend
+docker-compose ps
+
+# Restart backend if needed
+docker-compose restart
+
+# Check gateway logs
+docker-compose logs gateway
+```
+
+### 7. "Connection refused" to backend
+
+**Cause:** Backend not running or wrong API URL.
+
+**Fix:**
+```bash
+# Verify backend is running
+cd D:/IUH/test/Backend
+docker-compose ps
+
+# All containers should be "Up" or "Healthy"
+
+# Check .env.local has correct URL
+NEXT_PUBLIC_API_URL=http://localhost/api
+```
+
+### 8. Docker build fails for frontend
+
+**Cause:** Build context missing files.
+
+**Fix:**
+```bash
+cd D:/IUH/test/Frontend_Web_Test
+npm run build  # Test local build first
+docker build -t face-recognition-web .
+```
+
+### 9. Login/Register not working
+
+**Cause:** Backend services not healthy or JWT misconfiguration.
+
+**Fix:**
+```bash
+# Check all backend services
+docker-compose ps
+
+# View user-service logs
+docker-compose logs user-service
+
+# View gateway logs
+docker-compose logs gateway
+
+# Restart if needed
+docker-compose restart
+```
+
+### 10. Build errors with TypeScript
+
+**Cause:** Type checking failures.
+
+**Fix:**
+```bash
+cd D:/IUH/test/Frontend_Web_Test
+# Check TypeScript
+npx tsc --noEmit
+
+# Build with skipping lint
+npm run build -- --no-lint
+```
+
+---
+
+## Development
+
+### Available Scripts
+
+```bash
+npm run dev      # Start development server (Turbo)
+npm run build    # Build for production
+npm run start    # Start production server
+npm run lint     # Run ESLint
+```
+
+### Code Quality
+
+```bash
+# Format code
+npm run lint -- --fix
+```
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NEXT_PUBLIC_API_URL` | `/api` | API Gateway URL |
+
+For local development with Docker backend:
+```env
+NEXT_PUBLIC_API_URL=http://localhost/api
+```
+
+---
+
+## Pages
+
+| Route | Auth | Description |
+|-------|------|-------------|
+| `/` | No | Landing page |
+| `/login` | No | Login form |
+| `/register` | No | Registration form |
+| `/dashboard` | Yes | Dashboard overview |
+| `/dashboard/enroll` | Yes | Enroll face |
+| `/dashboard/verify` | Yes | Verify face |
+| `/dashboard/identify` | Yes | Identify face |
+| `/dashboard/liveness` | Yes | Liveness check |
+| `/dashboard/admin` | Admin | User management |
+
+---
+
+## API Integration
+
+The frontend communicates with the backend via the API Gateway (http://localhost/api).
+
+### Authentication Flow
+
+1. User logs in via `/auth/login`
+2. Backend returns `access_token` + `refresh_token`
+3. Frontend stores tokens in localStorage
+4. API client auto-attaches `Authorization: Bearer <token>` to requests
+5. On 401 response, client auto-refreshes the access token
+
+---
+
+## Backend Repository
+
+The backend code is in: `D:/IUH/test/Backend/`
+
+For the full stack to work:
+
+1. **Start backend first:**
+   ```bash
+   cd D:/IUH/test/Backend
+   # Build TypeScript services first
+   cd user-service && npm install && npm run build && cd ..
+   cd api-gateway && npm install && npm run build && cd ..
+   # Then start Docker
+   docker-compose up -d --build
+   ```
+
+2. **Start frontend:**
+   ```bash
+   cd D:/IUH/test/Frontend_Web_Test
+   npm install
+   npm run dev
+   ```
+
+---
+
+## Tech Stack
+
+- Next.js 15 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS
+- Axios
+- react-webcam
+
+## Build for Production
+
+```bash
+npm run build
+npm start
+```
+
+Or use Docker:
+
+```bash
+docker build -t face-recognition-web .
+docker run -p 3000:3000 face-recognition-web
+```
+
+---
+
+## Troubleshooting Checklist
+
+1. [ ] Docker Desktop is running
+2. [ ] Backend is fully built and running (`docker-compose ps` shows all Up/Healthy)
+3. [ ] TypeScript services built (`npm run build` succeeds locally)
+4. [ ] `.env.local` exists with correct `NEXT_PUBLIC_API_URL`
+5. [ ] `npm install` completed without errors
+6. [ ] Port 3000 (frontend) and 80 (backend gateway) are free
+7. [ ] Browser has camera permissions for face recognition features
 </file>
 
 <file path="src/app/(dashboard)/history/page.tsx">
@@ -1795,52 +2057,28 @@ AGENTS.md
 next-env.d.ts
 </file>
 
-<file path="package.json">
-{
-  "name": "face-recognition-frontend",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbo",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "axios": "^1.7.7",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.454.0",
-    "next": "15.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-hook-form": "^7.53.2",
-    "react-is": "^19.2.7",
-    "react-webcam": "^7.2.0",
-    "recharts": "^3.8.1",
-    "tailwind-merge": "^2.5.4",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@hookform/resolvers": "^3.9.1",
-    "@types/node": "^22.9.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3"
-  }
-}
-</file>
-
 <file path="src/app/(dashboard)/enroll/page.tsx">
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Camera, Upload, CheckCircle } from "lucide-react";
+import { Camera, Upload, CheckCircle, RefreshCw, ArrowRight, ArrowLeft, ArrowDown, Eye } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api-client";
+
+const ANGLE_CONFIG = [
+  { angle: "frontal", icon: Eye, instruction: "Nhìn thẳng vào camera", tip: "Giữ mặt thẳng, mắt mở tự nhiên" },
+  { angle: "right", icon: ArrowLeft, instruction: "Quay mặt sang phải", tip: "Xoay đầu sang phải khoảng 30°" },
+  { angle: "left", icon: ArrowRight, instruction: "Quay mặt sang trái", tip: "Xoay đầu sang trái khoảng 30°" },
+  { angle: "down", icon: ArrowDown, instruction: "Cúi mặt xuống", tip: "Cúi nhẹ cằm xuống ngực" },
+];
+
+type CaptureMode = "quick" | "full";
+
+interface CaptureSlot {
+  angle: string;
+  status: "pending" | "capturing" | "done";
+  file: File | null;
+  dataUrl: string | null;
+}
 
 export default function EnrollPage() {
   const [image, setImage] = useState<string | null>(null);
@@ -1856,7 +2094,14 @@ export default function EnrollPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const router = useRouter();
+  const [captureMode, setCaptureMode] = useState<CaptureMode>("full");
+  const [captures, setCaptures] = useState<CaptureSlot[]>(
+    ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null }))
+  );
+  const [currentAngleIdx, setCurrentAngleIdx] = useState(-1);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isSequenceRunning, setIsSequenceRunning] = useState(false);
+  const [quickSubmitted, setQuickSubmitted] = useState(false);
 
   const startCamera = useCallback(async () => {
     try {
@@ -1920,6 +2165,16 @@ export default function EnrollPage() {
     };
   }, [isCameraOn]);
 
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -1929,45 +2184,119 @@ export default function EnrollPage() {
     setCameraReady(false);
   }, []);
 
-  const capturePhoto = () => {
-    if (!videoRef.current || !streamRef.current || !cameraReady) {
-      setError("Camera is not ready. Please wait and try again.");
-      return;
-    }
+  const captureImage = useCallback((): Promise<{ file: File; dataUrl: string }> => {
+    return new Promise((resolve, reject) => {
+      const video = videoRef.current;
+      if (!video || !streamRef.current || !cameraReady || video.videoWidth === 0 || video.videoHeight === 0) {
+        reject(new Error("Camera not ready"));
+        return;
+      }
 
-    const video = videoRef.current;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Could not create canvas")); return; }
 
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      setError("Camera not ready. Please wait and try again.");
-      return;
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setError("Could not capture image");
-      return;
-    }
-
-    ctx.drawImage(video, 0, 0);
-
-    canvas.toBlob(
-      (blob) => {
+      ctx.drawImage(video, 0, 0);
+      const dataUrl = canvas.toDataURL("image/jpeg");
+      canvas.toBlob((blob) => {
         if (blob) {
-          const capturedFile = new File([blob], "face_capture.jpg", {
-            type: "image/jpeg",
-          });
-          setFile(capturedFile);
-          setImage(canvas.toDataURL("image/jpeg"));
-          stopCamera();
+          resolve({ file: new File([blob], "face_capture.jpg", { type: "image/jpeg" }), dataUrl });
+        } else {
+          reject(new Error("Could not create image"));
         }
-      },
-      "image/jpeg",
-      0.9
+      }, "image/jpeg", 0.9);
+    });
+  }, [cameraReady]);
+
+  const capturePhoto = async () => {
+    try {
+      const { file, dataUrl } = await captureImage();
+      setFile(file);
+      setImage(dataUrl);
+      stopCamera();
+    } catch {
+      setError("Capture failed. Please try again.");
+    }
+  };
+
+  const startSequence = useCallback(async () => {
+    setError("");
+    setQuickSubmitted(false);
+    setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
+    setCurrentAngleIdx(0);
+    setIsSequenceRunning(true);
+    await startCamera();
+  }, [startCamera]);
+
+  useEffect(() => {
+    if (currentAngleIdx < 0 || currentAngleIdx >= ANGLE_CONFIG.length) return;
+    if (!cameraReady || !isSequenceRunning) return;
+
+    let cancelled = false;
+    let c = 3;
+    setCountdown(c);
+    setCaptures((prev) =>
+      prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "capturing" } : s))
     );
+
+    const timer = setInterval(async () => {
+      c--;
+      if (cancelled) { clearInterval(timer); return; }
+
+      if (c <= 0) {
+        clearInterval(timer);
+        setCountdown(null);
+
+        try {
+          const { file, dataUrl } = await captureImage();
+          if (!cancelled) {
+            setCaptures((prev) =>
+              prev.map((s, i) =>
+                i === currentAngleIdx
+                  ? { ...s, status: "done", file, dataUrl }
+                  : s
+              )
+            );
+
+            const nextIdx = currentAngleIdx + 1;
+            if (nextIdx >= ANGLE_CONFIG.length) {
+              setIsSequenceRunning(false);
+              setCurrentAngleIdx(-1);
+              stopCamera();
+            } else {
+              setTimeout(() => {
+                if (!cancelled) setCurrentAngleIdx(nextIdx);
+              }, 800);
+            }
+          }
+        } catch {
+          if (!cancelled) {
+            setCaptures((prev) =>
+              prev.map((s, i) =>
+                i === currentAngleIdx ? { ...s, status: "pending" } : s
+              )
+            );
+            setCurrentAngleIdx(-1);
+            setIsSequenceRunning(false);
+            setError("Capture failed. Please try again.");
+          }
+        }
+      } else {
+        setCountdown(c);
+      }
+    }, 1000);
+
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [currentAngleIdx, cameraReady, isSequenceRunning, captureImage, stopCamera]);
+
+  const retakeAngle = (idx: number) => {
+    startCamera();
+    setCaptures((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, status: "pending", file: null, dataUrl: null } : s))
+    );
+    setTimeout(() => setCurrentAngleIdx(idx), 500);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1982,17 +2311,7 @@ export default function EnrollPage() {
     }
   };
 
-  useEffect(() => {
-    return () => {
-      stopCamera();
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    };
-  }, [stopCamera]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitSingle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
 
@@ -2012,6 +2331,34 @@ export default function EnrollPage() {
     }
   };
 
+  const handleSubmitMulti = async () => {
+    const readyCaptures = captures.filter((c) => c.status === "done" && c.file);
+    if (readyCaptures.length < 2) {
+      setError("Please capture at least 2 angles");
+      return;
+    }
+
+    setError("");
+    setIsLoading(true);
+    setQuickSubmitted(true);
+
+    try {
+      const results = await Promise.all(
+        readyCaptures.map((c) => api.enrollFace(c.file!, consent, c.angle))
+      );
+      const jobId = results[0]?.job_id;
+      if (jobId) {
+        setJobId(jobId);
+        pollForResult(jobId);
+      } else {
+        setResult({ success: true, message: `${results.length} angles enrolled` });
+      }
+    } catch (err: any) {
+      setError(getErrorMessage(err) || "Multi-angle enrollment failed");
+      setIsLoading(false);
+    }
+  };
+
   const pollForResult = async (taskId: string) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     pollIntervalRef.current = setInterval(async () => {
@@ -2022,15 +2369,18 @@ export default function EnrollPage() {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
           setResult(data.result);
+          setIsLoading(false);
         } else if (data.status === "FAILURE") {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
           setError("Enrollment failed");
+          setIsLoading(false);
         }
       } catch {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
         setError("Failed to poll task status");
+        setIsLoading(false);
       }
     }, 2000);
   };
@@ -2042,7 +2392,14 @@ export default function EnrollPage() {
     setJobId(null);
     setResult(null);
     setError("");
+    setQuickSubmitted(false);
+    setCurrentAngleIdx(-1);
+    setIsSequenceRunning(false);
+    setCountdown(null);
+    setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
   };
+
+  const allCaptured = captures.every((c) => c.status === "done");
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -2068,134 +2425,295 @@ export default function EnrollPage() {
             Enroll Another
           </button>
         </div>
-      ) : jobId ? (
+      ) : jobId && !result ? (
         <div className="bg-white p-6 rounded-lg border text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
           <h2 className="text-lg font-semibold mb-2">Processing...</h2>
           <p className="text-gray-600 text-sm">Job ID: {jobId}</p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg border space-y-6">
-          {!image ? (
-            <>
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                {isCameraOn ? (
-                  <>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-contain"
-                    />
-                    {!cameraReady && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
-                        Loading camera...
+        <div className="bg-white p-6 rounded-lg border space-y-6">
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => { setCaptureMode("quick"); handleReset(); }}
+              className={`px-4 py-2 rounded-md text-sm font-medium ${captureMode === "quick" ? "bg-primary text-primary-foreground" : "bg-gray-100"}`}
+            >
+              Quick (1 photo)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setCaptureMode("full"); handleReset(); }}
+              className={`px-4 py-2 rounded-md text-sm font-medium ${captureMode === "full" ? "bg-primary text-primary-foreground" : "bg-gray-100"}`}
+            >
+              Full (4 angles)
+            </button>
+          </div>
+
+          {captureMode === "quick" ? (
+            <form onSubmit={handleSubmitSingle}>
+              {!image ? (
+                <>
+                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                    {isCameraOn ? (
+                      <>
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-contain"
+                        />
+                        {!cameraReady && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+                            Loading camera...
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400 text-center p-4">
+                        {error || "Click 'Start Camera' to begin, or use 'Upload'"}
                       </div>
                     )}
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400 text-center p-4">
-                    {error || "Click 'Start Camera' to begin, or use 'Upload'"}
                   </div>
-                )}
-              </div>
 
-              {error && <div className="text-red-500 text-sm">{error}</div>}
+                  <div className="flex gap-3 mt-4">
+                    {!isCameraOn ? (
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
+                      >
+                        <Camera className="w-5 h-5" />
+                        Start Camera
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={capturePhoto}
+                        disabled={!cameraReady}
+                        className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+                      >
+                        Capture
+                      </button>
+                    )}
 
-              <div className="flex gap-3">
-                {!isCameraOn ? (
+                    <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
+                      <Upload className="w-5 h-5" />
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {isCameraOn && (
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="px-4 py-2 text-red-600 bg-red-50 rounded-md hover:bg-red-100"
+                      >
+                        Stop
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                    <img
+                      src={image}
+                      alt="Captured"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div className="flex gap-3 mt-4">
+                    <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
+                      <Upload className="w-5 h-5" />
+                      Change
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {image && (
+                <>
+                  <div className="flex items-center gap-3 mt-6">
+                    <input
+                      type="checkbox"
+                      id="consent"
+                      checked={consent}
+                      onChange={(e) => setConsent(e.target.checked)}
+                      className="w-5 h-5"
+                    />
+                    <label htmlFor="consent" className="text-sm text-gray-600">
+                      I consent to the processing of my facial data for identification purposes.
+                    </label>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={startCamera}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
+                    type="submit"
+                    disabled={!consent || isLoading}
+                    className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 mt-4"
                   >
-                    <Camera className="w-5 h-5" />
-                    Start Camera
+                    {isLoading ? "Enrolling..." : "Enroll Face"}
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={capturePhoto}
-                    disabled={!cameraReady}
-                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
-                  >
-                    Capture
-                  </button>
-                )}
-
-                <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
-                  <Upload className="w-5 h-5" />
-                  Upload
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
-
-                {isCameraOn && (
-                  <button
-                    type="button"
-                    onClick={stopCamera}
-                    className="px-4 py-2 text-red-600 bg-red-50 rounded-md hover:bg-red-100"
-                  >
-                    Stop
-                  </button>
-                )}
-              </div>
-            </>
+                </>
+              )}
+            </form>
           ) : (
-            <>
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <img
-                  src={image}
-                  alt="Captured"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div className="flex gap-3">
-                <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
-                  <Upload className="w-5 h-5" />
-                  Change
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
+            <div className="space-y-6">
+              {!allCaptured && !isSequenceRunning && currentAngleIdx < 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-4">
+                    Capture your face from 4 angles for better walk-through recognition
+                  </p>
+                  <button
+                    type="button"
+                    onClick={startSequence}
+                    className="px-6 py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90"
+                  >
+                    <Camera className="w-5 h-5 inline mr-2" />
+                    Start Multi-Angle Capture
+                  </button>
+                </div>
+              )}
+
+              {(isSequenceRunning || currentAngleIdx >= 0) && (
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-contain"
                   />
-                </label>
-              </div>
-            </>
-          )}
+                  {!cameraReady && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+                      Loading camera...
+                    </div>
+                  )}
+                  {countdown !== null && (() => {
+                    const cfg = ANGLE_CONFIG[currentAngleIdx];
+                    const ArrowIcon = cfg?.icon;
+                    return (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+                        <div className="text-center">
+                          {ArrowIcon && (
+                            <div className="animate-bounce mb-2">
+                              <ArrowIcon className="w-10 h-10 mx-auto text-yellow-400" />
+                            </div>
+                          )}
+                          <p className="text-white text-xl font-semibold mb-1">
+                            {cfg?.instruction}
+                          </p>
+                          <p className="text-gray-300 text-sm mb-4">
+                            {cfg?.tip}
+                          </p>
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            {ANGLE_CONFIG.map((_, i) => (
+                              <span
+                                key={i}
+                                className={`w-3 h-3 rounded-full ${
+                                  i < captures.filter(c => c.status === "done").length
+                                    ? "bg-green-500"
+                                    : i === currentAngleIdx
+                                    ? "bg-yellow-400"
+                                    : "bg-gray-600"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-white text-5xl font-bold drop-shadow-lg">{countdown}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
-          {image && (
-            <>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="consent"
-                  checked={consent}
-                  onChange={(e) => setConsent(e.target.checked)}
-                  className="w-5 h-5"
-                />
-                <label htmlFor="consent" className="text-sm text-gray-600">
-                  I consent to the processing of my facial data for identification
-                  purposes.
-                </label>
-              </div>
+              {allCaptured && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    {captures.map((c, i) => (
+                      <div
+                        key={c.angle}
+                        className={`relative aspect-video rounded-lg overflow-hidden border-2 ${c.status === "done" ? "border-green-500" : "border-gray-200"}`}
+                      >
+                        {c.dataUrl ? (
+                          <img src={c.dataUrl} alt={c.angle} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="flex items-center justify-center h-full bg-gray-100 text-gray-400">
+                            <Camera className="w-8 h-8" />
+                          </div>
+                        )}
+                        <div className="absolute top-1 left-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded flex items-center gap-1">
+                          {(() => { const Icon = ANGLE_CONFIG[i].icon; return Icon ? <Icon className="w-3 h-3" /> : null; })()}
+                          {ANGLE_CONFIG[i].instruction}
+                        </div>
+                        {c.status === "done" && (
+                          <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5">
+                            <CheckCircle className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
-              <button
-                type="submit"
-                disabled={!consent || isLoading}
-                className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
-              >
-                {isLoading ? "Enrolling..." : "Enroll Face"}
-              </button>
-            </>
+                  <div className="flex gap-2">
+                    {captures.map((c, i) =>
+                      c.status === "done" ? (
+                        <button
+                          key={c.angle}
+                          type="button"
+                          onClick={() => retakeAngle(i)}
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 rounded-md text-sm hover:bg-gray-200"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Retake
+                        </button>
+                      ) : null
+                    )}
+                  </div>
+                </>
+              )}
+
+              {allCaptured && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="consent-multi"
+                      checked={consent}
+                      onChange={(e) => setConsent(e.target.checked)}
+                      className="w-5 h-5"
+                    />
+                    <label htmlFor="consent-multi" className="text-sm text-gray-600">
+                      I consent to the processing of my facial data for identification purposes.
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSubmitMulti}
+                    disabled={!consent || isLoading}
+                    className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isLoading ? "Enrolling..." : `Enroll ${captures.filter(c => c.status === "done").length} Angles`}
+                  </button>
+                </>
+              )}
+            </div>
           )}
-        </form>
+        </div>
       )}
     </div>
   );
@@ -2280,8 +2798,17 @@ export default function PatronDetailPage() {
 
   const handleDelete = async () => {
     if (!patron || !confirm("Xóa độc giả này?")) return;
-    await api.deletePatron(patron.id);
-    router.push("/patrons");
+    try {
+      await api.deletePatron(patron.id);
+      router.push("/patrons");
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        alert("Độc giả không tồn tại hoặc đã bị xóa trước đó.");
+        router.push("/patrons");
+      } else {
+        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lỗi không xác định"));
+      }
+    }
   };
 
   const startEnrollCam = async () => {
@@ -2382,7 +2909,15 @@ export default function PatronDetailPage() {
   };
 
   if (loading) return <p className="text-gray-500">Đang tải...</p>;
-  if (!patron) return <p className="text-gray-500">Không tìm thấy độc giả</p>;
+  if (!patron) return (
+    <div className="text-center py-12">
+      <p className="text-gray-500 text-lg mb-4">Không tìm thấy độc giả</p>
+      <p className="text-gray-400 text-sm mb-6">Độc giả có thể đã bị xóa hoặc ID không hợp lệ.</p>
+      <button onClick={() => router.push("/patrons")} className="px-4 py-2 bg-blue-600 text-white rounded-md">
+        &larr; Quay lại danh sách
+      </button>
+    </div>
+  );
 
   const pageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
   const currentPage = Math.floor(logsSkip / logsLimit) + 1;
@@ -2404,10 +2939,8 @@ export default function PatronDetailPage() {
         <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
           <div><span className="text-gray-500">Họ tên:</span> <span className="font-medium">{patron.full_name}</span></div>
           <div><span className="text-gray-500">MSSV:</span> <span className="font-medium">{patron.student_code}</span></div>
-          <div><span className="text-gray-500">CMND/CCCD:</span> <span className="font-medium">{patron.identity_number || "-"}</span></div>
+          <div><span className="text-gray-500">Lớp:</span> <span className="font-medium">{patron.class_name || "-"}</span></div>
           <div><span className="text-gray-500">Mã thẻ:</span> <span className="font-medium">{patron.card_number}</span></div>
-          <div><span className="text-gray-500">Email:</span> <span className="font-medium">{patron.email || "-"}</span></div>
-          <div><span className="text-gray-500">SĐT:</span> <span className="font-medium">{patron.phone || "-"}</span></div>
           <div><span className="text-gray-500">Ngày cấp thẻ:</span> <span className="font-medium">{patron.issue_date || "-"}</span></div>
           <div><span className="text-gray-500">Hạn thẻ:</span>
             <span className={`font-medium ml-1 ${new Date(patron.membership_expiry) < new Date() ? "text-red-600" : "text-green-600"}`}>
@@ -2423,8 +2956,7 @@ export default function PatronDetailPage() {
         </div>
         <div className="flex gap-3 mt-6 pt-4 border-t">
           <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm" onClick={() => { setEditForm({
-            full_name: patron.full_name, identity_number: patron.identity_number || undefined,
-            email: patron.email || undefined, phone: patron.phone || undefined,
+            full_name: patron.full_name, class_name: patron.class_name || undefined,
             membership_expiry: patron.membership_expiry, status: patron.status,
           }); setShowEdit(true); }}>Sửa thông tin</button>
           <button className="px-4 py-2 bg-green-600 text-white rounded-md text-sm" onClick={handleRenew}>Gia hạn thẻ</button>
@@ -2494,7 +3026,7 @@ export default function PatronDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
           <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold">Sửa độc giả</h2>
-            {[["full_name", "Họ tên"], ["identity_number", "CMND/CCCD"], ["email", "Email"], ["phone", "SĐT"],
+            {[["full_name", "Họ tên"], ["class_name", "Lớp"],
               ["membership_expiry", "Hạn thẻ"], ["status", "Trạng thái"]
             ].map(([key, label]) => (
               <label key={key} className="block">
@@ -2612,7 +3144,7 @@ export default function PatronsPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<PatronCreate>({
-    full_name: "", student_code: "", card_number: "", membership_expiry: "",
+    full_name: "", student_code: "", class_name: "", membership_expiry: "",
   });
 
   const [editTarget, setEditTarget] = useState<PatronPublic | null>(null);
@@ -2650,7 +3182,7 @@ export default function PatronsPage() {
       await api.createPatron(createForm);
       setShowCreate(false);
       setCreateError("");
-      setCreateForm({ full_name: "", student_code: "", card_number: "", membership_expiry: "" });
+      setCreateForm({ full_name: "", student_code: "", class_name: "", membership_expiry: "" });
       load();
     } catch (err: any) {
       if (err?.response?.status === 409) {
@@ -2692,8 +3224,17 @@ export default function PatronsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Xóa độc giả này?")) return;
-    await api.deletePatron(id);
-    load();
+    setPatrons((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await api.deletePatron(id);
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        alert("Độc giả đã bị xóa trước đó.");
+      } else {
+        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lỗi không xác định"));
+        load();
+      }
+    }
   };
 
   const startEnrollCam = async () => {
@@ -2820,7 +3361,7 @@ export default function PatronsPage() {
               {createError}
             </div>
           )}
-          {[["full_name", "Họ tên"], ["student_code", "MSSV"], ["card_number", "Mã thẻ"], ["membership_expiry", "Hạn thẻ"]].map(([key, label]) => (
+          {[["full_name", "Họ tên"], ["student_code", "MSSV"], ["class_name", "Lớp"]].map(([key, label]) => (
             <label key={key} className="block">
               <span className="text-sm font-medium">{label}:</span>
               <input className="mt-1 block w-full px-3 py-2 border rounded-md" value={(createForm as any)[key]}
@@ -2828,6 +3369,13 @@ export default function PatronsPage() {
                 type={key === "membership_expiry" ? "date" : "text"} />
             </label>
           ))}
+          <label className="block">
+            <span className="text-sm font-medium">Hạn thẻ:</span>
+            <input className="mt-1 block w-full px-3 py-2 border rounded-md" value={createForm.membership_expiry}
+              onChange={(e) => { setCreateForm({ ...createForm, membership_expiry: e.target.value }); setCreateError(""); }}
+              type="date" />
+          </label>
+          <p className="text-xs text-gray-500">Số thẻ thư viện sẽ được tự động sinh theo định dạng THV-MSSV</p>
           <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleCreate}>Tạo</button>
         </div>
       )}
@@ -3136,6 +3684,45 @@ export default function RegisterPage() {
       </div>
     </div>
   );
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "face-recognition-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
+    "next": "^16.2.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-form": "^7.53.2",
+    "react-is": "^19.2.7",
+    "react-webcam": "^7.2.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
+  }
 }
 </file>
 
@@ -3659,8 +4246,9 @@ export default function JobPoll({ jobId, onComplete, onError }: JobPollProps) {
 <file path="src/app/(dashboard)/gate/page.tsx">
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, ArrowLeft, ArrowDown, Eye } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api-client";
 import FrequencyChart from "@/components/frequency-chart";
 import type { AccessFrequencyDay, AccessLogPublic, CameraEvent, CameraStatus, KioskResult, PatronLookupResult } from "@/lib/types";
@@ -3709,16 +4297,18 @@ export default function GatePage() {
 
   const [form, setForm] = useState({
     full_name: "",
-    identity_number: "",
-    email: "",
-    phone: "",
-    card_number: "",
-    issue_date: defaultIssueDate,
+    student_code: "",
+    class_name: "",
   });
 
   const [cameraReady, setCameraReady] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [statusText, setStatusText] = useState("");
+
+  const [isMultiCapturing, setIsMultiCapturing] = useState(false);
+  const [captureAngles, setCaptureAngles] = useState<{ angle: string; label: string; file: File | null }[]>([]);
+  const [currentCaptureIdx, setCurrentCaptureIdx] = useState(-1);
+  const [captureCountdown, setCaptureCountdown] = useState<number | null>(null);
   const [camStatus, setCamStatus] = useState<"checking" | "available" | "unavailable" | "blocked">("checking");
   const [entryCamOk, setEntryCamOk] = useState<boolean | null>(null);
   const [exitCamOk, setExitCamOk] = useState<boolean | null>(null);
@@ -3879,34 +4469,109 @@ export default function GatePage() {
     throw new Error("Timeout waiting for result");
   }, []);
 
+  const CAPTURE_ANGLE_SEQUENCE = [
+    { angle: "frontal", label: "Nhìn thẳng", icon: Eye, tip: "Giữ mặt thẳng, mắt mở tự nhiên" },
+    { angle: "right", label: "Quay phải", icon: ArrowLeft, tip: "Xoay đầu phải 30°" },
+    { angle: "left", label: "Quay trái", icon: ArrowRight, tip: "Xoay đầu trái 30°" },
+    { angle: "down", label: "Cúi xuống", icon: ArrowDown, tip: "Cúi nhẹ cằm xuống" },
+  ];
+
+  useEffect(() => {
+    if (currentCaptureIdx < 0 || currentCaptureIdx >= CAPTURE_ANGLE_SEQUENCE.length) return;
+    if (!cameraReady || !isMultiCapturing) return;
+
+    let cancelled = false;
+    let c = 3;
+    setCaptureCountdown(c);
+
+    const timer = setInterval(async () => {
+      c--;
+      if (cancelled) { clearInterval(timer); return; }
+
+      if (c <= 0) {
+        clearInterval(timer);
+        setCaptureCountdown(null);
+
+        try {
+          const file = await captureImage();
+          if (!cancelled) {
+            setCaptureAngles((prev) => [...prev, { ...CAPTURE_ANGLE_SEQUENCE[currentCaptureIdx], file }]);
+            const nextIdx = currentCaptureIdx + 1;
+            if (nextIdx >= CAPTURE_ANGLE_SEQUENCE.length) {
+              setIsMultiCapturing(false);
+              setCurrentCaptureIdx(-1);
+            } else {
+              setTimeout(() => { if (!cancelled) setCurrentCaptureIdx(nextIdx); }, 600);
+            }
+          }
+        } catch (err: any) {
+          if (!cancelled) {
+            addToast({ type: "error", message: `Lỗi chụp: ${err.message}` });
+            setIsMultiCapturing(false);
+            setCurrentCaptureIdx(-1);
+            setCaptureCountdown(null);
+            setLoading(false);
+            setStatusText("");
+          }
+        }
+      } else {
+        setCaptureCountdown(c);
+      }
+    }, 1000);
+
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [currentCaptureIdx, cameraReady, isMultiCapturing, captureImage, addToast]);
+
   const handleEnroll = async () => {
     if (!form.full_name) return;
     setLoading(true);
-    setStatusText("Đang chụp ảnh...");
-    try {
-      const imageFile = await captureImage();
-      stopCamera();
-      setStatusText("Đang gửi dữ liệu...");
-      const cardNumber = form.card_number || `CARD-${mssv || Date.now()}`;
-      const res = await api.kioskEnroll(imageFile, form.full_name, mssv, cardNumber,
-        defaultExpiryStr, form.identity_number || undefined, form.email || undefined, form.phone || undefined, form.issue_date || undefined);
-      if (res.job_id) {
-        setStatusText("Đang xử lý ảnh...");
-        await pollTask(res.job_id);
-      }
-      setResult(res);
-      setStep("result");
-      setForm({ full_name: "", identity_number: "", email: "", phone: "", card_number: "", issue_date: defaultIssueDate });
-    } catch (err: any) {
-      const msg = getErrorMessage(err) || "Đăng ký thất bại";
-      setResult({ success: false, message: msg, patron: null, job_id: null });
-      setStep("result");
-      addToast({ type: "error", message: msg });
-    } finally {
-      setLoading(false);
-      setStatusText("");
-    }
+    setStatusText("Đang chuẩn bị chụp...");
+    setCaptureAngles([]);
+    setIsMultiCapturing(true);
+    setCurrentCaptureIdx(0);
   };
+
+  useEffect(() => {
+    if (captureAngles.length !== CAPTURE_ANGLE_SEQUENCE.length || isMultiCapturing) return;
+    if (captureAngles.length === 0) return;
+
+    (async () => {
+      setStatusText("Đang gửi dữ liệu...");
+      try {
+        const frontal = captureAngles.find((a) => a.angle === "frontal");
+        const right = captureAngles.find((a) => a.angle === "right");
+        const left = captureAngles.find((a) => a.angle === "left");
+        const down = captureAngles.find((a) => a.angle === "down");
+        if (!frontal?.file || !right?.file || !left?.file || !down?.file) {
+          throw new Error("Thiếu ảnh chụp");
+        }
+
+        stopCamera();
+        const studentCode = form.student_code || mssv;
+        const res = await api.kioskBatchEnroll(
+          frontal.file, right.file, left.file, down.file,
+          form.full_name, studentCode,
+          defaultExpiryStr,
+          form.class_name || undefined,
+        );
+
+        if (res.success) {
+          addToast({ type: "info", message: "Đã tạo độc giả với đầy đủ 4 góc khuôn mặt" });
+        }
+        setResult(res);
+        setStep("result");
+        setForm({ full_name: "", student_code: "", class_name: "" });
+      } catch (err: any) {
+        const msg = getErrorMessage(err) || "Đăng ký thất bại";
+        setResult({ success: false, message: msg, patron: null, job_id: null });
+        setStep("result");
+        addToast({ type: "error", message: msg });
+      } finally {
+        setLoading(false);
+        setStatusText("");
+      }
+    })();
+  }, [captureAngles, isMultiCapturing]);
 
   const handleVerify = async () => {
     setLoading(true);
@@ -3951,6 +4616,10 @@ export default function GatePage() {
     setLookup(null);
     setResult(null);
     setCaptured(null);
+    setIsMultiCapturing(false);
+    setCaptureAngles([]);
+    setCurrentCaptureIdx(-1);
+    setCaptureCountdown(null);
     stopCamera();
   };
 
@@ -4033,6 +4702,7 @@ export default function GatePage() {
       try {
         const data = await api.getAccessFrequency();
         setFrequency(data.daily);
+      } catch {
       } finally {
         setFreqLoading(false);
       }
@@ -4180,13 +4850,44 @@ export default function GatePage() {
           <div>
             <div className="relative bg-black rounded-lg overflow-hidden">
               <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-lg" />
-              {!cameraReady && (
+              {!cameraReady && !isMultiCapturing && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
                   Đang mở camera...
                 </div>
               )}
+              {captureCountdown !== null && (() => {
+                const cfg = CAPTURE_ANGLE_SEQUENCE[currentCaptureIdx];
+                const ArrowIcon = cfg?.icon;
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+                    <div className="text-center">
+                      {ArrowIcon && (
+                        <div className="animate-bounce mb-2">
+                          <ArrowIcon className="w-10 h-10 mx-auto text-yellow-400" />
+                        </div>
+                      )}
+                      <p className="text-white text-xl font-semibold mb-1">{cfg?.label}</p>
+                      <p className="text-gray-300 text-sm mb-4">{cfg?.tip}</p>
+                      <div className="flex justify-center gap-1 mb-2">
+                        {CAPTURE_ANGLE_SEQUENCE.map((_, i) => (
+                          <span
+                            key={i}
+                            className={`w-3 h-3 rounded-full ${i < captureAngles.length ? "bg-green-500" : i === currentCaptureIdx ? "bg-yellow-400" : "bg-gray-600"}`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-white text-5xl font-bold drop-shadow-lg">{captureCountdown}</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-            {captured && <img src={captured} className="w-full mt-2 rounded-lg border" />}
+            {captured && !isMultiCapturing && <img src={captured} className="w-full mt-2 rounded-lg border" />}
+            {captureAngles.length > 0 && captureAngles.length < CAPTURE_ANGLE_SEQUENCE.length && (
+              <div className="mt-2 text-sm text-green-600">
+                Đã chụp: {captureAngles.map((a) => a.label).join(", ")}
+              </div>
+            )}
           </div>
           <div className="space-y-4">
             {step === "enroll_form" && (
@@ -4195,24 +4896,21 @@ export default function GatePage() {
                 <p className="text-gray-600">Vui lòng nhìn vào camera và điền thông tin</p>
                 {[
                   ["full_name", "Họ tên", "text"],
-                  ["card_number", "Số thẻ thư viện", "text"],
-                  ["identity_number", "CMND/CCCD", "text"],
-                  ["email", "Email", "email"],
-                  ["phone", "SĐT", "tel"],
-                  ["issue_date", "Ngày cấp", "date"],
+                  ["student_code", "MSSV", "text"],
+                  ["class_name", "Lớp", "text"],
                 ].map(([key, label, type]) => (
                   <label key={key} className="block">
                     <span className="text-sm font-medium">{label}:</span>
                     <input type={type as string}
                       className="mt-1 block w-full px-3 py-2 border rounded-md"
-                      value={(form as any)[key]}
+                      value={(form as any)[key] || ""}
                       onChange={(e) => setForm({ ...form, [key]: e.target.value })}
                     />
                   </label>
                 ))}
                 <p className="text-xs text-gray-500">Hạn thẻ: <strong>{defaultExpiryStr}</strong> (1 năm kể từ hôm nay)</p>
-                <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleEnroll} disabled={loading}>
-                  {loading ? "Đang đăng ký..." : "Đăng ký & Vào cổng"}
+                <button className="px-4 py-2 bg-green-600 text-white rounded-md" onClick={handleEnroll} disabled={loading || isMultiCapturing}>
+                  {loading ? "Đang đăng ký..." : isMultiCapturing ? "Đang chụp..." : "Đăng ký & Vào cổng"}
                 </button>
               </>
             )}
@@ -4626,6 +5324,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(email, password);
+      window.location.href = "/dashboard";
     } catch (err: any) {
       setError(getErrorMessage(err) || "Login failed");
     } finally {
@@ -5165,6 +5864,7 @@ export interface PatronPublic {
   id: string;
   full_name: string;
   student_code: string;
+  class_name: string | null;
   identity_number: string | null;
   email: string | null;
   phone: string | null;
@@ -5180,16 +5880,14 @@ export interface PatronPublic {
 export interface PatronCreate {
   full_name: string;
   student_code: string;
-  card_number: string;
+  class_name?: string;
   membership_expiry: string;
-  identity_number?: string;
-  email?: string;
-  phone?: string;
   issue_date?: string;
 }
 
 export interface PatronUpdate {
   full_name?: string;
+  class_name?: string;
   identity_number?: string;
   email?: string;
   phone?: string;
@@ -5372,11 +6070,15 @@ class ApiClient {
       return this.client(originalRequest);
     }
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+    const hasAccessToken = typeof window !== "undefined" && !!localStorage.getItem("access_token");
+    const hasRefreshToken = typeof window !== "undefined" && !!localStorage.getItem("refresh_token");
+    if (!hasAccessToken && !hasRefreshToken) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
     }
 
     return Promise.reject(new Error("Session expired"));
@@ -5440,11 +6142,13 @@ class ApiClient {
   // === Face Operations ===
   async enrollFace(
     imageFile: File,
-    consentGiven: boolean = true
+    consentGiven: boolean = true,
+    angle: string = "frontal"
   ): Promise<{ job_id: string }> {
     const formData = new FormData();
     formData.append("file", imageFile);
     formData.append("consent_given", String(consentGiven));
+    formData.append("angle", angle);
 
     const response = await this.client.post("/api/face/enroll", formData);
     return response.data;
@@ -5577,7 +6281,7 @@ class ApiClient {
   }
 
   connectAccessSSE(onEvent: (event: CameraEvent) => void): () => void {
-    const es = new EventSource(`${API_BASE_URL}/access/events`);
+    const es = new EventSource(`${API_BASE_URL}/api/access/events`);
     es.addEventListener("camera_event", (msg: MessageEvent) => {
       try {
         const data = JSON.parse(msg.data) as CameraEvent;
@@ -5589,12 +6293,12 @@ class ApiClient {
   }
 
   async getRecentLogs(): Promise<AccessLogList> {
-    const response = await this.client.get<AccessLogList>("/access/recent");
+    const response = await this.client.get<AccessLogList>("/api/access/recent");
     return response.data;
   }
 
   async getActivePatrons(): Promise<{ items: ActivePatron[]; total: number }> {
-    const response = await this.client.get<{ items: ActivePatron[]; total: number }>("/access/active");
+    const response = await this.client.get<{ items: ActivePatron[]; total: number }>("/api/access/active");
     return response.data;
   }
 
@@ -5607,16 +6311,18 @@ class ApiClient {
   }
 
   async getStats(): Promise<StatsResponse> {
-    const response = await this.client.get<StatsResponse>("/access/stats");
+    const response = await this.client.get<StatsResponse>("/api/access/stats");
     return response.data;
   }
 
   async enrollPatronFace(
     patronId: string,
-    imageFile: File
+    imageFile: File,
+    angle: string = "frontal"
   ): Promise<{ success: boolean; job_id: string; message: string }> {
     const formData = new FormData();
     formData.append("image", imageFile);
+    formData.append("angle", angle);
     const response = await this.client.post(`/api/patrons/${patronId}/enroll-face`, formData);
     return response.data;
   }
@@ -5629,7 +6335,7 @@ class ApiClient {
     const params: any = {};
     if (studentCode) params.student_code = studentCode;
     if (cardNumber) params.card_number = cardNumber;
-    const response = await this.client.post<PatronLookupResult>("/kiosk/lookup", null, { params });
+    const response = await this.client.post<PatronLookupResult>("/api/kiosk/lookup", null, { params });
     return response.data;
   }
 
@@ -5637,24 +6343,18 @@ class ApiClient {
     imageFile: File,
     fullName: string,
     studentCode: string,
-    cardNumber: string,
     membershipExpiry: string,
-    identityNumber?: string,
-    email?: string,
-    phone?: string,
-    issueDate?: string
+    className?: string,
+    angle: string = "frontal"
   ): Promise<KioskResult> {
     const formData = new FormData();
     formData.append("image", imageFile);
     formData.append("full_name", fullName);
     formData.append("student_code", studentCode);
-    formData.append("card_number", cardNumber);
     formData.append("membership_expiry", membershipExpiry);
-    if (identityNumber) formData.append("identity_number", identityNumber);
-    if (email) formData.append("email", email);
-    if (phone) formData.append("phone", phone);
-    if (issueDate) formData.append("issue_date", issueDate);
-    const response = await this.client.post<KioskResult>("/kiosk/enroll", formData);
+    formData.append("angle", angle);
+    if (className) formData.append("class_name", className);
+    const response = await this.client.post<KioskResult>("/api/kiosk/enroll", formData);
     return response.data;
   }
 
@@ -5662,23 +6362,58 @@ class ApiClient {
     const formData = new FormData();
     formData.append("image", imageFile);
     formData.append("student_code", studentCode);
-    const response = await this.client.post<KioskResult>("/kiosk/enter", formData);
+    const response = await this.client.post<KioskResult>("/api/kiosk/enter", formData);
+    return response.data;
+  }
+
+  async kioskBatchEnroll(
+    imageFrontal: File,
+    imageRight: File,
+    imageLeft: File,
+    imageDown: File,
+    fullName: string,
+    studentCode: string,
+    membershipExpiry: string,
+    className?: string,
+  ): Promise<KioskResult> {
+    const formData = new FormData();
+    formData.append("image_frontal", imageFrontal);
+    formData.append("image_right", imageRight);
+    formData.append("image_left", imageLeft);
+    formData.append("image_down", imageDown);
+    formData.append("full_name", fullName);
+    formData.append("student_code", studentCode);
+    formData.append("membership_expiry", membershipExpiry);
+    if (className) formData.append("class_name", className);
+    const response = await this.client.post<KioskResult>("/api/kiosk/batch-enroll", formData);
+    return response.data;
+  }
+
+  async kioskEnrollFace(
+    patronId: string,
+    imageFile: File,
+    angle: string = "frontal"
+  ): Promise<{ success: boolean; message: string }> {
+    const formData = new FormData();
+    formData.append("image", imageFile);
+    formData.append("angle", angle);
+    const response = await this.client.post(`/api/kiosk/enroll-face/${patronId}`, formData);
     return response.data;
   }
 
   // === Camera ===
   async getCameraStatus(): Promise<CameraStatus[]> {
-    const response = await this.client.get<CameraStatus[]>("/camera/status");
+    const response = await this.client.get<CameraStatus[]>("/api/camera/status");
     return response.data;
   }
 
   async reconnectCamera(cameraId: string): Promise<{ message: string }> {
-    const response = await this.client.post(`/camera/reconnect/${cameraId}`);
+    const response = await this.client.post(`/api/camera/reconnect/${cameraId}`);
     return response.data;
   }
 
   async reconnectAllCameras(): Promise<{ message: string; cameras: string[] }> {
-    const response = await this.client.post("/camera/reconnect-all");
+    const response = await this.client.post("/api/camera/reconnect-all");
     return response.data;
   }
 }
