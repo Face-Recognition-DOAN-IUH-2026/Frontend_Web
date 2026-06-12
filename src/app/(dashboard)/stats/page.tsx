@@ -23,12 +23,14 @@ export default function StatsPage() {
         const today = toDateStr(new Date());
         const [s, logs, active] = await Promise.all([
           api.getStats(),
-          api.getAccessLogs({ dateFrom: today, limit: 500 }),
+          api.getAccessLogs({ dateFrom: today, limit: 200 }),
           api.getActivePatrons(),
         ]);
         setStats(s);
         setTodayLogs(logs.items);
         setActivePatrons(active.items);
+      } catch (err) {
+        console.error("Failed to load stats:", err);
       } finally {
         setLoading(false);
       }

@@ -22,12 +22,13 @@ export default function LoginPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [faceFailCount, setFaceFailCount] = useState(0);
+  const faceFailCountRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoCaptureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startCamera = useCallback(async () => {
     try {
@@ -43,7 +44,7 @@ export default function LoginPage() {
       streamRef.current = stream;
       setIsCameraOn(true);
     } catch {
-      setError("Camera access denied or not available");
+      setError("Không thể truy cập camera");
       setIsCameraOn(false);
     }
   }, []);
@@ -52,7 +53,9 @@ export default function LoginPage() {
     if (!isCameraOn || !videoRef.current || !streamRef.current) return;
     const video = videoRef.current;
     const stream = streamRef.current;
-    const onReady = () => setCameraReady(true);
+    const onReady = () => {
+      setCameraReady(true);
+    };
     video.onloadedmetadata = onReady;
     video.onplaying = onReady;
     video.onerror = () => setError("Camera error");
@@ -61,12 +64,22 @@ export default function LoginPage() {
     readyTimeoutRef.current = setTimeout(() => setCameraReady(true), 3000);
     return () => {
       if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+      if (autoCaptureTimeoutRef.current) clearTimeout(autoCaptureTimeoutRef.current);
       video.onloadedmetadata = null;
       video.onplaying = null;
       video.onerror = null;
       video.srcObject = null;
     };
   }, [isCameraOn]);
+
+  useEffect(() => {
+    if (cameraReady && mode === "face" && !imagePreview) {
+      autoCaptureTimeoutRef.current = setTimeout(autoCapture, 1500);
+    }
+    return () => {
+      if (autoCaptureTimeoutRef.current) clearTimeout(autoCaptureTimeoutRef.current);
+    };
+  }, [cameraReady, mode, imagePreview]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -80,31 +93,47 @@ export default function LoginPage() {
   useEffect(() => {
     return () => {
       stopCamera();
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
     };
   }, [stopCamera]);
 
-  const capturePhoto = () => {
-    if (!videoRef.current || !cameraReady) return;
-    const video = videoRef.current;
-    if (video.videoWidth === 0 || video.videoHeight === 0) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], "face.jpg", { type: "image/jpeg" });
-      setImageFile(file);
-      setImagePreview(canvas.toDataURL("image/jpeg"));
-      stopCamera();
-    }, "image/jpeg", 0.9);
+  const resetFaceState = () => {
+    setImageFile(null);
+    setImagePreview(null);
   };
+
+  const doFaceLogin = useCallback(async (file: File) => {
+    setError("");
+    setIsLoading(true);
+    try {
+      const res = await api.faceLogin(file);
+      const payload = JSON.parse(atob(res.access_token.split(".")[1]));
+      const email = payload?.email || "";
+      const role = ((payload?.roles as string[])?.[0]) || "user";
+      setAuthFromToken(res.access_token, res.refresh_token, email, role);
+      setSuccess(true);
+      setIsLoading(false);
+      setFaceFailCount(0);
+      faceFailCountRef.current = 0;
+      setTimeout(() => router.push("/dashboard"), 500);
+    } catch (err: any) {
+      const msg = getErrorMessage(err) || "Đăng nhập thất bại";
+      setError(msg);
+      setIsLoading(false);
+      const newCount = faceFailCountRef.current + 1;
+      faceFailCountRef.current = newCount;
+      setFaceFailCount(newCount);
+      if (newCount >= 2) {
+        setMode("password");
+        setFaceFailCount(0);
+        faceFailCountRef.current = 0;
+        resetFaceState();
+        setError(msg + " — Chuyển sang đăng nhập mật khẩu");
+      } else {
+        resetFaceState();
+        startCamera();
+      }
+    }
+  }, [router]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,60 +159,44 @@ export default function LoginPage() {
     stopCamera();
   };
 
-  const handleFaceSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!imageFile || !email) return;
+  const capturePhoto = useCallback((cb?: (file: File) => void) => {
+    if (!videoRef.current || !cameraReady) return;
+    const video = videoRef.current;
+    if (video.videoWidth === 0 || video.videoHeight === 0) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], "face.jpg", { type: "image/jpeg" });
+      setImageFile(file);
+      setImagePreview(canvas.toDataURL("image/jpeg"));
+      cb?.(file);
+    }, "image/jpeg", 0.9);
+  }, [cameraReady]);
+
+  const autoCapture = useCallback(() => {
+    capturePhoto((file) => {
+      stopCamera();
+      doFaceLogin(file);
+    });
+  }, [capturePhoto, stopCamera, doFaceLogin]);
+
+  const switchToFace = () => {
+    setMode("face");
     setError("");
-    setIsLoading(true);
-    setJobId(null);
-    try {
-      const { job_id } = await api.faceLogin(email, imageFile);
-      setJobId(job_id);
-      pollFaceLogin(job_id);
-    } catch (err: any) {
-      setError(getErrorMessage(err) || "Face login failed");
-      setIsLoading(false);
-    }
+    setFaceFailCount(0);
+    resetFaceState();
   };
 
-  const pollFaceLogin = useCallback(
-    async (taskId: string) => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          const resp = await api.getTaskStatus(taskId);
-          if (resp.status === "SUCCESS" && resp.result) {
-            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-            if (resp.result.status === "error") {
-              setError(resp.result.error || "Face login failed");
-              setIsLoading(false);
-              setJobId(null);
-            } else if (resp.result.access_token) {
-              setAuthFromToken(resp.result.access_token, resp.result.refresh_token || null, email, "user");
-              setSuccess(true);
-              setJobId(null);
-              setIsLoading(false);
-              setTimeout(() => router.push("/dashboard"), 500);
-            }
-          } else if (resp.status === "FAILURE") {
-            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-            setError(resp.result?.error || "Face login failed");
-            setIsLoading(false);
-            setJobId(null);
-          }
-        } catch {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-          setError("Failed to poll login status");
-          setIsLoading(false);
-          setJobId(null);
-        }
-      }, 2000);
-    },
-    [email, router],
-  );
+  const switchToPassword = () => {
+    setMode("password");
+    setError("");
+    stopCamera();
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -196,7 +209,7 @@ export default function LoginPage() {
         <div className="flex mb-6 border rounded-lg overflow-hidden">
           <button
             type="button"
-            onClick={() => { setMode("password"); setError(""); setJobId(null); }}
+            onClick={switchToPassword}
             className={`flex-1 py-2 text-sm font-medium ${
               mode === "password"
                 ? "bg-primary text-primary-foreground"
@@ -207,7 +220,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setMode("face"); setError(""); setJobId(null); }}
+            onClick={switchToFace}
             className={`flex-1 py-2 text-sm font-medium flex items-center justify-center gap-1 ${
               mode === "face"
                 ? "bg-primary text-primary-foreground"
@@ -235,11 +248,10 @@ export default function LoginPage() {
             <p className="text-lg font-semibold text-green-600">Login Successful!</p>
             <p className="text-sm text-gray-500 mt-1">Redirecting to dashboard...</p>
           </div>
-        ) : jobId ? (
+        ) : isLoading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4" />
             <p className="text-gray-600">Verifying face...</p>
-            <p className="text-xs text-gray-400 mt-1">Job ID: {jobId}</p>
           </div>
         ) : mode === "password" ? (
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
@@ -266,23 +278,13 @@ export default function LoginPage() {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleFaceSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="face-email" className="block text-sm font-medium mb-1">Email</label>
-              <input
-                id="face-email" type="email" value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Enter your email" required
-              />
-            </div>
-
+          <div className="space-y-4">
             {imagePreview ? (
               <div className="space-y-2">
                 <div className="aspect-video bg-black rounded-lg overflow-hidden">
                   <img src={imagePreview} alt="Captured" className="w-full h-full object-contain" />
                 </div>
-                <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); }}
+                <button type="button" onClick={() => { resetFaceState(); startCamera(); }}
                   className="w-full py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200"
                 >
                   Retake
@@ -294,9 +296,13 @@ export default function LoginPage() {
                   {isCameraOn ? (
                     <>
                       <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
-                      {!cameraReady && (
+                      {!cameraReady ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
                           Loading camera...
+                        </div>
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-48 h-48 border-2 border-primary/50 rounded-full" />
                         </div>
                       )}
                     </>
@@ -307,17 +313,11 @@ export default function LoginPage() {
                   )}
                 </div>
                 <div className="flex gap-3">
-                  {!isCameraOn ? (
+                  {!isCameraOn && (
                     <button type="button" onClick={startCamera}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
                     >
                       <Camera className="w-5 h-5" /> Start Camera
-                    </button>
-                  ) : (
-                    <button type="button" onClick={capturePhoto} disabled={!cameraReady}
-                      className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
-                    >
-                      Capture
                     </button>
                   )}
                   <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
@@ -334,16 +334,7 @@ export default function LoginPage() {
                 </div>
               </>
             )}
-
-            {imagePreview && (
-              <button type="submit" disabled={!email || isLoading}
-                className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <Eye className="w-4 h-4" />
-                {isLoading ? "Verifying..." : "Login with Face"}
-              </button>
-            )}
-          </form>
+          </div>
         )}
 
         <p className="mt-4 text-center text-sm text-gray-600">

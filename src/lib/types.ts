@@ -236,4 +236,6 @@ export interface CameraEvent {
   is_live?: boolean;
   liveness_score?: number;
   error?: string;
+  bbox?: [number, number, number, number];
+  landmarks?: [number, number][];
 }

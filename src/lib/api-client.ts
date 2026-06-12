@@ -169,6 +169,21 @@ class ApiClient {
     return response.data;
   }
 
+  async enrollBatch(
+    files: { frontal: File; right: File; left: File; down: File },
+    consentGiven: boolean = true
+  ): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    formData.append("frontal", files.frontal);
+    formData.append("right", files.right);
+    formData.append("left", files.left);
+    formData.append("down", files.down);
+    formData.append("consent_given", String(consentGiven));
+
+    const response = await this.client.post("/api/face/enroll-batch", formData);
+    return response.data;
+  }
+
   async verifyFace(
     imageFile: File,
     targetUserId: string,
@@ -195,12 +210,11 @@ class ApiClient {
     return response.data;
   }
 
-  async faceLogin(email: string, imageFile: File): Promise<{ job_id: string }> {
+  async faceLogin(imageFile: File): Promise<TokenResponse> {
     const formData = new FormData();
-    formData.append("email", email);
     formData.append("file", imageFile);
 
-    const response = await this.client.post("/api/auth/face-login", formData);
+    const response = await this.client.post<TokenResponse>("/api/auth/face-login", formData);
     return response.data;
   }
 
@@ -289,7 +303,7 @@ class ApiClient {
       if (params.dateTo) query.date_to = params.dateTo;
       if (params.search) query.search = params.search;
       query.skip = params.skip ?? 0;
-      query.limit = params.limit ?? 50;
+      query.limit = Math.min(params.limit ?? 50, 200);
     }
     const response = await this.client.get<AccessLogList>("/api/access/logs", { params: query });
     return response.data;

@@ -91,6 +91,7 @@ export default function AdminPage() {
               <tr className="bg-gray-100">
                 <th className="p-3 text-left font-medium">Email</th>
                 <th className="p-3 text-left font-medium">Role</th>
+                <th className="p-3 text-left font-medium">Face</th>
                 <th className="p-3 text-left font-medium">Hành động</th>
               </tr>
             </thead>
@@ -102,6 +103,19 @@ export default function AdminPage() {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       u.role === "admin" ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-800"
                     }`}>{u.role}</span>
+                  </td>
+                  <td className="p-3">
+                    {u.has_face ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                        Đã xác thực
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                        Chưa xác thực
+                      </span>
+                    )}
                   </td>
                   <td className="p-3">
                     <button className="text-red-600 text-sm hover:underline"

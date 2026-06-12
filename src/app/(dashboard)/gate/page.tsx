@@ -9,6 +9,8 @@ import type { AccessFrequencyDay, AccessLogPublic, CameraEvent, CameraStatus, Ki
 
 const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || "http://192.168.1.121:8080/video";
 const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || "http://192.168.1.240:8080/video";
+const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || "entry_gate";
+const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || "exit_gate";
 
 type Step = "idle" | "lookup" | "enroll_form" | "verify" | "result";
 
@@ -27,6 +29,11 @@ export default function GatePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const entryCamRef = useRef<HTMLImageElement>(null);
+  const exitCamRef = useRef<HTMLImageElement>(null);
+  const entryCanvasRef = useRef<HTMLCanvasElement>(null);
+  const exitCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [step, setStep] = useState<Step>("idle");
   const [mssv, setMssv] = useState("");
   const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
@@ -69,6 +76,8 @@ export default function GatePage() {
   const [cameraStatusList, setCameraStatusList] = useState<CameraStatus[]>([]);
   const [todayCounts, setTodayCounts] = useState({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
   const [showCamDetail, setShowCamDetail] = useState(false);
+  const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
+  const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
 
   const addToast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastId;
@@ -88,6 +97,47 @@ export default function GatePage() {
     }
     setIsCameraOn(false);
     setCameraReady(false);
+  }, []);
+
+  const OVERLAY_COLORS: Record<string, string> = {
+    granted: "#22c55e",
+    wrong_direction: "#eab308",
+    expired: "#f97316",
+    spoof: "#ef4444",
+  };
+
+  const drawFaceOverlay = useCallback((
+    img: HTMLImageElement,
+    canvas: HTMLCanvasElement,
+    overlay: { bbox?: [number, number, number, number]; landmarks?: [number, number][] },
+    status?: string,
+  ) => {
+    const rect = img.getBoundingClientRect();
+    const scaleX = rect.width / (img.naturalWidth || 1);
+    const scaleY = rect.height / (img.naturalHeight || 1);
+
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (overlay.bbox) {
+      const [x1, y1, x2, y2] = overlay.bbox;
+      ctx.strokeStyle = OVERLAY_COLORS[status || "granted"] || "#22c55e";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
+    }
+
+    if (overlay.landmarks) {
+      overlay.landmarks.forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.arc(x * scaleX, y * scaleY, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ef4444";
+        ctx.fill();
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -383,6 +433,33 @@ export default function GatePage() {
     if (sseConnectedRef.current) return;
     sseConnectedRef.current = true;
     const cleanup = api.connectAccessSSE((event: CameraEvent) => {
+      console.log("[SSE] event:", JSON.stringify(event));
+      if (event.bbox || event.landmarks) {
+        const overlay = { bbox: event.bbox, landmarks: event.landmarks };
+        if (event.camera_id === ENTRY_CAM_ID) {
+          setEntryOverlay({ ...overlay, status: event.status });
+          if (entryCamRef.current && entryCanvasRef.current) {
+            drawFaceOverlay(entryCamRef.current, entryCanvasRef.current, overlay, event.status);
+          }
+        } else if (event.camera_id === EXIT_CAM_ID) {
+          setExitOverlay({ ...overlay, status: event.status });
+          if (exitCamRef.current && exitCanvasRef.current) {
+            drawFaceOverlay(exitCamRef.current, exitCanvasRef.current, overlay, event.status);
+          }
+        }
+        if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
+        overlayTimeoutRef.current = setTimeout(() => {
+          setEntryOverlay(null);
+          setExitOverlay(null);
+          [entryCanvasRef, exitCanvasRef].forEach((ref) => {
+            const c = ref.current;
+            if (c) {
+              const ctx = c.getContext("2d");
+              ctx?.clearRect(0, 0, c.width, c.height);
+            }
+          });
+        }, 2000);
+      }
       if (event.status === "granted") {
         const type = event.access_type === "entry" ? "entry" : "exit";
         addToast({
@@ -495,22 +572,28 @@ export default function GatePage() {
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="border rounded-lg overflow-hidden bg-black">
-          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
-            <span>Cổng vào — Camera 1</span>
-            <span className={`inline-block w-2 h-2 rounded-full ${entryCamOk === null ? "bg-yellow-400" : entryCamOk ? "bg-green-400" : "bg-red-400"}`} />
+          <div className="border rounded-lg overflow-hidden bg-black">
+            <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
+              <span>Cổng vào — Camera 1</span>
+              <span className={`inline-block w-2 h-2 rounded-full ${entryCamOk === null ? "bg-yellow-400" : entryCamOk ? "bg-green-400" : "bg-red-400"}`} />
+            </div>
+            <div className="relative">
+              <img ref={entryCamRef} src={`${ENTRY_CAM}?_t=${entryTs}`} className="w-full h-64 object-contain" alt="Entry cam"
+                onLoad={() => setEntryCamOk(true)} onError={() => setEntryCamOk(false)} />
+              <canvas ref={entryCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-10" />
+            </div>
           </div>
-          <img src={`${ENTRY_CAM}?_t=${entryTs}`} className="w-full h-64 object-contain" alt="Entry cam"
-            onLoad={() => setEntryCamOk(true)} onError={() => setEntryCamOk(false)} />
-        </div>
-        <div className="border rounded-lg overflow-hidden bg-black">
-          <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
-            <span>Cổng ra — Camera 2</span>
-            <span className={`inline-block w-2 h-2 rounded-full ${exitCamOk === null ? "bg-yellow-400" : exitCamOk ? "bg-green-400" : "bg-red-400"}`} />
+          <div className="border rounded-lg overflow-hidden bg-black">
+            <div className="bg-gray-800 text-white px-3 py-1 text-sm font-medium flex items-center gap-2">
+              <span>Cổng ra — Camera 2</span>
+              <span className={`inline-block w-2 h-2 rounded-full ${exitCamOk === null ? "bg-yellow-400" : exitCamOk ? "bg-green-400" : "bg-red-400"}`} />
+            </div>
+            <div className="relative">
+              <img ref={exitCamRef} src={`${EXIT_CAM}?_t=${exitTs}`} className="w-full h-64 object-contain" alt="Exit cam"
+                onLoad={() => setExitCamOk(true)} onError={() => setExitCamOk(false)} />
+              <canvas ref={exitCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-10" />
+            </div>
           </div>
-          <img src={`${EXIT_CAM}?_t=${exitTs}`} className="w-full h-64 object-contain" alt="Exit cam"
-            onLoad={() => setExitCamOk(true)} onError={() => setExitCamOk(false)} />
-        </div>
       </div>
 
       {/* Camera stats bar */}

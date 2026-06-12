@@ -272,9 +272,14 @@ export default function EnrollPage() {
   };
 
   const handleSubmitMulti = async () => {
-    const readyCaptures = captures.filter((c) => c.status === "done" && c.file);
-    if (readyCaptures.length < 2) {
-      setError("Please capture at least 2 angles");
+    const ready = captures.filter((c) => c.status === "done" && c.file);
+    const findFile = (angle: string) => ready.find((c) => c.angle === angle)?.file;
+    const frontal = findFile("frontal");
+    const right = findFile("right");
+    const left = findFile("left");
+    const down = findFile("down");
+    if (!frontal || !right || !left || !down) {
+      setError("Please capture all 4 angles");
       return;
     }
 
@@ -283,19 +288,10 @@ export default function EnrollPage() {
     setQuickSubmitted(true);
 
     try {
-      // Enroll tuần tự để tránh race condition (DB/Milvus/MinIO) khi nhiều góc chạy song song
-      const results = [] as Array<Awaited<ReturnType<typeof api.enrollFace>>>;
-      for (const c of readyCaptures) {
-        // eslint-disable-next-line no-await-in-loop
-        const r = await api.enrollFace(c.file!, consent, c.angle);
-        results.push(r);
-      }
-      const jobId = results[0]?.job_id;
-      if (jobId) {
-        setJobId(jobId);
-        pollForResult(jobId);
-      } else {
-        setResult({ success: true, message: `${results.length} angles enrolled` });
+      const data = await api.enrollBatch({ frontal, right, left, down }, consent);
+      if (data.job_id) {
+        setJobId(data.job_id);
+        pollForResult(data.job_id);
       }
     } catch (err: any) {
       setError(getErrorMessage(err) || "Multi-angle enrollment failed");
@@ -312,12 +308,18 @@ export default function EnrollPage() {
         if (data.status === "SUCCESS") {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
-          setResult(data.result);
+          const inner = data.result;
+          if (inner && inner.status === "error") {
+            setError(inner.error || "Enrollment failed");
+          } else {
+            setResult(inner);
+          }
           setIsLoading(false);
         } else if (data.status === "FAILURE") {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
-          setError("Enrollment failed");
+          const inner = data.result;
+          setError(inner?.error || "Enrollment failed");
           setIsLoading(false);
         }
       } catch {
@@ -362,6 +364,16 @@ export default function EnrollPage() {
           <p className="text-gray-600 mb-4">
             Your face has been enrolled successfully.
           </p>
+          {result.results && (
+            <div className="mb-4 space-y-1">
+              <p className="text-sm font-medium text-gray-700">Per-angle status:</p>
+              {result.results.map((r: any, i: number) => (
+                <p key={i} className={`text-sm ${r.status === "success" ? "text-green-600" : "text-red-600"}`}>
+                  {r.angle}: {r.status === "success" ? "✓" : "✗"} {r.error || ""}
+                </p>
+              ))}
+            </div>
+          )}
           <button
             onClick={handleReset}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
