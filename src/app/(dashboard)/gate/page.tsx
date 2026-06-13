@@ -362,7 +362,7 @@ export default function GatePage() {
                   status={getResultStatus()}
                   patronInfo={result?.patron ? {
                     fullName: result.patron.full_name || '',
-                    mssv: result.patron.student_code || result?.patron?.user_id || '',
+                    mssv: result.patron.student_code || result?.patron?.id || '',
                     faculty: '',
                   } : undefined}
                   message={result?.message}

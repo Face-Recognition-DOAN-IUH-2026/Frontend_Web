@@ -115,26 +115,22 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Lịch sử ra vào</h1>
-        <span className="text-sm text-gray-500">Tổng: {total}</span>
-      </div>
-
-      <div className="flex flex-wrap gap-2 items-end">
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Tìm kiếm</span>
+      {/* Filter bar */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-col gap-1">
+          <label className="text-caption text-text-3">Tìm kiếm</label>
           <input
-            className="mt-1 block w-40 px-3 py-2 border rounded-md text-sm"
+            className="input w-44"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="MSSV hoặc tên..."
           />
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Loại</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-caption text-text-3">Loại</label>
           <select
-            className="mt-1 block w-28 px-3 py-2 border rounded-md text-sm"
+            className="input w-32"
             value={accessType}
             onChange={(e) => setAccessType(e.target.value)}
           >
@@ -142,11 +138,11 @@ export default function HistoryPage() {
             <option value="entry">Vào</option>
             <option value="exit">Ra</option>
           </select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Kết quả</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-caption text-text-3">Kết quả</label>
           <select
-            className="mt-1 block w-28 px-3 py-2 border rounded-md text-sm"
+            className="input w-36"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
@@ -156,34 +152,34 @@ export default function HistoryPage() {
             <option value="expired">Hết hạn</option>
             <option value="spoof">Giả mạo</option>
           </select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Từ ngày</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-caption text-text-3">Từ ngày</label>
           <input
             type="date"
-            className="mt-1 block w-36 px-3 py-2 border rounded-md text-sm"
+            className="input w-40"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
           />
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">Đến ngày</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-caption text-text-3">Đến ngày</label>
           <input
             type="date"
-            className="mt-1 block w-36 px-3 py-2 border rounded-md text-sm"
+            className="input w-40"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
           />
-        </label>
+        </div>
         <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm"
+          className="btn-primary px-4 py-2.5"
           onClick={handleSearch}
           disabled={loading}
         >
-          {loading ? "..." : "🔍 Lọc"}
+          {loading ? "..." : "Lọc"}
         </button>
-        <label className="flex items-center gap-2 text-sm ml-auto">
-          <span className="text-gray-600">Live</span>
+        <label className="flex items-center gap-2 text-body-sm ml-auto cursor-pointer">
+          <span className="text-text-3">Live</span>
           <input
             type="checkbox"
             className="toggle"
@@ -191,6 +187,7 @@ export default function HistoryPage() {
             onChange={(e) => setLive(e.target.checked)}
           />
         </label>
+        <span className="text-body-sm text-text-3 ml-auto self-center">Tổng: {total}</span>
       </div>
 
       {/* Frequency chart */}
@@ -198,70 +195,72 @@ export default function HistoryPage() {
         <FrequencyChart data={frequency} loading={freqLoading} />
       )}
 
-      <div className="overflow-x-auto border rounded-lg">
+      <div className="overflow-x-auto border border-border rounded-lg">
         {loading && logs.length === 0 ? (
-          <p className="p-4 text-gray-500">Đang tải...</p>
+          <div className="p-8 text-center text-text-3 text-body-sm">Đang tải...</div>
         ) : logs.length === 0 ? (
-          <p className="p-4 text-gray-500">Không có dữ liệu</p>
+          <div className="p-8 text-center text-text-3 text-body-sm">Không có dữ liệu</div>
         ) : (
-          <table className="w-full border-collapse text-sm">
+          <table className="table">
             <thead>
-              <tr className="bg-gray-100 text-left">
-                <th className="p-3 font-medium">Thời gian</th>
-                <th className="p-3 font-medium">Họ tên</th>
-                <th className="p-3 font-medium">MSSV</th>
-                <th className="p-3 font-medium">Loại</th>
-                <th className="p-3 font-medium">Phương thức</th>
-                <th className="p-3 font-medium">Cổng</th>
-                <th className="p-3 font-medium">Độ tin cậy</th>
-                <th className="p-3 font-medium">Kết quả</th>
+              <tr>
+                <th>Thời gian</th>
+                <th>Họ tên</th>
+                <th>MSSV</th>
+                <th>Loại</th>
+                <th>Phương thức</th>
+                <th>Cổng</th>
+                <th>Độ tin cậy</th>
+                <th>Kết quả</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => (
-                <tr key={log.id} className="border-t hover:bg-gray-50 transition-colors">
-                  <td className="p-3 whitespace-nowrap">{new Date(log.access_time).toLocaleString("vi-VN")}</td>
-                  <td className="p-3 font-medium">{log.patron_name || "-"}</td>
-                  <td className="p-3 text-gray-600">{log.student_code || "-"}</td>
-                  <td className="p-3">
+                <tr key={log.id}>
+                  <td className="whitespace-nowrap font-mono text-text-3">
+                    {new Date(log.access_time).toLocaleString("vi-VN")}
+                  </td>
+                  <td className="font-medium">{log.patron_name || "-"}</td>
+                  <td className="font-mono text-text-3">{log.student_code || "-"}</td>
+                  <td>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                       log.access_type === "entry"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-orange-100 text-orange-800"
+                        ? "bg-success/15 text-success"
+                        : "bg-warning/15 text-warning"
                     }`}>
                       {log.access_type === "entry" ? "Vào" : "Ra"}
                     </span>
                   </td>
-                  <td className="p-3 text-gray-600">{log.verify_method}</td>
-                  <td className="p-3 text-gray-600">{log.camera_id}</td>
-                  <td className="p-3">
+                  <td className="text-text-3">{log.verify_method}</td>
+                  <td className="font-mono text-text-3">{log.camera_id}</td>
+                  <td>
                     {log.confidence != null ? (
                       <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="w-16 h-1.5 bg-surface-3 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
-                              log.confidence >= 0.8 ? "bg-green-500" : log.confidence >= 0.6 ? "bg-yellow-500" : "bg-red-500"
+                              log.confidence >= 0.8 ? "bg-success" : log.confidence >= 0.6 ? "bg-warning" : "bg-error"
                             }`}
                             style={{ width: `${(log.confidence * 100).toFixed(0)}%` }}
                           />
                         </div>
-                        <span className="text-xs">{(log.confidence * 100).toFixed(0)}%</span>
+                        <span className="text-caption text-text-3">{(log.confidence * 100).toFixed(0)}%</span>
                       </div>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-text-3">-</span>
                     )}
                   </td>
-                  <td className="p-3">
+                  <td>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                       log.status === "success"
-                        ? "bg-green-100 text-green-800"
+                        ? "bg-success/15 text-success"
                         : log.status === "expired"
-                        ? "bg-yellow-100 text-yellow-800"
+                        ? "bg-warning/15 text-warning"
                         : log.status === "spoof"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-red-100 text-red-800"
+                        ? "bg-error/15 text-error"
+                        : "bg-error/15 text-error"
                     }`}>
-                      {log.status === "success" ? "✓" : log.status === "expired" ? "!" : "✗"}
+                      {log.status === "success" ? "✓" : log.status === "expired" ? "!" : "✗"} {log.status === "success" ? "Thành công" : log.status === "expired" ? "Hết hạn" : "Thất bại"}
                     </span>
                   </td>
                 </tr>
@@ -271,11 +270,11 @@ export default function HistoryPage() {
         )}
       </div>
 
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between text-body-sm">
         <div className="flex items-center gap-2">
-          <span className="text-gray-600">Số dòng:</span>
+          <span className="text-text-3">Số dòng:</span>
           <select
-            className="px-2 py-1 border rounded-md"
+            className="input py-1.5 w-20"
             value={limit}
             onChange={(e) => { setLimit(Number(e.target.value)); setSkip(0); }}
           >
@@ -284,33 +283,33 @@ export default function HistoryPage() {
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
-            className="px-3 py-1 border rounded-md disabled:opacity-40"
+            className="btn-ghost px-3 py-1.5"
             disabled={currentPage <= 1}
             onClick={() => goToPage(1)}
           >
             ««
           </button>
           <button
-            className="px-3 py-1 border rounded-md disabled:opacity-40"
+            className="btn-ghost px-3 py-1.5"
             disabled={currentPage <= 1}
             onClick={() => goToPage(currentPage - 1)}
           >
             «
           </button>
-          <span className="px-3 py-1">
+          <span className="px-3 py-1.5 text-text-2">
             Trang {currentPage} / {totalPages}
           </span>
           <button
-            className="px-3 py-1 border rounded-md disabled:opacity-40"
+            className="btn-ghost px-3 py-1.5"
             disabled={currentPage >= totalPages}
             onClick={() => goToPage(currentPage + 1)}
           >
             »
           </button>
           <button
-            className="px-3 py-1 border rounded-md disabled:opacity-40"
+            className="btn-ghost px-3 py-1.5"
             disabled={currentPage >= totalPages}
             onClick={() => goToPage(totalPages)}
           >

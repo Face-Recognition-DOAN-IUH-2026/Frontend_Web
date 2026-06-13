@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, AlertCircle, RotateCcw } from "lucide-react";
 import api, { getErrorMessage } from "@/lib/api-client";
 import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 
 export default function EnrollPage() {
   const [consent, setConsent] = useState(false);
@@ -16,10 +19,7 @@ export default function EnrollPage() {
 
   useEffect(() => {
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
   }, []);
 
@@ -28,13 +28,10 @@ export default function EnrollPage() {
     pollIntervalRef.current = setInterval(async () => {
       try {
         const data = await api.getTaskStatus(taskId);
-
         if (data.status === "SUCCESS") {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-
           const inner = data.result;
-          if (inner && inner.status === "error") {
+          if (inner?.status === "error") {
             setError(inner.error || "Enrollment failed");
             setResult(inner);
           } else {
@@ -43,15 +40,12 @@ export default function EnrollPage() {
           setIsLoading(false);
         } else if (data.status === "FAILURE") {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-          const inner = data.result;
-          setError(inner?.error || "Enrollment failed");
-          setResult(inner);
+          setError(data.result?.error || "Enrollment failed");
+          setResult(data.result);
           setIsLoading(false);
         }
       } catch {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
         setError("Failed to poll task status");
         setIsLoading(false);
       }
@@ -63,11 +57,8 @@ export default function EnrollPage() {
     setIsLoading(true);
     setJobId(null);
     setResult(null);
-
-    // Temporary: use existing enrollBatch until API client is updated.
     try {
-      const { frontal, right, left, down } = files;
-      const data = await api.enrollBatch({ frontal, right, left, down }, consent);
+      const data = await api.enrollBatch(files, consent);
       setJobId(data.job_id);
       await pollForResult(data.job_id);
     } catch (err: any) {
@@ -84,61 +75,81 @@ export default function EnrollPage() {
     setIsLoading(false);
   };
 
-  return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Enroll Face</h1>
+  const failedCount = result?.results?.filter((r: any) => r.status !== "success").length || 0;
 
-      {error && <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>}
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      {error && (
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg flex items-center gap-3 text-error">
+          <AlertCircle size={18} />
+          {error}
+        </div>
+      )}
 
       {result ? (
-        <div className="bg-white p-6 rounded-lg border">
-          {result.status === "error" ? (
-            <div className="flex items-center gap-3 text-red-600 mb-4">
-              <CheckCircle className="w-8 h-8" />
-              <h2 className="text-xl font-semibold">Enrollment Partially Failed</h2>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 text-green-600 mb-4">
-              <CheckCircle className="w-8 h-8" />
-              <h2 className="text-xl font-semibold">Enrollment Successful!</h2>
-            </div>
-          )}
-          <p className="text-gray-600 mb-4">
-            {result.status === "error"
-              ? `${result.results?.filter((r: any) => r.status !== "success").length} angle(s) failed.`
-              : "Your face has been enrolled successfully."}
-          </p>
-
-          {result.results && (
-            <div className="mb-4 space-y-1">
-              <p className="text-sm font-medium text-gray-700">Per-angle status:</p>
-              {result.results.map((r: any, i: number) => (
-                <p key={i} className={`text-sm ${r.status === "success" ? "text-green-600" : "text-red-600"}`}>
-                  {r.angle}: {r.status === "success" ? "✓" : "✗"} {r.error || ""}
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                result.status === "error" ? "bg-error/15" : "bg-success/15"
+              }`}>
+                {result.status === "error" ? (
+                  <AlertCircle size={24} className="text-error" />
+                ) : (
+                  <CheckCircle size={24} className="text-success" />
+                )}
+              </div>
+              <div>
+                <h2 className="text-heading-lg text-text">
+                  {result.status === "error" ? "Đăng ký thất bại một phần" : "Đăng ký thành công!"}
+                </h2>
+                <p className="text-body-sm text-text-3 mt-0.5">
+                  {result.status === "error"
+                    ? `${failedCount} góc ảnh thất bại.`
+                    : "Khuôn mặt của bạn đã được đăng ký thành công."}
                 </p>
-              ))}
+              </div>
             </div>
-          )}
 
-          <button onClick={handleReset} className="px-4 py-2 bg-primary text-primary-foreground rounded-md">
-            {result.status === "error" ? "Try Again" : "Enroll Another"}
-          </button>
-        </div>
+            {result.results && (
+              <div className="border-t border-border pt-4 space-y-2">
+                <p className="text-caption text-text-3 uppercase tracking-wide">Kết quả từng góc</p>
+                {result.results.map((r: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                    <span className="text-body-sm text-text-2 capitalize">{r.angle}</span>
+                    <Badge variant={r.status === "success" ? "success" : "error"} dot>
+                      {r.status === "success" ? "Thành công" : "Thất bại"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Button onClick={handleReset} icon={<RotateCcw size={16} />}>
+              {result.status === "error" ? "Thử lại" : "Đăng ký thêm"}
+            </Button>
+          </CardContent>
+        </Card>
       ) : jobId && !result ? (
-        <div className="bg-white p-6 rounded-lg border text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Processing...</h2>
-          <p className="text-gray-600 text-sm">Job ID: {jobId}</p>
-        </div>
+        <Card>
+          <CardContent className="p-8 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
+            <div>
+              <h2 className="text-heading-md text-text">Đang xử lý...</h2>
+              <p className="text-body-sm text-text-3 font-mono mt-1">Job ID: {jobId}</p>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="bg-white p-6 rounded-lg border space-y-6">
-          <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleFilesReady} />
-          {isLoading && (
-            <div className="text-center text-sm text-gray-600">Submitting enrollment...</div>
-          )}
-        </div>
+        <Card padding="none">
+          <CardContent className="p-6 space-y-6">
+            <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleFilesReady} />
+            {isLoading && (
+              <div className="text-center text-body-sm text-text-3">Đang gửi đăng ký...</div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
 }
-

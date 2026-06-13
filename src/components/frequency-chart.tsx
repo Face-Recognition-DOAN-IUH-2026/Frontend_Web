@@ -8,17 +8,17 @@ import type { AccessFrequencyDay } from "@/lib/types";
 
 export default function FrequencyChart({ data, loading }: { data: AccessFrequencyDay[]; loading: boolean }) {
   return (
-    <div className="bg-white rounded-lg border p-4">
+    <div className="bg-surface rounded-lg border border-border p-4">
       <div className="flex items-center gap-2 mb-4">
-        <BarChart3 className="w-5 h-5 text-gray-500" />
-        <h2 className="text-lg font-semibold">Thống kê tần suất ra vào</h2>
+        <BarChart3 className="w-5 h-5 text-text-3" />
+        <h2 className="text-heading-md text-text">Thống kê tần suất ra vào</h2>
       </div>
       {loading ? (
-        <p className="text-gray-500 text-sm">Đang tải...</p>
+        <p className="text-text-3 text-body-sm">Đang tải...</p>
       ) : (
         <ResponsiveContainer width="100%" height={250}>
           <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#2E3345" />
             <XAxis
               dataKey="date"
               tickFormatter={(d: string) => {
@@ -26,18 +26,21 @@ export default function FrequencyChart({ data, loading }: { data: AccessFrequenc
                 return date.toLocaleDateString("vi-VN", { day: "numeric", month: "numeric" });
               }}
               fontSize={12}
+              tick={{ fill: "#B8B0A4" }}
             />
-            <YAxis allowDecimals={false} fontSize={12} />
+            <YAxis allowDecimals={false} fontSize={12} tick={{ fill: "#B8B0A4" }} />
             <Tooltip
+              labelStyle={{ color: "#EDE8DF" }}
+              contentStyle={{ background: "#1C2030", border: "1px solid #2E3345", borderRadius: "8px" }}
               labelFormatter={(d: any) => {
                 if (!d) return "";
                 const date = new Date(String(d) + "T00:00:00");
                 return date.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
               }}
             />
-            <Legend />
-            <Bar dataKey="entry" fill="#22c55e" name="Vào" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="exit" fill="#fb923c" name="Ra" radius={[4, 4, 0, 0]} />
+            <Legend wrapperStyle={{ color: "#B8B0A4" }} />
+            <Bar dataKey="entry" fill="#4A8C5C" name="Vào" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="exit" fill="#C49A3C" name="Ra" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       )}

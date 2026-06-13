@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import api, { getErrorMessage } from "@/lib/api-client";
-import type { BorrowRecord, BookInfo } from "@/lib/types";
-import { BookOpen, User, Calendar, CheckCircle, XCircle } from "lucide-react";
+import type { BorrowRecord } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import { BookOpen, CheckCircle, XCircle, ScanLine, ArrowRight } from "lucide-react";
 
 export default function ReturnPage() {
   const [barcode, setBarcode] = useState("");
@@ -53,24 +55,25 @@ export default function ReturnPage() {
     }
   };
 
+  const isOverdue = record ? new Date(record.due_at) < new Date() : false;
+
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-3xl font-bold">Trả sách</h1>
-        <p className="text-gray-600 mt-1">Quét mã vạch thẻ sách để trả (chỉ nhân viên thư viện)</p>
-      </div>
-
-      <div className="flex gap-2">
-        <input
-          className="flex-1 px-4 py-3 border rounded-lg text-lg font-mono"
-          value={barcode}
-          onChange={(e) => { setBarcode(e.target.value); setResult(null); }}
-          onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-          placeholder="Nhập mã vạch..."
-          autoFocus
-        />
+      {/* Search bar */}
+      <div className="flex gap-3">
+        <div className="flex-1 relative">
+          <ScanLine size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-3" />
+          <input
+            className="input pl-10 text-lg font-mono"
+            value={barcode}
+            onChange={(e) => { setBarcode(e.target.value); setResult(null); }}
+            onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+            placeholder="Nhập mã vạch..."
+            autoFocus
+          />
+        </div>
         <button
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg disabled:opacity-50"
+          className="btn-primary px-6 py-2.5 text-body-md"
           onClick={handleLookup}
           disabled={loading || !barcode.trim()}
         >
@@ -78,65 +81,89 @@ export default function ReturnPage() {
         </button>
       </div>
 
+      {/* Error */}
       {lookupError && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
-          <XCircle className="w-5 h-5" />
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg flex items-center gap-3 text-error">
+          <XCircle size={18} />
           {lookupError}
         </div>
       )}
 
+      {/* Record info */}
       {record && (
-        <div className="p-6 bg-white border rounded-lg space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <BookOpen className="w-5 h-5" />
-            Thông tin mượn sách
-          </h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Mã vạch:</span>
-              <p className="font-mono font-medium">{barcode}</p>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen size={18} className="text-primary" />
+              Thông tin mượn sách
+            </CardTitle>
+            <Badge variant={record.status === "borrowed" ? "warning" : "neutral"}>
+              {record.status === "borrowed" ? "Đang mượn" : record.status}
+            </Badge>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-body-sm">
+              <div>
+                <p className="text-text-3 text-caption">Mã vạch</p>
+                <p className="font-mono font-medium text-text">{barcode}</p>
+              </div>
+              <div>
+                <p className="text-text-3 text-caption">Mã bạn đọc</p>
+                <p className="font-mono font-medium text-text">{record.patron_id}</p>
+              </div>
+              <div>
+                <p className="text-text-3 text-caption">Mã sách</p>
+                <p className="font-mono font-medium text-text">{record.book_id}</p>
+              </div>
+              <div>
+                <p className="text-text-3 text-caption">Vị trí</p>
+                <p className="font-mono text-text">{record.shelf_location || "-"}</p>
+              </div>
+              <div>
+                <p className="text-text-3 text-caption">Ngày mượn</p>
+                <p className="text-text">{new Date(record.borrow_at).toLocaleDateString("vi-VN")}</p>
+              </div>
+              <div className={isOverdue ? "text-error" : ""}>
+                <p className="text-text-3 text-caption">Hạn trả</p>
+                <p className={`font-semibold ${isOverdue ? "text-error" : "text-text"}`}>
+                  {new Date(record.due_at).toLocaleDateString("vi-VN")}
+                  {isOverdue && " ⚠️"}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="text-gray-500">Trạng thái:</span>
-              <p>
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  {record.status}
-                </span>
-              </p>
+
+            <div className="border-t border-border pt-4">
+              <button
+                className="btn-primary w-full py-3 text-body-md font-semibold flex items-center justify-center gap-2"
+                onClick={handleReturn}
+                disabled={returning}
+              >
+                {returning ? (
+                  <>
+                    <span className="w-4 h-4 rounded-full border-2 border-bg border-t-transparent animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={18} />
+                    Xác nhận trả sách
+                  </>
+                )}
+              </button>
             </div>
-            <div>
-              <span className="text-gray-500">Mã bạn đọc:</span>
-              <p className="font-medium">{record.patron_id}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Mã sách:</span>
-              <p className="font-medium">{record.book_id}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Ngày mượn:</span>
-              <p>{new Date(record.borrow_at).toLocaleDateString("vi-VN")}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Hạn trả:</span>
-              <p className="text-red-600 font-medium">{new Date(record.due_at).toLocaleDateString("vi-VN")}</p>
-            </div>
-          </div>
-          <button
-            className="w-full px-4 py-3 bg-green-600 text-white rounded-lg disabled:opacity-50 text-lg font-semibold"
-            onClick={handleReturn}
-            disabled={returning}
-          >
-            {returning ? "Đang xử lý..." : "Xác nhận trả sách"}
-          </button>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
+      {/* Result */}
       {result && (
-        <div className={`p-4 border rounded-lg flex items-center gap-3 ${
-          result.success ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"
+        <div className={`p-4 border rounded-lg flex items-center gap-3 animate-fade-in ${
+          result.success
+            ? "bg-success/10 border-success/20 text-success"
+            : "bg-error/10 border-error/20 text-error"
         }`}>
-          {result.success ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-          {result.message}
+          {result.success ? <CheckCircle size={20} /> : <XCircle size={20} />}
+          <p className="text-body-md font-medium">{result.message}</p>
         </div>
       )}
     </div>

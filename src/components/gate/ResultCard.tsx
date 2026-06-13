@@ -13,7 +13,13 @@ interface ResultCardProps {
 }
 
 export default function ResultCard({ status, patronInfo, message }: ResultCardProps) {
-  const config = {
+  type PulseColor = 'emerald' | 'red' | 'amber' | 'none';
+  const config: Record<string, {
+    borderColor: string;
+    bgColor: string;
+    pulseColor: PulseColor;
+    icon: React.ReactNode;
+  }> = {
     success: {
       borderColor: 'border-emerald-500',
       bgColor: 'bg-emerald-500/10',

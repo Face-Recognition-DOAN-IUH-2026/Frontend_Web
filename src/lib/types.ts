@@ -102,6 +102,7 @@ export interface AuthUser {
   id: string;
   email: string;
   role: string;
+  full_name?: string | null;
 }
 
 export interface AuthContextType {

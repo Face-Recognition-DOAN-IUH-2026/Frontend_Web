@@ -5,26 +5,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Home,
+  LayoutDashboard,
   Users,
   BookOpen,
   History,
   BookMarked,
-  UserPlus,
+  ScanFace,
   UserCheck,
   Search,
   Eye,
   Shield,
   BarChart3,
   ChevronDown,
+  DoorOpen,
   LogOut,
   Library,
 } from "lucide-react";
 
 const libraryItems = [
-  { href: "/dashboard", label: "Tổng quan", icon: Home },
+  { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { href: "/patrons", label: "Độc giả", icon: Users },
   { href: "/active", label: "Đang hiện diện", icon: BookOpen },
+  { href: "/gate", label: "Cổng ra vào", icon: DoorOpen },
   { href: "/history", label: "Lịch sử ra vào", icon: History },
 ];
 
@@ -33,7 +35,7 @@ const circulationItems = [
 ];
 
 const aiItems = [
-  { href: "/enroll", label: "Đăng ký khuôn mặt", icon: UserPlus },
+  { href: "/enroll", label: "Đăng ký khuôn mặt", icon: ScanFace },
   { href: "/verify", label: "Xác thực khuôn mặt", icon: UserCheck },
   { href: "/identify", label: "Nhận diện", icon: Search },
   { href: "/liveness", label: "Kiểm tra sống", icon: Eye },
@@ -44,121 +46,158 @@ const adminItems = [
   { href: "/stats", label: "Thống kê", icon: BarChart3 },
 ];
 
-function NavLink({ href, icon: Icon, label, pathname }: { href: string; icon: any; label: string; pathname: string }) {
-  const active = pathname === href;
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  active,
+  badge,
+}: {
+  href: string;
+  icon: any;
+  label: string;
+  active?: boolean;
+  badge?: number;
+}) {
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-        active
-          ? "bg-primary text-primary-foreground font-medium"
-          : "text-gray-700 hover:bg-accent"
-      }`}
+      className={`nav-item ${active ? "nav-item-active" : ""}`}
     >
-      <Icon className={`w-5 h-5 shrink-0 ${active ? "" : "text-gray-400"}`} />
-      <span className="truncate">{label}</span>
+      <Icon size={18} className={`shrink-0 ${active ? "text-primary" : "text-text-2"}`} />
+      <span className="flex-1 truncate">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-caption font-medium min-w-[20px] text-center">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </Link>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, collapsible, open, onToggle }: {
+  children: React.ReactNode;
+  collapsible?: boolean;
+  open?: boolean;
+  onToggle?: () => void;
+}) {
+  if (collapsible) {
+    return (
+      <button
+        onClick={onToggle}
+        className="flex items-center justify-between w-full px-3 mb-1 text-body-sm text-text-2 hover:text-text transition-colors"
+      >
+        <span>{children}</span>
+        <ChevronDown
+          size={12}
+          className={`transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+    );
+  }
   return (
-    <p className="px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
-      {children}
-    </p>
+    <p className="px-3 mb-1 text-body-sm text-text-2">{children}</p>
   );
 }
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const [aiOpen, setAiOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(true);
+  const [adminOpen, setAdminOpen] = useState(true);
+
+  const role = user?.role || "staff";
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r flex flex-col">
-      <div className="p-4 border-b">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-            <Library className="w-5 h-5 text-primary-foreground" />
+    <aside className="w-64 min-h-screen bg-surface border-r border-border flex flex-col">
+      {/* Logo */}
+      <div className="px-4 py-5 border-b border-border">
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Library size={22} className="text-primary" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-bold leading-tight">Thư Viện</h2>
-            <p className="text-[11px] text-gray-400">Hệ thống quản lý</p>
+            <h2 className="text-heading-md text-text">THƯ VIỆN IUH</h2>
+            <p className="text-caption text-text-3">Hệ thống quản lý</p>
           </div>
-        </div>
+        </Link>
       </div>
 
-      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+      {/* Navigation */}
+      <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+        {/* Library section */}
         <div>
           <SectionLabel>Thư viện</SectionLabel>
           <div className="space-y-0.5">
             {libraryItems.map((item) => (
-                  <NavLink key={item.href} {...item} pathname={pathname} />
-                ))}
+              <NavItem key={item.href} {...item} active={pathname === item.href} />
+            ))}
           </div>
         </div>
 
-        {(user?.role === "admin" || user?.role === "staff") && (
+        {/* Circulation */}
+        {role === "admin" || role === "staff" ? (
           <div>
             <SectionLabel>Mượn / Trả</SectionLabel>
             <div className="space-y-0.5">
               {circulationItems.map((item) => (
-                  <NavLink key={item.href} {...item} pathname={pathname} />
-                ))}
+                <NavItem key={item.href} {...item} active={pathname === item.href} />
+              ))}
             </div>
           </div>
-        )}
+        ) : null}
 
-        {user?.role === "admin" && (
+        {/* AI Diagnostics — collapsible */}
+        {role === "admin" ? (
           <div>
-            <button
-              onClick={() => setAiOpen((v) => !v)}
-              className="flex items-center justify-between w-full px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors rounded-md"
-            >
-              <span>Chẩn đoán AI</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform ${
-                  aiOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+            <SectionLabel collapsible open={aiOpen} onToggle={() => setAiOpen((v) => !v)}>
+              Chẩn đoán AI
+            </SectionLabel>
             {aiOpen && (
-              <div className="mt-0.5 space-y-0.5">
+              <div className="space-y-0.5">
                 {aiItems.map((item) => (
-                  <NavLink key={item.href} {...item} pathname={pathname} />
+                  <NavItem key={item.href} {...item} active={pathname === item.href} />
                 ))}
               </div>
             )}
           </div>
-        )}
+        ) : null}
 
-        {user?.role === "admin" && (
+        {/* Admin */}
+        {role === "admin" ? (
           <div>
-            <SectionLabel>Quản trị</SectionLabel>
-            <div className="space-y-0.5">
-              {adminItems.map((item) => (
-                  <NavLink key={item.href} {...item} pathname={pathname} />
+            <SectionLabel collapsible open={adminOpen} onToggle={() => setAdminOpen((v) => !v)}>
+              Quản trị
+            </SectionLabel>
+            {adminOpen && (
+              <div className="space-y-0.5">
+                {adminItems.map((item) => (
+                  <NavItem key={item.href} {...item} active={pathname === item.href} />
                 ))}
-            </div>
+              </div>
+            )}
           </div>
-        )}
+        ) : null}
       </nav>
 
-      <div className="p-3 border-t">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-md">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-            {user?.email?.charAt(0).toUpperCase() || "U"}
+      {/* User footer */}
+      <div className="p-3 border-t border-border">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-surface-2 transition-colors">
+          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate text-gray-800">{user?.email}</p>
-            <p className="text-[11px] text-gray-400 capitalize">{user?.role}</p>
+            <p className="text-body-sm font-medium text-text truncate">
+              {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
+            </p>
+            <p className="text-caption text-text-2 capitalize">{role === "admin" ? "Quản trị viên" : "Nhân viên"}</p>
           </div>
           <button
             onClick={logout}
-            className="p-1.5 rounded-md hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors shrink-0"
+            className="p-1.5 rounded-md text-text-2 hover:text-error hover:bg-error/10 transition-colors shrink-0"
             title="Đăng xuất"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut size={15} />
           </button>
         </div>
       </div>

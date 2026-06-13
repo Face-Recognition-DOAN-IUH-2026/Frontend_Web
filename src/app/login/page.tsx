@@ -52,9 +52,7 @@ export default function LoginPage() {
     if (!isCameraOn || !videoRef.current || !streamRef.current) return;
     const video = videoRef.current;
     const stream = streamRef.current;
-    const onReady = () => {
-      setCameraReady(true);
-    };
+    const onReady = () => setCameraReady(true);
     video.onloadedmetadata = onReady;
     video.onplaying = onReady;
     video.onerror = () => setError("Camera error");
@@ -89,11 +87,7 @@ export default function LoginPage() {
     setCameraReady(false);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, [stopCamera]);
+  useEffect(() => () => stopCamera(), [stopCamera]);
 
   const resetFaceState = () => {
     setImageFile(null);
@@ -142,7 +136,7 @@ export default function LoginPage() {
       await login(email, password);
       window.location.href = "/dashboard";
     } catch (err: any) {
-      setError(getErrorMessage(err) || "Login failed");
+      setError(getErrorMessage(err) || "Đăng nhập thất bại");
     } finally {
       setIsLoading(false);
     }
@@ -184,158 +178,179 @@ export default function LoginPage() {
     });
   }, [capturePhoto, stopCamera, doFaceLogin]);
 
-  const switchToFace = () => {
-    setMode("face");
-    setError("");
-    setFaceFailCount(0);
-    resetFaceState();
-  };
-
-  const switchToPassword = () => {
-    setMode("password");
-    setError("");
-    stopCamera();
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-md">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your account</p>
-        </div>
+    <div className="min-h-screen bg-bg flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background radial gradient */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(212,168,83,0.08) 0%, transparent 70%)",
+      }} />
 
-        <div className="flex mb-6 border rounded-lg overflow-hidden">
-          <button
-            type="button"
-            onClick={switchToPassword}
-            className={`flex-1 py-2 text-sm font-medium ${
-              mode === "password"
-                ? "bg-primary text-primary-foreground"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            Password
-          </button>
-          <button
-            type="button"
-            onClick={switchToFace}
-            className={`flex-1 py-2 text-sm font-medium flex items-center justify-center gap-1 ${
-              mode === "face"
-                ? "bg-primary text-primary-foreground"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            <Eye className="w-4 h-4" />
-            Face
-          </button>
-        </div>
+      {/* Decorative orbs */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-10 blur-3xl pointer-events-none" style={{ background: "radial-gradient(circle, #D4A853 0%, transparent 70%)" }} />
+      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full opacity-5 blur-3xl pointer-events-none" style={{ background: "radial-gradient(circle, #D4A853 0%, transparent 70%)" }} />
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">
-            {error}
-          </div>
-        )}
-
-        {success ? (
-          <div className="text-center py-8">
-            <div className="rounded-full h-16 w-16 bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+      <div className="w-full max-w-md relative">
+        {/* Card */}
+        <div className="card-elevated p-8">
+          {/* Logo / Header */}
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-xl bg-primary/15 flex items-center justify-center mx-auto mb-4">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-primary">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" fill="currentColor" opacity="0.3" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" fill="currentColor" />
               </svg>
             </div>
-            <p className="text-lg font-semibold text-green-600">Login Successful!</p>
-            <p className="text-sm text-gray-500 mt-1">Redirecting to dashboard...</p>
+            <h1 className="text-display-lg text-text font-display font-bold">THƯ VIỆN IUH</h1>
+            <p className="text-body-sm text-text-3 mt-1">Đăng nhập vào hệ thống quản lý</p>
           </div>
-        ) : isLoading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-gray-600">Verifying face...</p>
-          </div>
-        ) : mode === "password" ? (
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
-              <input
-                id="email" type="email" value={email} autoComplete="email"
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" required
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-1">Password</label>
-              <input
-                id="password" type="password" value={password} autoComplete="current-password"
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" required
-              />
-            </div>
-            <button type="submit" disabled={isLoading}
-              className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
-            >
-              {isLoading ? "Signing in..." : "Sign In"}
-            </button>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            {imagePreview ? (
-              <div className="space-y-2">
-                <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                  <img src={imagePreview} alt="Captured" className="w-full h-full object-contain" />
-                </div>
-                <button type="button" onClick={() => { resetFaceState(); startCamera(); }}
-                  className="w-full py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200"
-                >
-                  Retake
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                  {isCameraOn ? (
-                    <>
-                      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
-                      {!cameraReady ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
-                          Loading camera...
-                        </div>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="w-48 h-48 border-2 border-primary/50 rounded-full" />
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-                      Click "Start Camera" or "Upload"
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-3">
-                  {!isCameraOn && (
-                    <button type="button" onClick={startCamera}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
-                    >
-                      <Camera className="w-5 h-5" /> Start Camera
-                    </button>
-                  )}
-                  <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200 cursor-pointer">
-                    <Upload className="w-5 h-5" /> Upload
-                    <input type="file" accept="image/*" capture="user" onChange={handleFileChange} className="hidden" />
-                  </label>
-                  {isCameraOn && (
-                    <button type="button" onClick={stopCamera}
-                      className="px-4 py-2 text-red-600 bg-red-50 rounded-md hover:bg-red-100"
-                    >
-                      Stop
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
 
+          {/* Mode toggle */}
+          <div className="flex mb-6 bg-surface-2 rounded-lg p-1">
+            <button
+              type="button"
+              onClick={() => { setMode("password"); setError(""); setFaceFailCount(0); resetFaceState(); }}
+              className={`flex-1 py-2 text-body-sm font-medium rounded-md transition-all ${
+                mode === "password"
+                  ? "bg-surface text-text shadow-sm"
+                  : "text-text-3 hover:text-text-2"
+              }`}
+            >
+              Mật khẩu
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("face"); setError(""); setFaceFailCount(0); resetFaceState(); }}
+              className={`flex-1 py-2 text-body-sm font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                mode === "face"
+                  ? "bg-surface text-text shadow-sm"
+                  : "text-text-3 hover:text-text-2"
+              }`}
+            >
+              <Eye size={14} />
+              Khuôn mặt
+            </button>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="mb-4 px-4 py-3 bg-error/10 border border-error/20 rounded-lg text-error text-body-sm flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+              </svg>
+              {error}
+            </div>
+          )}
+
+          {/* Success */}
+          {success ? (
+            <div className="text-center py-8 animate-success-pop">
+              <div className="w-16 h-16 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-4">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="text-success">
+                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <p className="text-heading-md text-text font-semibold text-success">Đăng nhập thành công!</p>
+              <p className="text-body-sm text-text-3 mt-1">Đang chuyển hướng...</p>
+            </div>
+          ) : isLoading ? (
+            <div className="text-center py-8">
+              <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-4" />
+              <p className="text-body-sm text-text-3">
+                {mode === "face" ? "Đang xác thực khuôn mặt..." : "Đang đăng nhập..."}
+              </p>
+            </div>
+          ) : mode === "password" ? (
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-body-sm font-medium text-text-2 mb-1.5">Email</label>
+                <input
+                  id="email" type="email" value={email} autoComplete="email"
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@iuh.edu.vn"
+                  className="input w-full" required
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-body-sm font-medium text-text-2 mb-1.5">Mật khẩu</label>
+                <input
+                  id="password" type="password" value={password} autoComplete="current-password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="input w-full" required
+                />
+              </div>
+              <button type="submit" disabled={isLoading} className="btn-primary w-full py-2.5 mt-2">
+                Đăng nhập
+              </button>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              {imagePreview ? (
+                <div className="space-y-3">
+                  <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                    <img src={imagePreview} alt="Captured" className="w-full h-full object-contain" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { resetFaceState(); startCamera(); }}
+                    className="btn-secondary w-full"
+                  >
+                    Chụp lại
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                    {isCameraOn ? (
+                      <>
+                        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
+                        {!cameraReady && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white text-body-sm">
+                            Đang kết nối camera...
+                          </div>
+                        )}
+                        {cameraReady && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-48 h-48 border-2 border-primary/50 rounded-full" />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-text-3 text-body-sm gap-2">
+                        <Camera size={24} />
+                        <span>Bật camera hoặc tải ảnh lên</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    {!isCameraOn && (
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        className="btn-secondary flex-1 flex items-center justify-center gap-2"
+                      >
+                        <Camera size={16} /> Bật camera
+                      </button>
+                    )}
+                    <label className="btn-secondary flex-1 flex items-center justify-center gap-2 cursor-pointer">
+                      <Upload size={16} /> Tải ảnh
+                      <input type="file" accept="image/*" capture="user" onChange={handleFileChange} className="hidden" />
+                    </label>
+                    {isCameraOn && (
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="btn-ghost px-4 text-error"
+                      >
+                        Tắt
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
