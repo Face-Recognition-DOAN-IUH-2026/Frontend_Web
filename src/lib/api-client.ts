@@ -360,6 +360,21 @@ class ApiClient {
     return response.data;
   }
 
+  async enrollPatronFaceBatch(
+    patronId: string,
+    files: { frontal: File; right: File; left: File; down: File },
+    consent: boolean = true
+  ): Promise<{ success: boolean; job_id: string; message: string }> {
+    const formData = new FormData();
+    formData.append("frontal", files.frontal);
+    formData.append("right", files.right);
+    formData.append("left", files.left);
+    formData.append("down", files.down);
+    formData.append("consent_given", String(consent));
+    const response = await this.client.post(`/api/patrons/${patronId}/enroll-batch`, formData);
+    return response.data;
+  }
+
   // === Kiosk ===
   async kioskLookup(
     studentCode?: string,

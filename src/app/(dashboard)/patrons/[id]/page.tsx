@@ -1,9 +1,11 @@
-"use client";
+'use client';
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api, { getErrorMessage } from "@/lib/api-client";
+import MultiAngleCapture from "@/components/MultiAngleCapture";
 import type { AccessLogPublic, PatronPublic, PatronUpdate } from "@/lib/types";
+import type { CaptureAngle } from "@/components/MultiAngleCapture";
 
 export default function PatronDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -19,14 +21,8 @@ export default function PatronDetailPage() {
   const [editForm, setEditForm] = useState<PatronUpdate>({});
   const [showEdit, setShowEdit] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const enrollReadyRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [enrollStreaming, setEnrollStreaming] = useState(false);
-  const [enrollReady, setEnrollReady] = useState(false);
-  const [enrollPreview, setEnrollPreview] = useState<string | null>(null);
-  const [enrollFile, setEnrollFile] = useState<File | null>(null);
+  const [showEnroll, setShowEnroll] = useState(false);
+  const [consent, setConsent] = useState(false);
   const [enrollError, setEnrollError] = useState("");
   const [enrollSuccess, setEnrollSuccess] = useState("");
   const [enrollLoading, setEnrollLoading] = useState(false);
@@ -83,93 +79,27 @@ export default function PatronDetailPage() {
         alert("Độc giả không tồn tại hoặc đã bị xóa trước đó.");
         router.push("/patrons");
       } else {
-        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lỗi không xác định"));
+        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lời không xác định"));
       }
     }
   };
 
-  const startEnrollCam = async () => {
-    try {
-      setEnrollError("");
-      setEnrollReady(false);
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      setEnrollStreaming(true);
-    } catch (err: any) {
-      if (err.name === "NotAllowedError") setEnrollError("Không có quyền truy cập camera");
-      else if (err.name === "NotFoundError") setEnrollError("Không tìm thấy camera");
-      else setEnrollError(`Lỗi camera: ${err.message}`);
-    }
-  };
-
-  useEffect(() => {
-    if (!enrollStreaming || !videoRef.current || !streamRef.current) return;
-    const video = videoRef.current;
-    const stream = streamRef.current;
-    const onReady = () => setEnrollReady(true);
-    video.onloadedmetadata = onReady;
-    video.onplaying = onReady;
-    video.srcObject = stream;
-    if (video.readyState >= 2) onReady();
-    enrollReadyRef.current = setTimeout(() => setEnrollReady(true), 1500);
-    return () => { if (enrollReadyRef.current) clearTimeout(enrollReadyRef.current); };
-  }, [enrollStreaming]);
-
-  const stopEnrollCam = () => {
-    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
-    setEnrollStreaming(false);
-    setEnrollReady(false);
-  };
-
-  const captureEnroll = () => {
-    const video = videoRef.current;
-    if (!video || !video.videoWidth) { setEnrollError("Camera chưa sẵn sàng"); return; }
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], "face.jpg", { type: "image/jpeg" });
-      setEnrollFile(file);
-      setEnrollPreview(canvas.toDataURL("image/jpeg"));
-      stopEnrollCam();
-    }, "image/jpeg", 0.9);
-  };
-
-  const handleEnrollFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setEnrollError("Vui lòng chọn file ảnh");
-      return;
-    }
-    setEnrollFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setEnrollPreview(ev.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const submitEnroll = async () => {
-    if (!patron || !enrollFile) return;
+  const handleEnroll = async (files: Record<CaptureAngle, File>) => {
+    if (!patron) return;
     setEnrollLoading(true);
     setEnrollError("");
     setEnrollSuccess("");
     try {
-      await api.enrollPatronFace(patron.id, enrollFile);
-      setEnrollPreview(null);
-      setEnrollFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      await loadPatron();
+      await api.enrollPatronFaceBatch(patron.id, {
+        frontal: files.frontal,
+        right: files.right,
+        left: files.left,
+        down: files.down,
+      });
       setEnrollSuccess("Đăng ký khuôn mặt thành công!");
+      setShowEnroll(false);
+      setConsent(false);
+      await loadPatron();
     } catch (err: any) {
       const errCode = err?.response?.data?.error || err?.response?.data?.detail;
       const errorMessages: Record<string, string> = {
@@ -238,19 +168,8 @@ export default function PatronDetailPage() {
           }); setShowEdit(true); }}>Sửa thông tin</button>
           <button className="px-4 py-2 bg-green-600 text-white rounded-md text-sm" onClick={handleRenew}>Gia hạn thẻ</button>
           {!patron.has_face && (
-            <>
-              <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
-                onClick={startEnrollCam}>📷 Chụp ảnh</button>
-              <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
-                onClick={() => fileInputRef.current?.click()}>📁 Tải ảnh lên</button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleEnrollFileChange}
-              />
-            </>
+            <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
+              onClick={() => setShowEnroll(true)}>📷 Đăng ký khuôn mặt</button>
           )}
           <button className="px-4 py-2 bg-red-600 text-white rounded-md text-sm ml-auto" onClick={handleDelete}>Xóa</button>
         </div>
@@ -261,43 +180,22 @@ export default function PatronDetailPage() {
         )}
       </div>
 
-      {enrollPreview ? (
-        <div className="border rounded-lg p-4 space-y-3 bg-white">
-          <h3 className="font-semibold">Xác nhận ảnh khuôn mặt</h3>
-          <img src={enrollPreview} className="w-64 rounded-lg border" />
-          <div className="flex gap-3">
-            <button className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50"
-              onClick={submitEnroll} disabled={enrollLoading}>
-              {enrollLoading ? "Đang đăng ký..." : "Xác nhận & Gửi"}
-            </button>
-            <button className="px-4 py-2 bg-gray-200 rounded-md"
-              onClick={() => { setEnrollPreview(null); setEnrollFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>Chụp lại</button>
+      {showEnroll && !patron.has_face && (
+        <div className="border rounded-lg p-4 bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg">Đăng ký khuôn mặt 4 góc</h3>
+            <button onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}
+              className="text-gray-500 hover:text-gray-700 text-sm">✕ Đóng</button>
           </div>
-          {enrollError && <p className="text-red-500 text-sm">{enrollError}</p>}
+          <MultiAngleCapture
+            consent={consent}
+            setConsent={setConsent}
+            onFilesReady={handleEnroll}
+          />
+          {enrollError && <p className="text-red-500 text-sm mt-2">{enrollError}</p>}
+          {enrollLoading && <p className="text-blue-600 text-sm mt-2">Đang đăng ký...</p>}
         </div>
-      ) : enrollStreaming ? (
-        <div className="border rounded-lg p-4 space-y-3 bg-white">
-          <h3 className="font-semibold">Đăng ký khuôn mặt</h3>
-          <p className="text-sm text-gray-500">Đặt khuôn mặt vào khung bên dưới, đảm bảo đủ ánh sáng và nhìn thẳng vào camera.</p>
-          <div className="relative bg-black rounded-lg overflow-hidden max-w-md">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-lg" />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-48 h-64 border-4 border-dashed border-yellow-400 rounded-3xl opacity-80" />
-            </div>
-            {!enrollReady && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
-                Đang mở camera...
-              </div>
-            )}
-          </div>
-          {enrollError && <p className="text-red-500 text-sm">{enrollError}</p>}
-          <div className="flex gap-3">
-            <button className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-50"
-              onClick={captureEnroll} disabled={!enrollReady}>Chụp ảnh</button>
-            <button className="px-4 py-2 bg-gray-200 rounded-md" onClick={stopEnrollCam}>Tắt camera</button>
-          </div>
-        </div>
-      ) : null}
+      )}
 
       {showEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
