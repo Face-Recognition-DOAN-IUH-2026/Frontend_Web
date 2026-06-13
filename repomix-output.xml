@@ -51,8 +51,6 @@ src/app/(dashboard)/active/page.tsx
 src/app/(dashboard)/dashboard/admin/page.tsx
 src/app/(dashboard)/dashboard/page.tsx
 src/app/(dashboard)/enroll/page.tsx
-src/app/(dashboard)/gate/layout.tsx
-src/app/(dashboard)/gate/page.tsx
 src/app/(dashboard)/history/page.tsx
 src/app/(dashboard)/identify/page.tsx
 src/app/(dashboard)/layout.tsx
@@ -62,6 +60,8 @@ src/app/(dashboard)/patrons/page.tsx
 src/app/(dashboard)/return/page.tsx
 src/app/(dashboard)/stats/page.tsx
 src/app/(dashboard)/verify/page.tsx
+src/app/(kiosk)/gate/page.tsx
+src/app/(kiosk)/layout.tsx
 src/app/globals.css
 src/app/layout.tsx
 src/app/login/page.tsx
@@ -93,6 +93,1091 @@ tsconfig.json
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/app/(kiosk)/gate/page.tsx">
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import api, { getErrorMessage } from '@/lib/api-client';
+import CameraFeed from '@/components/gate/CameraFeed';
+import MssvInput from '@/components/gate/MssvInput';
+import GateButton from '@/components/gate/GateButton';
+import ResultCard from '@/components/gate/ResultCard';
+import PulseAnimation from '@/components/gate/PulseAnimation';
+import type { CameraEvent, KioskResult, PatronLookupResult } from '@/lib/types';
+
+const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || 'http://192.168.1.121:8080/video';
+const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || 'http://192.168.1.240:8080/video';
+const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || 'entry_gate';
+const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || 'exit_gate';
+
+type Step = 'idle' | 'verify' | 'result';
+
+interface Toast {
+  id: number;
+  type: 'entry' | 'exit' | 'error' | 'info';
+  message: string;
+  patron_name?: string;
+}
+
+let toastId = 0;
+
+export default function GatePage() {
+  const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const [step, setStep] = useState<Step>('idle');
+  const [mssv, setMssv] = useState('');
+  const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
+  const [result, setResult] = useState<KioskResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState('');
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [todayCounts, setTodayCounts] = useState({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
+  const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
+  const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
+  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const addToast = useCallback((t: Omit<Toast, 'id'>) => {
+    const id = ++toastId;
+    setToasts((prev) => [{ ...t, id }, ...prev.slice(0, 4)]);
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, [stopCamera]);
+
+  const startCamera = useCallback(async () => {
+    try {
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Không thể mở camera' });
+    }
+  }, [addToast]);
+
+  const captureImage = useCallback((): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const video = videoRef.current;
+      if (!video || !video.videoWidth) {
+        reject(new Error('Camera chưa sẵn sàng'));
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Không thể tạo canvas')); return; }
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], 'face_capture.jpg', { type: 'image/jpeg' });
+          resolve(file);
+        } else {
+          reject(new Error('Không thể tạo ảnh'));
+        }
+      }, 'image/jpeg', 0.9);
+    });
+  }, []);
+
+  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      try {
+        const task = await api.getTaskStatus(jobId);
+        if (task.status === 'SUCCESS') return task.result;
+        if (task.status === 'FAILURE') throw new Error(task.result?.error || 'Task failed');
+        setStatusText(task.result?.status === 'granted' ? 'Đã ghi nhận...' : 'Đang xử lý...');
+      } catch {}
+    }
+    throw new Error('Timeout waiting for result');
+  }, []);
+
+  const handleLookup = async (inputMssv: string) => {
+    if (!inputMssv.trim()) return;
+    setMssv(inputMssv.trim());
+    setLoading(true);
+    setStatusText('Đang tra cứu...');
+    try {
+      const res = await api.kioskLookup(inputMssv.trim());
+      setLookup(res);
+      if (res.exists && res.has_face && !res.is_expired) {
+        setStep('verify');
+        setStatusText('Mở camera...');
+        await startCamera();
+      } else if (res.exists && !res.has_face) {
+        setStep('result');
+        setResult({
+          success: false,
+          message: 'Tài khoản chưa được đăng ký khuôn mặt. Vui lòng đăng ký tại quầy.',
+          patron: res.patron,
+          job_id: null,
+        });
+      } else if (res.exists && res.is_expired) {
+        setStep('result');
+        setResult({ success: false, message: 'Thẻ hội viên đã hết hạn', patron: res.patron, job_id: null });
+      } else {
+        setStep('result');
+        setResult({ success: false, message: 'Không tìm thấy tài khoản. Vui lòng đăng ký tại quầy.', patron: null, job_id: null });
+      }
+    } catch (err: any) {
+      setStep('result');
+      setResult({ success: false, message: getErrorMessage(err) || 'Tra cứu thất bại', patron: null, job_id: null });
+    } finally {
+      setLoading(false);
+      setStatusText('');
+    }
+  };
+
+  const handleVerify = async () => {
+    setLoading(true);
+    setStatusText('Đang chụp ảnh...');
+    try {
+      const imageFile = await captureImage();
+      stopCamera();
+      setStatusText('Đang xác thực khuôn mặt...');
+      const res = await api.kioskEnter(imageFile, mssv);
+      if (res.job_id) {
+        const taskResult = await pollTask(res.job_id);
+        const success = taskResult?.status === 'success';
+        const confidence = taskResult?.score ?? taskResult?.confidence;
+        setResult({
+          success,
+          message: success
+            ? `Xác thực thành công — ${taskResult?.access_type === 'exit' ? 'Ra' : 'Vào'} thư viện`
+            : (taskResult?.error || 'Xác thực thất bại'),
+          patron: res.patron,
+          job_id: res.job_id,
+          confidence,
+        });
+      } else {
+        setResult(res);
+      }
+      setStep('result');
+    } catch (err: any) {
+      const msg = getErrorMessage(err) || 'Xác thực thất bại';
+      setResult({ success: false, message: msg, patron: null, job_id: null });
+      setStep('result');
+      addToast({ type: 'error', message: msg });
+    } finally {
+      setLoading(false);
+      setStatusText('');
+    }
+  };
+
+  const reset = () => {
+    setStep('idle');
+    setMssv('');
+    setLookup(null);
+    setResult(null);
+    stopCamera();
+  };
+
+  useEffect(() => {
+    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
+      if (event.bbox || event.landmarks) {
+        const overlay = { bbox: event.bbox, landmarks: event.landmarks };
+        if (event.camera_id === ENTRY_CAM_ID) {
+          setEntryOverlay({ ...overlay, status: event.status });
+        } else if (event.camera_id === EXIT_CAM_ID) {
+          setExitOverlay({ ...overlay, status: event.status });
+        }
+        if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
+        overlayTimeoutRef.current = setTimeout(() => {
+          setEntryOverlay(null);
+          setExitOverlay(null);
+        }, 2000);
+      }
+      if (event.status === 'granted') {
+        const type = event.access_type === 'entry' ? 'entry' : 'exit';
+        addToast({
+          type,
+          message: `${event.full_name} — ${type === 'entry' ? 'Vào' : 'Ra'} thư viện`,
+          patron_name: event.full_name,
+        });
+        setTodayCounts((c) => ({ ...c, [type === 'entry' ? 'entries' : 'exits']: c[type === 'entry' ? 'entries' : 'exits'] + 1 }));
+      } else if (event.status === 'no_match') {
+        setTodayCounts((c) => ({ ...c, no_match: c.no_match + 1 }));
+        addToast({ type: 'info', message: 'Khuôn mặt mới — không nhận diện được' });
+      } else if (event.status === 'spoof') {
+        setTodayCounts((c) => ({ ...c, spoof: c.spoof + 1 }));
+        addToast({ type: 'error', message: 'Phát hiện giả mạo!' });
+      }
+    });
+    return cleanup;
+  }, [addToast]);
+
+  const getResultStatus = () => {
+    if (!result) return 'processing';
+    if (result.success) return 'success';
+    if (result.message?.includes('đăng ký tại quầy')) return 'unregistered';
+    return 'error';
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <button onClick={() => router.push('/dashboard')} className="text-slate-400 hover:text-amber-400 transition-colors text-sm mb-2">
+              ← Quay lại Dashboard
+            </button>
+            <h1 className="text-3xl font-bold text-white font-['Outfit',sans-serif]">
+              <span className="text-amber-400">Cổng</span> Thư Viện
+            </h1>
+          </div>
+          <div className="flex gap-6">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-emerald-400">{todayCounts.entries}</p>
+              <p className="text-xs text-slate-400">Vào hôm nay</p>
+            </div>
+            <div className="text-center">
+              <p className="text-3xl font-bold text-orange-400">{todayCounts.exits}</p>
+              <p className="text-xs text-slate-400">Ra hôm nay</p>
+            </div>
+          </div>
+        </div>
+
+        {toasts.length > 0 && (
+          <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+            {toasts.map((t) => (
+              <div
+                key={t.id}
+                className={`px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium ${
+                  t.type === 'entry' ? 'bg-emerald-600' :
+                  t.type === 'exit' ? 'bg-orange-600' :
+                  t.type === 'error' ? 'bg-red-600' : 'bg-slate-700'
+                }`}
+              >
+                {t.patron_name && <strong>{t.patron_name}</strong>} {t.message}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          <div className="col-span-2 grid grid-cols-2 gap-4">
+            <CameraFeed
+              src={`${ENTRY_CAM}`}
+              label="Cổng vào"
+              overlay={entryOverlay}
+              onStatusChange={(ok) => {}}
+            />
+            <CameraFeed
+              src={`${EXIT_CAM}`}
+              label="Cổng ra"
+              overlay={exitOverlay}
+              onStatusChange={(ok) => {}}
+            />
+          </div>
+
+          <div className="space-y-4">
+            {step === 'idle' && (
+              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold text-white">Chào mừng</h2>
+                  <p className="text-slate-400 text-sm mt-1">Nhập MSSV để xác thực khuôn mặt</p>
+                </div>
+                <MssvInput onSubmit={handleLookup} disabled={loading} />
+                {loading && (
+                  <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
+                    <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm">{statusText || 'Đang xử lý...'}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {step === 'verify' && (
+              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
+                <div className="text-center mb-4">
+                  <h2 className="text-xl font-semibold text-white">Xác thực khuôn mặt</h2>
+                  <p className="text-slate-400 text-sm mt-1">
+                    {lookup?.patron?.full_name || mssv}
+                  </p>
+                </div>
+                <div className="relative bg-black rounded-xl overflow-hidden mb-4 aspect-[4/3]">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-32 h-32 border-2 border-amber-400/50 rounded-full" />
+                  </div>
+                  {loading && (
+                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                      <div className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mb-3" />
+                      <p className="text-white text-sm">{statusText}</p>
+                    </div>
+                  )}
+                </div>
+                <GateButton onClick={handleVerify} disabled={loading} fullWidth>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Xác thực & Vào cổng
+                </GateButton>
+                <button
+                  onClick={reset}
+                  className="mt-3 w-full py-3 text-slate-400 hover:text-white transition-colors text-sm"
+                >
+                  Hủy
+                </button>
+              </div>
+            )}
+
+            {step === 'result' && (
+              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
+                <ResultCard
+                  status={getResultStatus()}
+                  patronInfo={result?.patron ? {
+                    fullName: result.patron.full_name || '',
+                    mssv: result.patron.student_code || result?.patron?.id || '',
+                    faculty: '',
+                  } : undefined}
+                  message={result?.message}
+                />
+                <GateButton onClick={reset} variant="secondary" fullWidth className="mt-4">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Thử lại
+                </GateButton>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+          <div className="flex items-center gap-2 text-slate-400 text-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Hệ thống đang hoạt động
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(kiosk)/layout.tsx">
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+
+export default function KioskLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+          <p className="text-body-sm text-slate-400">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+</file>
+
+<file path="postcss.config.js">
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+</file>
+
+<file path="public/favicon.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="20" fill="#2563eb"/>
+  <text x="50" y="68" font-family="Arial" font-size="55" font-weight="bold" fill="white" text-anchor="middle">F</text>
+</svg>
+</file>
+
+<file path="src/components/gate/CameraFeed.tsx">
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+
+interface CameraFeedProps {
+  src: string;
+  label: string;
+  overlay?: {
+    bbox?: [number, number, number, number];
+    landmarks?: [number, number][];
+    status?: string;
+  } | null;
+  onStatusChange?: (ok: boolean) => void;
+}
+
+const OVERLAY_COLORS: Record<string, string> = {
+  granted: '#22c55e',
+  wrong_direction: '#eab308',
+  expired: '#f97316',
+  spoof: '#ef4444',
+};
+
+export default function CameraFeed({ src, label, overlay, onStatusChange }: CameraFeedProps) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [ts] = useState(() => Date.now());
+  const [ok, setOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    onStatusChange?.(ok === true);
+  }, [ok, onStatusChange]);
+
+  useEffect(() => {
+    if (!overlay?.bbox && !overlay?.landmarks) return;
+    const img = imgRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas) return;
+
+    const rect = img.getBoundingClientRect();
+    const scaleX = rect.width / (img.naturalWidth || 1);
+    const scaleY = rect.height / (img.naturalHeight || 1);
+
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (overlay.bbox) {
+      const [x1, y1, x2, y2] = overlay.bbox;
+      ctx.strokeStyle = OVERLAY_COLORS[overlay.status || 'granted'] || '#22c55e';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
+    }
+
+    if (overlay.landmarks) {
+      overlay.landmarks.forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.arc(x * scaleX, y * scaleY, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+      });
+    }
+  }, [overlay]);
+
+  return (
+    <div className="bg-slate-800/50 rounded-xl overflow-hidden border border-slate-700">
+      <div className="bg-slate-800 px-4 py-2 flex items-center gap-2 border-b border-slate-700">
+        <span className={`w-2 h-2 rounded-full ${ok === null ? 'bg-yellow-400 animate-pulse' : ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
+        <span className="text-sm font-medium text-slate-300">{label}</span>
+      </div>
+      <div className="relative aspect-video">
+        <img
+          ref={imgRef}
+          src={`${src}?_t=${ts}`}
+          className="w-full h-full object-contain bg-black"
+          onLoad={() => setOk(true)}
+          onError={() => setOk(false)}
+          alt={label}
+        />
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+        />
+        {ok === null && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <div className="text-slate-400 text-sm">Đang kết nối...</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/gate/GateButton.tsx">
+'use client';
+
+interface GateButtonProps {
+  onClick: () => void;
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'danger';
+  disabled?: boolean;
+  fullWidth?: boolean;
+  className?: string;
+}
+
+export default function GateButton({
+  onClick,
+  children,
+  variant = 'primary',
+  disabled,
+  fullWidth,
+  className = '',
+}: GateButtonProps) {
+  const baseClasses = 'flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold text-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+
+  const variantClasses = {
+    primary: 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 active:scale-95',
+    secondary: 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 active:scale-95',
+    danger: 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50 active:scale-95',
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseClasses} ${variantClasses[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/gate/MssvInput.tsx">
+'use client';
+
+import { useState, KeyboardEvent } from 'react';
+
+interface MssvInputProps {
+  onSubmit: (mssv: string) => void;
+  disabled?: boolean;
+}
+
+export default function MssvInput({ onSubmit, disabled }: MssvInputProps) {
+  const [value, setValue] = useState('');
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && value.trim()) {
+      onSubmit(value.trim());
+    }
+  };
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        placeholder="Nhập MSSV..."
+        className="w-full bg-slate-800/80 border border-slate-600 rounded-xl px-5 py-4 text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all disabled:opacity-50 font-mono tracking-wider text-center"
+      />
+      {value && (
+        <button
+          onClick={() => onSubmit(value.trim())}
+          disabled={disabled}
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 disabled:opacity-50 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/gate/PulseAnimation.tsx">
+'use client';
+
+interface PulseAnimationProps {
+  color?: 'amber' | 'emerald' | 'red';
+  size?: number;
+}
+
+export default function PulseAnimation({ color = 'amber', size = 120 }: PulseAnimationProps) {
+  const colorMap = {
+    amber: 'border-amber-500',
+    emerald: 'border-emerald-500',
+    red: 'border-red-500',
+  };
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <div
+        className={`absolute inset-0 rounded-full border-2 ${colorMap[color]} opacity-0 animate-ping`}
+        style={{ animationDuration: '2s' }}
+      />
+      <div
+        className={`absolute inset-2 rounded-full border ${colorMap[color]} opacity-40`}
+      />
+      <div
+        className={`absolute inset-4 rounded-full border ${colorMap[color]} opacity-60`}
+      />
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/MultiAngleCapture.tsx">
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, RefreshCw } from "lucide-react";
+
+export type CaptureAngle = "frontal" | "right" | "left" | "down";
+export type MultiAngleCaptureStatus = "pending" | "capturing" | "done";
+
+export interface AngleConfig {
+  angle: CaptureAngle;
+  instruction: string;
+  tip: string;
+}
+
+export interface CapturedAngle {
+  angle: CaptureAngle;
+  status: MultiAngleCaptureStatus;
+  file: File | null;
+  dataUrl: string | null;
+}
+
+export interface MultiAngleCaptureProps {
+  angles?: AngleConfig[];
+  consent: boolean;
+  setConsent?: (v: boolean) => void;
+  onFilesReady: (files: Record<CaptureAngle, File>) => Promise<void> | void;
+  className?: string;
+}
+
+function captureFromVideo(video: HTMLVideoElement, cameraReady: boolean) {
+  return new Promise<{ file: File; dataUrl: string }>((resolve, reject) => {
+    if (!cameraReady) return reject(new Error("Camera not ready"));
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      return reject(new Error("Camera not initialized"));
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return reject(new Error("Could not create canvas"));
+
+    ctx.drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL("image/jpeg");
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error("Could not create image"));
+        resolve({ file: new File([blob], "face_capture.jpg", { type: "image/jpeg" }), dataUrl });
+      },
+      "image/jpeg",
+      0.9
+    );
+  });
+}
+
+export default function MultiAngleCapture({
+  angles,
+  consent,
+  setConsent,
+  onFilesReady,
+  className,
+}: MultiAngleCaptureProps) {
+  const defaultAngles = useMemo<AngleConfig[]>(
+    () =>
+      angles ?? [
+        { angle: "frontal", instruction: "Nhìn thẳng", tip: "Giữ mặt thẳng, mắt mở tự nhiên" },
+        { angle: "right", instruction: "Quay phải", tip: "Xoay đầu sang phải khoảng 30°" },
+        { angle: "left", instruction: "Quay trái", tip: "Xoay đầu sang trái khoảng 30°" },
+        { angle: "down", instruction: "Cúi xuống", tip: "Cúi nhẹ cằm xuống ngực" },
+      ],
+    [angles]
+  );
+
+  const ANGLE_CONFIG = defaultAngles;
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const [cameraReady, setCameraReady] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+
+  const [isSequenceRunning, setIsSequenceRunning] = useState(false);
+  const [currentAngleIdx, setCurrentAngleIdx] = useState(-1);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  const [captures, setCaptures] = useState<CapturedAngle[]>(
+    ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null }))
+  );
+
+  useEffect(() => {
+    setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
+  }, [ANGLE_CONFIG]);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setIsCameraOn(false);
+    setCameraReady(false);
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    try {
+      setCameraReady(false);
+      setIsCameraOn(false);
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 640, min: 320 },
+          height: { ideal: 480, min: 240 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      setIsCameraOn(true);
+    } catch (err: any) {
+      setIsCameraOn(false);
+      setCameraReady(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isCameraOn || !videoRef.current || !streamRef.current) return;
+
+    const video = videoRef.current;
+
+    const onReady = () => setCameraReady(true);
+    const handleError = () => setCameraReady(false);
+
+    video.onloadedmetadata = onReady;
+    video.onplaying = onReady;
+    video.onerror = handleError;
+    video.srcObject = streamRef.current;
+
+    if (video.readyState >= 2) onReady();
+
+    const t = setTimeout(() => setCameraReady(true), 3000);
+
+    return () => {
+      clearTimeout(t);
+      video.onloadedmetadata = null;
+      video.onplaying = null;
+      video.onerror = null;
+      video.srcObject = null;
+    };
+  }, [isCameraOn]);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  const retakeAngle = useCallback(
+    async (idx: number) => {
+      setCaptures((prev) =>
+        prev.map((s, i) => (i === idx ? { ...s, status: "pending", file: null, dataUrl: null } : s))
+      );
+      await startCamera();
+      setTimeout(() => setCurrentAngleIdx(idx), 500);
+    },
+    [startCamera]
+  );
+
+  const startSequence = useCallback(async () => {
+    setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
+    setCurrentAngleIdx(0);
+    setIsSequenceRunning(true);
+    setCountdown(null);
+    await startCamera();
+  }, [ANGLE_CONFIG, startCamera]);
+
+  useEffect(() => {
+    if (currentAngleIdx < 0 || currentAngleIdx >= ANGLE_CONFIG.length) return;
+    if (!cameraReady || !isSequenceRunning) return;
+
+    let cancelled = false;
+    let c = 5;
+
+    setCountdown(c);
+    setCaptures((prev) => prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "capturing" } : s)));
+
+    const timer = window.setInterval(async () => {
+      c--;
+      if (cancelled) {
+        clearInterval(timer);
+        return;
+      }
+
+      if (c <= 0) {
+        clearInterval(timer);
+        setCountdown(null);
+
+        try {
+          const video = videoRef.current;
+          if (!video) throw new Error("Video not found");
+
+          const { file, dataUrl } = await captureFromVideo(video, cameraReady);
+
+          if (cancelled) return;
+
+          setCaptures((prev) =>
+            prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "done", file, dataUrl } : s))
+          );
+
+          const nextIdx = currentAngleIdx + 1;
+          if (nextIdx >= ANGLE_CONFIG.length) {
+            setIsSequenceRunning(false);
+            setCurrentAngleIdx(-1);
+            stopCamera();
+          } else {
+            setTimeout(() => {
+              if (!cancelled) setCurrentAngleIdx(nextIdx);
+            }, 800);
+          }
+        } catch {
+          if (cancelled) return;
+          setCaptures((prev) => prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "pending" } : s)));
+          setIsSequenceRunning(false);
+          setCurrentAngleIdx(-1);
+          stopCamera();
+        }
+      } else {
+        setCountdown(c);
+      }
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [currentAngleIdx, cameraReady, isSequenceRunning, ANGLE_CONFIG.length, stopCamera]);
+
+  const allCaptured = captures.every((c) => c.status === "done" && !!c.file);
+
+  const capturedFiles = useMemo(() => {
+    const result = {} as Record<CaptureAngle, File>;
+    for (const c of captures) {
+      if (c.status === "done" && c.file) {
+        result[c.angle] = c.file;
+      }
+    }
+    return result;
+  }, [captures]);
+
+  const submit = useCallback(async () => {
+    if (!consent) return;
+    if (!allCaptured) return;
+    await onFilesReady(capturedFiles);
+  }, [allCaptured, capturedFiles, consent, onFilesReady]);
+
+  const instructionLabels: Record<CaptureAngle, string> = {
+    frontal: "Nhìn thẳng",
+    right: "Quay phải",
+    left: "Quay trái",
+    down: "Cúi xuống",
+  };
+
+  return (
+    <div className={className}>
+      {!allCaptured && !isSequenceRunning && currentAngleIdx < 0 && (
+        <div className="text-center py-6">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
+            <Camera className="w-8 h-8 text-amber-400" />
+          </div>
+          <p className="text-slate-300 mb-1">Chụp khuôn mặt từ 4 góc</p>
+          <p className="text-slate-500 text-sm mb-2">Nhận diện nhanh hơn, chính xác hơn tại cổng</p>
+          <div className="bg-slate-900/50 rounded-lg p-3 mb-4 text-left text-xs text-slate-400 space-y-1">
+            <p className="text-amber-400 font-medium">Lưu ý khi chụp:</p>
+            <p>• Đủ ánh sáng, không ngược sáng</p>
+            <p>• Giữ yên khi đếm ngược về 0</p>
+            <p>• Mặt vừa đủ trong khung tròn</p>
+          </div>
+          <button
+            type="button"
+            onClick={startSequence}
+            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25"
+          >
+            <Camera className="w-5 h-5 inline mr-2" />
+            Bắt đầu chụp
+          </button>
+        </div>
+      )}
+
+      {(isSequenceRunning || currentAngleIdx >= 0) && (
+        <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-contain"
+          />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-32 h-32 border-2 border-amber-400/50 rounded-full" />
+          </div>
+          {!cameraReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-slate-300">
+              <div className="text-center">
+                <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-sm">Đang mở camera...</p>
+              </div>
+            </div>
+          )}
+          {countdown !== null && currentAngleIdx >= 0 && currentAngleIdx < ANGLE_CONFIG.length && (() => {
+            const cfg = ANGLE_CONFIG[currentAngleIdx];
+            return (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/75">
+                <div className="text-center">
+                  <p className="text-white text-xl font-semibold mb-1">{cfg.instruction}</p>
+                  <p className="text-slate-300 text-sm mb-4">{cfg.tip}</p>
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    {ANGLE_CONFIG.map((c, i) => (
+                      <span
+                        key={c.angle}
+                        className={`w-3 h-3 rounded-full transition-colors ${
+                          i < captures.filter((x) => x.status === "done").length
+                            ? "bg-emerald-500"
+                            : i === currentAngleIdx
+                              ? "bg-amber-400 animate-pulse"
+                              : "bg-slate-600"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  {countdown === 1 && (
+                    <p className="text-red-400 text-lg font-bold mb-2 animate-pulse">GIỮ YÊN!</p>
+                  )}
+                  <p className="text-white text-6xl font-bold drop-shadow-lg">{countdown}</p>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {allCaptured && (
+        <>
+          <div className="grid grid-cols-4 gap-2">
+            {captures.map((c, i) => (
+              <div
+                key={c.angle}
+                className={`relative aspect-square rounded-lg overflow-hidden border-2 ${
+                  c.status === "done" ? "border-emerald-500" : "border-slate-600"
+                }`}
+              >
+                {c.dataUrl ? (
+                  <img src={c.dataUrl} alt={c.angle} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex items-center justify-center h-full bg-slate-800 text-slate-500">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                )}
+                <div className="absolute bottom-1 left-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded capitalize">
+                  {instructionLabels[c.angle]}
+                </div>
+                {c.status === "done" && (
+                  <div className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full p-0.5">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2 mt-3">
+            {captures.map((c, i) =>
+              c.status === "done" ? (
+                <button
+                  key={c.angle}
+                  type="button"
+                  onClick={() => retakeAngle(i)}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs transition-colors"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  {instructionLabels[c.angle]}
+                </button>
+              ) : null
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 mt-4 p-3 bg-slate-900/50 rounded-xl border border-slate-700">
+            <input
+              type="checkbox"
+              id="consent-multi"
+              checked={consent}
+              onChange={(e) => setConsent?.(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500"
+              disabled={!setConsent}
+            />
+            <label htmlFor="consent-multi" className="text-sm text-slate-400">
+              Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện tại cổng
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!consent}
+            className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Xác nhận {captures.filter((c) => c.status === "done").length} góc ảnh
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+</file>
 
 <file path="src/components/ui/Badge.tsx">
 import { HTMLAttributes, forwardRef } from "react";
@@ -582,1442 +1667,6 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 }
 </file>
 
-<file path="postcss.config.js">
-module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-</file>
-
-<file path="public/favicon.svg">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="20" fill="#2563eb"/>
-  <text x="50" y="68" font-family="Arial" font-size="55" font-weight="bold" fill="white" text-anchor="middle">F</text>
-</svg>
-</file>
-
-<file path="src/app/(dashboard)/dashboard/page.tsx">
-"use client";
-
-import { useAuth } from "@/lib/auth-context";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import api from "@/lib/api-client";
-import StatCard from "@/components/ui/StatCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import { Users, UserCheck, LogIn, LogOut, BookOpen, AlertCircle, Clock, ArrowRight } from "lucide-react";
-import Link from "next/link";
-
-import type { AccessLogPublic } from "@/lib/types";
-
-interface Stats {
-  total_patrons: number;
-  active_patrons: number;
-  today_entries: number;
-  today_exits: number;
-}
-
-export default function DashboardPage() {
-  const { user, isLoading, isAuthenticated } = useAuth();
-  const router = useRouter();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isLoading, isAuthenticated, router]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    async function fetchData() {
-      try {
-        const [statsData, logsData] = await Promise.all([
-          api.getStats().catch(() => null),
-          api.getRecentLogs().catch(() => null),
-        ]);
-
-        if (statsData) {
-          setStats({
-            total_patrons: statsData.total_patrons || 0,
-            active_patrons: statsData.active_patrons || 0,
-            today_entries: statsData.today_entries || 0,
-            today_exits: statsData.today_exits || 0,
-          });
-        }
-
-        if (logsData?.items) {
-          setRecentLogs(logsData.items.slice(0, 8));
-        }
-      } catch {
-        // silently fail
-      } finally {
-        setLoadingData(false);
-      }
-    }
-
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
-
-  if (isLoading || !isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-body-sm text-text-3">Đang tải...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const role = user?.role || "staff";
-
-  return (
-    <div className="space-y-6">
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Tổng độc giả"
-          value={stats?.total_patrons ?? "—"}
-          icon={Users}
-          accentColor="primary"
-          description="Đã đăng ký"
-        />
-        <StatCard
-          label="Đang có mặt"
-          value={stats?.active_patrons ?? "—"}
-          icon={UserCheck}
-          accentColor="success"
-          description="Trong thư viện"
-        />
-        <StatCard
-          label="Lượt vào hôm nay"
-          value={stats?.today_entries ?? "—"}
-          icon={LogIn}
-          accentColor="info"
-          description="Ra vào cửa"
-        />
-        <StatCard
-          label="Lượt ra hôm nay"
-          value={stats?.today_exits ?? "—"}
-          icon={LogOut}
-          accentColor="warning"
-          description="Ra về"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent activity */}
-        <div className="lg:col-span-2">
-          <Card padding="none">
-            <CardHeader className="p-4 border-b border-border">
-              <CardTitle>Hoạt động gần đây</CardTitle>
-              <Link href="/history" className="text-body-sm text-primary hover:text-primary/80 flex items-center gap-1">
-                Xem tất cả <ArrowRight size={14} />
-              </Link>
-            </CardHeader>
-            <CardContent className="p-0">
-              {loadingData ? (
-                <div className="p-8 text-center text-text-3 text-body-sm">Đang tải...</div>
-              ) : recentLogs.length === 0 ? (
-                <div className="p-8 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3 text-text-3">
-                    <Clock size={20} />
-                  </div>
-                  <p className="text-body-sm text-text-3">Chưa có hoạt động nào</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {recentLogs.map((log) => (
-                    <div key={log.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                        log.access_type === "entry"
-                          ? "bg-success/15 text-success"
-                          : "bg-error/15 text-error"
-                      }`}>
-                        {log.access_type === "entry" ? <LogIn size={16} /> : <LogOut size={16} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-body-sm font-medium text-text truncate">{log.patron_name || "—"}</p>
-                        <p className="text-caption text-text-3">{log.student_code || log.patron_id}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <Badge variant={log.status === "granted" ? "success" : "error"} dot>
-                          {log.status === "granted" ? "Thành công" : "Thất bại"}
-                        </Badge>
-                        <p className="text-caption text-text-3 mt-1">
-                          {new Date(log.access_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick access */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Thao tác nhanh</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {role === "admin" && (
-                <>
-                  <QuickAction href="/enroll" icon={<LogIn size={16} />} label="Đăng ký khuôn mặt" color="primary" />
-                  <QuickAction href="/patrons" icon={<Users size={16} />} label="Quản lý độc giả" color="info" />
-                  <QuickAction href="/return" icon={<BookOpen size={16} />} label="Trả sách" color="warning" />
-                  <QuickAction href="/stats" icon={<AlertCircle size={16} />} label="Xem thống kê" color="success" />
-                </>
-              )}
-              <QuickAction href="/active" icon={<UserCheck size={16} />} label="Đang có mặt" color="success" />
-              <QuickAction href="/history" icon={<Clock size={16} />} label="Lịch sử ra vào" color="info" />
-            </CardContent>
-          </Card>
-
-          
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function QuickAction({ href, icon, label, color }: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  color: "primary" | "success" | "error" | "warning" | "info";
-}) {
-  const colorMap = {
-    primary: "text-primary hover:bg-primary/10",
-    success: "text-success hover:bg-success/10",
-    error: "text-error hover:bg-error/10",
-    warning: "text-warning hover:bg-warning/10",
-    info: "text-info hover:bg-info/10",
-  };
-
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${colorMap[color]}`}
-    >
-      <span className="shrink-0">{icon}</span>
-      <span className="text-body-sm font-medium">{label}</span>
-      <ArrowRight size={14} className="ml-auto shrink-0 opacity-50" />
-    </Link>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/gate/layout.tsx">
-export default function GateLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
-</file>
-
-<file path="src/app/(dashboard)/layout.tsx">
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import Sidebar from "@/components/sidebar";
-import { Bell, User, LogOut, ChevronRight } from "lucide-react";
-
-const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard": { title: "Tổng quan", subtitle: "Chào mừng bạn quay lại" },
-  "/patrons": { title: "Quản lý độc giả", subtitle: "Danh sách và thông tin độc giả" },
-  "/active": { title: "Đang hiện diện", subtitle: "Độc giả đang có mặt trong thư viện" },
-  "/gate": { title: "Cổng ra vào", subtitle: "Xác thực khuôn mặt tại cổng" },
-  "/history": { title: "Lịch sử ra vào", subtitle: "Nhật ký ra vào cửa thư viện" },
-  "/return": { title: "Trả sách", subtitle: "Xử lý trả sách cho độc giả" },
-  "/stats": { title: "Thống kê", subtitle: "Báo cáo và biểu đồ hoạt động" },
-  "/enroll": { title: "Đăng ký khuôn mặt", subtitle: "Cập nhật thông tin khuôn mặt" },
-  "/verify": { title: "Xác thực khuôn mặt", subtitle: "Kiểm tra đối chiếu khuôn mặt" },
-  "/identify": { title: "Nhận diện", subtitle: "Tìm kiếm độc giả qua khuôn mặt" },
-  "/liveness": { title: "Kiểm tra sống", subtitle: "Xác minh khuôn mặt thật" },
-  "/dashboard/admin": { title: "Quản trị hệ thống", subtitle: "Quản lý người dùng và phân quyền" },
-};
-
-function Breadcrumb({ pathname }: { pathname: string }) {
-  const parts = pathname.split("/").filter(Boolean);
-  if (parts.length <= 1) return null;
-
-  return (
-    <nav className="flex items-center gap-1.5 text-body-sm text-text-3">
-      {parts.map((part, i) => (
-        <span key={i} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight size={12} className="text-text-3" />}
-          <span className={i === parts.length - 1 ? "text-text-2" : "capitalize"}>
-            {PAGE_TITLES[`/${parts.slice(0, i + 1).join("/")}`]?.title || part.replace(/-/g, ' ')}
-          </span>
-        </span>
-      ))}
-    </nav>
-  );
-}
-
-function Topbar({ user }: { user: any }) {
-  return (
-    <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
-        {/* Page title injected via page — can be enhanced */}
-      </div>
-      <div className="flex items-center gap-3">
-        <button className="relative p-2 rounded-md hover:bg-surface-2 transition-colors">
-          <Bell size={18} className="text-text-2" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
-        </button>
-        <div className="flex items-center gap-2.5 pl-3 border-l border-border">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <User size={16} className="text-primary" />
-          </div>
-          <div className="hidden sm:block">
-            <p className="text-body-sm font-medium text-text">{user?.full_name || "Admin"}</p>
-            <p className="text-caption text-text-3 capitalize">{user?.role || "staff"}</p>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isAuthenticated, isLoading, router]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-body-sm text-text-3">Đang tải...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const pageInfo = PAGE_TITLES[pathname] || PAGE_TITLES[pathname.split("/").slice(0, 2).join("/")] || { title: "", subtitle: "" };
-
-  return (
-    <div className="flex min-h-screen bg-bg">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar user={user} />
-        <div className="p-6">
-          {/* Page Header */}
-          {pageInfo.title && (
-            <div className="mb-6 animate-fade-in">
-              <Breadcrumb pathname={pathname} />
-              <h1 className="text-display-xl text-text mt-1">{pageInfo.title}</h1>
-              {pageInfo.subtitle && (
-                <p className="text-body-md text-text-3 mt-0.5">{pageInfo.subtitle}</p>
-              )}
-            </div>
-          )}
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/return/page.tsx">
-"use client";
-
-import { useState } from "react";
-import api, { getErrorMessage } from "@/lib/api-client";
-import type { BorrowRecord } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import { BookOpen, CheckCircle, XCircle, ScanLine, ArrowRight } from "lucide-react";
-
-export default function ReturnPage() {
-  const [barcode, setBarcode] = useState("");
-  const [record, setRecord] = useState<BorrowRecord | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [lookupError, setLookupError] = useState("");
-  const [returning, setReturning] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  const handleLookup = async () => {
-    if (!barcode.trim()) return;
-    setLoading(true);
-    setLookupError("");
-    setResult(null);
-    setRecord(null);
-    try {
-      const data = await api.lookupBorrowByBarcode(barcode.trim());
-      if (!data) {
-        setLookupError("Không tìm thấy bản ghi mượn cho mã vạch này");
-        return;
-      }
-      setRecord(data);
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        setLookupError("Không tìm thấy bản ghi mượn cho mã vạch này");
-      } else {
-        setLookupError(getErrorMessage(err) || "Lỗi tra cứu");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReturn = async () => {
-    if (!record) return;
-    setReturning(true);
-    setResult(null);
-    try {
-      await api.staffReturnBook(barcode.trim());
-      setResult({ success: true, message: "Trả sách thành công!" });
-      setRecord(null);
-      setBarcode("");
-    } catch (err: any) {
-      setResult({ success: false, message: getErrorMessage(err) || "Trả sách thất bại" });
-    } finally {
-      setReturning(false);
-    }
-  };
-
-  const isOverdue = record ? new Date(record.due_at) < new Date() : false;
-
-  return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Search bar */}
-      <div className="flex gap-3">
-        <div className="flex-1 relative">
-          <ScanLine size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-3" />
-          <input
-            className="input pl-10 text-lg font-mono"
-            value={barcode}
-            onChange={(e) => { setBarcode(e.target.value); setResult(null); }}
-            onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-            placeholder="Nhập mã vạch..."
-            autoFocus
-          />
-        </div>
-        <button
-          className="btn-primary px-6 py-2.5 text-body-md"
-          onClick={handleLookup}
-          disabled={loading || !barcode.trim()}
-        >
-          {loading ? "Đang tra..." : "Tra cứu"}
-        </button>
-      </div>
-
-      {/* Error */}
-      {lookupError && (
-        <div className="p-4 bg-error/10 border border-error/20 rounded-lg flex items-center gap-3 text-error">
-          <XCircle size={18} />
-          {lookupError}
-        </div>
-      )}
-
-      {/* Record info */}
-      {record && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen size={18} className="text-primary" />
-              Thông tin mượn sách
-            </CardTitle>
-            <Badge variant={record.status === "borrowed" ? "warning" : "neutral"}>
-              {record.status === "borrowed" ? "Đang mượn" : record.status}
-            </Badge>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-body-sm">
-              <div>
-                <p className="text-text-3 text-caption">Mã vạch</p>
-                <p className="font-mono font-medium text-text">{barcode}</p>
-              </div>
-              <div>
-                <p className="text-text-3 text-caption">Mã bạn đọc</p>
-                <p className="font-mono font-medium text-text">{record.patron_id}</p>
-              </div>
-              <div>
-                <p className="text-text-3 text-caption">Mã sách</p>
-                <p className="font-mono font-medium text-text">{record.book_id}</p>
-              </div>
-              <div>
-                <p className="text-text-3 text-caption">Vị trí</p>
-                <p className="font-mono text-text">{record.shelf_location || "-"}</p>
-              </div>
-              <div>
-                <p className="text-text-3 text-caption">Ngày mượn</p>
-                <p className="text-text">{new Date(record.borrow_at).toLocaleDateString("vi-VN")}</p>
-              </div>
-              <div className={isOverdue ? "text-error" : ""}>
-                <p className="text-text-3 text-caption">Hạn trả</p>
-                <p className={`font-semibold ${isOverdue ? "text-error" : "text-text"}`}>
-                  {new Date(record.due_at).toLocaleDateString("vi-VN")}
-                  {isOverdue && " ⚠️"}
-                </p>
-              </div>
-            </div>
-
-            <div className="border-t border-border pt-4">
-              <button
-                className="btn-primary w-full py-3 text-body-md font-semibold flex items-center justify-center gap-2"
-                onClick={handleReturn}
-                disabled={returning}
-              >
-                {returning ? (
-                  <>
-                    <span className="w-4 h-4 rounded-full border-2 border-bg border-t-transparent animate-spin" />
-                    Đang xử lý...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={18} />
-                    Xác nhận trả sách
-                  </>
-                )}
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Result */}
-      {result && (
-        <div className={`p-4 border rounded-lg flex items-center gap-3 animate-fade-in ${
-          result.success
-            ? "bg-success/10 border-success/20 text-success"
-            : "bg-error/10 border-error/20 text-error"
-        }`}>
-          {result.success ? <CheckCircle size={20} /> : <XCircle size={20} />}
-          <p className="text-body-md font-medium">{result.message}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/frequency-chart.tsx">
-"use client";
-
-import { BarChart3 } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
-import type { AccessFrequencyDay } from "@/lib/types";
-
-export default function FrequencyChart({ data, loading }: { data: AccessFrequencyDay[]; loading: boolean }) {
-  return (
-    <div className="bg-surface rounded-lg border border-border p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <BarChart3 className="w-5 h-5 text-text-3" />
-        <h2 className="text-heading-md text-text">Thống kê tần suất ra vào</h2>
-      </div>
-      {loading ? (
-        <p className="text-text-3 text-body-sm">Đang tải...</p>
-      ) : (
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2E3345" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(d: string) => {
-                const date = new Date(d + "T00:00:00");
-                return date.toLocaleDateString("vi-VN", { day: "numeric", month: "numeric" });
-              }}
-              fontSize={12}
-              tick={{ fill: "#B8B0A4" }}
-            />
-            <YAxis allowDecimals={false} fontSize={12} tick={{ fill: "#B8B0A4" }} />
-            <Tooltip
-              labelStyle={{ color: "#EDE8DF" }}
-              contentStyle={{ background: "#1C2030", border: "1px solid #2E3345", borderRadius: "8px" }}
-              labelFormatter={(d: any) => {
-                if (!d) return "";
-                const date = new Date(String(d) + "T00:00:00");
-                return date.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-              }}
-            />
-            <Legend wrapperStyle={{ color: "#B8B0A4" }} />
-            <Bar dataKey="entry" fill="#4A8C5C" name="Vào" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="exit" fill="#C49A3C" name="Ra" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/gate/CameraFeed.tsx">
-'use client';
-
-import { useEffect, useRef, useState } from 'react';
-
-interface CameraFeedProps {
-  src: string;
-  label: string;
-  overlay?: {
-    bbox?: [number, number, number, number];
-    landmarks?: [number, number][];
-    status?: string;
-  } | null;
-  onStatusChange?: (ok: boolean) => void;
-}
-
-const OVERLAY_COLORS: Record<string, string> = {
-  granted: '#22c55e',
-  wrong_direction: '#eab308',
-  expired: '#f97316',
-  spoof: '#ef4444',
-};
-
-export default function CameraFeed({ src, label, overlay, onStatusChange }: CameraFeedProps) {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [ts] = useState(() => Date.now());
-  const [ok, setOk] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    onStatusChange?.(ok === true);
-  }, [ok, onStatusChange]);
-
-  useEffect(() => {
-    if (!overlay?.bbox && !overlay?.landmarks) return;
-    const img = imgRef.current;
-    const canvas = canvasRef.current;
-    if (!img || !canvas) return;
-
-    const rect = img.getBoundingClientRect();
-    const scaleX = rect.width / (img.naturalWidth || 1);
-    const scaleY = rect.height / (img.naturalHeight || 1);
-
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (overlay.bbox) {
-      const [x1, y1, x2, y2] = overlay.bbox;
-      ctx.strokeStyle = OVERLAY_COLORS[overlay.status || 'granted'] || '#22c55e';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
-    }
-
-    if (overlay.landmarks) {
-      overlay.landmarks.forEach(([x, y]) => {
-        ctx.beginPath();
-        ctx.arc(x * scaleX, y * scaleY, 4, 0, 2 * Math.PI);
-        ctx.fillStyle = '#ef4444';
-        ctx.fill();
-      });
-    }
-  }, [overlay]);
-
-  return (
-    <div className="bg-slate-800/50 rounded-xl overflow-hidden border border-slate-700">
-      <div className="bg-slate-800 px-4 py-2 flex items-center gap-2 border-b border-slate-700">
-        <span className={`w-2 h-2 rounded-full ${ok === null ? 'bg-yellow-400 animate-pulse' : ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
-        <span className="text-sm font-medium text-slate-300">{label}</span>
-      </div>
-      <div className="relative aspect-video">
-        <img
-          ref={imgRef}
-          src={`${src}?_t=${ts}`}
-          className="w-full h-full object-contain bg-black"
-          onLoad={() => setOk(true)}
-          onError={() => setOk(false)}
-          alt={label}
-        />
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-        />
-        {ok === null && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <div className="text-slate-400 text-sm">Đang kết nối...</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/gate/GateButton.tsx">
-'use client';
-
-interface GateButtonProps {
-  onClick: () => void;
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'danger';
-  disabled?: boolean;
-  fullWidth?: boolean;
-  className?: string;
-}
-
-export default function GateButton({
-  onClick,
-  children,
-  variant = 'primary',
-  disabled,
-  fullWidth,
-  className = '',
-}: GateButtonProps) {
-  const baseClasses = 'flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold text-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
-
-  const variantClasses = {
-    primary: 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 active:scale-95',
-    secondary: 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 active:scale-95',
-    danger: 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50 active:scale-95',
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`${baseClasses} ${variantClasses[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-</file>
-
-<file path="src/components/gate/MssvInput.tsx">
-'use client';
-
-import { useState, KeyboardEvent } from 'react';
-
-interface MssvInputProps {
-  onSubmit: (mssv: string) => void;
-  disabled?: boolean;
-}
-
-export default function MssvInput({ onSubmit, disabled }: MssvInputProps) {
-  const [value, setValue] = useState('');
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && value.trim()) {
-      onSubmit(value.trim());
-    }
-  };
-
-  return (
-    <div className="relative">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder="Nhập MSSV..."
-        className="w-full bg-slate-800/80 border border-slate-600 rounded-xl px-5 py-4 text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all disabled:opacity-50 font-mono tracking-wider text-center"
-      />
-      {value && (
-        <button
-          onClick={() => onSubmit(value.trim())}
-          disabled={disabled}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 disabled:opacity-50 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-          </svg>
-        </button>
-      )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/gate/PulseAnimation.tsx">
-'use client';
-
-interface PulseAnimationProps {
-  color?: 'amber' | 'emerald' | 'red';
-  size?: number;
-}
-
-export default function PulseAnimation({ color = 'amber', size = 120 }: PulseAnimationProps) {
-  const colorMap = {
-    amber: 'border-amber-500',
-    emerald: 'border-emerald-500',
-    red: 'border-red-500',
-  };
-
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <div
-        className={`absolute inset-0 rounded-full border-2 ${colorMap[color]} opacity-0 animate-ping`}
-        style={{ animationDuration: '2s' }}
-      />
-      <div
-        className={`absolute inset-2 rounded-full border ${colorMap[color]} opacity-40`}
-      />
-      <div
-        className={`absolute inset-4 rounded-full border ${colorMap[color]} opacity-60`}
-      />
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/gate/ResultCard.tsx">
-'use client';
-
-import PulseAnimation from './PulseAnimation';
-
-interface ResultCardProps {
-  status: 'success' | 'error' | 'unregistered' | 'processing';
-  patronInfo?: {
-    fullName: string;
-    mssv: string;
-    faculty: string;
-  };
-  message?: string;
-}
-
-export default function ResultCard({ status, patronInfo, message }: ResultCardProps) {
-  type PulseColor = 'emerald' | 'red' | 'amber' | 'none';
-  const config: Record<string, {
-    borderColor: string;
-    bgColor: string;
-    pulseColor: PulseColor;
-    icon: React.ReactNode;
-  }> = {
-    success: {
-      borderColor: 'border-emerald-500',
-      bgColor: 'bg-emerald-500/10',
-      pulseColor: 'emerald',
-      icon: (
-        <svg className="w-16 h-16 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    error: {
-      borderColor: 'border-red-500',
-      bgColor: 'bg-red-500/10',
-      pulseColor: 'red',
-      icon: (
-        <svg className="w-16 h-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    unregistered: {
-      borderColor: 'border-amber-500',
-      bgColor: 'bg-amber-500/10',
-      pulseColor: 'amber',
-      icon: (
-        <svg className="w-16 h-16 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-        </svg>
-      ),
-    },
-    processing: {
-      borderColor: 'border-slate-500',
-      bgColor: 'bg-slate-500/10',
-      pulseColor: 'none',
-      icon: (
-        <div className="w-16 h-16 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" />
-      ),
-    },
-  };
-
-  const { borderColor, bgColor, pulseColor, icon } = config[status];
-
-  return (
-    <div className={`relative border-2 ${borderColor} ${bgColor} rounded-2xl p-8 text-center`}>
-      {pulseColor !== 'none' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <PulseAnimation color={pulseColor} />
-        </div>
-      )}
-
-      <div className="relative z-10">
-        <div className="flex justify-center mb-4">{icon}</div>
-
-        {patronInfo && (
-          <div className="space-y-2 mb-4">
-            <h3 className="text-2xl font-bold text-white">{patronInfo.fullName}</h3>
-            <p className="text-amber-400 font-mono text-lg">{patronInfo.mssv}</p>
-            <p className="text-slate-400">{patronInfo.faculty}</p>
-          </div>
-        )}
-
-        {message && (
-          <p className={`text-lg ${status === 'success' ? 'text-emerald-400' : status === 'error' ? 'text-red-400' : 'text-amber-400'}`}>
-            {message}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/MultiAngleCapture.tsx">
-'use client';
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, RefreshCw } from "lucide-react";
-
-export type CaptureAngle = "frontal" | "right" | "left" | "down";
-export type MultiAngleCaptureStatus = "pending" | "capturing" | "done";
-
-export interface AngleConfig {
-  angle: CaptureAngle;
-  instruction: string;
-  tip: string;
-}
-
-export interface CapturedAngle {
-  angle: CaptureAngle;
-  status: MultiAngleCaptureStatus;
-  file: File | null;
-  dataUrl: string | null;
-}
-
-export interface MultiAngleCaptureProps {
-  angles?: AngleConfig[];
-  consent: boolean;
-  setConsent?: (v: boolean) => void;
-  onFilesReady: (files: Record<CaptureAngle, File>) => Promise<void> | void;
-  className?: string;
-}
-
-function captureFromVideo(video: HTMLVideoElement, cameraReady: boolean) {
-  return new Promise<{ file: File; dataUrl: string }>((resolve, reject) => {
-    if (!cameraReady) return reject(new Error("Camera not ready"));
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      return reject(new Error("Camera not initialized"));
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return reject(new Error("Could not create canvas"));
-
-    ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg");
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return reject(new Error("Could not create image"));
-        resolve({ file: new File([blob], "face_capture.jpg", { type: "image/jpeg" }), dataUrl });
-      },
-      "image/jpeg",
-      0.9
-    );
-  });
-}
-
-export default function MultiAngleCapture({
-  angles,
-  consent,
-  setConsent,
-  onFilesReady,
-  className,
-}: MultiAngleCaptureProps) {
-  const defaultAngles = useMemo<AngleConfig[]>(
-    () =>
-      angles ?? [
-        { angle: "frontal", instruction: "Nhìn thẳng", tip: "Giữ mặt thẳng, mắt mở tự nhiên" },
-        { angle: "right", instruction: "Quay phải", tip: "Xoay đầu sang phải khoảng 30°" },
-        { angle: "left", instruction: "Quay trái", tip: "Xoay đầu sang trái khoảng 30°" },
-        { angle: "down", instruction: "Cúi xuống", tip: "Cúi nhẹ cằm xuống ngực" },
-      ],
-    [angles]
-  );
-
-  const ANGLE_CONFIG = defaultAngles;
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const [cameraReady, setCameraReady] = useState(false);
-  const [isCameraOn, setIsCameraOn] = useState(false);
-
-  const [isSequenceRunning, setIsSequenceRunning] = useState(false);
-  const [currentAngleIdx, setCurrentAngleIdx] = useState(-1);
-  const [countdown, setCountdown] = useState<number | null>(null);
-
-  const [captures, setCaptures] = useState<CapturedAngle[]>(
-    ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null }))
-  );
-
-  useEffect(() => {
-    setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
-  }, [ANGLE_CONFIG]);
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    setIsCameraOn(false);
-    setCameraReady(false);
-  }, []);
-
-  const startCamera = useCallback(async () => {
-    try {
-      setCameraReady(false);
-      setIsCameraOn(false);
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 640, min: 320 },
-          height: { ideal: 480, min: 240 },
-        },
-        audio: false,
-      });
-
-      streamRef.current = stream;
-      setIsCameraOn(true);
-    } catch (err: any) {
-      setIsCameraOn(false);
-      setCameraReady(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isCameraOn || !videoRef.current || !streamRef.current) return;
-
-    const video = videoRef.current;
-
-    const onReady = () => setCameraReady(true);
-    const handleError = () => setCameraReady(false);
-
-    video.onloadedmetadata = onReady;
-    video.onplaying = onReady;
-    video.onerror = handleError;
-    video.srcObject = streamRef.current;
-
-    if (video.readyState >= 2) onReady();
-
-    const t = setTimeout(() => setCameraReady(true), 3000);
-
-    return () => {
-      clearTimeout(t);
-      video.onloadedmetadata = null;
-      video.onplaying = null;
-      video.onerror = null;
-      video.srcObject = null;
-    };
-  }, [isCameraOn]);
-
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, [stopCamera]);
-
-  const retakeAngle = useCallback(
-    async (idx: number) => {
-      setCaptures((prev) =>
-        prev.map((s, i) => (i === idx ? { ...s, status: "pending", file: null, dataUrl: null } : s))
-      );
-      await startCamera();
-      setTimeout(() => setCurrentAngleIdx(idx), 500);
-    },
-    [startCamera]
-  );
-
-  const startSequence = useCallback(async () => {
-    setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
-    setCurrentAngleIdx(0);
-    setIsSequenceRunning(true);
-    setCountdown(null);
-    await startCamera();
-  }, [ANGLE_CONFIG, startCamera]);
-
-  useEffect(() => {
-    if (currentAngleIdx < 0 || currentAngleIdx >= ANGLE_CONFIG.length) return;
-    if (!cameraReady || !isSequenceRunning) return;
-
-    let cancelled = false;
-    let c = 5;
-
-    setCountdown(c);
-    setCaptures((prev) => prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "capturing" } : s)));
-
-    const timer = window.setInterval(async () => {
-      c--;
-      if (cancelled) {
-        clearInterval(timer);
-        return;
-      }
-
-      if (c <= 0) {
-        clearInterval(timer);
-        setCountdown(null);
-
-        try {
-          const video = videoRef.current;
-          if (!video) throw new Error("Video not found");
-
-          const { file, dataUrl } = await captureFromVideo(video, cameraReady);
-
-          if (cancelled) return;
-
-          setCaptures((prev) =>
-            prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "done", file, dataUrl } : s))
-          );
-
-          const nextIdx = currentAngleIdx + 1;
-          if (nextIdx >= ANGLE_CONFIG.length) {
-            setIsSequenceRunning(false);
-            setCurrentAngleIdx(-1);
-            stopCamera();
-          } else {
-            setTimeout(() => {
-              if (!cancelled) setCurrentAngleIdx(nextIdx);
-            }, 800);
-          }
-        } catch {
-          if (cancelled) return;
-          setCaptures((prev) => prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "pending" } : s)));
-          setIsSequenceRunning(false);
-          setCurrentAngleIdx(-1);
-          stopCamera();
-        }
-      } else {
-        setCountdown(c);
-      }
-    }, 1000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [currentAngleIdx, cameraReady, isSequenceRunning, ANGLE_CONFIG.length, stopCamera]);
-
-  const allCaptured = captures.every((c) => c.status === "done" && !!c.file);
-
-  const capturedFiles = useMemo(() => {
-    const result = {} as Record<CaptureAngle, File>;
-    for (const c of captures) {
-      if (c.status === "done" && c.file) {
-        result[c.angle] = c.file;
-      }
-    }
-    return result;
-  }, [captures]);
-
-  const submit = useCallback(async () => {
-    if (!consent) return;
-    if (!allCaptured) return;
-    await onFilesReady(capturedFiles);
-  }, [allCaptured, capturedFiles, consent, onFilesReady]);
-
-  const instructionLabels: Record<CaptureAngle, string> = {
-    frontal: "Nhìn thẳng",
-    right: "Quay phải",
-    left: "Quay trái",
-    down: "Cúi xuống",
-  };
-
-  return (
-    <div className={className}>
-      {!allCaptured && !isSequenceRunning && currentAngleIdx < 0 && (
-        <div className="text-center py-6">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
-            <Camera className="w-8 h-8 text-amber-400" />
-          </div>
-          <p className="text-slate-300 mb-1">Chụp khuôn mặt từ 4 góc</p>
-          <p className="text-slate-500 text-sm mb-2">Nhận diện nhanh hơn, chính xác hơn tại cổng</p>
-          <div className="bg-slate-900/50 rounded-lg p-3 mb-4 text-left text-xs text-slate-400 space-y-1">
-            <p className="text-amber-400 font-medium">Lưu ý khi chụp:</p>
-            <p>• Đủ ánh sáng, không ngược sáng</p>
-            <p>• Giữ yên khi đếm ngược về 0</p>
-            <p>• Mặt vừa đủ trong khung tròn</p>
-          </div>
-          <button
-            type="button"
-            onClick={startSequence}
-            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25"
-          >
-            <Camera className="w-5 h-5 inline mr-2" />
-            Bắt đầu chụp
-          </button>
-        </div>
-      )}
-
-      {(isSequenceRunning || currentAngleIdx >= 0) && (
-        <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-contain"
-          />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-32 h-32 border-2 border-amber-400/50 rounded-full" />
-          </div>
-          {!cameraReady && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-slate-300">
-              <div className="text-center">
-                <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-sm">Đang mở camera...</p>
-              </div>
-            </div>
-          )}
-          {countdown !== null && currentAngleIdx >= 0 && currentAngleIdx < ANGLE_CONFIG.length && (() => {
-            const cfg = ANGLE_CONFIG[currentAngleIdx];
-            return (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/75">
-                <div className="text-center">
-                  <p className="text-white text-xl font-semibold mb-1">{cfg.instruction}</p>
-                  <p className="text-slate-300 text-sm mb-4">{cfg.tip}</p>
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    {ANGLE_CONFIG.map((c, i) => (
-                      <span
-                        key={c.angle}
-                        className={`w-3 h-3 rounded-full transition-colors ${
-                          i < captures.filter((x) => x.status === "done").length
-                            ? "bg-emerald-500"
-                            : i === currentAngleIdx
-                              ? "bg-amber-400 animate-pulse"
-                              : "bg-slate-600"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  {countdown === 1 && (
-                    <p className="text-red-400 text-lg font-bold mb-2 animate-pulse">GIỮ YÊN!</p>
-                  )}
-                  <p className="text-white text-6xl font-bold drop-shadow-lg">{countdown}</p>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {allCaptured && (
-        <>
-          <div className="grid grid-cols-4 gap-2">
-            {captures.map((c, i) => (
-              <div
-                key={c.angle}
-                className={`relative aspect-square rounded-lg overflow-hidden border-2 ${
-                  c.status === "done" ? "border-emerald-500" : "border-slate-600"
-                }`}
-              >
-                {c.dataUrl ? (
-                  <img src={c.dataUrl} alt={c.angle} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-slate-800 text-slate-500">
-                    <Camera className="w-6 h-6" />
-                  </div>
-                )}
-                <div className="absolute bottom-1 left-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded capitalize">
-                  {instructionLabels[c.angle]}
-                </div>
-                {c.status === "done" && (
-                  <div className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full p-0.5">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-2 mt-3">
-            {captures.map((c, i) =>
-              c.status === "done" ? (
-                <button
-                  key={c.angle}
-                  type="button"
-                  onClick={() => retakeAngle(i)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs transition-colors"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  {instructionLabels[c.angle]}
-                </button>
-              ) : null
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 mt-4 p-3 bg-slate-900/50 rounded-xl border border-slate-700">
-            <input
-              type="checkbox"
-              id="consent-multi"
-              checked={consent}
-              onChange={(e) => setConsent?.(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500"
-              disabled={!setConsent}
-            />
-            <label htmlFor="consent-multi" className="text-sm text-slate-400">
-              Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện tại cổng
-            </label>
-          </div>
-
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!consent}
-            className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Xác nhận {captures.filter((c) => c.status === "done").length} góc ảnh
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-</file>
-
-<file path="tailwind.config.ts">
-import type { Config } from "tailwindcss";
-
-const config: Config = {
-  darkMode: "class",
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {
-    extend: {
-      colors: {
-        bg: "#12151E",
-        surface: {
-          DEFAULT: "#1C2030",
-          2: "#242838",
-          3: "#2C3042",
-        },
-        primary: {
-          DEFAULT: "#D4A853",
-          dark: "#A88430",
-          dim: "#8A6A28",
-        },
-        secondary: {
-          DEFAULT: "#4A8C5C",
-          dark: "#3D7350",
-        },
-        tertiary: "#5B9BD5",
-        success: {
-          DEFAULT: "#4A8C5C",
-          bg: "#1A2E1F",
-        },
-        error: {
-          DEFAULT: "#C44E4E",
-          bg: "#2E1A1A",
-        },
-        warning: {
-          DEFAULT: "#C49A3C",
-          bg: "#2E2518",
-        },
-        info: {
-          DEFAULT: "#5B9BD5",
-          bg: "#1A2530",
-        },
-        text: {
-          DEFAULT: "#EDE8DF",
-          2: "#B8B0A4",
-          3: "#7A7368",
-        },
-        border: {
-          DEFAULT: "#2E3345",
-          2: "#3A4052",
-        },
-      },
-      fontFamily: {
-        display: ["Outfit", "sans-serif"],
-        body: ["Inter", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
-      },
-      boxShadow: {
-        glow: "0 0 20px rgba(212, 168, 83, 0.3)",
-        "glow-sm": "0 0 10px rgba(212, 168, 83, 0.2)",
-      },
-      borderRadius: {
-        sm: "6px",
-        md: "8px",
-        lg: "12px",
-        xl: "16px",
-      },
-      animation: {
-        "pulse-amber": "pulse-amber 2s ease-in-out infinite",
-        "slide-in": "slide-in 200ms ease-out",
-        shimmer: "shimmer 1.5s ease-in-out infinite",
-        "success-pop": "success-pop 300ms ease-out",
-        "fade-in": "fade-in 300ms ease-out",
-        "fade-in-up": "fade-in-up 300ms ease-out",
-      },
-      keyframes: {
-        "pulse-amber": {
-          "0%, 100%": { opacity: "1", transform: "scale(1)" },
-          "50%": { opacity: "0.5", transform: "scale(1.3)" },
-        },
-        "slide-in": {
-          from: { transform: "translateX(100%)", opacity: "0" },
-          to: { transform: "translateX(0)", opacity: "1" },
-        },
-        shimmer: {
-          from: { backgroundPosition: "-200% 0" },
-          to: { backgroundPosition: "200% 0" },
-        },
-        "success-pop": {
-          "0%": { transform: "scale(0)", opacity: "0" },
-          "70%": { transform: "scale(1.1)" },
-          "100%": { transform: "scale(1)", opacity: "1" },
-        },
-        "fade-in": {
-          from: { opacity: "0" },
-          to: { opacity: "1" },
-        },
-        "fade-in-up": {
-          from: { opacity: "0", transform: "translateY(8px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
-        },
-      },
-    },
-  },
-  plugins: [],
-};
-
-export default config;
-</file>
-
 <file path="next.config.js">
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -2386,6 +2035,1022 @@ docker run -p 3000:3000 face-recognition-web
 5. [ ] `npm install` completed without errors
 6. [ ] Port 3000 (frontend) and 80 (backend gateway) are free
 7. [ ] Browser has camera permissions for face recognition features
+</file>
+
+<file path="src/app/(dashboard)/dashboard/page.tsx">
+"use client";
+
+import { useAuth } from "@/lib/auth-context";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api-client";
+import StatCard from "@/components/ui/StatCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import { Users, UserCheck, LogIn, LogOut, BookOpen, AlertCircle, Clock, ArrowRight } from "lucide-react";
+import Link from "next/link";
+
+import type { AccessLogPublic } from "@/lib/types";
+
+interface Stats {
+  total_patrons: number;
+  active_patrons: number;
+  today_entries: number;
+  today_exits: number;
+}
+
+export default function DashboardPage() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    async function fetchData() {
+      try {
+        const [statsData, logsData] = await Promise.all([
+          api.getStats().catch(() => null),
+          api.getRecentLogs().catch(() => null),
+        ]);
+
+        if (statsData) {
+          setStats({
+            total_patrons: statsData.total_patrons || 0,
+            active_patrons: statsData.active_patrons || 0,
+            today_entries: statsData.today_entries || 0,
+            today_exits: statsData.today_exits || 0,
+          });
+        }
+
+        if (logsData?.items) {
+          setRecentLogs(logsData.items.slice(0, 8));
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setLoadingData(false);
+      }
+    }
+
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-body-sm text-text-3">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const role = user?.role || "staff";
+
+  return (
+    <div className="space-y-6">
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Tổng độc giả"
+          value={stats?.total_patrons ?? "—"}
+          icon={Users}
+          accentColor="primary"
+          description="Đã đăng ký"
+        />
+        <StatCard
+          label="Đang có mặt"
+          value={stats?.active_patrons ?? "—"}
+          icon={UserCheck}
+          accentColor="success"
+          description="Trong thư viện"
+        />
+        <StatCard
+          label="Lượt vào hôm nay"
+          value={stats?.today_entries ?? "—"}
+          icon={LogIn}
+          accentColor="info"
+          description="Ra vào cửa"
+        />
+        <StatCard
+          label="Lượt ra hôm nay"
+          value={stats?.today_exits ?? "—"}
+          icon={LogOut}
+          accentColor="warning"
+          description="Ra về"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent activity */}
+        <div className="lg:col-span-2">
+          <Card padding="none">
+            <CardHeader className="p-4 border-b border-border">
+              <CardTitle>Hoạt động gần đây</CardTitle>
+              <Link href="/history" className="text-body-sm text-primary hover:text-primary/80 flex items-center gap-1">
+                Xem tất cả <ArrowRight size={14} />
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loadingData ? (
+                <div className="p-8 text-center text-text-3 text-body-sm">Đang tải...</div>
+              ) : recentLogs.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3 text-text-3">
+                    <Clock size={20} />
+                  </div>
+                  <p className="text-body-sm text-text-3">Chưa có hoạt động nào</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {recentLogs.map((log) => (
+                    <div key={log.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                        log.access_type === "entry"
+                          ? "bg-success/15 text-success"
+                          : "bg-error/15 text-error"
+                      }`}>
+                        {log.access_type === "entry" ? <LogIn size={16} /> : <LogOut size={16} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-body-sm font-medium text-text truncate">{log.patron_name || "—"}</p>
+                        <p className="text-caption text-text-3">{log.student_code || log.patron_id}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <Badge variant={log.status === "granted" ? "success" : "error"} dot>
+                          {log.status === "granted" ? "Thành công" : "Thất bại"}
+                        </Badge>
+                        <p className="text-caption text-text-3 mt-1">
+                          {new Date(log.access_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick access */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Thao tác nhanh</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {role === "admin" && (
+                <>
+                  <QuickAction href="/enroll" icon={<LogIn size={16} />} label="Đăng ký khuôn mặt" color="primary" />
+                  <QuickAction href="/patrons" icon={<Users size={16} />} label="Quản lý độc giả" color="info" />
+                  <QuickAction href="/return" icon={<BookOpen size={16} />} label="Trả sách" color="warning" />
+                  <QuickAction href="/stats" icon={<AlertCircle size={16} />} label="Xem thống kê" color="success" />
+                </>
+              )}
+              <QuickAction href="/active" icon={<UserCheck size={16} />} label="Đang có mặt" color="success" />
+              <QuickAction href="/history" icon={<Clock size={16} />} label="Lịch sử ra vào" color="info" />
+            </CardContent>
+          </Card>
+
+          
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({ href, icon, label, color }: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  color: "primary" | "success" | "error" | "warning" | "info";
+}) {
+  const colorMap = {
+    primary: "text-primary hover:bg-primary/10",
+    success: "text-success hover:bg-success/10",
+    error: "text-error hover:bg-error/10",
+    warning: "text-warning hover:bg-warning/10",
+    info: "text-info hover:bg-info/10",
+  };
+
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${colorMap[color]}`}
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="text-body-sm font-medium">{label}</span>
+      <ArrowRight size={14} className="ml-auto shrink-0 opacity-50" />
+    </Link>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/layout.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import Sidebar from "@/components/sidebar";
+import { Bell, User, LogOut, ChevronRight } from "lucide-react";
+
+const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+  "/dashboard": { title: "Tổng quan", subtitle: "Chào mừng bạn quay lại" },
+  "/patrons": { title: "Quản lý độc giả", subtitle: "Danh sách và thông tin độc giả" },
+  "/active": { title: "Đang hiện diện", subtitle: "Độc giả đang có mặt trong thư viện" },
+  "/gate": { title: "Cổng ra vào", subtitle: "Xác thực khuôn mặt tại cổng" },
+  "/history": { title: "Lịch sử ra vào", subtitle: "Nhật ký ra vào cửa thư viện" },
+  "/return": { title: "Trả sách", subtitle: "Xử lý trả sách cho độc giả" },
+  "/stats": { title: "Thống kê", subtitle: "Báo cáo và biểu đồ hoạt động" },
+  "/enroll": { title: "Đăng ký khuôn mặt", subtitle: "Cập nhật thông tin khuôn mặt" },
+  "/verify": { title: "Xác thực khuôn mặt", subtitle: "Kiểm tra đối chiếu khuôn mặt" },
+  "/identify": { title: "Nhận diện", subtitle: "Tìm kiếm độc giả qua khuôn mặt" },
+  "/liveness": { title: "Kiểm tra sống", subtitle: "Xác minh khuôn mặt thật" },
+  "/dashboard/admin": { title: "Quản trị hệ thống", subtitle: "Quản lý người dùng và phân quyền" },
+};
+
+function Breadcrumb({ pathname }: { pathname: string }) {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length <= 1) return null;
+
+  return (
+    <nav className="flex items-center gap-1.5 text-body-sm text-text-3">
+      {parts.map((part, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <ChevronRight size={12} className="text-text-3" />}
+          <span className={i === parts.length - 1 ? "text-text-2" : "capitalize"}>
+            {PAGE_TITLES[`/${parts.slice(0, i + 1).join("/")}`]?.title || part.replace(/-/g, ' ')}
+          </span>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+function Topbar({ user }: { user: any }) {
+  return (
+    <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-6">
+      <div className="flex items-center gap-4">
+        {/* Page title injected via page — can be enhanced */}
+      </div>
+      <div className="flex items-center gap-3">
+        <button className="relative p-2 rounded-md hover:bg-surface-2 transition-colors">
+          <Bell size={18} className="text-text-2" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
+        </button>
+        <div className="flex items-center gap-2.5 pl-3 border-l border-border">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <User size={16} className="text-primary" />
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-body-sm font-medium text-text">{user?.full_name || "Admin"}</p>
+            <p className="text-caption text-text-3 capitalize">{user?.role || "staff"}</p>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-body-sm text-text-3">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  const pageInfo = PAGE_TITLES[pathname] || PAGE_TITLES[pathname.split("/").slice(0, 2).join("/")] || { title: "", subtitle: "" };
+
+  return (
+    <div className="flex min-h-screen bg-bg">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <Topbar user={user} />
+        <div className="p-6">
+          {/* Page Header */}
+          {pageInfo.title && (
+            <div className="mb-6 animate-fade-in">
+              <Breadcrumb pathname={pathname} />
+              <h1 className="text-display-xl text-text mt-1">{pageInfo.title}</h1>
+              {pageInfo.subtitle && (
+                <p className="text-body-md text-text-3 mt-0.5">{pageInfo.subtitle}</p>
+              )}
+            </div>
+          )}
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/return/page.tsx">
+"use client";
+
+import { useState } from "react";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type { BorrowRecord } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import { BookOpen, CheckCircle, XCircle, ScanLine, ArrowRight } from "lucide-react";
+
+export default function ReturnPage() {
+  const [barcode, setBarcode] = useState("");
+  const [record, setRecord] = useState<BorrowRecord | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [returning, setReturning] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleLookup = async () => {
+    if (!barcode.trim()) return;
+    setLoading(true);
+    setLookupError("");
+    setResult(null);
+    setRecord(null);
+    try {
+      const data = await api.lookupBorrowByBarcode(barcode.trim());
+      if (!data) {
+        setLookupError("Không tìm thấy bản ghi mượn cho mã vạch này");
+        return;
+      }
+      setRecord(data);
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        setLookupError("Không tìm thấy bản ghi mượn cho mã vạch này");
+      } else {
+        setLookupError(getErrorMessage(err) || "Lỗi tra cứu");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReturn = async () => {
+    if (!record) return;
+    setReturning(true);
+    setResult(null);
+    try {
+      await api.staffReturnBook(barcode.trim());
+      setResult({ success: true, message: "Trả sách thành công!" });
+      setRecord(null);
+      setBarcode("");
+    } catch (err: any) {
+      setResult({ success: false, message: getErrorMessage(err) || "Trả sách thất bại" });
+    } finally {
+      setReturning(false);
+    }
+  };
+
+  const isOverdue = record ? new Date(record.due_at) < new Date() : false;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      {/* Search bar */}
+      <div className="flex gap-3">
+        <div className="flex-1 relative">
+          <ScanLine size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-3" />
+          <input
+            className="input pl-10 text-lg font-mono"
+            value={barcode}
+            onChange={(e) => { setBarcode(e.target.value); setResult(null); }}
+            onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+            placeholder="Nhập mã vạch..."
+            autoFocus
+          />
+        </div>
+        <button
+          className="btn-primary px-6 py-2.5 text-body-md"
+          onClick={handleLookup}
+          disabled={loading || !barcode.trim()}
+        >
+          {loading ? "Đang tra..." : "Tra cứu"}
+        </button>
+      </div>
+
+      {/* Error */}
+      {lookupError && (
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg flex items-center gap-3 text-error">
+          <XCircle size={18} />
+          {lookupError}
+        </div>
+      )}
+
+      {/* Record info */}
+      {record && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen size={18} className="text-primary" />
+              Thông tin mượn sách
+            </CardTitle>
+            <Badge variant={record.status === "borrowed" ? "warning" : "neutral"}>
+              {record.status === "borrowed" ? "Đang mượn" : record.status}
+            </Badge>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-body-sm">
+              <div>
+                <p className="text-text-3 text-caption">Mã vạch</p>
+                <p className="font-mono font-medium text-text">{barcode}</p>
+              </div>
+              <div>
+                <p className="text-text-3 text-caption">Mã bạn đọc</p>
+                <p className="font-mono font-medium text-text">{record.patron_id}</p>
+              </div>
+              <div>
+                <p className="text-text-3 text-caption">Mã sách</p>
+                <p className="font-mono font-medium text-text">{record.book_id}</p>
+              </div>
+              <div>
+                <p className="text-text-3 text-caption">Vị trí</p>
+                <p className="font-mono text-text">{record.shelf_location || "-"}</p>
+              </div>
+              <div>
+                <p className="text-text-3 text-caption">Ngày mượn</p>
+                <p className="text-text">{new Date(record.borrow_at).toLocaleDateString("vi-VN")}</p>
+              </div>
+              <div className={isOverdue ? "text-error" : ""}>
+                <p className="text-text-3 text-caption">Hạn trả</p>
+                <p className={`font-semibold ${isOverdue ? "text-error" : "text-text"}`}>
+                  {new Date(record.due_at).toLocaleDateString("vi-VN")}
+                  {isOverdue && " ⚠️"}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <button
+                className="btn-primary w-full py-3 text-body-md font-semibold flex items-center justify-center gap-2"
+                onClick={handleReturn}
+                disabled={returning}
+              >
+                {returning ? (
+                  <>
+                    <span className="w-4 h-4 rounded-full border-2 border-bg border-t-transparent animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={18} />
+                    Xác nhận trả sách
+                  </>
+                )}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Result */}
+      {result && (
+        <div className={`p-4 border rounded-lg flex items-center gap-3 animate-fade-in ${
+          result.success
+            ? "bg-success/10 border-success/20 text-success"
+            : "bg-error/10 border-error/20 text-error"
+        }`}>
+          {result.success ? <CheckCircle size={20} /> : <XCircle size={20} />}
+          <p className="text-body-md font-medium">{result.message}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/page.tsx">
+import Link from "next/link";
+import { Library, Users, BookOpen, ScanFace, ArrowRight } from "lucide-react";
+
+const features = [
+  {
+    icon: Users,
+    title: "Quản lý độc giả",
+    desc: "Đăng ký, gia hạn thẻ, tra cứu thông tin bạn đọc toàn thư viện.",
+  },
+  {
+    icon: BookOpen,
+    title: "Mượn / Trả sách",
+    desc: "Quét mã vạch, mượn trả nhanh chóng. Hệ thống theo dõi hạn trả và nhắc nhở tự động.",
+  },
+  {
+    icon: ScanFace,
+    title: "Cửa ra vào thông minh",
+    desc: "Nhận diện khuôn mặt, kiểm soát ra vào, chống giả mạo và thống kê tần suất.",
+  },
+];
+
+export default function HomePage() {
+  return (
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 via-white to-slate-50">
+      <header className="border-b border-slate-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
+              <Library className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-base font-bold">Thư Viện</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              Đăng nhập
+            </Link>
+            <Link
+              href="/register"
+              className="px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:opacity-90 transition-opacity"
+            >
+              Đăng ký
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <section className="mx-auto max-w-6xl px-4 pt-24 pb-20 text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Hệ thống quản lý thư viện thông minh
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 leading-tight tracking-tight">
+            Chào mừng đến với{" "}
+            <span className="text-primary">Thư Viện</span>
+          </h1>
+          <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+            Nền tảng quản lý thư viện toàn diện — quản lý độc giả, theo dõi
+            mượn trả, và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn
+            mặt.
+          </p>
+          <div className="mt-8 flex items-center justify-center gap-4">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+            >
+              Truy cập hệ thống
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-4 pb-24">
+          <div className="grid gap-6 sm:grid-cols-3">
+            {features.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div
+                  key={f.title}
+                  className="group relative rounded-xl border border-slate-200 bg-white p-6 transition-shadow hover:shadow-md"
+                >
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/5 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-base font-semibold text-slate-900">
+                    {f.title}
+                  </h3>
+                  <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">
+                    {f.desc}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-6 flex items-center justify-between text-xs text-slate-400">
+          <span>© {new Date().getFullYear()} Thư Viện. All rights reserved.</span>
+          <span>Phiên bản 1.0</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/frequency-chart.tsx">
+"use client";
+
+import { BarChart3 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
+import type { AccessFrequencyDay } from "@/lib/types";
+
+export default function FrequencyChart({ data, loading }: { data: AccessFrequencyDay[]; loading: boolean }) {
+  return (
+    <div className="bg-surface rounded-lg border border-border p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <BarChart3 className="w-5 h-5 text-text-3" />
+        <h2 className="text-heading-md text-text">Thống kê tần suất ra vào</h2>
+      </div>
+      {loading ? (
+        <p className="text-text-3 text-body-sm">Đang tải...</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2E3345" />
+            <XAxis
+              dataKey="date"
+              tickFormatter={(d: string) => {
+                const date = new Date(d + "T00:00:00");
+                return date.toLocaleDateString("vi-VN", { day: "numeric", month: "numeric" });
+              }}
+              fontSize={12}
+              tick={{ fill: "#B8B0A4" }}
+            />
+            <YAxis allowDecimals={false} fontSize={12} tick={{ fill: "#B8B0A4" }} />
+            <Tooltip
+              labelStyle={{ color: "#EDE8DF" }}
+              contentStyle={{ background: "#1C2030", border: "1px solid #2E3345", borderRadius: "8px" }}
+              labelFormatter={(d: any) => {
+                if (!d) return "";
+                const date = new Date(String(d) + "T00:00:00");
+                return date.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+              }}
+            />
+            <Legend wrapperStyle={{ color: "#B8B0A4" }} />
+            <Bar dataKey="entry" fill="#4A8C5C" name="Vào" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="exit" fill="#C49A3C" name="Ra" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/gate/ResultCard.tsx">
+'use client';
+
+import PulseAnimation from './PulseAnimation';
+
+interface ResultCardProps {
+  status: 'success' | 'error' | 'unregistered' | 'processing';
+  patronInfo?: {
+    fullName: string;
+    mssv: string;
+    faculty: string;
+  };
+  message?: string;
+}
+
+export default function ResultCard({ status, patronInfo, message }: ResultCardProps) {
+  type PulseColor = 'emerald' | 'red' | 'amber' | 'none';
+  const config: Record<string, {
+    borderColor: string;
+    bgColor: string;
+    pulseColor: PulseColor;
+    icon: React.ReactNode;
+  }> = {
+    success: {
+      borderColor: 'border-emerald-500',
+      bgColor: 'bg-emerald-500/10',
+      pulseColor: 'emerald',
+      icon: (
+        <svg className="w-16 h-16 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    error: {
+      borderColor: 'border-red-500',
+      bgColor: 'bg-red-500/10',
+      pulseColor: 'red',
+      icon: (
+        <svg className="w-16 h-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    unregistered: {
+      borderColor: 'border-amber-500',
+      bgColor: 'bg-amber-500/10',
+      pulseColor: 'amber',
+      icon: (
+        <svg className="w-16 h-16 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+        </svg>
+      ),
+    },
+    processing: {
+      borderColor: 'border-slate-500',
+      bgColor: 'bg-slate-500/10',
+      pulseColor: 'none',
+      icon: (
+        <div className="w-16 h-16 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" />
+      ),
+    },
+  };
+
+  const { borderColor, bgColor, pulseColor, icon } = config[status];
+
+  return (
+    <div className={`relative border-2 ${borderColor} ${bgColor} rounded-2xl p-8 text-center`}>
+      {pulseColor !== 'none' && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <PulseAnimation color={pulseColor} />
+        </div>
+      )}
+
+      <div className="relative z-10">
+        <div className="flex justify-center mb-4">{icon}</div>
+
+        {patronInfo && (
+          <div className="space-y-2 mb-4">
+            <h3 className="text-2xl font-bold text-white">{patronInfo.fullName}</h3>
+            <p className="text-amber-400 font-mono text-lg">{patronInfo.mssv}</p>
+            <p className="text-slate-400">{patronInfo.faculty}</p>
+          </div>
+        )}
+
+        {message && (
+          <p className={`text-lg ${status === 'success' ? 'text-emerald-400' : status === 'error' ? 'text-red-400' : 'text-amber-400'}`}>
+            {message}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/middleware.ts">
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+const publicPaths = ["/login", "/register", "/"];
+
+export function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  if (publicPaths.includes(path)) {
+    return NextResponse.next();
+  }
+
+  const token = request.cookies.get("access_token")?.value;
+  if (!token) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", path);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
+</file>
+
+<file path="tailwind.config.ts">
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: "class",
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        bg: "#12151E",
+        surface: {
+          DEFAULT: "#1C2030",
+          2: "#242838",
+          3: "#2C3042",
+        },
+        primary: {
+          DEFAULT: "#D4A853",
+          dark: "#A88430",
+          dim: "#8A6A28",
+        },
+        secondary: {
+          DEFAULT: "#4A8C5C",
+          dark: "#3D7350",
+        },
+        tertiary: "#5B9BD5",
+        success: {
+          DEFAULT: "#4A8C5C",
+          bg: "#1A2E1F",
+        },
+        error: {
+          DEFAULT: "#C44E4E",
+          bg: "#2E1A1A",
+        },
+        warning: {
+          DEFAULT: "#C49A3C",
+          bg: "#2E2518",
+        },
+        info: {
+          DEFAULT: "#5B9BD5",
+          bg: "#1A2530",
+        },
+        text: {
+          DEFAULT: "#EDE8DF",
+          2: "#B8B0A4",
+          3: "#7A7368",
+        },
+        border: {
+          DEFAULT: "#2E3345",
+          2: "#3A4052",
+        },
+      },
+      fontFamily: {
+        display: ["Outfit", "sans-serif"],
+        body: ["Inter", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
+      },
+      boxShadow: {
+        glow: "0 0 20px rgba(212, 168, 83, 0.3)",
+        "glow-sm": "0 0 10px rgba(212, 168, 83, 0.2)",
+      },
+      borderRadius: {
+        sm: "6px",
+        md: "8px",
+        lg: "12px",
+        xl: "16px",
+      },
+      animation: {
+        "pulse-amber": "pulse-amber 2s ease-in-out infinite",
+        "slide-in": "slide-in 200ms ease-out",
+        shimmer: "shimmer 1.5s ease-in-out infinite",
+        "success-pop": "success-pop 300ms ease-out",
+        "fade-in": "fade-in 300ms ease-out",
+        "fade-in-up": "fade-in-up 300ms ease-out",
+      },
+      keyframes: {
+        "pulse-amber": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.5", transform: "scale(1.3)" },
+        },
+        "slide-in": {
+          from: { transform: "translateX(100%)", opacity: "0" },
+          to: { transform: "translateX(0)", opacity: "1" },
+        },
+        shimmer: {
+          from: { backgroundPosition: "-200% 0" },
+          to: { backgroundPosition: "200% 0" },
+        },
+        "success-pop": {
+          "0%": { transform: "scale(0)", opacity: "0" },
+          "70%": { transform: "scale(1.1)" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "fade-in-up": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
+</file>
+
+<file path=".env.local">
+NEXT_PUBLIC_API_URL=http://localhost:80
+NEXT_PUBLIC_APP_NAME=Face Recognition Platform
+NEXT_PUBLIC_MAX_IMAGE_SIZE=5242880
+NEXT_PUBLIC_ENTRY_CAM=http://192.168.1.13:8080/video
+NEXT_PUBLIC_EXIT_CAM=http://192.168.1.240:8080/video
+NEXT_PUBLIC_ENTRY_CAM_ID=entry_gate
+NEXT_PUBLIC_EXIT_CAM_ID=exit_gate
+</file>
+
+<file path=".gitignore">
+# === Node.js ===
+node_modules/
+
+# === Next.js ===
+.next/
+out/
+
+# Next.js build cache
+.next/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === Generated / Agent files ===
+repomix-output.xml/
+SkillAgent/
+CLAUDE.md
+AGENTS.md
+
+# === TypeScript ===
+*.tsbuildinfo
+next-env.d.ts
 </file>
 
 <file path="src/app/(dashboard)/active/page.tsx">
@@ -3412,118 +4077,6 @@ export default function StatsPage() {
 }
 </file>
 
-<file path="src/app/page.tsx">
-import Link from "next/link";
-import { Library, Users, BookOpen, ScanFace, ArrowRight } from "lucide-react";
-
-const features = [
-  {
-    icon: Users,
-    title: "Quản lý độc giả",
-    desc: "Đăng ký, gia hạn thẻ, tra cứu thông tin bạn đọc toàn thư viện.",
-  },
-  {
-    icon: BookOpen,
-    title: "Mượn / Trả sách",
-    desc: "Quét mã vạch, mượn trả nhanh chóng. Hệ thống theo dõi hạn trả và nhắc nhở tự động.",
-  },
-  {
-    icon: ScanFace,
-    title: "Cửa ra vào thông minh",
-    desc: "Nhận diện khuôn mặt, kiểm soát ra vào, chống giả mạo và thống kê tần suất.",
-  },
-];
-
-export default function HomePage() {
-  return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 via-white to-slate-50">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <Library className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-base font-bold">Thư Viện</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-            >
-              Đăng nhập
-            </Link>
-            <Link
-              href="/register"
-              className="px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:opacity-90 transition-opacity"
-            >
-              Đăng ký
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1">
-        <section className="mx-auto max-w-6xl px-4 pt-24 pb-20 text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            Hệ thống quản lý thư viện thông minh
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 leading-tight tracking-tight">
-            Chào mừng đến với{" "}
-            <span className="text-primary">Thư Viện</span>
-          </h1>
-          <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
-            Nền tảng quản lý thư viện toàn diện — quản lý độc giả, theo dõi
-            mượn trả, và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn
-            mặt.
-          </p>
-          <div className="mt-8 flex items-center justify-center gap-4">
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
-            >
-              Truy cập hệ thống
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-6xl px-4 pb-24">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {features.map((f) => {
-              const Icon = f.icon;
-              return (
-                <div
-                  key={f.title}
-                  className="group relative rounded-xl border border-slate-200 bg-white p-6 transition-shadow hover:shadow-md"
-                >
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/5 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-base font-semibold text-slate-900">
-                    {f.title}
-                  </h3>
-                  <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">
-                    {f.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-6 flex items-center justify-between text-xs text-slate-400">
-          <span>© {new Date().getFullYear()} Thư Viện. All rights reserved.</span>
-          <span>Phiên bản 1.0</span>
-        </div>
-      </footer>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/camera-capture.tsx">
 "use client";
 
@@ -3696,130 +4249,43 @@ export default function CameraCapture({
 }
 </file>
 
-<file path="src/middleware.ts">
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-
-const publicPaths = ["/login", "/register", "/"];
-
-export function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-
-  if (publicPaths.includes(path)) {
-    return NextResponse.next();
-  }
-
-  const token = request.cookies.get("access_token")?.value;
-  if (!token) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", path);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
-};
-</file>
-
-<file path="tsconfig.json">
+<file path="package.json">
 {
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    }
+  "name": "face-recognition-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "dependencies": {
+    "axios": "^1.7.7",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
+    "next": "^16.2.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-form": "^7.53.2",
+    "react-is": "^19.2.7",
+    "react-webcam": "^7.2.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
+  }
 }
-</file>
-
-<file path=".env.local">
-NEXT_PUBLIC_API_URL=http://localhost:80
-NEXT_PUBLIC_APP_NAME=Face Recognition Platform
-NEXT_PUBLIC_MAX_IMAGE_SIZE=5242880
-NEXT_PUBLIC_ENTRY_CAM=http://192.168.1.13:8080/video
-NEXT_PUBLIC_EXIT_CAM=http://192.168.1.240:8080/video
-NEXT_PUBLIC_ENTRY_CAM_ID=entry_gate
-NEXT_PUBLIC_EXIT_CAM_ID=exit_gate
-</file>
-
-<file path=".gitignore">
-# === Node.js ===
-node_modules/
-
-# === Next.js ===
-.next/
-out/
-
-# Next.js build cache
-.next/
-out/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# === OS ===
-.DS_Store
-Thumbs.db
-
-# === IDE ===
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# === Generated / Agent files ===
-repomix-output.xml/
-SkillAgent/
-CLAUDE.md
-AGENTS.md
-
-# === TypeScript ===
-*.tsbuildinfo
-next-env.d.ts
 </file>
 
 <file path="src/app/(dashboard)/dashboard/admin/page.tsx">
@@ -4239,45 +4705,6 @@ export default function Sidebar() {
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "face-recognition-frontend",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbo",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "axios": "^1.7.7",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.454.0",
-    "next": "^16.2.9",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-hook-form": "^7.53.2",
-    "react-is": "^19.2.7",
-    "react-webcam": "^7.2.0",
-    "recharts": "^3.8.1",
-    "tailwind-merge": "^2.5.4",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@hookform/resolvers": "^3.9.1",
-    "@types/node": "^22.9.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3"
-  }
-}
-</file>
-
 <file path="src/app/(dashboard)/identify/page.tsx">
 "use client";
 
@@ -4444,6 +4871,312 @@ export default function IdentifyPage() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/patrons/[id]/page.tsx">
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import api, { getErrorMessage } from "@/lib/api-client";
+import MultiAngleCapture from "@/components/MultiAngleCapture";
+import type { AccessLogPublic, PatronPublic, PatronUpdate } from "@/lib/types";
+import type { CaptureAngle } from "@/components/MultiAngleCapture";
+
+export default function PatronDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+
+  const [patron, setPatron] = useState<PatronPublic | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState<AccessLogPublic[]>([]);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsSkip, setLogsSkip] = useState(0);
+  const logsLimit = 20;
+
+  const [editForm, setEditForm] = useState<PatronUpdate>({});
+  const [showEdit, setShowEdit] = useState(false);
+
+  const [showEnroll, setShowEnroll] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [enrollError, setEnrollError] = useState("");
+  const [enrollSuccess, setEnrollSuccess] = useState("");
+  const [enrollLoading, setEnrollLoading] = useState(false);
+
+  const loadPatron = useCallback(async () => {
+    try {
+      const data = await api.getPatron(id);
+      setPatron(data);
+    } catch { return null; }
+  }, [id]);
+
+  const loadLogs = useCallback(async (append = false) => {
+    try {
+      const data = await api.getAccessLogs({ patronId: id, skip: logsSkip, limit: logsLimit });
+      if (append) setLogs((prev) => [...prev, ...data.items]);
+      else setLogs(data.items);
+      setLogsTotal(data.total);
+    } catch { }
+  }, [id, logsSkip]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await loadPatron();
+      await loadLogs();
+      setLoading(false);
+    })();
+  }, [loadPatron, loadLogs]);
+
+  const handleEdit = async () => {
+    if (!patron) return;
+    await api.updatePatron(patron.id, editForm);
+    setShowEdit(false);
+    setEditForm({});
+    await loadPatron();
+  };
+
+  const handleRenew = async () => {
+    if (!patron) return;
+    const current = new Date(patron.membership_expiry);
+    const next = new Date(current);
+    next.setFullYear(next.getFullYear() + 1);
+    await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
+    await loadPatron();
+  };
+
+  const handleDelete = async () => {
+    if (!patron || !confirm("Xóa độc giả này?")) return;
+    try {
+      await api.deletePatron(patron.id);
+      router.push("/patrons");
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        alert("Độc giả không tồn tại hoặc đã bị xóa trước đó.");
+        router.push("/patrons");
+      } else {
+        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lời không xác định"));
+      }
+    }
+  };
+
+  const handleEnroll = async (files: Record<CaptureAngle, File>) => {
+    if (!patron) return;
+    setEnrollLoading(true);
+    setEnrollError("");
+    setEnrollSuccess("");
+    try {
+      await api.enrollPatronFaceBatch(patron.id, {
+        frontal: files.frontal,
+        right: files.right,
+        left: files.left,
+        down: files.down,
+      });
+      setEnrollSuccess("Đăng ký khuôn mặt thành công!");
+      setShowEnroll(false);
+      setConsent(false);
+      await loadPatron();
+    } catch (err: any) {
+      const errCode = err?.response?.data?.error || err?.response?.data?.detail;
+      const errorMessages: Record<string, string> = {
+        LIVENESS_FAILED: "Ảnh không phải khuôn mặt thật, vui lòng chụp ảnh trực tiếp",
+        NO_FACE_DETECTED: "Không tìm thấy khuôn mặt trong ảnh, vui lòng thử lại",
+        MULTIPLE_FACES: "Có nhiều hơn 1 khuôn mặt trong ảnh, vui lòng chụp lại",
+        LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với điều kiện ánh sáng tốt hơn",
+        FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại",
+      };
+      setEnrollError(errorMessages[errCode] || getErrorMessage(err) || "Đăng ký thất bại");
+    } finally {
+      setEnrollLoading(false);
+    }
+  };
+
+  if (loading) return <p className="text-gray-500">Đang tải...</p>;
+  if (!patron) return (
+    <div className="text-center py-12">
+      <p className="text-gray-500 text-lg mb-4">Không tìm thấy độc giả</p>
+      <p className="text-gray-400 text-sm mb-6">Độc giả có thể đã bị xóa hoặc ID không hợp lệ.</p>
+      <button onClick={() => router.push("/patrons")} className="px-4 py-2 bg-blue-600 text-white rounded-md">
+        &larr; Quay lại danh sách
+      </button>
+    </div>
+  );
+
+  const pageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
+  const currentPage = Math.floor(logsSkip / logsLimit) + 1;
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <button onClick={() => router.push("/patrons")} className="text-blue-600 hover:underline text-sm">&larr; Quay lại danh sách</button>
+
+      <div className="border rounded-lg p-6 bg-white">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">{patron.full_name}</h1>
+            <p className="text-gray-500">MSSV: {patron.student_code} &middot; Mã thẻ: {patron.card_number}</p>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+            patron.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}>{patron.status}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+          <div><span className="text-gray-500">Họ tên:</span> <span className="font-medium">{patron.full_name}</span></div>
+          <div><span className="text-gray-500">MSSV:</span> <span className="font-medium">{patron.student_code}</span></div>
+          <div><span className="text-gray-500">Lớp:</span> <span className="font-medium">{patron.class_name || "-"}</span></div>
+          <div><span className="text-gray-500">Mã thẻ:</span> <span className="font-medium">{patron.card_number}</span></div>
+          <div><span className="text-gray-500">Ngày cấp thẻ:</span> <span className="font-medium">{patron.issue_date || "-"}</span></div>
+          <div><span className="text-gray-500">Hạn thẻ:</span>
+            <span className={`font-medium ml-1 ${new Date(patron.membership_expiry) < new Date() ? "text-red-600" : "text-green-600"}`}>
+              {patron.membership_expiry}
+            </span>
+          </div>
+          <div><span className="text-gray-500">Khuôn mặt:</span>
+            <span className={`font-medium ml-1 ${patron.has_face ? "text-green-600" : "text-gray-400"}`}>
+              {patron.has_face ? "✓ Đã đăng ký" : "✗ Chưa đăng ký"}
+            </span>
+          </div>
+          <div><span className="text-gray-500">Tạo lúc:</span> <span className="font-medium">{new Date(patron.created_at).toLocaleString("vi-VN")}</span></div>
+        </div>
+        <div className="flex gap-3 mt-6 pt-4 border-t">
+          <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm" onClick={() => { setEditForm({
+            full_name: patron.full_name, class_name: patron.class_name || undefined,
+            membership_expiry: patron.membership_expiry, status: patron.status,
+          }); setShowEdit(true); }}>Sửa thông tin</button>
+          <button className="px-4 py-2 bg-green-600 text-white rounded-md text-sm" onClick={handleRenew}>Gia hạn thẻ</button>
+          {!patron.has_face && (
+            <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
+              onClick={() => setShowEnroll(true)}>📷 Đăng ký khuôn mặt</button>
+          )}
+          <button className="px-4 py-2 bg-red-600 text-white rounded-md text-sm ml-auto" onClick={handleDelete}>Xóa</button>
+        </div>
+        {enrollSuccess && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
+            <span className="text-lg">✓</span> {enrollSuccess}
+          </div>
+        )}
+      </div>
+
+      {showEnroll && !patron.has_face && (
+        <div className="border rounded-lg p-4 bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg">Đăng ký khuôn mặt 4 góc</h3>
+            <button onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}
+              className="text-gray-500 hover:text-gray-700 text-sm">✕ Đóng</button>
+          </div>
+          <MultiAngleCapture
+            consent={consent}
+            setConsent={setConsent}
+            onFilesReady={handleEnroll}
+          />
+          {enrollError && <p className="text-red-500 text-sm mt-2">{enrollError}</p>}
+          {enrollLoading && <p className="text-blue-600 text-sm mt-2">Đang đăng ký...</p>}
+        </div>
+      )}
+
+      {showEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold">Sửa độc giả</h2>
+            {[["full_name", "Họ tên"], ["class_name", "Lớp"],
+              ["membership_expiry", "Hạn thẻ"], ["status", "Trạng thái"]
+            ].map(([key, label]) => (
+              <label key={key} className="block">
+                <span className="text-sm font-medium">{label}:</span>
+                {key === "status" ? (
+                  <select className="mt-1 block w-full px-3 py-2 border rounded-md"
+                    value={(editForm as any)[key] || ""}
+                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}>
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                    <option value="expired">expired</option>
+                  </select>
+                ) : (
+                  <input className="mt-1 block w-full px-3 py-2 border rounded-md"
+                    value={(editForm as any)[key] || ""}
+                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                    type={key === "membership_expiry" ? "date" : "text"} />
+                )}
+              </label>
+            ))}
+            <div className="flex gap-3 pt-2">
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleEdit}>Lưu</button>
+              <button className="px-4 py-2 bg-gray-200 rounded-md" onClick={() => setShowEdit(false)}>Hủy</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="border rounded-lg bg-white">
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold">Lịch sử ra vào</h2>
+        </div>
+        {logs.length === 0 ? (
+          <p className="p-4 text-gray-500 text-sm">Chưa có lịch sử ra vào</p>
+        ) : (
+          <>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-3 text-left font-medium">Thời gian</th>
+                  <th className="p-3 text-left font-medium">Loại</th>
+                  <th className="p-3 text-left font-medium">Cổng</th>
+                  <th className="p-3 text-left font-medium">Phương thức</th>
+                  <th className="p-3 text-left font-medium">Độ tin cậy</th>
+                  <th className="p-3 text-left font-medium">Kết quả</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.id} className="border-t hover:bg-gray-50">
+                    <td className="p-3 whitespace-nowrap">{new Date(log.access_time).toLocaleString("vi-VN")}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        log.access_type === "entry" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"
+                      }`}>{log.access_type === "entry" ? "Vào" : "Ra"}</span>
+                    </td>
+                    <td className="p-3 text-gray-600">{log.camera_id}</td>
+                    <td className="p-3 text-gray-600">{log.verify_method}</td>
+                    <td className="p-3">
+                      {log.confidence != null ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${
+                              log.confidence >= 0.8 ? "bg-green-500" : log.confidence >= 0.6 ? "bg-yellow-500" : "bg-red-500"
+                            }`} style={{ width: `${(log.confidence * 100).toFixed(0)}%` }} />
+                          </div>
+                          <span className="text-xs">{(log.confidence * 100).toFixed(0)}%</span>
+                        </div>
+                      ) : "-"}
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        log.status === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      }`}>{log.status === "success" ? "✓" : "✗"}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {logsTotal > logsLimit && (
+              <div className="flex items-center justify-between p-4 border-t text-sm">
+                <span className="text-gray-500">Tổng: {logsTotal}</span>
+                <div className="flex items-center gap-2">
+                  <button className="px-3 py-1 border rounded-md disabled:opacity-40"
+                    disabled={currentPage <= 1}
+                    onClick={() => setLogsSkip(0)}>«</button>
+                  <span>Trang {currentPage} / {pageCount}</span>
+                  <button className="px-3 py-1 border rounded-md disabled:opacity-40"
+                    disabled={currentPage >= pageCount}
+                    onClick={() => setLogsSkip((pageCount - 1) * logsLimit)}>»</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -4907,312 +5640,6 @@ export default function LivenessPage() {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/patrons/[id]/page.tsx">
-'use client';
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import api, { getErrorMessage } from "@/lib/api-client";
-import MultiAngleCapture from "@/components/MultiAngleCapture";
-import type { AccessLogPublic, PatronPublic, PatronUpdate } from "@/lib/types";
-import type { CaptureAngle } from "@/components/MultiAngleCapture";
-
-export default function PatronDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-
-  const [patron, setPatron] = useState<PatronPublic | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [logs, setLogs] = useState<AccessLogPublic[]>([]);
-  const [logsTotal, setLogsTotal] = useState(0);
-  const [logsSkip, setLogsSkip] = useState(0);
-  const logsLimit = 20;
-
-  const [editForm, setEditForm] = useState<PatronUpdate>({});
-  const [showEdit, setShowEdit] = useState(false);
-
-  const [showEnroll, setShowEnroll] = useState(false);
-  const [consent, setConsent] = useState(false);
-  const [enrollError, setEnrollError] = useState("");
-  const [enrollSuccess, setEnrollSuccess] = useState("");
-  const [enrollLoading, setEnrollLoading] = useState(false);
-
-  const loadPatron = useCallback(async () => {
-    try {
-      const data = await api.getPatron(id);
-      setPatron(data);
-    } catch { return null; }
-  }, [id]);
-
-  const loadLogs = useCallback(async (append = false) => {
-    try {
-      const data = await api.getAccessLogs({ patronId: id, skip: logsSkip, limit: logsLimit });
-      if (append) setLogs((prev) => [...prev, ...data.items]);
-      else setLogs(data.items);
-      setLogsTotal(data.total);
-    } catch { }
-  }, [id, logsSkip]);
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await loadPatron();
-      await loadLogs();
-      setLoading(false);
-    })();
-  }, [loadPatron, loadLogs]);
-
-  const handleEdit = async () => {
-    if (!patron) return;
-    await api.updatePatron(patron.id, editForm);
-    setShowEdit(false);
-    setEditForm({});
-    await loadPatron();
-  };
-
-  const handleRenew = async () => {
-    if (!patron) return;
-    const current = new Date(patron.membership_expiry);
-    const next = new Date(current);
-    next.setFullYear(next.getFullYear() + 1);
-    await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
-    await loadPatron();
-  };
-
-  const handleDelete = async () => {
-    if (!patron || !confirm("Xóa độc giả này?")) return;
-    try {
-      await api.deletePatron(patron.id);
-      router.push("/patrons");
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        alert("Độc giả không tồn tại hoặc đã bị xóa trước đó.");
-        router.push("/patrons");
-      } else {
-        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lời không xác định"));
-      }
-    }
-  };
-
-  const handleEnroll = async (files: Record<CaptureAngle, File>) => {
-    if (!patron) return;
-    setEnrollLoading(true);
-    setEnrollError("");
-    setEnrollSuccess("");
-    try {
-      await api.enrollPatronFaceBatch(patron.id, {
-        frontal: files.frontal,
-        right: files.right,
-        left: files.left,
-        down: files.down,
-      });
-      setEnrollSuccess("Đăng ký khuôn mặt thành công!");
-      setShowEnroll(false);
-      setConsent(false);
-      await loadPatron();
-    } catch (err: any) {
-      const errCode = err?.response?.data?.error || err?.response?.data?.detail;
-      const errorMessages: Record<string, string> = {
-        LIVENESS_FAILED: "Ảnh không phải khuôn mặt thật, vui lòng chụp ảnh trực tiếp",
-        NO_FACE_DETECTED: "Không tìm thấy khuôn mặt trong ảnh, vui lòng thử lại",
-        MULTIPLE_FACES: "Có nhiều hơn 1 khuôn mặt trong ảnh, vui lòng chụp lại",
-        LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với điều kiện ánh sáng tốt hơn",
-        FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại",
-      };
-      setEnrollError(errorMessages[errCode] || getErrorMessage(err) || "Đăng ký thất bại");
-    } finally {
-      setEnrollLoading(false);
-    }
-  };
-
-  if (loading) return <p className="text-gray-500">Đang tải...</p>;
-  if (!patron) return (
-    <div className="text-center py-12">
-      <p className="text-gray-500 text-lg mb-4">Không tìm thấy độc giả</p>
-      <p className="text-gray-400 text-sm mb-6">Độc giả có thể đã bị xóa hoặc ID không hợp lệ.</p>
-      <button onClick={() => router.push("/patrons")} className="px-4 py-2 bg-blue-600 text-white rounded-md">
-        &larr; Quay lại danh sách
-      </button>
-    </div>
-  );
-
-  const pageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
-  const currentPage = Math.floor(logsSkip / logsLimit) + 1;
-
-  return (
-    <div className="space-y-6 max-w-4xl">
-      <button onClick={() => router.push("/patrons")} className="text-blue-600 hover:underline text-sm">&larr; Quay lại danh sách</button>
-
-      <div className="border rounded-lg p-6 bg-white">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{patron.full_name}</h1>
-            <p className="text-gray-500">MSSV: {patron.student_code} &middot; Mã thẻ: {patron.card_number}</p>
-          </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            patron.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}>{patron.status}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-          <div><span className="text-gray-500">Họ tên:</span> <span className="font-medium">{patron.full_name}</span></div>
-          <div><span className="text-gray-500">MSSV:</span> <span className="font-medium">{patron.student_code}</span></div>
-          <div><span className="text-gray-500">Lớp:</span> <span className="font-medium">{patron.class_name || "-"}</span></div>
-          <div><span className="text-gray-500">Mã thẻ:</span> <span className="font-medium">{patron.card_number}</span></div>
-          <div><span className="text-gray-500">Ngày cấp thẻ:</span> <span className="font-medium">{patron.issue_date || "-"}</span></div>
-          <div><span className="text-gray-500">Hạn thẻ:</span>
-            <span className={`font-medium ml-1 ${new Date(patron.membership_expiry) < new Date() ? "text-red-600" : "text-green-600"}`}>
-              {patron.membership_expiry}
-            </span>
-          </div>
-          <div><span className="text-gray-500">Khuôn mặt:</span>
-            <span className={`font-medium ml-1 ${patron.has_face ? "text-green-600" : "text-gray-400"}`}>
-              {patron.has_face ? "✓ Đã đăng ký" : "✗ Chưa đăng ký"}
-            </span>
-          </div>
-          <div><span className="text-gray-500">Tạo lúc:</span> <span className="font-medium">{new Date(patron.created_at).toLocaleString("vi-VN")}</span></div>
-        </div>
-        <div className="flex gap-3 mt-6 pt-4 border-t">
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm" onClick={() => { setEditForm({
-            full_name: patron.full_name, class_name: patron.class_name || undefined,
-            membership_expiry: patron.membership_expiry, status: patron.status,
-          }); setShowEdit(true); }}>Sửa thông tin</button>
-          <button className="px-4 py-2 bg-green-600 text-white rounded-md text-sm" onClick={handleRenew}>Gia hạn thẻ</button>
-          {!patron.has_face && (
-            <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
-              onClick={() => setShowEnroll(true)}>📷 Đăng ký khuôn mặt</button>
-          )}
-          <button className="px-4 py-2 bg-red-600 text-white rounded-md text-sm ml-auto" onClick={handleDelete}>Xóa</button>
-        </div>
-        {enrollSuccess && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
-            <span className="text-lg">✓</span> {enrollSuccess}
-          </div>
-        )}
-      </div>
-
-      {showEnroll && !patron.has_face && (
-        <div className="border rounded-lg p-4 bg-white">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-lg">Đăng ký khuôn mặt 4 góc</h3>
-            <button onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}
-              className="text-gray-500 hover:text-gray-700 text-sm">✕ Đóng</button>
-          </div>
-          <MultiAngleCapture
-            consent={consent}
-            setConsent={setConsent}
-            onFilesReady={handleEnroll}
-          />
-          {enrollError && <p className="text-red-500 text-sm mt-2">{enrollError}</p>}
-          {enrollLoading && <p className="text-blue-600 text-sm mt-2">Đang đăng ký...</p>}
-        </div>
-      )}
-
-      {showEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
-          <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold">Sửa độc giả</h2>
-            {[["full_name", "Họ tên"], ["class_name", "Lớp"],
-              ["membership_expiry", "Hạn thẻ"], ["status", "Trạng thái"]
-            ].map(([key, label]) => (
-              <label key={key} className="block">
-                <span className="text-sm font-medium">{label}:</span>
-                {key === "status" ? (
-                  <select className="mt-1 block w-full px-3 py-2 border rounded-md"
-                    value={(editForm as any)[key] || ""}
-                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}>
-                    <option value="active">active</option>
-                    <option value="inactive">inactive</option>
-                    <option value="expired">expired</option>
-                  </select>
-                ) : (
-                  <input className="mt-1 block w-full px-3 py-2 border rounded-md"
-                    value={(editForm as any)[key] || ""}
-                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
-                    type={key === "membership_expiry" ? "date" : "text"} />
-                )}
-              </label>
-            ))}
-            <div className="flex gap-3 pt-2">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleEdit}>Lưu</button>
-              <button className="px-4 py-2 bg-gray-200 rounded-md" onClick={() => setShowEdit(false)}>Hủy</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="border rounded-lg bg-white">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Lịch sử ra vào</h2>
-        </div>
-        {logs.length === 0 ? (
-          <p className="p-4 text-gray-500 text-sm">Chưa có lịch sử ra vào</p>
-        ) : (
-          <>
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="p-3 text-left font-medium">Thời gian</th>
-                  <th className="p-3 text-left font-medium">Loại</th>
-                  <th className="p-3 text-left font-medium">Cổng</th>
-                  <th className="p-3 text-left font-medium">Phương thức</th>
-                  <th className="p-3 text-left font-medium">Độ tin cậy</th>
-                  <th className="p-3 text-left font-medium">Kết quả</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id} className="border-t hover:bg-gray-50">
-                    <td className="p-3 whitespace-nowrap">{new Date(log.access_time).toLocaleString("vi-VN")}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        log.access_type === "entry" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"
-                      }`}>{log.access_type === "entry" ? "Vào" : "Ra"}</span>
-                    </td>
-                    <td className="p-3 text-gray-600">{log.camera_id}</td>
-                    <td className="p-3 text-gray-600">{log.verify_method}</td>
-                    <td className="p-3">
-                      {log.confidence != null ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${
-                              log.confidence >= 0.8 ? "bg-green-500" : log.confidence >= 0.6 ? "bg-yellow-500" : "bg-red-500"
-                            }`} style={{ width: `${(log.confidence * 100).toFixed(0)}%` }} />
-                          </div>
-                          <span className="text-xs">{(log.confidence * 100).toFixed(0)}%</span>
-                        </div>
-                      ) : "-"}
-                    </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        log.status === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                      }`}>{log.status === "success" ? "✓" : "✗"}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {logsTotal > logsLimit && (
-              <div className="flex items-center justify-between p-4 border-t text-sm">
-                <span className="text-gray-500">Tổng: {logsTotal}</span>
-                <div className="flex items-center gap-2">
-                  <button className="px-3 py-1 border rounded-md disabled:opacity-40"
-                    disabled={currentPage <= 1}
-                    onClick={() => setLogsSkip(0)}>«</button>
-                  <span>Trang {currentPage} / {pageCount}</span>
-                  <button className="px-3 py-1 border rounded-md disabled:opacity-40"
-                    disabled={currentPage >= pageCount}
-                    onClick={() => setLogsSkip((pageCount - 1) * logsLimit)}>»</button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }
@@ -5874,399 +6301,6 @@ export default function EnrollPage() {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/gate/page.tsx">
-'use client';
-
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import api, { getErrorMessage } from '@/lib/api-client';
-import CameraFeed from '@/components/gate/CameraFeed';
-import MssvInput from '@/components/gate/MssvInput';
-import GateButton from '@/components/gate/GateButton';
-import ResultCard from '@/components/gate/ResultCard';
-import PulseAnimation from '@/components/gate/PulseAnimation';
-import type { CameraEvent, KioskResult, PatronLookupResult } from '@/lib/types';
-
-const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || 'http://192.168.1.121:8080/video';
-const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || 'http://192.168.1.240:8080/video';
-const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || 'entry_gate';
-const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || 'exit_gate';
-
-type Step = 'idle' | 'verify' | 'result';
-
-interface Toast {
-  id: number;
-  type: 'entry' | 'exit' | 'error' | 'info';
-  message: string;
-  patron_name?: string;
-}
-
-let toastId = 0;
-
-export default function GatePage() {
-  const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const [step, setStep] = useState<Step>('idle');
-  const [mssv, setMssv] = useState('');
-  const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
-  const [result, setResult] = useState<KioskResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState('');
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [todayCounts, setTodayCounts] = useState({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
-  const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
-  const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
-  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
-
-  const addToast = useCallback((t: Omit<Toast, 'id'>) => {
-    const id = ++toastId;
-    setToasts((prev) => [{ ...t, id }, ...prev.slice(0, 4)]);
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => stopCamera();
-  }, [stopCamera]);
-
-  const startCamera = useCallback(async () => {
-    try {
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch {
-      addToast({ type: 'error', message: 'Không thể mở camera' });
-    }
-  }, [addToast]);
-
-  const captureImage = useCallback((): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      const video = videoRef.current;
-      if (!video || !video.videoWidth) {
-        reject(new Error('Camera chưa sẵn sàng'));
-        return;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { reject(new Error('Không thể tạo canvas')); return; }
-      ctx.drawImage(video, 0, 0);
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], 'face_capture.jpg', { type: 'image/jpeg' });
-          resolve(file);
-        } else {
-          reject(new Error('Không thể tạo ảnh'));
-        }
-      }, 'image/jpeg', 0.9);
-    });
-  }, []);
-
-  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      await new Promise((r) => setTimeout(r, intervalMs));
-      try {
-        const task = await api.getTaskStatus(jobId);
-        if (task.status === 'SUCCESS') return task.result;
-        if (task.status === 'FAILURE') throw new Error(task.result?.error || 'Task failed');
-        setStatusText(task.result?.status === 'granted' ? 'Đã ghi nhận...' : 'Đang xử lý...');
-      } catch {}
-    }
-    throw new Error('Timeout waiting for result');
-  }, []);
-
-  const handleLookup = async (inputMssv: string) => {
-    if (!inputMssv.trim()) return;
-    setMssv(inputMssv.trim());
-    setLoading(true);
-    setStatusText('Đang tra cứu...');
-    try {
-      const res = await api.kioskLookup(inputMssv.trim());
-      setLookup(res);
-      if (res.exists && res.has_face && !res.is_expired) {
-        setStep('verify');
-        setStatusText('Mở camera...');
-        await startCamera();
-      } else if (res.exists && !res.has_face) {
-        setStep('result');
-        setResult({
-          success: false,
-          message: 'Tài khoản chưa được đăng ký khuôn mặt. Vui lòng đăng ký tại quầy.',
-          patron: res.patron,
-          job_id: null,
-        });
-      } else if (res.exists && res.is_expired) {
-        setStep('result');
-        setResult({ success: false, message: 'Thẻ hội viên đã hết hạn', patron: res.patron, job_id: null });
-      } else {
-        setStep('result');
-        setResult({ success: false, message: 'Không tìm thấy tài khoản. Vui lòng đăng ký tại quầy.', patron: null, job_id: null });
-      }
-    } catch (err: any) {
-      setStep('result');
-      setResult({ success: false, message: getErrorMessage(err) || 'Tra cứu thất bại', patron: null, job_id: null });
-    } finally {
-      setLoading(false);
-      setStatusText('');
-    }
-  };
-
-  const handleVerify = async () => {
-    setLoading(true);
-    setStatusText('Đang chụp ảnh...');
-    try {
-      const imageFile = await captureImage();
-      stopCamera();
-      setStatusText('Đang xác thực khuôn mặt...');
-      const res = await api.kioskEnter(imageFile, mssv);
-      if (res.job_id) {
-        const taskResult = await pollTask(res.job_id);
-        const success = taskResult?.status === 'success';
-        const confidence = taskResult?.score ?? taskResult?.confidence;
-        setResult({
-          success,
-          message: success
-            ? `Xác thực thành công — ${taskResult?.access_type === 'exit' ? 'Ra' : 'Vào'} thư viện`
-            : (taskResult?.error || 'Xác thực thất bại'),
-          patron: res.patron,
-          job_id: res.job_id,
-          confidence,
-        });
-      } else {
-        setResult(res);
-      }
-      setStep('result');
-    } catch (err: any) {
-      const msg = getErrorMessage(err) || 'Xác thực thất bại';
-      setResult({ success: false, message: msg, patron: null, job_id: null });
-      setStep('result');
-      addToast({ type: 'error', message: msg });
-    } finally {
-      setLoading(false);
-      setStatusText('');
-    }
-  };
-
-  const reset = () => {
-    setStep('idle');
-    setMssv('');
-    setLookup(null);
-    setResult(null);
-    stopCamera();
-  };
-
-  useEffect(() => {
-    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
-      if (event.bbox || event.landmarks) {
-        const overlay = { bbox: event.bbox, landmarks: event.landmarks };
-        if (event.camera_id === ENTRY_CAM_ID) {
-          setEntryOverlay({ ...overlay, status: event.status });
-        } else if (event.camera_id === EXIT_CAM_ID) {
-          setExitOverlay({ ...overlay, status: event.status });
-        }
-        if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
-        overlayTimeoutRef.current = setTimeout(() => {
-          setEntryOverlay(null);
-          setExitOverlay(null);
-        }, 2000);
-      }
-      if (event.status === 'granted') {
-        const type = event.access_type === 'entry' ? 'entry' : 'exit';
-        addToast({
-          type,
-          message: `${event.full_name} — ${type === 'entry' ? 'Vào' : 'Ra'} thư viện`,
-          patron_name: event.full_name,
-        });
-        setTodayCounts((c) => ({ ...c, [type === 'entry' ? 'entries' : 'exits']: c[type === 'entry' ? 'entries' : 'exits'] + 1 }));
-      } else if (event.status === 'no_match') {
-        setTodayCounts((c) => ({ ...c, no_match: c.no_match + 1 }));
-        addToast({ type: 'info', message: 'Khuôn mặt mới — không nhận diện được' });
-      } else if (event.status === 'spoof') {
-        setTodayCounts((c) => ({ ...c, spoof: c.spoof + 1 }));
-        addToast({ type: 'error', message: 'Phát hiện giả mạo!' });
-      }
-    });
-    return cleanup;
-  }, [addToast]);
-
-  const getResultStatus = () => {
-    if (!result) return 'processing';
-    if (result.success) return 'success';
-    if (result.message?.includes('đăng ký tại quầy')) return 'unregistered';
-    return 'error';
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-900">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <button onClick={() => router.push('/dashboard')} className="text-slate-400 hover:text-amber-400 transition-colors text-sm mb-2">
-              ← Quay lại Dashboard
-            </button>
-            <h1 className="text-3xl font-bold text-white font-['Outfit',sans-serif]">
-              <span className="text-amber-400">Cổng</span> Thư Viện
-            </h1>
-          </div>
-          <div className="flex gap-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-emerald-400">{todayCounts.entries}</p>
-              <p className="text-xs text-slate-400">Vào hôm nay</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-orange-400">{todayCounts.exits}</p>
-              <p className="text-xs text-slate-400">Ra hôm nay</p>
-            </div>
-          </div>
-        </div>
-
-        {toasts.length > 0 && (
-          <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
-            {toasts.map((t) => (
-              <div
-                key={t.id}
-                className={`px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium ${
-                  t.type === 'entry' ? 'bg-emerald-600' :
-                  t.type === 'exit' ? 'bg-orange-600' :
-                  t.type === 'error' ? 'bg-red-600' : 'bg-slate-700'
-                }`}
-              >
-                {t.patron_name && <strong>{t.patron_name}</strong>} {t.message}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="grid grid-cols-3 gap-6 mb-6">
-          <div className="col-span-2 grid grid-cols-2 gap-4">
-            <CameraFeed
-              src={`${ENTRY_CAM}`}
-              label="Cổng vào"
-              overlay={entryOverlay}
-              onStatusChange={(ok) => {}}
-            />
-            <CameraFeed
-              src={`${EXIT_CAM}`}
-              label="Cổng ra"
-              overlay={exitOverlay}
-              onStatusChange={(ok) => {}}
-            />
-          </div>
-
-          <div className="space-y-4">
-            {step === 'idle' && (
-              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-semibold text-white">Chào mừng</h2>
-                  <p className="text-slate-400 text-sm mt-1">Nhập MSSV để xác thực khuôn mặt</p>
-                </div>
-                <MssvInput onSubmit={handleLookup} disabled={loading} />
-                {loading && (
-                  <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
-                    <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm">{statusText || 'Đang xử lý...'}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {step === 'verify' && (
-              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
-                <div className="text-center mb-4">
-                  <h2 className="text-xl font-semibold text-white">Xác thực khuôn mặt</h2>
-                  <p className="text-slate-400 text-sm mt-1">
-                    {lookup?.patron?.full_name || mssv}
-                  </p>
-                </div>
-                <div className="relative bg-black rounded-xl overflow-hidden mb-4 aspect-[4/3]">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-32 h-32 border-2 border-amber-400/50 rounded-full" />
-                  </div>
-                  {loading && (
-                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-                      <div className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mb-3" />
-                      <p className="text-white text-sm">{statusText}</p>
-                    </div>
-                  )}
-                </div>
-                <GateButton onClick={handleVerify} disabled={loading} fullWidth>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Xác thực & Vào cổng
-                </GateButton>
-                <button
-                  onClick={reset}
-                  className="mt-3 w-full py-3 text-slate-400 hover:text-white transition-colors text-sm"
-                >
-                  Hủy
-                </button>
-              </div>
-            )}
-
-            {step === 'result' && (
-              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
-                <ResultCard
-                  status={getResultStatus()}
-                  patronInfo={result?.patron ? {
-                    fullName: result.patron.full_name || '',
-                    mssv: result.patron.student_code || result?.patron?.id || '',
-                    faculty: '',
-                  } : undefined}
-                  message={result?.message}
-                />
-                <GateButton onClick={reset} variant="secondary" fullWidth className="mt-4">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Thử lại
-                </GateButton>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-          <div className="flex items-center gap-2 text-slate-400 text-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Hệ thống đang hoạt động
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
