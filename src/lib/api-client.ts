@@ -17,6 +17,10 @@ import type {
   TokenResponse,
   UserListResponse,
   UserPublic,
+  BorrowRecord,
+  BorrowResponse,
+  ReturnResponse,
+  StaffReturnRequest,
 } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
@@ -444,6 +448,33 @@ class ApiClient {
   async reconnectAllCameras(): Promise<{ message: string; cameras: string[] }> {
     const response = await this.client.post("/api/camera/reconnect-all");
     return response.data;
+  }
+
+  // === Borrow (via gateway: /api/borrow/* -> borrow-service) ===
+  async borrowBook(barcode: string): Promise<BorrowResponse> {
+    const response = await this.client.post<BorrowResponse>("/api/borrow/", { barcode });
+    return response.data;
+  }
+
+  async staffReturnBook(barcode: string): Promise<ReturnResponse> {
+    const response = await this.client.post<ReturnResponse>("/api/borrow/staff-return", { barcode } as StaffReturnRequest);
+    return response.data;
+  }
+
+  async getBorrowHistory(statusFilter?: string): Promise<BorrowRecord[]> {
+    const params: any = {};
+    if (statusFilter) params.status_filter = statusFilter;
+    const response = await this.client.get<BorrowRecord[]>("/api/borrow/history", { params });
+    return response.data;
+  }
+
+  async lookupBorrowByBarcode(barcode: string): Promise<BorrowRecord | null> {
+    try {
+      const response = await this.client.get<BorrowRecord>(`/api/borrow/barcode/${barcode}`);
+      return response.data;
+    } catch {
+      return null;
+    }
   }
 }
 

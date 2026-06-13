@@ -3,8 +3,8 @@ import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Face Recognition Platform",
-  description: "Face Recognition Platform with FastAPI and Next.js",
+  title: "Thư Viện — Hệ thống Quản lý Thư viện Thông minh",
+  description: "Nền tảng quản lý thư viện toàn diện — quản lý độc giả, theo dõi mượn trả, và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn mặt.",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>

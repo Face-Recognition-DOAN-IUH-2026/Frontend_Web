@@ -311,6 +311,7 @@ export default function EnrollPage() {
           const inner = data.result;
           if (inner && inner.status === "error") {
             setError(inner.error || "Enrollment failed");
+            setResult(inner);
           } else {
             setResult(inner);
           }
@@ -320,6 +321,7 @@ export default function EnrollPage() {
           pollIntervalRef.current = null;
           const inner = data.result;
           setError(inner?.error || "Enrollment failed");
+          setResult(inner);
           setIsLoading(false);
         }
       } catch {
@@ -357,12 +359,21 @@ export default function EnrollPage() {
 
       {result ? (
         <div className="bg-white p-6 rounded-lg border">
-          <div className="flex items-center gap-3 text-green-600 mb-4">
-            <CheckCircle className="w-8 h-8" />
-            <h2 className="text-xl font-semibold">Enrollment Successful!</h2>
-          </div>
+          {result.status === "error" ? (
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <CheckCircle className="w-8 h-8" />
+              <h2 className="text-xl font-semibold">Enrollment Partially Failed</h2>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 text-green-600 mb-4">
+              <CheckCircle className="w-8 h-8" />
+              <h2 className="text-xl font-semibold">Enrollment Successful!</h2>
+            </div>
+          )}
           <p className="text-gray-600 mb-4">
-            Your face has been enrolled successfully.
+            {result.status === "error"
+              ? `${result.results?.filter((r: any) => r.status !== "success").length} angle(s) failed. You can retry the failed angles below.`
+              : "Your face has been enrolled successfully."}
           </p>
           {result.results && (
             <div className="mb-4 space-y-1">
@@ -378,7 +389,7 @@ export default function EnrollPage() {
             onClick={handleReset}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
           >
-            Enroll Another
+            {result.status === "error" ? "Try Again" : "Enroll Another"}
           </button>
         </div>
       ) : jobId && !result ? (

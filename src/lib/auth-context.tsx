@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import api from "./api-client";
-import type { AuthContextType, AuthUser, LoginRequest, RegisterRequest } from "./types";
+import type { AuthContextType, AuthUser, LoginRequest } from "./types";
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -89,12 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/dashboard");
   };
 
-  const register = async (email: string, password: string, role: string = "user") => {
-    const data: RegisterRequest = { email, password, role };
-    await api.register(data);
-    router.push("/login");
-  };
-
   const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
     localStorage.setItem("access_token", accessToken);
     setTokenCookie(accessToken);
@@ -148,7 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessToken,
         login,
         setAuthFromToken,
-        register,
         logout,
         refreshAccessToken,
         isAuthenticated: !!user && !!accessToken,

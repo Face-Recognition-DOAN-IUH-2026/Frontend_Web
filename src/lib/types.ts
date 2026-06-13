@@ -109,7 +109,6 @@ export interface AuthContextType {
   accessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
   setAuthFromToken: (accessToken: string, refreshToken: string | null, email: string, role?: string) => void;
-  register: (email: string, password: string, role?: string) => Promise<void>;
   logout: () => void;
   refreshAccessToken: () => Promise<boolean>;
   isAuthenticated: boolean;
@@ -157,6 +156,54 @@ export interface PatronLookupResult {
   patron: PatronPublic | null;
   has_face: boolean;
   is_expired: boolean;
+}
+
+// === Borrow ===
+export interface BorrowRecord {
+  id: string;
+  patron_id: string;
+  book_id: string;
+  copy_id: string | null;
+  borrow_at: string;
+  due_at: string;
+  return_at: string | null;
+  shelf_location: string | null;
+  status: string;
+}
+
+export interface BorrowResponse {
+  status: string;
+  message: string;
+  record: BorrowRecord | null;
+  book: BookInfo | null;
+}
+
+export interface ReturnResponse {
+  status: string;
+  message: string;
+  record: BorrowRecord | null;
+}
+
+export interface BookCopy {
+  id: string;
+  book_id: string;
+  barcode: string;
+  is_available: boolean;
+  shelf_location: string | null;
+}
+
+export interface BookInfo {
+  id: string;
+  isbn: string;
+  title: string;
+  author: string | null;
+  cover_url: string | null;
+  shelf_location: string | null;
+  copies: BookCopy[];
+}
+
+export interface StaffReturnRequest {
+  barcode: string;
 }
 
 // === Access Log ===

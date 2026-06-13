@@ -13,7 +13,7 @@ export default function AdminPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ email: "", password: "", role: "user" });
+  const [createForm, setCreateForm] = useState({ email: "", password: "", role: "staff" });
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.push("/login");
@@ -72,7 +72,7 @@ export default function AdminPage() {
             <span className="text-sm font-medium">Role:</span>
             <select className="mt-1 block w-full px-3 py-2 border rounded-md" value={createForm.role}
               onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}>
-              <option value="user">user</option>
+              <option value="staff">staff</option>
               <option value="admin">admin</option>
             </select>
           </label>
@@ -101,7 +101,7 @@ export default function AdminPage() {
                   <td className="p-3">{u.email}</td>
                   <td className="p-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      u.role === "admin" ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-800"
+                      u.role === "admin" ? "bg-purple-100 text-purple-800" : u.role === "staff" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
                     }`}>{u.role}</span>
                   </td>
                   <td className="p-3">

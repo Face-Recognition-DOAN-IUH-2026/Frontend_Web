@@ -4,7 +4,6 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Eye, Camera, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import api, { getErrorMessage } from "@/lib/api-client";
 
 type LoginMode = "password" | "face";
@@ -337,10 +336,6 @@ export default function LoginPage() {
           </div>
         )}
 
-        <p className="mt-4 text-center text-sm text-gray-600">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-primary hover:underline">Register</Link>
-        </p>
       </div>
     </div>
   );
