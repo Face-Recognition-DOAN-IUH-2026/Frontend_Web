@@ -10,6 +10,8 @@ import ResultCard from '@/components/gate/ResultCard';
 import PulseAnimation from '@/components/gate/PulseAnimation';
 import type { CameraEvent, KioskResult, PatronLookupResult } from '@/lib/types';
 
+interface TodayCounts { entries: number; exits: number; no_match: number; spoof: number; }
+
 const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || 'http://192.168.1.121:8080/video';
 const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || 'http://192.168.1.240:8080/video';
 const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || 'entry_gate';
@@ -38,7 +40,15 @@ export default function GatePage() {
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [todayCounts, setTodayCounts] = useState({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
+  const [todayCounts, setTodayCounts] = useState<TodayCounts>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('gate_today_counts');
+      if (cached) {
+        try { return JSON.parse(cached) as TodayCounts; } catch {}
+      }
+    }
+    return { entries: 0, exits: 0, no_match: 0, spoof: 0 };
+  });
   const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
   const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
   const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -196,6 +206,20 @@ export default function GatePage() {
   };
 
   useEffect(() => {
+    api.getStats().then((s) => {
+      if (s) {
+        const fresh: TodayCounts = { entries: s.today_entries ?? 0, exits: s.today_exits ?? 0, no_match: 0, spoof: 0 };
+        setTodayCounts(fresh);
+        localStorage.setItem('gate_today_counts', JSON.stringify(fresh));
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('gate_today_counts', JSON.stringify(todayCounts));
+  }, [todayCounts]);
+
+  useEffect(() => {
     const cleanup = api.connectAccessSSE((event: CameraEvent) => {
       if (event.bbox || event.landmarks) {
         const overlay = { bbox: event.bbox, landmarks: event.landmarks };
@@ -217,12 +241,12 @@ export default function GatePage() {
           message: `${event.full_name} — ${type === 'entry' ? 'Vào' : 'Ra'} thư viện`,
           patron_name: event.full_name,
         });
-        setTodayCounts((c) => ({ ...c, [type === 'entry' ? 'entries' : 'exits']: c[type === 'entry' ? 'entries' : 'exits'] + 1 }));
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, [type === 'entry' ? 'entries' : 'exits']: prev[type === 'entry' ? 'entries' : 'exits'] + 1 }));
       } else if (event.status === 'no_match') {
-        setTodayCounts((c) => ({ ...c, no_match: c.no_match + 1 }));
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, no_match: prev.no_match + 1 }));
         addToast({ type: 'info', message: 'Khuôn mặt mới — không nhận diện được' });
       } else if (event.status === 'spoof') {
-        setTodayCounts((c) => ({ ...c, spoof: c.spoof + 1 }));
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, spoof: prev.spoof + 1 }));
         addToast({ type: 'error', message: 'Phát hiện giả mạo!' });
       }
     });

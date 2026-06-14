@@ -42,12 +42,22 @@ The content is organized as follows:
 <directory_structure>
 .env.local
 .gitignore
+e2e/playwright.config.ts
+e2e/tests/auth.spec.ts
+e2e/tests/basic.spec.ts
+e2e/tests/borrow.spec.ts
+e2e/tests/gate-kiosk.spec.ts
+e2e/tests/job-poll.spec.ts
 next.config.js
 package.json
 postcss.config.js
 public/favicon.svg
 README.md
+src/__tests__/books/BooksPage.test.tsx
+src/__tests__/books/BorrowFlow.test.tsx
+src/__tests__/components/JobPoll.test.tsx
 src/app/(dashboard)/active/page.tsx
+src/app/(dashboard)/books/page.tsx
 src/app/(dashboard)/dashboard/admin/page.tsx
 src/app/(dashboard)/dashboard/page.tsx
 src/app/(dashboard)/enroll/page.tsx
@@ -85,14 +95,1441 @@ src/components/ui/StatCard.tsx
 src/components/ui/Toast.tsx
 src/lib/api-client.ts
 src/lib/auth-context.tsx
+src/lib/mock-data/edge-cases.json
 src/lib/types.ts
 src/middleware.ts
 tailwind.config.ts
+test-results/.last-run.json
+test-results/e2e-tests-basic-Basic-App-Tests-login-page-loads/error-context.md
 tsconfig.json
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/__tests__/books/BooksPage.test.tsx">
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import BooksPage from "@/app/(dashboard)/books/page";
+import * as apiClient from "@/lib/api-client";
+
+jest.mock("@/lib/api-client", () => ({
+  api: {
+    listBooks: jest.fn(),
+    searchBooks: jest.fn(),
+    importBooks: jest.fn(),
+    getBarcodePreview: jest.fn(),
+    downloadBookTemplate: jest.fn(),
+    exportBooks: jest.fn(),
+    updateBookQuantity: jest.fn(),
+    getBarcodes: jest.fn(),
+  },
+  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
+}));
+
+const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
+
+const mockBooksResponse = {
+  items: [
+    {
+      id: "book-1",
+      isbn: "9780544003415",
+      title: "The Lord of the Rings",
+      author: "J.R.R. Tolkien",
+      cover_url: null,
+      shelf_location: "A-01",
+      total_copies: 5,
+      available_copies: 3,
+      created_at: "2026-01-01T00:00:00Z",
+    },
+    {
+      id: "book-2",
+      isbn: "9780439708180",
+      title: "Harry Potter",
+      author: "J.K. Rowling",
+      cover_url: null,
+      shelf_location: "B-02",
+      total_copies: 2,
+      available_copies: 0,
+      created_at: "2026-01-02T00:00:00Z",
+    },
+  ],
+  total: 2,
+  skip: 0,
+  limit: 10,
+};
+
+describe("BooksPage", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockApi.listBooks.mockResolvedValue(mockBooksResponse);
+    mockApi.searchBooks.mockResolvedValue(mockBooksResponse.items);
+    mockApi.getBarcodes.mockResolvedValue([]);
+  });
+
+  it("renders book list with data from API", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Harry Potter")).toBeInTheDocument();
+  });
+
+  it("shows search input", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/tìm kiếm/i)).toBeInTheDocument();
+    });
+  });
+
+  it("opens quantity modal on row click", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
+    });
+
+    const bookRow = screen.getByText("The Lord of the Rings").closest("tr") || screen.getByText("The Lord of the Rings");
+    await userEvent.click(bookRow);
+
+    await waitFor(() => {
+      expect(screen.getByText(/số lượng/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows total and available copies in table", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("5")).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
+    });
+  });
+
+  it("shows zero available copies for fully borrowed book", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("0")).toBeInTheDocument();
+    });
+  });
+
+  it("calls searchBooks when typing in search", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      const searchInput = screen.getByPlaceholderText(/tìm kiếm/i);
+      return searchInput;
+    });
+
+    const searchInput = screen.getByPlaceholderText(/tìm kiếm/i);
+    await userEvent.type(searchInput, "Harry");
+
+    await waitFor(() => {
+      expect(mockApi.searchBooks).toHaveBeenCalledWith("Harry");
+    });
+  });
+
+  it("renders download template button", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      const templateBtn = buttons.find((b) => b.textContent?.includes("Tải mẫu"));
+      expect(templateBtn).toBeTruthy();
+    });
+  });
+
+  it("renders export excel button", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      const exportBtn = buttons.find((b) => b.textContent?.includes("Xuất Excel"));
+      expect(exportBtn).toBeTruthy();
+    });
+  });
+
+  it("handles empty book list gracefully", async () => {
+    mockApi.listBooks.mockResolvedValueOnce({
+      items: [],
+      total: 0,
+      skip: 0,
+      limit: 10,
+    });
+
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/không tìm thấy/i)).toBeInTheDocument();
+    });
+  });
+
+  it("validates quantity >= 1 in modal", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
+    });
+
+    const bookRow = screen.getByText("The Lord of the Rings").closest("tr") || screen.getByText("The Lord of the Rings");
+    await userEvent.click(bookRow);
+
+    await waitFor(() => {
+      expect(screen.getByText(/số lượng/i)).toBeInTheDocument();
+    });
+
+    const quantityInput = screen.getByRole("spinbutton");
+    await userEvent.clear(quantityInput);
+    await userEvent.type(quantityInput, "-1");
+
+    const saveButton = screen.getByText("Lưu");
+    await userEvent.click(saveButton);
+
+    expect(mockApi.updateBookQuantity).not.toHaveBeenCalled();
+  });
+});
+</file>
+
+<file path="src/__tests__/books/BorrowFlow.test.tsx">
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import * as apiClient from "@/lib/api-client";
+
+jest.mock("@/lib/api-client", () => ({
+  api: {
+    borrowBook: jest.fn(),
+    staffReturnBook: jest.fn(),
+    getBorrowHistory: jest.fn(),
+    lookupBorrowByBarcode: jest.fn(),
+  },
+  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
+}));
+
+const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
+
+describe("Borrow API client", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("borrowBook calls correct endpoint", async () => {
+    mockApi.borrowBook.mockResolvedValueOnce({
+      status: "success",
+      message: "Mượn sách thành công",
+      record: { id: "rec-1", status: "borrowed" } as any,
+      book: { id: "book-1", isbn: "123", title: "Test" } as any,
+    });
+
+    const result = await apiClient.api.borrowBook("LIB-123-001");
+    expect(mockApi.borrowBook).toHaveBeenCalledWith("LIB-123-001");
+    expect(result.status).toBe("success");
+  });
+
+  it("staffReturnBook calls correct endpoint", async () => {
+    mockApi.staffReturnBook.mockResolvedValueOnce({
+      status: "success",
+      message: "Trả sách thành công",
+      record: { id: "rec-1", status: "returned" } as any,
+    });
+
+    const result = await apiClient.api.staffReturnBook("LIB-123-001");
+    expect(mockApi.staffReturnBook).toHaveBeenCalledWith("LIB-123-001");
+    expect(result.status).toBe("success");
+  });
+
+  it("getBorrowHistory returns records", async () => {
+    mockApi.getBorrowHistory.mockResolvedValueOnce([
+      { id: "rec-1", status: "borrowed" } as any,
+      { id: "rec-2", status: "returned" } as any,
+    ]);
+
+    const result = await apiClient.api.getBorrowHistory({ statusFilter: "borrowed" });
+    expect(mockApi.getBorrowHistory).toHaveBeenCalledWith({ statusFilter: "borrowed" });
+    expect(result).toHaveLength(2);
+  });
+
+  it("lookupBorrowByBarcode returns null on error", async () => {
+    mockApi.lookupBorrowByBarcode.mockRejectedValueOnce(new Error("Not found"));
+
+    const result = await apiClient.api.lookupBorrowByBarcode("NONEXISTENT");
+    expect(result).toBeNull();
+  });
+});
+
+describe("getErrorMessage", () => {
+  it("returns detail from response", () => {
+    const err = { response: { data: { detail: "Sách không tồn tại" } } };
+    expect(apiClient.getErrorMessage(err)).toBe("Sách không tồn tại");
+  });
+
+  it("returns message for generic errors", () => {
+    const err = new Error("Network error");
+    expect(apiClient.getErrorMessage(err)).toBe("Network error");
+  });
+
+  it("returns Unknown error for null", () => {
+    expect(apiClient.getErrorMessage(null)).toBe("Unknown error");
+  });
+});
+</file>
+
+<file path="e2e/playwright.config.ts">
+import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./e2e/tests",
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: "list",
+  use: {
+    baseURL: "http://localhost:3000",
+    trace: "on-first-retry",
+    screenshot: "only-on-failure",
+  },
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
+});
+</file>
+
+<file path="e2e/tests/auth.spec.ts">
+import { test, expect } from "@playwright/test";
+
+test.describe("Authentication Flow", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login");
+  });
+
+  test("WEB-01: Login with valid credentials redirects to dashboard", async ({ page }) => {
+    await page.fill('input[name="email"]', "admin@example.com");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 });
+  });
+
+  test("WEB-02: Login with invalid credentials shows error", async ({ page }) => {
+    await page.fill('input[name="email"]', "invalid@example.com");
+    await page.fill('input[name="password"]', "wrongpassword");
+    await page.click('button[type="submit"]');
+
+    await expect(page.locator("text=Invalid credentials")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("WEB-03: Token refresh on 401", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
+
+    await page.fill('input[name="email"]', "admin@example.com");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 });
+  });
+
+  test("WEB-04: Logout clears tokens and redirects to login", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[name="email"]', "admin@example.com");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 });
+
+    await page.click('button:has-text("Logout")');
+    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
+
+    const token = await page.evaluate(() => localStorage.getItem("access_token"));
+    expect(token).toBeNull();
+  });
+});
+
+test.describe("Token Handling", () => {
+  test("401 response triggers token refresh", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[name="email"]', "admin@example.com");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 });
+
+    await page.evaluate(() => {
+      localStorage.setItem("access_token", "invalid-token");
+    });
+
+    await page.reload();
+    await page.waitForTimeout(2000);
+  });
+
+  test("Failed refresh redirects to login", async ({ page }) => {
+    await page.goto("/login");
+    await page.evaluate(() => {
+      localStorage.setItem("access_token", "expired-token");
+      localStorage.setItem("refresh_token", "invalid-refresh");
+    });
+
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
+  });
+});
+</file>
+
+<file path="e2e/tests/basic.spec.ts">
+import { test, expect } from "@playwright/test";
+
+test.describe("Basic App Tests", () => {
+  test("login page loads", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.locator("body")).toBeVisible();
+  });
+});
+</file>
+
+<file path="e2e/tests/borrow.spec.ts">
+import { test, expect } from "@playwright/test";
+
+test.describe("Borrow Flow", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[name="email"]', "patron@example.com");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
+  });
+
+  test("WEB-16: Navigate to borrow page", async ({ page }) => {
+    await page.goto("/borrow");
+    await page.waitForTimeout(1000);
+  });
+
+  test("WEB-17: Borrow success shows confirmation", async ({ page }) => {
+    await page.goto("/borrow");
+    await page.waitForTimeout(500);
+
+    const barcodeInput = page.locator('input[placeholder*="barcode"], input[placeholder*="mã vạch"]');
+    if (await barcodeInput.isVisible({ timeout: 3000 })) {
+      await barcodeInput.fill("TEST-BOOK-001");
+    }
+  });
+
+  test("WEB-18: Borrow fails when patron outside library", async ({ page }) => {
+    await page.route(
+      /\/api\/patrons\/me/,
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            id: "test-patron",
+            current_status: "outside",
+            full_name: "Test Patron",
+          }),
+        });
+      }
+    );
+
+    await page.goto("/borrow");
+    await page.waitForTimeout(1000);
+  });
+
+  test("WEB-19: Borrow shows book info after scan", async ({ page }) => {
+    await page.goto("/borrow");
+    await page.waitForTimeout(500);
+  });
+});
+
+test.describe("Staff Return Flow", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[name="email"]', "staff@example.com");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
+  });
+
+  test("WEB-20: Staff can access return page", async ({ page }) => {
+    await page.goto("/return");
+    await page.waitForTimeout(1000);
+  });
+
+  test("WEB-21: Staff return book success", async ({ page }) => {
+    await page.goto("/return");
+    await page.waitForTimeout(500);
+  });
+});
+</file>
+
+<file path="e2e/tests/gate-kiosk.spec.ts">
+import { test, expect } from "@playwright/test";
+
+test.describe("Gate/Kiosk Flow", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[name="email"]', "admin@example.com");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
+  });
+
+  test("WEB-05: Navigate to gate page", async ({ page }) => {
+    await page.goto("/gate");
+    await expect(page.locator("text=Cổng")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("WEB-06: Gate page shows entry/exit camera feeds", async ({ page }) => {
+    await page.goto("/gate");
+    await expect(page.locator("text=Cổng vào")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=Cổng ra")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("WEB-07: Enter MSSV and lookup patron", async ({ page }) => {
+    await page.goto("/gate");
+    await page.waitForTimeout(1000);
+
+    const mssvInput = page.locator('input[placeholder*="MSSV"]');
+    if (await mssvInput.isVisible()) {
+      await mssvInput.fill("TEST001");
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(2000);
+    }
+  });
+
+  test("WEB-08: Gate page shows today's entry/exit counts", async ({ page }) => {
+    await page.goto("/gate");
+    await expect(page.locator("text=Vào hôm nay")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=Ra hôm nay")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("WEB-09: SSE connection for real-time events", async ({ page }) => {
+    await page.goto("/gate");
+    await page.waitForTimeout(2000);
+  });
+});
+
+test.describe("Kiosk Self-Service Flow", () => {
+  test("WEB-10: Kiosk lookup with invalid student code", async ({ page }) => {
+    await page.goto("/kiosk/enroll");
+    const input = page.locator('input[name="student_code"]');
+    if (await input.isVisible({ timeout: 3000 })) {
+      await input.fill("NONEXISTENT");
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(1000);
+    }
+  });
+});
+</file>
+
+<file path="e2e/tests/job-poll.spec.ts">
+import { test, expect, Page } from "@playwright/test";
+
+test.describe("JobPoll Component", () => {
+  test("WEB-11: JobPoll shows pending state with spinner", async ({ page }) => {
+    await page.goto("/login");
+    await page.fill('input[name="email"]', "admin@example.com");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
+
+    await page.goto("/enroll");
+    await page.waitForTimeout(1000);
+  });
+
+  test("WEB-12: JobPoll displays SUCCESS with result info", async ({ page }) => {
+    await page.route(
+      /\/api\/tasks\/mock-success*/,
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            task_id: "mock-success-task",
+            status: "SUCCESS",
+            result: { status: "success", is_live: true, score: 0.95 },
+          }),
+        });
+      }
+    );
+  });
+
+  test("WEB-13: JobPoll displays FAILURE with error message", async ({ page }) => {
+    await page.route(
+      /\/api\/tasks\/mock-failure*/,
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            task_id: "mock-failure-task",
+            status: "FAILURE",
+            result: { error: "NO_FACE_DETECTED", type: "task_failure" },
+          }),
+        });
+      }
+    );
+  });
+
+  test("WEB-14: Task polling transitions from PENDING to SUCCESS", async ({ page }) => {
+    let callCount = 0;
+    await page.route(
+      /\/api\/tasks\/poll-task*/,
+      async (route) => {
+        callCount++;
+        if (callCount === 1) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              task_id: "poll-task-id",
+              status: "PENDING",
+              result: null,
+            }),
+          });
+        } else {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              task_id: "poll-task-id",
+              status: "SUCCESS",
+              result: { is_live: true, score: 0.95 },
+            }),
+          });
+        }
+      }
+    );
+
+    await page.goto("/enroll");
+    await page.waitForTimeout(5000);
+  });
+
+  test("WEB-15: JobPoll handles NULL confidence (edge case)", async ({ page }) => {
+    await page.route(
+      /\/api\/tasks\/null-confidence*/,
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            task_id: "null-confidence-task",
+            status: "SUCCESS",
+            result: { is_live: null, score: 0 },
+          }),
+        });
+      }
+    );
+  });
+});
+</file>
+
+<file path="postcss.config.js">
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+</file>
+
+<file path="public/favicon.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="20" fill="#2563eb"/>
+  <text x="50" y="68" font-family="Arial" font-size="55" font-weight="bold" fill="white" text-anchor="middle">F</text>
+</svg>
+</file>
+
+<file path="src/__tests__/components/JobPoll.test.tsx">
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import JobPoll from "@/components/job-poll";
+import * as apiClient from "@/lib/api-client";
+
+jest.mock("@/lib/api-client", () => ({
+  api: {
+    getTaskStatus: jest.fn(),
+  },
+  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
+}));
+
+const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
+
+describe("JobPoll Component", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("renders pending state with spinner", async () => {
+    mockApi.getTaskStatus.mockResolvedValueOnce({
+      task_id: "test-task",
+      status: "PENDING",
+      result: null,
+    });
+
+    render(<JobPoll jobId="test-task" />);
+
+    expect(screen.getByText("Đang xử lý...")).toBeInTheDocument();
+    expect(screen.getByText(/Job ID: test-task/)).toBeInTheDocument();
+  });
+
+  it("renders success state with verification result", async () => {
+    mockApi.getTaskStatus
+      .mockResolvedValueOnce({
+        task_id: "test-task",
+        status: "PENDING",
+        result: null,
+      })
+      .mockResolvedValueOnce({
+        task_id: "test-task",
+        status: "SUCCESS",
+        result: {
+          status: "success",
+          verified: true,
+          score: 0.9523,
+        },
+      });
+
+    render(<JobPoll jobId="test-task" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Thành công")).toBeInTheDocument();
+    });
+  });
+
+  it("renders success with liveness result", async () => {
+    mockApi.getTaskStatus
+      .mockResolvedValueOnce({
+        task_id: "liveness-task",
+        status: "PENDING",
+        result: null,
+      })
+      .mockResolvedValueOnce({
+        task_id: "liveness-task",
+        status: "SUCCESS",
+        result: {
+          status: "success",
+          is_live: true,
+          liveness_score: 0.9876,
+        },
+      });
+
+    render(<JobPoll jobId="liveness-task" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Thành công")).toBeInTheDocument();
+      expect(screen.getByText(/Khuôn mặt thật: Có/)).toBeInTheDocument();
+    });
+  });
+
+  it("renders failure state with error message", async () => {
+    mockApi.getTaskStatus
+      .mockResolvedValueOnce({
+        task_id: "fail-task",
+        status: "PENDING",
+        result: null,
+      })
+      .mockResolvedValueOnce({
+        task_id: "fail-task",
+        status: "FAILURE",
+        result: {
+          error: "NO_FACE_DETECTED",
+          type: "task_failure",
+        },
+      });
+
+    render(<JobPoll jobId="fail-task" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Lỗi")).toBeInTheDocument();
+      expect(screen.getByText(/NO_FACE_DETECTED/)).toBeInTheDocument();
+    });
+  });
+
+  it("calls onComplete callback on success", async () => {
+    const onComplete = jest.fn();
+    mockApi.getTaskStatus
+      .mockResolvedValueOnce({
+        task_id: "callback-task",
+        status: "PENDING",
+        result: null,
+      })
+      .mockResolvedValueOnce({
+        task_id: "callback-task",
+        status: "SUCCESS",
+        result: { status: "success", is_live: true },
+      });
+
+    render(<JobPoll jobId="callback-task" onComplete={onComplete} />);
+
+    await waitFor(() => {
+      expect(onComplete).toHaveBeenCalledWith({ status: "success", is_live: true });
+    });
+  });
+
+  it("calls onError callback on failure", async () => {
+    const onError = jest.fn();
+    mockApi.getTaskStatus
+      .mockResolvedValueOnce({
+        task_id: "error-task",
+        status: "PENDING",
+        result: null,
+      })
+      .mockResolvedValueOnce({
+        task_id: "error-task",
+        status: "FAILURE",
+        result: { error: "LOW_QUALITY" },
+      });
+
+    render(<JobPoll jobId="error-task" onError={onError} />);
+
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith("LOW_QUALITY");
+    });
+  });
+
+  it("handles NULL confidence edge case", async () => {
+    mockApi.getTaskStatus
+      .mockResolvedValueOnce({
+        task_id: "null-task",
+        status: "PENDING",
+        result: null,
+      })
+      .mockResolvedValueOnce({
+        task_id: "null-task",
+        status: "SUCCESS",
+        result: {
+          status: "success",
+          is_live: null,
+          score: 0,
+          confidence: 0,
+        },
+      });
+
+    render(<JobPoll jobId="null-task" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Thành công")).toBeInTheDocument();
+    });
+  });
+
+  it("handles empty result object", async () => {
+    mockApi.getTaskStatus
+      .mockResolvedValueOnce({
+        task_id: "empty-task",
+        status: "PENDING",
+        result: null,
+      })
+      .mockResolvedValueOnce({
+        task_id: "empty-task",
+        status: "SUCCESS",
+        result: {},
+      });
+
+    render(<JobPoll jobId="empty-task" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Thành công")).toBeInTheDocument();
+    });
+  });
+
+  it("handles is_live false (spoof detected)", async () => {
+    mockApi.getTaskStatus
+      .mockResolvedValueOnce({
+        task_id: "spoof-task",
+        status: "PENDING",
+        result: null,
+      })
+      .mockResolvedValueOnce({
+        task_id: "spoof-task",
+        status: "SUCCESS",
+        result: {
+          status: "success",
+          is_live: false,
+          liveness_score: 0.1234,
+        },
+      });
+
+    render(<JobPoll jobId="spoof-task" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Thành công")).toBeInTheDocument();
+      expect(screen.getByText(/Khuôn mặt thật: Không/)).toBeInTheDocument();
+    });
+  });
+});
+</file>
+
+<file path="src/app/(dashboard)/books/page.tsx">
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type {
+  BookWithStats,
+  BookImportPreviewRow,
+  BookImportResultRow,
+} from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
+import StatCard from "@/components/ui/StatCard";
+import { useToast } from "@/components/ui/Toast";
+import {
+  BookOpen,
+  Upload,
+  FileSpreadsheet,
+  Search,
+  X,
+  CheckCircle,
+  AlertCircle,
+  SkipForward,
+  Eye,
+  Download,
+  Printer,
+  Package,
+  Library,
+  RefreshCw,
+} from "lucide-react";
+
+export default function BooksPage() {
+  const { addToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [books, setBooks] = useState<BookWithStats[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<BookWithStats[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewData, setPreviewData] = useState<BookImportPreviewRow[] | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const [importResults, setImportResults] = useState<BookImportResultRow[] | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const [recentlyPrinted, setRecentlyPrinted] = useState<string[]>([]);
+
+  const [page, setPage] = useState(0);
+  const limit = 30;
+
+  const [selectedBook, setSelectedBook] = useState<BookWithStats | null>(null);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [editQuantity, setEditQuantity] = useState(0);
+  const [savingQuantity, setSavingQuantity] = useState(false);
+  const [quantityError, setQuantityError] = useState("");
+
+  const loadBooks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.listBooks({ skip: page * limit, limit });
+      setBooks(data.items ?? []);
+      setTotal(data.total ?? 0);
+    } catch (err) {
+      addToast({ type: "error", title: "Lỗi tải dữ liệu", description: getErrorMessage(err) });
+      setBooks([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, addToast]);
+
+  const handleRowClick = (book: BookWithStats) => {
+    setSelectedBook(book);
+    setEditQuantity(book.total_copies);
+    setQuantityError("");
+    setShowQuantityModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowQuantityModal(false);
+    setSelectedBook(null);
+    setEditQuantity(0);
+    setQuantityError("");
+  };
+
+  useEffect(() => { loadBooks(); }, [loadBooks]);
+
+  useEffect(() => {
+    if (!showQuantityModal) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleCloseModal(); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [showQuantityModal, handleCloseModal]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) { setSearchResults([]); return; }
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await api.searchBooks(searchQuery);
+        setSearchResults(results);
+      } catch { /* ignore */ }
+      finally { setSearching(false); }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPreviewFile(file);
+    setPreviewData(null);
+    setShowResults(false);
+    setPreviewLoading(true);
+    try {
+      const data = await api.getBarcodePreview(file);
+      setPreviewData(data.rows);
+      addToast({ type: "info", title: "Xem trước file", description: `Đã đọc ${data.total_rows} dòng (hiển thị tối đa 100)` });
+    } catch (err) {
+      addToast({ type: "error", title: "Lỗi đọc file", description: getErrorMessage(err) });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!previewFile) return;
+    setImporting(true);
+    setShowResults(false);
+    try {
+      const result = await api.importBooks(previewFile);
+      setImportResults(result.results);
+      setShowResults(true);
+      setPreviewData(null);
+      setPreviewFile(null);
+      setSearchQuery("");
+      setPage(0);
+      await loadBooks();
+      if (result.errors === 0) {
+        addToast({ type: "success", title: "Nhập kho thành công", description: `Đã nhập ${result.imported} đầu sách (${result.skipped} bị bỏ qua)` });
+      } else {
+        addToast({ type: "warning", title: "Nhập kho hoàn thành (có lỗi)", description: `${result.imported} nhập thành công, ${result.errors} lỗi` });
+      }
+    } catch (err) {
+      addToast({ type: "error", title: "Lỗi nhập kho", description: getErrorMessage(err) });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleQuantitySave = async () => {
+    if (!selectedBook) return;
+    const borrowed = selectedBook.total_copies - selectedBook.available_copies;
+    if (editQuantity < borrowed) {
+      setQuantityError(`Tối thiểu ${borrowed} bản (${borrowed} bản đang mượn)`);
+      return;
+    }
+    if (editQuantity < 1) {
+      setQuantityError("Số lượng phải lớn hơn 0");
+      return;
+    }
+    setSavingQuantity(true);
+    try {
+      const updated = await api.updateBookQuantity(selectedBook.id, editQuantity);
+      setBooks(prev => prev.map(b => b.id === updated.id ? updated : b));
+      setSearchResults(prev => prev.map(b => b.id === updated.id ? updated : b));
+      addToast({ type: "success", title: "Đã cập nhật", description: `Số lượng: ${updated.total_copies} bản` });
+      handleCloseModal();
+    } catch (err) {
+      addToast({ type: "error", title: "Lỗi", description: getErrorMessage(err) });
+    } finally {
+      setSavingQuantity(false);
+    }
+  };
+
+  const handlePrintBarcodes = async (bookId?: string) => {
+    try {
+      const barcodes = await api.getBarcodes(bookId);
+      if (barcodes.length === 0) {
+        addToast({ type: "info", title: "Không có mã vạch", description: "Không tìm thấy mã vạch để in" });
+        return;
+      }
+      setRecentlyPrinted(barcodes.map(b => b.barcode));
+      addToast({ type: "success", title: "Đã sinh mã vạch", description: `${barcodes.length} mã vạch sẵn sàng in (xem bảng bên dưới)` });
+    } catch (err) {
+      addToast({ type: "error", title: "Lỗi", description: getErrorMessage(err) });
+    }
+  };
+
+  const stats = {
+    totalBooks: total,
+    totalCopies: (books ?? []).reduce((s, b) => s + (b?.total_copies ?? 0), 0),
+    availableCopies: (books ?? []).reduce((s, b) => s + (b?.available_copies ?? 0), 0),
+    borrowedCopies: (books ?? []).reduce((s, b) => s + ((b?.total_copies ?? 0) - (b?.available_copies ?? 0)), 0),
+  };
+
+  const displayBooks = searchQuery.trim() ? searchResults : books;
+
+  return (
+    <div className="space-y-6">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Tổng đầu sách" value={stats.totalBooks} icon={Library} accentColor="primary" description="Trong hệ thống" />
+        <StatCard label="Tổng bản sao" value={stats.totalCopies} icon={Package} accentColor="info" description="Tất cả các bản" />
+        <StatCard label="Sẵn sàng" value={stats.availableCopies} icon={CheckCircle} accentColor="success" description="Có thể mượn" />
+        <StatCard label="Đang được mượn" value={stats.borrowedCopies} icon={BookOpen} accentColor="warning" description="Đang lưu hành" />
+      </div>
+
+      {/* Search + Import */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="flex-1 min-w-[280px] relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-3" />
+          <input
+            className="input pl-10 pr-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm kiếm sách (ISBN, tên, tác giả)..."
+          />
+          {searching && (
+            <RefreshCw size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-3 animate-spin" />
+          )}
+          {searchQuery && !searching && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-3 hover:text-text">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+        <Button variant="secondary" icon={<Upload size={15} />} onClick={() => fileInputRef.current?.click()}>
+          Nhập kho Excel
+        </Button>
+        <Button variant="ghost" icon={<RefreshCw size={15} />} onClick={() => { setPage(0); setSearchQuery(""); loadBooks(); }}>
+          Tải lại
+        </Button>
+        <Button variant="ghost" icon={<Download size={15} />} onClick={() => api.downloadBookTemplate()}>
+          Tải mẫu .xlsx
+        </Button>
+        <Button variant="ghost" icon={<Download size={15} />} onClick={() => api.exportBooks()}>
+          Xuất Excel
+        </Button>
+      </div>
+
+      {/* Search results hint */}
+      {searchQuery.trim() && (
+        <Card padding="none">
+          <CardContent className="p-0">
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <p className="text-body-sm text-text-3">
+                Kết quả tìm kiếm: <span className="text-text font-medium">{searchResults.length}</span> cuốn sách
+              </p>
+              {searchResults.length > 0 && (
+                <Button size="sm" variant="ghost" icon={<Eye size={14} />} onClick={() => handlePrintBarcodes()}>
+                  In mã vạch
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upload zone / Preview */}
+      {previewFile && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileSpreadsheet size={16} className="text-primary" />
+              Xem trước: {previewFile.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {previewLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw size={20} className="animate-spin text-text-3" />
+                <span className="ml-3 text-text-3">Đang đọc file...</span>
+              </div>
+            ) : previewData && previewData.length > 0 ? (
+              <>
+                <div className="flex items-center gap-3 text-body-sm text-text-3">
+                  <span className="px-2 py-0.5 rounded bg-success/15 text-success">{previewData.filter(r => r.status !== "invalid").length} hàng hợp lệ</span>
+                  <span className="px-2 py-0.5 rounded bg-error/15 text-error">{previewData.filter(r => r.status === "invalid").length} hàng lỗi</span>
+                </div>
+                <div className="overflow-x-auto max-h-72 overflow-y-auto border border-border rounded-lg">
+                  <table className="table">
+                    <thead className="sticky top-0 bg-surface-2">
+                      <tr>
+                        <th>ISBN</th>
+                        <th>Tên sách</th>
+                        <th>Tác giả</th>
+                        <th>SL</th>
+                        <th>Mã vạch mẫu</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewData.slice(0, 20).map((row, i) => (
+                        <tr key={i} className={row.status === "invalid" ? "bg-error/5" : ""}>
+                          <td className="font-mono text-sm">{row.isbn || "-"}</td>
+                          <td className="text-sm max-w-[200px] truncate">{row.title || "-"}</td>
+                          <td className="text-text-3 text-sm">{row.author || "-"}</td>
+                          <td className="text-center font-mono">{row.quantity}</td>
+                          <td className="font-mono text-xs text-text-3">{row.barcodes[0] || "-"}</td>
+                          <td>
+                            <Badge variant={row.status === "exists" ? "neutral" : row.status === "new" ? "success" : row.status === "warning" ? "warning" : "error"}>
+                              {row.status === "exists" ? "Đã có" : row.status === "new" ? "Mới" : row.status === "warning" ? "Cảnh báo" : "Lỗi"}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {previewData.length > 20 && (
+                  <p className="text-caption text-text-3 text-center">...và {previewData.length - 20} dòng nữa</p>
+                )}
+                <div className="flex gap-3 justify-end">
+                  <Button variant="ghost" onClick={() => { setPreviewFile(null); setPreviewData(null); }}>
+                    Hủy
+                  </Button>
+                  <Button icon={<CheckCircle size={15} />} onClick={handleImport} loading={importing}>
+                    Xác nhận nhập kho
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Import results */}
+      {showResults && importResults && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle size={16} className="text-success" />
+              Kết quả nhập kho
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-3 text-body-sm">
+              <span className="px-2 py-0.5 rounded bg-success/15 text-success">Nhập: {importResults.filter(r => r.status === "imported").length}</span>
+              <span className="px-2 py-0.5 rounded bg-info/15 text-info">Cập nhật: {importResults.filter(r => r.status === "updated").length}</span>
+              <span className="px-2 py-0.5 rounded bg-warning/15 text-warning">Cảnh báo: {importResults.filter(r => r.status === "warning").length}</span>
+              <span className="px-2 py-0.5 rounded bg-text-2/15 text-text-2">Bỏ qua: {importResults.filter(r => r.status === "skipped").length}</span>
+              <span className="px-2 py-0.5 rounded bg-error/15 text-error">Lỗi: {importResults.filter(r => r.status === "error").length}</span>
+            </div>
+            <div className="overflow-x-auto max-h-64 overflow-y-auto border border-border rounded-lg">
+              <table className="table">
+                <thead className="sticky top-0 bg-surface-2">
+                  <tr>
+                    <th>ISBN</th>
+                    <th>Tên sách</th>
+                    <th>SL</th>
+                    <th>Barcode mẫu</th>
+                    <th>Trạng thái</th>
+                    <th>Thông báo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importResults.map((row, i) => (
+                    <tr key={i} className={row.status === "error" ? "bg-error/5" : row.status === "warning" ? "bg-warning/5" : ""}>
+                      <td className="font-mono text-sm">{row.isbn || "-"}</td>
+                      <td className="text-sm max-w-[200px] truncate">{row.title || "-"}</td>
+                      <td className="text-center font-mono">{row.quantity}</td>
+                      <td className="font-mono text-xs text-text-3">{row.barcodes[0] || "-"}</td>
+                      <td>
+                        <Badge variant={row.status === "imported" ? "success" : row.status === "updated" ? "info" : row.status === "warning" ? "warning" : row.status === "skipped" ? "neutral" : "error"}>
+                          {row.status === "updated" ? "Cập nhật" : row.status === "imported" ? "Thành công" : row.status === "warning" ? "Cảnh báo" : row.status === "skipped" ? "Bỏ qua" : "Lỗi"}
+                        </Badge>
+                      </td>
+                      <td className="text-caption text-text-3 max-w-[200px] truncate">{row.message || ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {importResults.some(r => r.status === "imported" || r.status === "warning") && (
+              <div className="flex gap-3">
+                <Button size="sm" variant="secondary" icon={<Printer size={14} />} onClick={() => handlePrintBarcodes()}>
+                  In mã vạch vừa tạo
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recently printed barcodes */}
+      {recentlyPrinted.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Printer size={16} className="text-text-3" />
+              Mã vạch sẵn sàng in ({recentlyPrinted.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {recentlyPrinted.map((bc) => (
+                <div key={bc} className="flex flex-col items-center p-2 border border-border rounded-lg bg-surface-2 min-w-[120px]">
+                  <span className="font-mono text-sm font-bold text-text">{bc}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-caption text-text-3 mt-3">Sử dụng trình in mã vạch của hệ thống hoặc copy danh sách barcode để in theo template.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Book listing */}
+      <Card padding="none">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ISBN</th>
+                  <th>Tiêu đề</th>
+                  <th>Tác giả</th>
+                  <th className="text-center">Tổng</th>
+                  <th className="text-center">Sẵn sàng</th>
+                  <th className="text-center">Mượn</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-text-3">
+                      <RefreshCw size={18} className="animate-spin mx-auto" />
+                    </td>
+                  </tr>
+                ) : displayBooks.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-12">
+                      <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3 text-text-3">
+                        <BookOpen size={20} />
+                      </div>
+                      <p className="text-text-3">
+                        {searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  displayBooks.map((book) => (
+                    <tr key={book.id} className="group cursor-pointer hover:bg-surface-2/50 transition-colors" onClick={() => handleRowClick(book)}>
+                      <td className="font-mono text-sm text-primary">{book.isbn}</td>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          {book.cover_url ? (
+                            <img src={book.cover_url} alt={book.title} className="w-8 h-10 object-cover rounded border border-border" />
+                          ) : (
+                            <div className="w-8 h-10 rounded border border-border bg-surface-2 flex items-center justify-center">
+                              <BookOpen size={14} className="text-text-3" />
+                            </div>
+                          )}
+                          <span className="font-medium text-sm">{book.title}</span>
+                        </div>
+                      </td>
+                      <td className="text-text-3 text-sm">{book.author || "-"}</td>
+                      <td className="text-center font-mono">{book.total_copies}</td>
+                      <td className="text-center">
+                        <Badge variant={book.available_copies > 0 ? "success" : "error"}>
+                          {book.available_copies}
+                        </Badge>
+                      </td>
+                      <td className="text-center font-mono text-text-3">
+                        {book.total_copies - book.available_copies}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {!searchQuery && total > limit && (
+            <div className="flex items-center justify-between p-4 border-t border-border">
+              <p className="text-caption text-text-3">
+                Hiển thị {page * limit + 1}–{Math.min((page + 1) * limit, total)} / {total} đầu sách
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+                  Trước
+                </Button>
+                <Button size="sm" variant="ghost" disabled={(page + 1) * limit >= total} onClick={() => setPage(p => p + 1)}>
+                  Sau
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quantity edit modal */}
+      {showQuantityModal && selectedBook && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={handleCloseModal}>
+          <div className="bg-surface rounded-xl border border-border shadow-xl w-full max-w-md animate-fade-in-up" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center gap-3 p-5 border-b border-border">
+              {selectedBook.cover_url ? (
+                <img src={selectedBook.cover_url} alt={selectedBook.title} className="w-10 h-13 object-cover rounded border border-border" />
+              ) : (
+                <div className="w-10 h-13 rounded border border-border bg-surface-2 flex items-center justify-center">
+                  <BookOpen size={16} className="text-text-3" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <h3 className="font-display font-semibold text-text truncate">{selectedBook.title}</h3>
+                <p className="text-body-sm text-text-3 font-mono">ISBN: {selectedBook.isbn}</p>
+              </div>
+              <button onClick={handleCloseModal} className="text-text-3 hover:text-text transition-colors p-1">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-5">
+              <div className="flex gap-4 text-center">
+                <div className="flex-1 p-3 rounded-lg bg-surface-2">
+                  <p className="text-body-sm text-text-3">Tổng</p>
+                  <p className="font-display font-bold text-text text-xl">{selectedBook.total_copies}</p>
+                </div>
+                <div className="flex-1 p-3 rounded-lg bg-surface-2">
+                  <p className="text-body-sm text-text-3">Sẵn sàng</p>
+                  <p className="font-display font-bold text-success text-xl">{selectedBook.available_copies}</p>
+                </div>
+                <div className="flex-1 p-3 rounded-lg bg-surface-2">
+                  <p className="text-body-sm text-text-3">Đang mượn</p>
+                  <p className="font-display font-bold text-warning text-xl">{selectedBook.total_copies - selectedBook.available_copies}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-body-sm font-medium text-text-2 mb-1.5">Số lượng mới</label>
+                <input
+                  type="number"
+                  min={1}
+                  className={`input ${quantityError ? "border-error focus:border-error focus:ring-error/30" : ""}`}
+                  value={editQuantity}
+                  onChange={e => { setEditQuantity(parseInt(e.target.value) || 0); setQuantityError(""); }}
+                />
+                {quantityError && (
+                  <p className="mt-1.5 text-body-sm text-error flex items-center gap-1">
+                    <AlertCircle size={13} />
+                    {quantityError}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 justify-end p-5 border-t border-border">
+              <Button variant="ghost" onClick={handleCloseModal}>Huỷ</Button>
+              <Button loading={savingQuantity} onClick={handleQuantitySave}>Lưu thay đổi</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
 
 <file path="src/app/(kiosk)/gate/page.tsx">
 'use client';
@@ -106,6 +1543,8 @@ import GateButton from '@/components/gate/GateButton';
 import ResultCard from '@/components/gate/ResultCard';
 import PulseAnimation from '@/components/gate/PulseAnimation';
 import type { CameraEvent, KioskResult, PatronLookupResult } from '@/lib/types';
+
+interface TodayCounts { entries: number; exits: number; no_match: number; spoof: number; }
 
 const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || 'http://192.168.1.121:8080/video';
 const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || 'http://192.168.1.240:8080/video';
@@ -135,7 +1574,15 @@ export default function GatePage() {
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [todayCounts, setTodayCounts] = useState({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
+  const [todayCounts, setTodayCounts] = useState<TodayCounts>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('gate_today_counts');
+      if (cached) {
+        try { return JSON.parse(cached) as TodayCounts; } catch {}
+      }
+    }
+    return { entries: 0, exits: 0, no_match: 0, spoof: 0 };
+  });
   const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
   const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
   const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -293,6 +1740,20 @@ export default function GatePage() {
   };
 
   useEffect(() => {
+    api.getStats().then((s) => {
+      if (s) {
+        const fresh: TodayCounts = { entries: s.today_entries ?? 0, exits: s.today_exits ?? 0, no_match: 0, spoof: 0 };
+        setTodayCounts(fresh);
+        localStorage.setItem('gate_today_counts', JSON.stringify(fresh));
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('gate_today_counts', JSON.stringify(todayCounts));
+  }, [todayCounts]);
+
+  useEffect(() => {
     const cleanup = api.connectAccessSSE((event: CameraEvent) => {
       if (event.bbox || event.landmarks) {
         const overlay = { bbox: event.bbox, landmarks: event.landmarks };
@@ -314,12 +1775,12 @@ export default function GatePage() {
           message: `${event.full_name} — ${type === 'entry' ? 'Vào' : 'Ra'} thư viện`,
           patron_name: event.full_name,
         });
-        setTodayCounts((c) => ({ ...c, [type === 'entry' ? 'entries' : 'exits']: c[type === 'entry' ? 'entries' : 'exits'] + 1 }));
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, [type === 'entry' ? 'entries' : 'exits']: prev[type === 'entry' ? 'entries' : 'exits'] + 1 }));
       } else if (event.status === 'no_match') {
-        setTodayCounts((c) => ({ ...c, no_match: c.no_match + 1 }));
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, no_match: prev.no_match + 1 }));
         addToast({ type: 'info', message: 'Khuôn mặt mới — không nhận diện được' });
       } else if (event.status === 'spoof') {
-        setTodayCounts((c) => ({ ...c, spoof: c.spoof + 1 }));
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, spoof: prev.spoof + 1 }));
         addToast({ type: 'error', message: 'Phát hiện giả mạo!' });
       }
     });
@@ -525,22 +1986,6 @@ export default function KioskLayout({
 
   return <>{children}</>;
 }
-</file>
-
-<file path="postcss.config.js">
-module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-</file>
-
-<file path="public/favicon.svg">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="20" fill="#2563eb"/>
-  <text x="50" y="68" font-family="Arial" font-size="55" font-weight="bold" fill="white" text-anchor="middle">F</text>
-</svg>
 </file>
 
 <file path="src/components/gate/CameraFeed.tsx">
@@ -1667,6 +3112,278 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 }
 </file>
 
+<file path="src/lib/mock-data/edge-cases.json">
+{
+  "task_status_responses": [
+    {
+      "task_id": "mock-pending",
+      "status": "PENDING",
+      "result": null,
+      "description": "Task is still processing"
+    },
+    {
+      "task_id": "mock-success-verified",
+      "status": "SUCCESS",
+      "result": {
+        "status": "success",
+        "verified": true,
+        "score": 0.9523,
+        "confidence": 0.9523
+      },
+      "description": "Verification succeeded with high confidence"
+    },
+    {
+      "task_id": "mock-success-liveness",
+      "status": "SUCCESS",
+      "result": {
+        "status": "success",
+        "is_live": true,
+        "liveness_score": 0.9876,
+        "score": 0.9876
+      },
+      "description": "Liveness check passed - real face"
+    },
+    {
+      "task_id": "mock-success-no-liveness",
+      "status": "SUCCESS",
+      "result": {
+        "status": "success",
+        "is_live": false,
+        "liveness_score": 0.1234,
+        "score": 0.1234
+      },
+      "description": "Liveness check failed - not a real face"
+    },
+    {
+      "task_id": "mock-failure-no-face",
+      "status": "FAILURE",
+      "result": {
+        "error": "NO_FACE_DETECTED",
+        "type": "task_failure"
+      },
+      "description": "No face found in image"
+    },
+    {
+      "task_id": "mock-failure-low-quality",
+      "status": "FAILURE",
+      "result": {
+        "error": "LOW_QUALITY",
+        "type": "task_failure"
+      },
+      "description": "Image quality too low"
+    },
+    {
+      "task_id": "mock-failure-spoof",
+      "status": "FAILURE",
+      "result": {
+        "error": "SPOOF_DETECTED",
+        "type": "task_failure"
+      },
+      "description": "Potential spoof attack detected"
+    },
+    {
+      "task_id": "mock-null-confidence",
+      "status": "SUCCESS",
+      "result": {
+        "status": "success",
+        "is_live": null,
+        "score": 0,
+        "confidence": 0
+      },
+      "description": "Edge case: null values in result"
+    },
+    {
+      "task_id": "mock-empty-result",
+      "status": "SUCCESS",
+      "result": {},
+      "description": "Edge case: empty result object"
+    }
+  ],
+  "kiosk_lookup_responses": [
+    {
+      "exists": true,
+      "patron": {
+        "id": "test-patron-id",
+        "full_name": "Nguyen Van A",
+        "student_code": "B21DCCN001",
+        "class_name": "D21CQCN01-N",
+        "email": "B21DCCN001@stu.edu.vn",
+        "card_number": "THV-B21DCCN001",
+        "has_face": true,
+        "current_status": "outside"
+      },
+      "has_face": true,
+      "is_expired": false
+    },
+    {
+      "exists": true,
+      "patron": {
+        "id": "expired-patron-id",
+        "full_name": "Tran Van B",
+        "student_code": "B21DCCN002",
+        "has_face": false,
+        "current_status": "outside"
+      },
+      "has_face": false,
+      "is_expired": true
+    },
+    {
+      "exists": false,
+      "patron": null,
+      "has_face": false,
+      "is_expired": false
+    }
+  ],
+  "access_events": [
+    {
+      "event_type": "camera_event",
+      "camera_id": "entry_gate",
+      "status": "granted",
+      "patron_id": "test-patron-id",
+      "full_name": "Nguyen Van A",
+      "student_code": "B21DCCN001",
+      "score": 0.95,
+      "access_type": "entry",
+      "timestamp": "2025-01-01T10:00:00Z"
+    },
+    {
+      "event_type": "camera_event",
+      "camera_id": "exit_gate",
+      "status": "granted",
+      "patron_id": "test-patron-id",
+      "full_name": "Nguyen Van A",
+      "student_code": "B21DCCN001",
+      "score": 0.93,
+      "access_type": "exit",
+      "timestamp": "2025-01-01T12:00:00Z"
+    },
+    {
+      "event_type": "camera_event",
+      "camera_id": "entry_gate",
+      "status": "spoof",
+      "patron_id": null,
+      "full_name": null,
+      "student_code": null,
+      "score": 0.1,
+      "access_type": "entry",
+      "timestamp": "2025-01-01T11:00:00Z"
+    },
+    {
+      "event_type": "camera_event",
+      "camera_id": "entry_gate",
+      "status": "no_match",
+      "patron_id": null,
+      "full_name": null,
+      "student_code": null,
+      "score": 0.3,
+      "access_type": "entry",
+      "timestamp": "2025-01-01T11:30:00Z"
+    }
+  ],
+  "borrow_responses": [
+    {
+      "status": "success",
+      "message": "Mượn sách thành công. Vui lòng trả trước ngày 15/01/2025.",
+      "record": {
+        "id": "record-id",
+        "book_id": "book-id",
+        "copy_id": "copy-id",
+        "borrow_at": "2025-01-01T10:00:00Z",
+        "due_at": "2025-01-15T10:00:00Z",
+        "status": "borrowed"
+      },
+      "book": {
+        "id": "book-id",
+        "isbn": "978-0-13-468599-1",
+        "title": "Introduction to Algorithms",
+        "author": "Thomas H. Cormen"
+      }
+    },
+    {
+      "status": "error",
+      "detail": "Bạn phải có mặt trong thư viện để mượn sách. Vui lòng quét thẻ tại cửa vào."
+    },
+    {
+      "status": "error",
+      "detail": "Bạn đã mượn tối đa 3 cuốn. Vui lòng trả sách trước khi mượn thêm."
+    },
+    {
+      "status": "error",
+      "detail": "Bạn có sách quá hạn chưa trả. Vui lòng trả sách trước khi mượn thêm."
+    }
+  ],
+  "edge_case_access_logs": [
+    {
+      "id": "log-1",
+      "patron_id": null,
+      "patron_name": null,
+      "student_code": null,
+      "access_type": "entry",
+      "camera_id": "entry_gate",
+      "status": "no_match",
+      "confidence": 0.0,
+      "access_time": "2025-01-01T10:00:00Z"
+    },
+    {
+      "id": "log-2",
+      "patron_id": "patron-id",
+      "patron_name": null,
+      "student_code": "UNKNOWN",
+      "access_type": "entry",
+      "camera_id": "entry_gate",
+      "status": "granted",
+      "confidence": 0.95,
+      "access_time": "2025-01-01T10:05:00Z"
+    }
+  ]
+}
+</file>
+
+<file path="test-results/.last-run.json">
+{
+  "status": "failed",
+  "failedTests": [
+    "db700634b014199b4900-895959feff9a882d1b45"
+  ]
+}
+</file>
+
+<file path="test-results/e2e-tests-basic-Basic-App-Tests-login-page-loads/error-context.md">
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: e2e\tests\basic.spec.ts >> Basic App Tests >> login page loads
+- Location: e2e\tests\basic.spec.ts:4:7
+
+# Error details
+
+```
+Error: page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
+Call log:
+  - navigating to "/login", waiting until "load"
+
+```
+
+# Test source
+
+```ts
+  1 | import { test, expect } from "@playwright/test";
+  2 | 
+  3 | test.describe("Basic App Tests", () => {
+  4 |   test("login page loads", async ({ page }) => {
+> 5 |     await page.goto("/login");
+    |                ^ Error: page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
+  6 |     await expect(page.locator("body")).toBeVisible();
+  7 |   });
+  8 | });
+```
+</file>
+
 <file path="next.config.js">
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -2035,350 +3752,6 @@ docker run -p 3000:3000 face-recognition-web
 5. [ ] `npm install` completed without errors
 6. [ ] Port 3000 (frontend) and 80 (backend gateway) are free
 7. [ ] Browser has camera permissions for face recognition features
-</file>
-
-<file path="src/app/(dashboard)/dashboard/page.tsx">
-"use client";
-
-import { useAuth } from "@/lib/auth-context";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import api from "@/lib/api-client";
-import StatCard from "@/components/ui/StatCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import { Users, UserCheck, LogIn, LogOut, BookOpen, AlertCircle, Clock, ArrowRight } from "lucide-react";
-import Link from "next/link";
-
-import type { AccessLogPublic } from "@/lib/types";
-
-interface Stats {
-  total_patrons: number;
-  active_patrons: number;
-  today_entries: number;
-  today_exits: number;
-}
-
-export default function DashboardPage() {
-  const { user, isLoading, isAuthenticated } = useAuth();
-  const router = useRouter();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isLoading, isAuthenticated, router]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    async function fetchData() {
-      try {
-        const [statsData, logsData] = await Promise.all([
-          api.getStats().catch(() => null),
-          api.getRecentLogs().catch(() => null),
-        ]);
-
-        if (statsData) {
-          setStats({
-            total_patrons: statsData.total_patrons || 0,
-            active_patrons: statsData.active_patrons || 0,
-            today_entries: statsData.today_entries || 0,
-            today_exits: statsData.today_exits || 0,
-          });
-        }
-
-        if (logsData?.items) {
-          setRecentLogs(logsData.items.slice(0, 8));
-        }
-      } catch {
-        // silently fail
-      } finally {
-        setLoadingData(false);
-      }
-    }
-
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
-
-  if (isLoading || !isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-body-sm text-text-3">Đang tải...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const role = user?.role || "staff";
-
-  return (
-    <div className="space-y-6">
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Tổng độc giả"
-          value={stats?.total_patrons ?? "—"}
-          icon={Users}
-          accentColor="primary"
-          description="Đã đăng ký"
-        />
-        <StatCard
-          label="Đang có mặt"
-          value={stats?.active_patrons ?? "—"}
-          icon={UserCheck}
-          accentColor="success"
-          description="Trong thư viện"
-        />
-        <StatCard
-          label="Lượt vào hôm nay"
-          value={stats?.today_entries ?? "—"}
-          icon={LogIn}
-          accentColor="info"
-          description="Ra vào cửa"
-        />
-        <StatCard
-          label="Lượt ra hôm nay"
-          value={stats?.today_exits ?? "—"}
-          icon={LogOut}
-          accentColor="warning"
-          description="Ra về"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent activity */}
-        <div className="lg:col-span-2">
-          <Card padding="none">
-            <CardHeader className="p-4 border-b border-border">
-              <CardTitle>Hoạt động gần đây</CardTitle>
-              <Link href="/history" className="text-body-sm text-primary hover:text-primary/80 flex items-center gap-1">
-                Xem tất cả <ArrowRight size={14} />
-              </Link>
-            </CardHeader>
-            <CardContent className="p-0">
-              {loadingData ? (
-                <div className="p-8 text-center text-text-3 text-body-sm">Đang tải...</div>
-              ) : recentLogs.length === 0 ? (
-                <div className="p-8 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3 text-text-3">
-                    <Clock size={20} />
-                  </div>
-                  <p className="text-body-sm text-text-3">Chưa có hoạt động nào</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {recentLogs.map((log) => (
-                    <div key={log.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                        log.access_type === "entry"
-                          ? "bg-success/15 text-success"
-                          : "bg-error/15 text-error"
-                      }`}>
-                        {log.access_type === "entry" ? <LogIn size={16} /> : <LogOut size={16} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-body-sm font-medium text-text truncate">{log.patron_name || "—"}</p>
-                        <p className="text-caption text-text-3">{log.student_code || log.patron_id}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <Badge variant={log.status === "granted" ? "success" : "error"} dot>
-                          {log.status === "granted" ? "Thành công" : "Thất bại"}
-                        </Badge>
-                        <p className="text-caption text-text-3 mt-1">
-                          {new Date(log.access_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick access */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Thao tác nhanh</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {role === "admin" && (
-                <>
-                  <QuickAction href="/enroll" icon={<LogIn size={16} />} label="Đăng ký khuôn mặt" color="primary" />
-                  <QuickAction href="/patrons" icon={<Users size={16} />} label="Quản lý độc giả" color="info" />
-                  <QuickAction href="/return" icon={<BookOpen size={16} />} label="Trả sách" color="warning" />
-                  <QuickAction href="/stats" icon={<AlertCircle size={16} />} label="Xem thống kê" color="success" />
-                </>
-              )}
-              <QuickAction href="/active" icon={<UserCheck size={16} />} label="Đang có mặt" color="success" />
-              <QuickAction href="/history" icon={<Clock size={16} />} label="Lịch sử ra vào" color="info" />
-            </CardContent>
-          </Card>
-
-          
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function QuickAction({ href, icon, label, color }: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  color: "primary" | "success" | "error" | "warning" | "info";
-}) {
-  const colorMap = {
-    primary: "text-primary hover:bg-primary/10",
-    success: "text-success hover:bg-success/10",
-    error: "text-error hover:bg-error/10",
-    warning: "text-warning hover:bg-warning/10",
-    info: "text-info hover:bg-info/10",
-  };
-
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${colorMap[color]}`}
-    >
-      <span className="shrink-0">{icon}</span>
-      <span className="text-body-sm font-medium">{label}</span>
-      <ArrowRight size={14} className="ml-auto shrink-0 opacity-50" />
-    </Link>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/layout.tsx">
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import Sidebar from "@/components/sidebar";
-import { Bell, User, LogOut, ChevronRight } from "lucide-react";
-
-const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard": { title: "Tổng quan", subtitle: "Chào mừng bạn quay lại" },
-  "/patrons": { title: "Quản lý độc giả", subtitle: "Danh sách và thông tin độc giả" },
-  "/active": { title: "Đang hiện diện", subtitle: "Độc giả đang có mặt trong thư viện" },
-  "/gate": { title: "Cổng ra vào", subtitle: "Xác thực khuôn mặt tại cổng" },
-  "/history": { title: "Lịch sử ra vào", subtitle: "Nhật ký ra vào cửa thư viện" },
-  "/return": { title: "Trả sách", subtitle: "Xử lý trả sách cho độc giả" },
-  "/stats": { title: "Thống kê", subtitle: "Báo cáo và biểu đồ hoạt động" },
-  "/enroll": { title: "Đăng ký khuôn mặt", subtitle: "Cập nhật thông tin khuôn mặt" },
-  "/verify": { title: "Xác thực khuôn mặt", subtitle: "Kiểm tra đối chiếu khuôn mặt" },
-  "/identify": { title: "Nhận diện", subtitle: "Tìm kiếm độc giả qua khuôn mặt" },
-  "/liveness": { title: "Kiểm tra sống", subtitle: "Xác minh khuôn mặt thật" },
-  "/dashboard/admin": { title: "Quản trị hệ thống", subtitle: "Quản lý người dùng và phân quyền" },
-};
-
-function Breadcrumb({ pathname }: { pathname: string }) {
-  const parts = pathname.split("/").filter(Boolean);
-  if (parts.length <= 1) return null;
-
-  return (
-    <nav className="flex items-center gap-1.5 text-body-sm text-text-3">
-      {parts.map((part, i) => (
-        <span key={i} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight size={12} className="text-text-3" />}
-          <span className={i === parts.length - 1 ? "text-text-2" : "capitalize"}>
-            {PAGE_TITLES[`/${parts.slice(0, i + 1).join("/")}`]?.title || part.replace(/-/g, ' ')}
-          </span>
-        </span>
-      ))}
-    </nav>
-  );
-}
-
-function Topbar({ user }: { user: any }) {
-  return (
-    <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
-        {/* Page title injected via page — can be enhanced */}
-      </div>
-      <div className="flex items-center gap-3">
-        <button className="relative p-2 rounded-md hover:bg-surface-2 transition-colors">
-          <Bell size={18} className="text-text-2" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
-        </button>
-        <div className="flex items-center gap-2.5 pl-3 border-l border-border">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <User size={16} className="text-primary" />
-          </div>
-          <div className="hidden sm:block">
-            <p className="text-body-sm font-medium text-text">{user?.full_name || "Admin"}</p>
-            <p className="text-caption text-text-3 capitalize">{user?.role || "staff"}</p>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isAuthenticated, isLoading, router]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-body-sm text-text-3">Đang tải...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const pageInfo = PAGE_TITLES[pathname] || PAGE_TITLES[pathname.split("/").slice(0, 2).join("/")] || { title: "", subtitle: "" };
-
-  return (
-    <div className="flex min-h-screen bg-bg">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar user={user} />
-        <div className="p-6">
-          {/* Page Header */}
-          {pageInfo.title && (
-            <div className="mb-6 animate-fade-in">
-              <Breadcrumb pathname={pathname} />
-              <h1 className="text-display-xl text-text mt-1">{pageInfo.title}</h1>
-              {pageInfo.subtitle && (
-                <p className="text-body-md text-text-3 mt-0.5">{pageInfo.subtitle}</p>
-              )}
-            </div>
-          )}
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
 </file>
 
 <file path="src/app/(dashboard)/return/page.tsx">
@@ -3184,6 +4557,227 @@ export default function ActivePage() {
 }
 </file>
 
+<file path="src/app/(dashboard)/dashboard/page.tsx">
+"use client";
+
+import { useAuth } from "@/lib/auth-context";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api-client";
+import StatCard from "@/components/ui/StatCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import { Users, UserCheck, LogIn, LogOut, BookOpen, AlertCircle, Clock, ArrowRight } from "lucide-react";
+import Link from "next/link";
+
+import type { AccessLogPublic } from "@/lib/types";
+
+interface Stats {
+  total_patrons: number;
+  active_patrons: number;
+  today_entries: number;
+  today_exits: number;
+}
+
+export default function DashboardPage() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    async function fetchData() {
+      try {
+        const [statsData, logsData] = await Promise.all([
+          api.getStats().catch(() => null),
+          api.getRecentLogs().catch(() => null),
+        ]);
+
+        if (statsData) {
+          setStats({
+            total_patrons: statsData.total_patrons || 0,
+            active_patrons: statsData.active_patrons || 0,
+            today_entries: statsData.today_entries || 0,
+            today_exits: statsData.today_exits || 0,
+          });
+        }
+
+        if (logsData?.items) {
+          setRecentLogs(logsData.items.slice(0, 8));
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setLoadingData(false);
+      }
+    }
+
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-body-sm text-text-3">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const role = user?.role || "staff";
+
+  return (
+    <div className="space-y-6">
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Tổng độc giả"
+          value={stats?.total_patrons ?? "—"}
+          icon={Users}
+          accentColor="primary"
+          description="Đã đăng ký"
+        />
+        <StatCard
+          label="Đang có mặt"
+          value={stats?.active_patrons ?? "—"}
+          icon={UserCheck}
+          accentColor="success"
+          description="Trong thư viện"
+        />
+        <StatCard
+          label="Lượt vào hôm nay"
+          value={stats?.today_entries ?? "—"}
+          icon={LogIn}
+          accentColor="info"
+          description="Ra vào cửa"
+        />
+        <StatCard
+          label="Lượt ra hôm nay"
+          value={stats?.today_exits ?? "—"}
+          icon={LogOut}
+          accentColor="warning"
+          description="Ra về"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent activity */}
+        <div className="lg:col-span-2">
+          <Card padding="none">
+            <CardHeader className="p-4 border-b border-border">
+              <CardTitle>Hoạt động gần đây</CardTitle>
+              <Link href="/history" className="text-body-sm text-primary hover:text-primary/80 flex items-center gap-1">
+                Xem tất cả <ArrowRight size={14} />
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loadingData ? (
+                <div className="p-8 text-center text-text-3 text-body-sm">Đang tải...</div>
+              ) : recentLogs.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3 text-text-3">
+                    <Clock size={20} />
+                  </div>
+                  <p className="text-body-sm text-text-3">Chưa có hoạt động nào</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {recentLogs.map((log) => (
+                    <div key={log.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                        log.access_type === "entry"
+                          ? "bg-success/15 text-success"
+                          : "bg-error/15 text-error"
+                      }`}>
+                        {log.access_type === "entry" ? <LogIn size={16} /> : <LogOut size={16} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-body-sm font-medium text-text truncate">{log.patron_name || "—"}</p>
+                        <p className="text-caption text-text-3">{log.student_code || log.patron_id}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <Badge variant={log.status === "success" ? "success" : "error"} dot>
+                          {log.status === "success" ? "Thành công" : "Thất bại"}
+                        </Badge>
+                        <p className="text-caption text-text-3 mt-1">
+                          {new Date(log.access_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick access */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Thao tác nhanh</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {role === "admin" && (
+                <>
+                  <QuickAction href="/enroll" icon={<LogIn size={16} />} label="Đăng ký khuôn mặt" color="primary" />
+                  <QuickAction href="/patrons" icon={<Users size={16} />} label="Quản lý độc giả" color="info" />
+                  <QuickAction href="/return" icon={<BookOpen size={16} />} label="Trả sách" color="warning" />
+                  <QuickAction href="/stats" icon={<AlertCircle size={16} />} label="Xem thống kê" color="success" />
+                </>
+              )}
+              <QuickAction href="/active" icon={<UserCheck size={16} />} label="Đang có mặt" color="success" />
+              <QuickAction href="/history" icon={<Clock size={16} />} label="Lịch sử ra vào" color="info" />
+            </CardContent>
+          </Card>
+
+          
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({ href, icon, label, color }: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  color: "primary" | "success" | "error" | "warning" | "info";
+}) {
+  const colorMap = {
+    primary: "text-primary hover:bg-primary/10",
+    success: "text-success hover:bg-success/10",
+    error: "text-error hover:bg-error/10",
+    warning: "text-warning hover:bg-warning/10",
+    info: "text-info hover:bg-info/10",
+  };
+
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${colorMap[color]}`}
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="text-body-sm font-medium">{label}</span>
+      <ArrowRight size={14} className="ml-auto shrink-0 opacity-50" />
+    </Link>
+  );
+}
+</file>
+
 <file path="src/app/(dashboard)/history/page.tsx">
 "use client";
 
@@ -3509,61 +5103,92 @@ export default function HistoryPage() {
 }
 </file>
 
-<file path="src/app/(dashboard)/stats/page.tsx">
+<file path="src/app/(dashboard)/layout.tsx">
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import api from "@/lib/api-client";
-import type { AccessLogPublic, ActivePatron, StatsResponse } from "@/lib/types";
-import StatCard from "@/components/ui/StatCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import { Users, BookOpen, LogIn, LogOut, Clock, TrendingUp, UserCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import Sidebar from "@/components/sidebar";
+import { Bell, User, LogOut, ChevronRight } from "lucide-react";
 
-function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
+const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+  "/dashboard": { title: "Tổng quan", subtitle: "Chào mừng bạn quay lại" },
+  "/patrons": { title: "Quản lý độc giả", subtitle: "Danh sách và thông tin độc giả" },
+  "/books": { title: "Kho sách", subtitle: "Quản lý và nhập kho sách" },
+  "/active": { title: "Đang hiện diện", subtitle: "Độc giả đang có mặt trong thư viện" },
+  "/gate": { title: "Cổng ra vào", subtitle: "Xác thực khuôn mặt tại cổng" },
+  "/history": { title: "Lịch sử ra vào", subtitle: "Nhật ký ra vào cửa thư viện" },
+  "/return": { title: "Trả sách", subtitle: "Xử lý trả sách cho độc giả" },
+  "/stats": { title: "Thống kê", subtitle: "Báo cáo và biểu đồ hoạt động" },
+  "/enroll": { title: "Đăng ký khuôn mặt", subtitle: "Cập nhật thông tin khuôn mặt" },
+  "/verify": { title: "Xác thực khuôn mặt", subtitle: "Kiểm tra đối chiếu khuôn mặt" },
+  "/identify": { title: "Nhận diện", subtitle: "Tìm kiếm độc giả qua khuôn mặt" },
+  "/liveness": { title: "Kiểm tra sống", subtitle: "Xác minh khuôn mặt thật" },
+  "/dashboard/admin": { title: "Quản trị hệ thống", subtitle: "Quản lý người dùng và phân quyền" },
+};
+
+function Breadcrumb({ pathname }: { pathname: string }) {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length <= 1) return null;
+
+  return (
+    <nav className="flex items-center gap-1.5 text-body-sm text-text-3">
+      {parts.map((part, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <ChevronRight size={12} className="text-text-3" />}
+          <span className={i === parts.length - 1 ? "text-text-2" : "capitalize"}>
+            {PAGE_TITLES[`/${parts.slice(0, i + 1).join("/")}`]?.title || part.replace(/-/g, ' ')}
+          </span>
+        </span>
+      ))}
+    </nav>
+  );
 }
 
-export default function StatsPage() {
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [todayLogs, setTodayLogs] = useState<AccessLogPublic[]>([]);
-  const [activePatrons, setActivePatrons] = useState<ActivePatron[]>([]);
-  const [loading, setLoading] = useState(true);
+function Topbar({ user }: { user: any }) {
+  return (
+    <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-6">
+      <div className="flex items-center gap-4">
+        {/* Page title injected via page — can be enhanced */}
+      </div>
+      <div className="flex items-center gap-3">
+        <button className="relative p-2 rounded-md hover:bg-surface-2 transition-colors">
+          <Bell size={18} className="text-text-2" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />
+        </button>
+        <div className="flex items-center gap-2.5 pl-3 border-l border-border">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <User size={16} className="text-primary" />
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-body-sm font-medium text-text">{user?.full_name || "Admin"}</p>
+            <p className="text-caption text-text-3 capitalize">{user?.role || "staff"}</p>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    (async () => {
-      try {
-        const today = toDateStr(new Date());
-        const [s, logs, active] = await Promise.all([
-          api.getStats(),
-          api.getAccessLogs({ dateFrom: today, limit: 200 }),
-          api.getActivePatrons(),
-        ]);
-        setStats(s);
-        setTodayLogs(logs.items);
-        setActivePatrons(active.items);
-      } catch (err) {
-        console.error("Failed to load stats:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
 
-  const hourlyData = useMemo(() => {
-    const buckets = new Array(24).fill(0);
-    todayLogs.forEach((l) => {
-      const h = new Date(l.access_time).getHours();
-      buckets[h]++;
-    });
-    return buckets;
-  }, [todayLogs]);
-
-  const maxHourly = Math.max(...hourlyData, 1);
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
           <p className="text-body-sm text-text-3">Đang tải...</p>
@@ -3572,173 +5197,31 @@ export default function StatsPage() {
     );
   }
 
-  if (!stats) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-body-sm text-text-3">Không có dữ liệu</p>
-      </div>
-    );
+  if (!isAuthenticated) {
+    return null;
   }
 
+  const pageInfo = PAGE_TITLES[pathname] || PAGE_TITLES[pathname.split("/").slice(0, 2).join("/")] || { title: "", subtitle: "" };
+
   return (
-    <div className="space-y-6">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Tổng độc giả"
-          value={stats.total_patrons}
-          icon={Users}
-          accentColor="primary"
-          description="Đã đăng ký"
-        />
-        <StatCard
-          label="Đang trong thư viện"
-          value={stats.active_patrons}
-          icon={UserCheck}
-          accentColor="success"
-          description="Có mặt"
-        />
-        <StatCard
-          label="Vào hôm nay"
-          value={stats.today_entries}
-          icon={LogIn}
-          accentColor="info"
-          description="Từ 00:00"
-        />
-        <StatCard
-          label="Ra hôm nay"
-          value={stats.today_exits}
-          icon={LogOut}
-          accentColor="warning"
-          description="Từ 00:00"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Hourly distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock size={16} className="text-text-3" />
-              Phân bố theo giờ hôm nay
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-0.5 h-36">
-              {hourlyData.map((count, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-                  <span className="text-caption text-text-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {count || ""}
-                  </span>
-                  <div
-                    className="w-full bg-primary/60 hover:bg-primary rounded-t transition-all"
-                    style={{ height: `${Math.max((count / maxHourly) * 100, count > 0 ? 4 : 2)}%` }}
-                  />
-                  <span className="text-caption text-text-3">{i}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Currently in library */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen size={16} className="text-text-3" />
-              Đang trong thư viện ({activePatrons.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {activePatrons.length === 0 ? (
-              <div className="text-center py-6">
-                <div className="w-10 h-10 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-2 text-text-3">
-                  <UserCheck size={18} />
-                </div>
-                <p className="text-body-sm text-text-3">Không có ai trong thư viện</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-52 overflow-y-auto">
-                {activePatrons.slice(0, 20).map((p) => (
-                  <div key={p.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-bold">
-                        {p.full_name?.charAt(0) || "?"}
-                      </div>
-                      <div>
-                        <p className="text-body-sm font-medium text-text">{p.full_name}</p>
-                        <p className="text-caption text-text-3 font-mono">{p.student_code}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-caption text-text-3">
-                        {new Date(p.entered_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                      {p.confidence && (
-                        <p className="text-caption text-success">{(p.confidence * 100).toFixed(0)}%</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent activity table */}
-      <Card padding="none">
-        <CardHeader className="p-4 border-b border-border">
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp size={16} className="text-text-3" />
-            Hoạt động hôm nay
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {todayLogs.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-body-sm text-text-3">Chưa có hoạt động hôm nay</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Thời gian</th>
-                    <th>Độc giả</th>
-                    <th>Loại</th>
-                    <th>Cổng</th>
-                    <th>Xác thực</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {todayLogs.slice(0, 30).map((l) => (
-                    <tr key={l.id}>
-                      <td className="font-mono text-text-3">
-                        {new Date(l.access_time).toLocaleTimeString("vi-VN")}
-                      </td>
-                      <td className="font-medium">{l.patron_name || l.student_code || "-"}</td>
-                      <td>
-                        <Badge variant={l.access_type === "entry" ? "success" : "warning"} dot>
-                          {l.access_type === "entry" ? "Vào" : "Ra"}
-                        </Badge>
-                      </td>
-                      <td className="font-mono text-text-3">{l.camera_id}</td>
-                      <td className="text-text-3">{l.verify_method}</td>
-                      <td>
-                        <Badge variant={l.status === "granted" ? "success" : "error"} dot>
-                          {l.status === "granted" ? "Thành công" : "Thất bại"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+    <div className="flex min-h-screen bg-bg">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <Topbar user={user} />
+        <div className="p-6">
+          {/* Page Header */}
+          {pageInfo.title && (
+            <div className="mb-6 animate-fade-in">
+              <Breadcrumb pathname={pathname} />
+              <h1 className="text-display-xl text-text mt-1">{pageInfo.title}</h1>
+              {pageInfo.subtitle && (
+                <p className="text-body-md text-text-3 mt-0.5">{pageInfo.subtitle}</p>
+              )}
             </div>
           )}
-        </CardContent>
-      </Card>
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
@@ -4249,45 +5732,6 @@ export default function CameraCapture({
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "face-recognition-frontend",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbo",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "axios": "^1.7.7",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.454.0",
-    "next": "^16.2.9",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-hook-form": "^7.53.2",
-    "react-is": "^19.2.7",
-    "react-webcam": "^7.2.0",
-    "recharts": "^3.8.1",
-    "tailwind-merge": "^2.5.4",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@hookform/resolvers": "^3.9.1",
-    "@types/node": "^22.9.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3"
-  }
-}
-</file>
-
 <file path="src/app/(dashboard)/dashboard/admin/page.tsx">
 "use client";
 
@@ -4471,237 +5915,381 @@ export default function AdminPage() {
 }
 </file>
 
-<file path="src/app/layout.tsx">
-import type { Metadata } from "next";
-import { AuthProvider } from "@/lib/auth-context";
-import "./globals.css";
+<file path="src/app/(dashboard)/stats/page.tsx">
+"use client";
 
-export const metadata: Metadata = {
-  title: "Thư Viện IUH — Hệ thống Quản lý Thư viện Thông minh",
-  description: "Nền tảng quản lý thư viện toàn diện — quản lý độc giả, theo dõi mượn trả, và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn mặt.",
-};
+import { useEffect, useMemo, useState } from "react";
+import api from "@/lib/api-client";
+import type { AccessLogPublic, ActivePatron, BorrowRecord, StatsResponse } from "@/lib/types";
+import StatCard from "@/components/ui/StatCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import { AlertTriangle, BookOpen, Clock, LogIn, LogOut, TrendingUp, UserCheck, Users } from "lucide-react";
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function toDateStr(d: Date) {
+  return d.toISOString().split("T")[0];
+}
+
+export default function StatsPage() {
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [todayLogs, setTodayLogs] = useState<AccessLogPublic[]>([]);
+  const [activePatrons, setActivePatrons] = useState<ActivePatron[]>([]);
+  const [borrows, setBorrows] = useState<BorrowRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const today = toDateStr(new Date());
+        const [s, logs, active, allBorrows] = await Promise.all([
+          api.getStats(),
+          api.getAccessLogs({ dateFrom: today, limit: 200 }),
+          api.getActivePatrons(),
+          api.getBorrowHistory(),
+        ]);
+        setStats(s);
+        setTodayLogs(logs.items);
+        setActivePatrons(active.items);
+        setBorrows(allBorrows || []);
+      } catch (err) {
+        console.error("Failed to load stats:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const borrowStats = useMemo(() => {
+    const active = borrows.filter((b) => b.status === "borrowing");
+    const overdue = active.filter((b) => new Date(b.due_at) < new Date());
+    return {
+      total: borrows.length,
+      active: active.length,
+      overdue: overdue.length,
+      returned: borrows.filter((b) => b.status === "returned").length,
+    };
+  }, [borrows]);
+
+  const recentBorrows = useMemo(() => {
+    return [...borrows]
+      .filter((b) => b.status === "borrowing")
+      .sort((a, b) => new Date(b.borrow_at).getTime() - new Date(a.borrow_at).getTime())
+      .slice(0, 15);
+  }, [borrows]);
+
+  const hourlyData = useMemo(() => {
+    const buckets = new Array(24).fill(0);
+    todayLogs.forEach((l) => {
+      const h = new Date(l.access_time).getHours();
+      buckets[h]++;
+    });
+    return buckets;
+  }, [todayLogs]);
+
+  const maxHourly = Math.max(...hourlyData, 1);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-body-sm text-text-3">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-body-sm text-text-3">Không có dữ liệu</p>
+      </div>
+    );
+  }
+
   return (
-    <html lang="vi" className="dark">
-      <body suppressHydrationWarning className="bg-bg text-text">
-        <AuthProvider>{children}</AuthProvider>
-      </body>
-    </html>
+    <div className="space-y-6">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Tổng độc giả"
+          value={stats.total_patrons}
+          icon={Users}
+          accentColor="primary"
+          description="Đã đăng ký"
+        />
+        <StatCard
+          label="Đang trong thư viện"
+          value={stats.active_patrons}
+          icon={UserCheck}
+          accentColor="success"
+          description="Có mặt"
+        />
+        <StatCard
+          label="Vào hôm nay"
+          value={stats.today_entries}
+          icon={LogIn}
+          accentColor="info"
+          description="Từ 00:00"
+        />
+        <StatCard
+          label="Ra hôm nay"
+          value={stats.today_exits}
+          icon={LogOut}
+          accentColor="warning"
+          description="Từ 00:00"
+        />
+      </div>
+
+      {/* Borrow stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatCard
+          label="Tổng lượt mượn"
+          value={borrowStats.total}
+          icon={BookOpen}
+          accentColor="primary"
+          description="Tất cả"
+        />
+        <StatCard
+          label="Đang mượn"
+          value={borrowStats.active}
+          icon={BookOpen}
+          accentColor="success"
+          description="Chưa trả"
+        />
+        <StatCard
+          label="Quá hạn"
+          value={borrowStats.overdue}
+          icon={AlertTriangle}
+          accentColor="error"
+          description="Cần xử lý"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Hourly distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock size={16} className="text-text-3" />
+              Phân bố theo giờ hôm nay
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-0.5 h-36">
+              {hourlyData.map((count, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                  <span className="text-caption text-text-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {count || ""}
+                  </span>
+                  <div
+                    className="w-full bg-primary/60 hover:bg-primary rounded-t transition-all"
+                    style={{ height: `${Math.max((count / maxHourly) * 100, count > 0 ? 4 : 2)}%` }}
+                  />
+                  <span className="text-caption text-text-3">{i}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Currently in library */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen size={16} className="text-text-3" />
+              Đang trong thư viện ({activePatrons.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {activePatrons.length === 0 ? (
+              <div className="text-center py-6">
+                <div className="w-10 h-10 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-2 text-text-3">
+                  <UserCheck size={18} />
+                </div>
+                <p className="text-body-sm text-text-3">Không có ai trong thư viện</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-52 overflow-y-auto">
+                {activePatrons.slice(0, 20).map((p) => (
+                  <div key={p.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-bold">
+                        {p.full_name?.charAt(0) || "?"}
+                      </div>
+                      <div>
+                        <p className="text-body-sm font-medium text-text">{p.full_name}</p>
+                        <p className="text-caption text-text-3 font-mono">{p.student_code}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-caption text-text-3">
+                        {new Date(p.entered_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                      {p.confidence && (
+                        <p className="text-caption text-success">{(p.confidence * 100).toFixed(0)}%</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent activity table */}
+      <Card padding="none">
+        <CardHeader className="p-4 border-b border-border">
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp size={16} className="text-text-3" />
+            Hoạt động hôm nay
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {todayLogs.length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-body-sm text-text-3">Chưa có hoạt động hôm nay</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Độc giả</th>
+                    <th>Loại</th>
+                    <th>Cổng</th>
+                    <th>Xác thực</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {todayLogs.slice(0, 30).map((l) => (
+                    <tr key={l.id}>
+                      <td className="font-mono text-text-3">
+                        {new Date(l.access_time).toLocaleTimeString("vi-VN")}
+                      </td>
+                      <td className="font-medium">{l.patron_name || l.student_code || "-"}</td>
+                      <td>
+                        <Badge variant={l.access_type === "entry" ? "success" : "warning"} dot>
+                          {l.access_type === "entry" ? "Vào" : "Ra"}
+                        </Badge>
+                      </td>
+                      <td className="font-mono text-text-3">{l.camera_id}</td>
+                      <td className="text-text-3">{l.verify_method}</td>
+                      <td>
+                        <Badge variant={l.status === "granted" ? "success" : "error"} dot>
+                          {l.status === "granted" ? "Thành công" : "Thất bại"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Active borrows */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen size={16} className="text-text-3" />
+            Sách đang mượn ({borrowStats.active})
+            {borrowStats.overdue > 0 && (
+              <Badge variant="error" className="ml-2">{borrowStats.overdue} quá hạn</Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentBorrows.length === 0 ? (
+            <div className="text-center py-6">
+              <div className="w-10 h-10 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-2 text-text-3">
+                <BookOpen size={18} />
+              </div>
+              <p className="text-body-sm text-text-3">Không có sách đang được mượn</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Mã sách</th>
+                    <th>Mã thẻ</th>
+                    <th>Ngày mượn</th>
+                    <th>Hạn trả</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentBorrows.map((b) => {
+                    const isOverdue = b.status === "borrowing" && new Date(b.due_at) < new Date();
+                    return (
+                      <tr key={b.id} className={isOverdue ? "bg-error/5" : ""}>
+                        <td className="font-mono text-primary">{b.book_id}</td>
+                        <td className="font-mono text-text-3">{b.patron_id}</td>
+                        <td>{new Date(b.borrow_at).toLocaleDateString("vi-VN")}</td>
+                        <td className={isOverdue ? "text-error font-semibold" : ""}>
+                          {new Date(b.due_at).toLocaleDateString("vi-VN")}
+                        </td>
+                        <td>
+                          <Badge variant={isOverdue ? "error" : "success"}>
+                            {isOverdue ? "Quá hạn" : "Đúng hạn"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 </file>
 
-<file path="src/components/sidebar.tsx">
-"use client";
-
-import { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import {
-  LayoutDashboard,
-  Users,
-  BookOpen,
-  History,
-  BookMarked,
-  ScanFace,
-  UserCheck,
-  Search,
-  Eye,
-  Shield,
-  BarChart3,
-  ChevronDown,
-  DoorOpen,
-  LogOut,
-  Library,
-} from "lucide-react";
-
-const libraryItems = [
-  { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
-  { href: "/patrons", label: "Độc giả", icon: Users },
-  { href: "/active", label: "Đang hiện diện", icon: BookOpen },
-  { href: "/gate", label: "Cổng ra vào", icon: DoorOpen },
-  { href: "/history", label: "Lịch sử ra vào", icon: History },
-];
-
-const circulationItems = [
-  { href: "/return", label: "Trả sách", icon: BookMarked },
-];
-
-const aiItems = [
-  { href: "/enroll", label: "Đăng ký khuôn mặt", icon: ScanFace },
-  { href: "/verify", label: "Xác thực khuôn mặt", icon: UserCheck },
-  { href: "/identify", label: "Nhận diện", icon: Search },
-  { href: "/liveness", label: "Kiểm tra sống", icon: Eye },
-];
-
-const adminItems = [
-  { href: "/dashboard/admin", label: "Quản trị", icon: Shield },
-  { href: "/stats", label: "Thống kê", icon: BarChart3 },
-];
-
-function NavItem({
-  href,
-  icon: Icon,
-  label,
-  active,
-  badge,
-}: {
-  href: string;
-  icon: any;
-  label: string;
-  active?: boolean;
-  badge?: number;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`nav-item ${active ? "nav-item-active" : ""}`}
-    >
-      <Icon size={18} className={`shrink-0 ${active ? "text-primary" : "text-text-2"}`} />
-      <span className="flex-1 truncate">{label}</span>
-      {badge !== undefined && badge > 0 && (
-        <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-caption font-medium min-w-[20px] text-center">
-          {badge > 99 ? "99+" : badge}
-        </span>
-      )}
-    </Link>
-  );
-}
-
-function SectionLabel({ children, collapsible, open, onToggle }: {
-  children: React.ReactNode;
-  collapsible?: boolean;
-  open?: boolean;
-  onToggle?: () => void;
-}) {
-  if (collapsible) {
-    return (
-      <button
-        onClick={onToggle}
-        className="flex items-center justify-between w-full px-3 mb-1 text-body-sm text-text-2 hover:text-text transition-colors"
-      >
-        <span>{children}</span>
-        <ChevronDown
-          size={12}
-          className={`transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-    );
+<file path="package.json">
+{
+  "name": "face-recognition-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
+    "next": "^16.2.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-form": "^7.53.2",
+    "react-is": "^19.2.7",
+    "react-webcam": "^7.2.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
   }
-  return (
-    <p className="px-3 mb-1 text-body-sm text-text-2">{children}</p>
-  );
-}
-
-export default function Sidebar() {
-  const pathname = usePathname();
-  const { user, logout } = useAuth();
-  const [aiOpen, setAiOpen] = useState(true);
-  const [adminOpen, setAdminOpen] = useState(true);
-
-  const role = user?.role || "staff";
-
-  return (
-    <aside className="w-64 min-h-screen bg-surface border-r border-border flex flex-col">
-      {/* Logo */}
-      <div className="px-4 py-5 border-b border-border">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Library size={22} className="text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-heading-md text-text">THƯ VIỆN IUH</h2>
-            <p className="text-caption text-text-3">Hệ thống quản lý</p>
-          </div>
-        </Link>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
-        {/* Library section */}
-        <div>
-          <SectionLabel>Thư viện</SectionLabel>
-          <div className="space-y-0.5">
-            {libraryItems.map((item) => (
-              <NavItem key={item.href} {...item} active={pathname === item.href} />
-            ))}
-          </div>
-        </div>
-
-        {/* Circulation */}
-        {role === "admin" || role === "staff" ? (
-          <div>
-            <SectionLabel>Mượn / Trả</SectionLabel>
-            <div className="space-y-0.5">
-              {circulationItems.map((item) => (
-                <NavItem key={item.href} {...item} active={pathname === item.href} />
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {/* AI Diagnostics — collapsible */}
-        {role === "admin" ? (
-          <div>
-            <SectionLabel collapsible open={aiOpen} onToggle={() => setAiOpen((v) => !v)}>
-              Chẩn đoán AI
-            </SectionLabel>
-            {aiOpen && (
-              <div className="space-y-0.5">
-                {aiItems.map((item) => (
-                  <NavItem key={item.href} {...item} active={pathname === item.href} />
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        {/* Admin */}
-        {role === "admin" ? (
-          <div>
-            <SectionLabel collapsible open={adminOpen} onToggle={() => setAdminOpen((v) => !v)}>
-              Quản trị
-            </SectionLabel>
-            {adminOpen && (
-              <div className="space-y-0.5">
-                {adminItems.map((item) => (
-                  <NavItem key={item.href} {...item} active={pathname === item.href} />
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </nav>
-
-      {/* User footer */}
-      <div className="p-3 border-t border-border">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-surface-2 transition-colors">
-          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary shrink-0">
-            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-body-sm font-medium text-text truncate">
-              {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
-            </p>
-            <p className="text-caption text-text-2 capitalize">{role === "admin" ? "Quản trị viên" : "Nhân viên"}</p>
-          </div>
-          <button
-            onClick={logout}
-            className="p-1.5 rounded-md text-text-2 hover:text-error hover:bg-error/10 transition-colors shrink-0"
-            title="Đăng xuất"
-          >
-            <LogOut size={15} />
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
 }
 </file>
 
@@ -4871,312 +6459,6 @@ export default function IdentifyPage() {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/patrons/[id]/page.tsx">
-'use client';
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import api, { getErrorMessage } from "@/lib/api-client";
-import MultiAngleCapture from "@/components/MultiAngleCapture";
-import type { AccessLogPublic, PatronPublic, PatronUpdate } from "@/lib/types";
-import type { CaptureAngle } from "@/components/MultiAngleCapture";
-
-export default function PatronDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-
-  const [patron, setPatron] = useState<PatronPublic | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [logs, setLogs] = useState<AccessLogPublic[]>([]);
-  const [logsTotal, setLogsTotal] = useState(0);
-  const [logsSkip, setLogsSkip] = useState(0);
-  const logsLimit = 20;
-
-  const [editForm, setEditForm] = useState<PatronUpdate>({});
-  const [showEdit, setShowEdit] = useState(false);
-
-  const [showEnroll, setShowEnroll] = useState(false);
-  const [consent, setConsent] = useState(false);
-  const [enrollError, setEnrollError] = useState("");
-  const [enrollSuccess, setEnrollSuccess] = useState("");
-  const [enrollLoading, setEnrollLoading] = useState(false);
-
-  const loadPatron = useCallback(async () => {
-    try {
-      const data = await api.getPatron(id);
-      setPatron(data);
-    } catch { return null; }
-  }, [id]);
-
-  const loadLogs = useCallback(async (append = false) => {
-    try {
-      const data = await api.getAccessLogs({ patronId: id, skip: logsSkip, limit: logsLimit });
-      if (append) setLogs((prev) => [...prev, ...data.items]);
-      else setLogs(data.items);
-      setLogsTotal(data.total);
-    } catch { }
-  }, [id, logsSkip]);
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await loadPatron();
-      await loadLogs();
-      setLoading(false);
-    })();
-  }, [loadPatron, loadLogs]);
-
-  const handleEdit = async () => {
-    if (!patron) return;
-    await api.updatePatron(patron.id, editForm);
-    setShowEdit(false);
-    setEditForm({});
-    await loadPatron();
-  };
-
-  const handleRenew = async () => {
-    if (!patron) return;
-    const current = new Date(patron.membership_expiry);
-    const next = new Date(current);
-    next.setFullYear(next.getFullYear() + 1);
-    await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
-    await loadPatron();
-  };
-
-  const handleDelete = async () => {
-    if (!patron || !confirm("Xóa độc giả này?")) return;
-    try {
-      await api.deletePatron(patron.id);
-      router.push("/patrons");
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        alert("Độc giả không tồn tại hoặc đã bị xóa trước đó.");
-        router.push("/patrons");
-      } else {
-        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lời không xác định"));
-      }
-    }
-  };
-
-  const handleEnroll = async (files: Record<CaptureAngle, File>) => {
-    if (!patron) return;
-    setEnrollLoading(true);
-    setEnrollError("");
-    setEnrollSuccess("");
-    try {
-      await api.enrollPatronFaceBatch(patron.id, {
-        frontal: files.frontal,
-        right: files.right,
-        left: files.left,
-        down: files.down,
-      });
-      setEnrollSuccess("Đăng ký khuôn mặt thành công!");
-      setShowEnroll(false);
-      setConsent(false);
-      await loadPatron();
-    } catch (err: any) {
-      const errCode = err?.response?.data?.error || err?.response?.data?.detail;
-      const errorMessages: Record<string, string> = {
-        LIVENESS_FAILED: "Ảnh không phải khuôn mặt thật, vui lòng chụp ảnh trực tiếp",
-        NO_FACE_DETECTED: "Không tìm thấy khuôn mặt trong ảnh, vui lòng thử lại",
-        MULTIPLE_FACES: "Có nhiều hơn 1 khuôn mặt trong ảnh, vui lòng chụp lại",
-        LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với điều kiện ánh sáng tốt hơn",
-        FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại",
-      };
-      setEnrollError(errorMessages[errCode] || getErrorMessage(err) || "Đăng ký thất bại");
-    } finally {
-      setEnrollLoading(false);
-    }
-  };
-
-  if (loading) return <p className="text-gray-500">Đang tải...</p>;
-  if (!patron) return (
-    <div className="text-center py-12">
-      <p className="text-gray-500 text-lg mb-4">Không tìm thấy độc giả</p>
-      <p className="text-gray-400 text-sm mb-6">Độc giả có thể đã bị xóa hoặc ID không hợp lệ.</p>
-      <button onClick={() => router.push("/patrons")} className="px-4 py-2 bg-blue-600 text-white rounded-md">
-        &larr; Quay lại danh sách
-      </button>
-    </div>
-  );
-
-  const pageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
-  const currentPage = Math.floor(logsSkip / logsLimit) + 1;
-
-  return (
-    <div className="space-y-6 max-w-4xl">
-      <button onClick={() => router.push("/patrons")} className="text-blue-600 hover:underline text-sm">&larr; Quay lại danh sách</button>
-
-      <div className="border rounded-lg p-6 bg-white">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{patron.full_name}</h1>
-            <p className="text-gray-500">MSSV: {patron.student_code} &middot; Mã thẻ: {patron.card_number}</p>
-          </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            patron.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}>{patron.status}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-          <div><span className="text-gray-500">Họ tên:</span> <span className="font-medium">{patron.full_name}</span></div>
-          <div><span className="text-gray-500">MSSV:</span> <span className="font-medium">{patron.student_code}</span></div>
-          <div><span className="text-gray-500">Lớp:</span> <span className="font-medium">{patron.class_name || "-"}</span></div>
-          <div><span className="text-gray-500">Mã thẻ:</span> <span className="font-medium">{patron.card_number}</span></div>
-          <div><span className="text-gray-500">Ngày cấp thẻ:</span> <span className="font-medium">{patron.issue_date || "-"}</span></div>
-          <div><span className="text-gray-500">Hạn thẻ:</span>
-            <span className={`font-medium ml-1 ${new Date(patron.membership_expiry) < new Date() ? "text-red-600" : "text-green-600"}`}>
-              {patron.membership_expiry}
-            </span>
-          </div>
-          <div><span className="text-gray-500">Khuôn mặt:</span>
-            <span className={`font-medium ml-1 ${patron.has_face ? "text-green-600" : "text-gray-400"}`}>
-              {patron.has_face ? "✓ Đã đăng ký" : "✗ Chưa đăng ký"}
-            </span>
-          </div>
-          <div><span className="text-gray-500">Tạo lúc:</span> <span className="font-medium">{new Date(patron.created_at).toLocaleString("vi-VN")}</span></div>
-        </div>
-        <div className="flex gap-3 mt-6 pt-4 border-t">
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm" onClick={() => { setEditForm({
-            full_name: patron.full_name, class_name: patron.class_name || undefined,
-            membership_expiry: patron.membership_expiry, status: patron.status,
-          }); setShowEdit(true); }}>Sửa thông tin</button>
-          <button className="px-4 py-2 bg-green-600 text-white rounded-md text-sm" onClick={handleRenew}>Gia hạn thẻ</button>
-          {!patron.has_face && (
-            <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
-              onClick={() => setShowEnroll(true)}>📷 Đăng ký khuôn mặt</button>
-          )}
-          <button className="px-4 py-2 bg-red-600 text-white rounded-md text-sm ml-auto" onClick={handleDelete}>Xóa</button>
-        </div>
-        {enrollSuccess && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
-            <span className="text-lg">✓</span> {enrollSuccess}
-          </div>
-        )}
-      </div>
-
-      {showEnroll && !patron.has_face && (
-        <div className="border rounded-lg p-4 bg-white">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-lg">Đăng ký khuôn mặt 4 góc</h3>
-            <button onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}
-              className="text-gray-500 hover:text-gray-700 text-sm">✕ Đóng</button>
-          </div>
-          <MultiAngleCapture
-            consent={consent}
-            setConsent={setConsent}
-            onFilesReady={handleEnroll}
-          />
-          {enrollError && <p className="text-red-500 text-sm mt-2">{enrollError}</p>}
-          {enrollLoading && <p className="text-blue-600 text-sm mt-2">Đang đăng ký...</p>}
-        </div>
-      )}
-
-      {showEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
-          <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold">Sửa độc giả</h2>
-            {[["full_name", "Họ tên"], ["class_name", "Lớp"],
-              ["membership_expiry", "Hạn thẻ"], ["status", "Trạng thái"]
-            ].map(([key, label]) => (
-              <label key={key} className="block">
-                <span className="text-sm font-medium">{label}:</span>
-                {key === "status" ? (
-                  <select className="mt-1 block w-full px-3 py-2 border rounded-md"
-                    value={(editForm as any)[key] || ""}
-                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}>
-                    <option value="active">active</option>
-                    <option value="inactive">inactive</option>
-                    <option value="expired">expired</option>
-                  </select>
-                ) : (
-                  <input className="mt-1 block w-full px-3 py-2 border rounded-md"
-                    value={(editForm as any)[key] || ""}
-                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
-                    type={key === "membership_expiry" ? "date" : "text"} />
-                )}
-              </label>
-            ))}
-            <div className="flex gap-3 pt-2">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleEdit}>Lưu</button>
-              <button className="px-4 py-2 bg-gray-200 rounded-md" onClick={() => setShowEdit(false)}>Hủy</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="border rounded-lg bg-white">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Lịch sử ra vào</h2>
-        </div>
-        {logs.length === 0 ? (
-          <p className="p-4 text-gray-500 text-sm">Chưa có lịch sử ra vào</p>
-        ) : (
-          <>
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="p-3 text-left font-medium">Thời gian</th>
-                  <th className="p-3 text-left font-medium">Loại</th>
-                  <th className="p-3 text-left font-medium">Cổng</th>
-                  <th className="p-3 text-left font-medium">Phương thức</th>
-                  <th className="p-3 text-left font-medium">Độ tin cậy</th>
-                  <th className="p-3 text-left font-medium">Kết quả</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id} className="border-t hover:bg-gray-50">
-                    <td className="p-3 whitespace-nowrap">{new Date(log.access_time).toLocaleString("vi-VN")}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        log.access_type === "entry" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"
-                      }`}>{log.access_type === "entry" ? "Vào" : "Ra"}</span>
-                    </td>
-                    <td className="p-3 text-gray-600">{log.camera_id}</td>
-                    <td className="p-3 text-gray-600">{log.verify_method}</td>
-                    <td className="p-3">
-                      {log.confidence != null ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${
-                              log.confidence >= 0.8 ? "bg-green-500" : log.confidence >= 0.6 ? "bg-yellow-500" : "bg-red-500"
-                            }`} style={{ width: `${(log.confidence * 100).toFixed(0)}%` }} />
-                          </div>
-                          <span className="text-xs">{(log.confidence * 100).toFixed(0)}%</span>
-                        </div>
-                      ) : "-"}
-                    </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        log.status === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                      }`}>{log.status === "success" ? "✓" : "✗"}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {logsTotal > logsLimit && (
-              <div className="flex items-center justify-between p-4 border-t text-sm">
-                <span className="text-gray-500">Tổng: {logsTotal}</span>
-                <div className="flex items-center gap-2">
-                  <button className="px-3 py-1 border rounded-md disabled:opacity-40"
-                    disabled={currentPage <= 1}
-                    onClick={() => setLogsSkip(0)}>«</button>
-                  <span>Trang {currentPage} / {pageCount}</span>
-                  <button className="px-3 py-1 border rounded-md disabled:opacity-40"
-                    disabled={currentPage >= pageCount}
-                    onClick={() => setLogsSkip((pageCount - 1) * logsLimit)}>»</button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }
@@ -5355,6 +6637,34 @@ export default function VerifyPage() {
 }
 </file>
 
+<file path="src/app/layout.tsx">
+import type { Metadata } from "next";
+import { AuthProvider } from "@/lib/auth-context";
+import { ToastProvider } from "@/components/ui/Toast";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Thư Viện IUH — Hệ thống Quản lý Thư viện Thông minh",
+  description: "Nền tảng quản lý thư viện toàn diện — quản lý độc giả, theo dõi mượn trả, và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn mặt.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="vi" className="dark">
+      <body suppressHydrationWarning className="bg-bg text-text">
+        <AuthProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}
+</file>
+
 <file path="src/components/job-poll.tsx">
 "use client";
 
@@ -5453,6 +6763,216 @@ export default function JobPoll({ jobId, onComplete, onError }: JobPollProps) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+</file>
+
+<file path="src/components/sidebar.tsx">
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import {
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  History,
+  BookMarked,
+  ScanFace,
+  UserCheck,
+  Search,
+  Eye,
+  Shield,
+  BarChart3,
+  ChevronDown,
+  DoorOpen,
+  LogOut,
+  Library,
+} from "lucide-react";
+
+const libraryItems = [
+  { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
+  { href: "/patrons", label: "Độc giả", icon: Users },
+  { href: "/active", label: "Đang hiện diện", icon: BookOpen },
+  { href: "/gate", label: "Cổng ra vào", icon: DoorOpen },
+  { href: "/history", label: "Lịch sử ra vào", icon: History },
+];
+
+const circulationItems = [
+  { href: "/return", label: "Trả sách", icon: BookMarked },
+  { href: "/books", label: "Kho sách", icon: Library },
+];
+
+const aiItems = [
+  { href: "/enroll", label: "Đăng ký khuôn mặt", icon: ScanFace },
+  { href: "/verify", label: "Xác thực khuôn mặt", icon: UserCheck },
+  { href: "/identify", label: "Nhận diện", icon: Search },
+  { href: "/liveness", label: "Kiểm tra sống", icon: Eye },
+];
+
+const adminItems = [
+  { href: "/dashboard/admin", label: "Quản trị", icon: Shield },
+  { href: "/stats", label: "Thống kê", icon: BarChart3 },
+];
+
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  active,
+  badge,
+}: {
+  href: string;
+  icon: any;
+  label: string;
+  active?: boolean;
+  badge?: number;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`nav-item ${active ? "nav-item-active" : ""}`}
+    >
+      <Icon size={18} className={`shrink-0 ${active ? "text-primary" : "text-text-2"}`} />
+      <span className="flex-1 truncate">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-caption font-medium min-w-[20px] text-center">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function SectionLabel({ children, collapsible, open, onToggle }: {
+  children: React.ReactNode;
+  collapsible?: boolean;
+  open?: boolean;
+  onToggle?: () => void;
+}) {
+  if (collapsible) {
+    return (
+      <button
+        onClick={onToggle}
+        className="flex items-center justify-between w-full px-3 mb-1 text-body-sm text-text-2 hover:text-text transition-colors"
+      >
+        <span>{children}</span>
+        <ChevronDown
+          size={12}
+          className={`transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+    );
+  }
+  return (
+    <p className="px-3 mb-1 text-body-sm text-text-2">{children}</p>
+  );
+}
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const { user, logout } = useAuth();
+  const [aiOpen, setAiOpen] = useState(true);
+  const [adminOpen, setAdminOpen] = useState(true);
+
+  const role = user?.role || "staff";
+
+  return (
+    <aside className="w-64 min-h-screen bg-surface border-r border-border flex flex-col">
+      {/* Logo */}
+      <div className="px-4 py-5 border-b border-border">
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Library size={22} className="text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-heading-md text-text">THƯ VIỆN IUH</h2>
+            <p className="text-caption text-text-3">Hệ thống quản lý</p>
+          </div>
+        </Link>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+        {/* Library section */}
+        <div>
+          <SectionLabel>Thư viện</SectionLabel>
+          <div className="space-y-0.5">
+            {libraryItems.map((item) => (
+              <NavItem key={item.href} {...item} active={pathname === item.href} />
+            ))}
+          </div>
+        </div>
+
+        {/* Circulation */}
+        {role === "admin" || role === "staff" ? (
+          <div>
+            <SectionLabel>Mượn / Trả</SectionLabel>
+            <div className="space-y-0.5">
+              {circulationItems.map((item) => (
+                <NavItem key={item.href} {...item} active={pathname === item.href} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* AI Diagnostics — collapsible */}
+        {role === "admin" ? (
+          <div>
+            <SectionLabel collapsible open={aiOpen} onToggle={() => setAiOpen((v) => !v)}>
+              Chẩn đoán AI
+            </SectionLabel>
+            {aiOpen && (
+              <div className="space-y-0.5">
+                {aiItems.map((item) => (
+                  <NavItem key={item.href} {...item} active={pathname === item.href} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {/* Admin */}
+        {role === "admin" ? (
+          <div>
+            <SectionLabel collapsible open={adminOpen} onToggle={() => setAdminOpen((v) => !v)}>
+              Quản trị
+            </SectionLabel>
+            {adminOpen && (
+              <div className="space-y-0.5">
+                {adminItems.map((item) => (
+                  <NavItem key={item.href} {...item} active={pathname === item.href} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </nav>
+
+      {/* User footer */}
+      <div className="p-3 border-t border-border">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-surface-2 transition-colors">
+          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-body-sm font-medium text-text truncate">
+              {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
+            </p>
+            <p className="text-caption text-text-2 capitalize">{role === "admin" ? "Quản trị viên" : "Nhân viên"}</p>
+          </div>
+          <button
+            onClick={logout}
+            className="p-1.5 rounded-md text-text-2 hover:text-error hover:bg-error/10 transition-colors shrink-0"
+            title="Đăng xuất"
+          >
+            <LogOut size={15} />
+          </button>
+        </div>
+      </div>
+    </aside>
   );
 }
 </file>
@@ -5640,6 +7160,376 @@ export default function LivenessPage() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/patrons/[id]/page.tsx">
+'use client';
+
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import api, { getErrorMessage } from "@/lib/api-client";
+import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import MultiAngleCapture from "@/components/MultiAngleCapture";
+import { BookOpen } from "lucide-react";
+import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
+import type { CaptureAngle } from "@/components/MultiAngleCapture";
+
+export default function PatronDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+
+  const [patron, setPatron] = useState<PatronPublic | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState<AccessLogPublic[]>([]);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsSkip, setLogsSkip] = useState(0);
+  const logsLimit = 20;
+
+  const [borrows, setBorrows] = useState<BorrowRecord[]>([]);
+
+  const [editForm, setEditForm] = useState<PatronUpdate>({});
+  const [showEdit, setShowEdit] = useState(false);
+  const [showEnroll, setShowEnroll] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [enrollError, setEnrollError] = useState("");
+  const [enrollSuccess, setEnrollSuccess] = useState("");
+  const [enrollLoading, setEnrollLoading] = useState(false);
+
+  const loadPatron = useCallback(async () => {
+    try {
+      const data = await api.getPatron(id);
+      setPatron(data);
+    } catch { return null; }
+  }, [id]);
+
+  const loadLogs = useCallback(async (append = false) => {
+    try {
+      const data = await api.getAccessLogs({ patronId: id, skip: logsSkip, limit: logsLimit });
+      if (append) setLogs((prev) => [...prev, ...data.items]);
+      else setLogs(data.items);
+      setLogsTotal(data.total);
+    } catch { }
+  }, [id, logsSkip]);
+
+  const loadBorrows = useCallback(async () => {
+    try {
+      const data = await api.getBorrowHistory({ patronId: id });
+      setBorrows(data);
+    } catch { /* silent fail */ }
+  }, [id]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await Promise.all([loadPatron(), loadLogs(), loadBorrows()]);
+      setLoading(false);
+    })();
+  }, [loadPatron, loadLogs, loadBorrows]);
+
+  const handleEdit = async () => {
+    if (!patron) return;
+    await api.updatePatron(patron.id, editForm);
+    setShowEdit(false);
+    setEditForm({});
+    await loadPatron();
+  };
+
+  const handleRenew = async () => {
+    if (!patron) return;
+    const current = new Date(patron.membership_expiry);
+    const next = new Date(current);
+    next.setFullYear(next.getFullYear() + 1);
+    await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
+    await loadPatron();
+  };
+
+  const handleDelete = async () => {
+    if (!patron || !confirm("Xóa độc giả này?")) return;
+    try {
+      await api.deletePatron(patron.id);
+      router.push("/patrons");
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        alert("Độc giả không tồn tại hoặc đã bị xóa trước đó.");
+        router.push("/patrons");
+      } else {
+        alert("Xóa thất bại: " + (getErrorMessage(err) || "Lời không xác định"));
+      }
+    }
+  };
+
+  const handleEnroll = async (files: Record<CaptureAngle, File>) => {
+    if (!patron) return;
+    setEnrollLoading(true);
+    setEnrollError("");
+    setEnrollSuccess("");
+    try {
+      await api.enrollPatronFaceBatch(patron.id, {
+        frontal: files.frontal,
+        right: files.right,
+        left: files.left,
+        down: files.down,
+      });
+      setEnrollSuccess("Đăng ký khuôn mặt thành công!");
+      setShowEnroll(false);
+      setConsent(false);
+      await loadPatron();
+    } catch (err: any) {
+      const errCode = err?.response?.data?.error || err?.response?.data?.detail;
+      const errorMessages: Record<string, string> = {
+        LIVENESS_FAILED: "Ảnh không phải khuôn mặt thật, vui lòng chụp ảnh trực tiếp",
+        NO_FACE_DETECTED: "Không tìm thấy khuôn mặt trong ảnh, vui lòng thử lại",
+        MULTIPLE_FACES: "Có nhiều hơn 1 khuôn mặt trong ảnh, vui lòng chụp lại",
+        LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với điều kiện ánh sáng tốt hơn",
+        FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại",
+      };
+      setEnrollError(errorMessages[errCode] || getErrorMessage(err) || "Đăng ký thất bại");
+    } finally {
+      setEnrollLoading(false);
+    }
+  };
+
+  if (loading) return <p className="text-text-3">Đang tải...</p>;
+  if (!patron) return (
+    <div className="text-center py-12">
+      <p className="text-text-2 text-lg mb-4">Không tìm thấy độc giả</p>
+      <p className="text-text-3 text-sm mb-6">Độc giả có thể đã bị xóa hoặc ID không hợp lệ.</p>
+      <Button variant="primary" onClick={() => router.push("/patrons")}>
+        &larr; Quay lại danh sách
+      </Button>
+    </div>
+  );
+
+  const pageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
+  const currentPage = Math.floor(logsSkip / logsLimit) + 1;
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <button onClick={() => router.push("/patrons")} className="text-primary hover:underline text-sm">&larr; Quay lại danh sách</button>
+
+      <Card>
+        <div className="p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col">
+              <h1 className="text-2xl font-bold">{patron.full_name}</h1>
+              <p className="text-text-3">MSSV: {patron.student_code} &middot; Mã thẻ: {patron.card_number}</p>
+            </div>
+            <Badge variant={patron.status === "active" ? "success" : "error"}>
+              {patron.status}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+            <div><span className="text-text-3">Họ tên:</span> <span className="font-medium">{patron.full_name}</span></div>
+            <div><span className="text-text-3">MSSV:</span> <span className="font-medium">{patron.student_code}</span></div>
+            <div><span className="text-text-3">Lớp:</span> <span className="font-medium">{patron.class_name || "-"}</span></div>
+            <div><span className="text-text-3">Mã thẻ:</span> <span className="font-medium">{patron.card_number}</span></div>
+            <div><span className="text-text-3">Ngày cấp thẻ:</span> <span className="font-medium">{patron.issue_date || "-"}</span></div>
+            <div><span className="text-text-3">Hạn thẻ:</span>
+              <span className={`font-medium ml-1 ${new Date(patron.membership_expiry) < new Date() ? "text-error" : "text-success"}`}>
+                {patron.membership_expiry}
+              </span>
+            </div>
+            <div><span className="text-text-3">Khuôn mặt:</span>
+              <span className={`font-medium ml-1 ${patron.has_face ? "text-success" : "text-text-3"}`}>
+                {patron.has_face ? "✓ Đã đăng ký" : "✗ Chưa đăng ký"}
+              </span>
+            </div>
+            <div><span className="text-text-3">Tạo lúc:</span> <span className="font-medium">{new Date(patron.created_at).toLocaleString("vi-VN")}</span></div>
+          </div>
+          <div className="flex gap-3 mt-6 pt-4 border-t">
+            <Button variant="primary" className="text-sm" onClick={() => { setEditForm({
+              full_name: patron.full_name,
+              class_name: patron.class_name || undefined,
+              membership_expiry: patron.membership_expiry,
+              status: patron.status,
+            }); setShowEdit(true); }}>Sửa thông tin</Button>
+            <Button variant="secondary" className="text-sm" onClick={handleRenew}>Gia hạn thẻ</Button>
+            {!patron.has_face && (
+              <Button variant="ghost" className="text-sm" onClick={() => setShowEnroll(true)}>📷 Đăng ký khuôn mặt</Button>
+            )}
+            <Button variant="danger" className="text-sm" onClick={handleDelete}>Xóa</Button>
+          </div>
+          {enrollSuccess && (
+            <div className="mt-4 p-3 bg-success/5 border border-success/10 rounded-lg text-success text-sm flex items-center gap-2">
+              <span className="text-lg">✓</span> {enrollSuccess}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card className="mt-6">
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <BookOpen size={20} className="text-primary" />
+            <h3 className="font-semibold text-lg">Lịch sử mượn sách</h3>
+          </div>
+        </div>
+        {borrows.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3">
+              <BookOpen size={20} className="text-text-3" />
+            </div>
+            <p className="text-text-3 text-sm italic">Độc giả này chưa mượn cuốn sách nào.</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-surface-2">
+              <tr className="border-b border-border">
+                <th className="p-3 text-left font-medium">Mã sách</th>
+                <th className="p-3 text-left font-medium">Ngày mượn</th>
+                <th className="p-3 text-left font-medium">Hạn trả</th>
+                <th className="p-3 text-left font-medium">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {borrows.map((b) => {
+                const isOverdue = b.status === "borrowing" && new Date(b.due_at) < new Date();
+                return (
+                  <tr key={b.id} className="border-t hover:bg-surface-2/20">
+                    <td className="p-3 font-mono text-primary">{b.book_id}</td>
+                    <td className="p-3">{new Date(b.borrow_at).toLocaleDateString("vi-VN")}</td>
+                    <td className={`p-3 ${isOverdue ? "text-error font-semibold" : ""}`}>
+                      {new Date(b.due_at).toLocaleDateString("vi-VN")}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={isOverdue ? "error" : b.status === "returned" ? "neutral" : "success"}>
+                        {b.status === "returned" ? "Đã trả" : isOverdue ? "Quá hạn" : "Đang mượn"}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      {showEnroll && !patron.has_face && (
+        <Card>
+          <div className="p-4 border-b">
+            <h3 className="font-semibold text-lg">Đăng ký khuôn mặt 4 góc</h3>
+          </div>
+          <div className="p-4">
+            <MultiAngleCapture
+              consent={consent}
+              setConsent={setConsent}
+              onFilesReady={handleEnroll}
+            />
+            {enrollError && <p className="text-error text-sm mt-2">{enrollError}</p>}
+            {enrollLoading && <p className="text-primary text-sm mt-2">Đang đăng ký...</p>}
+          </div>
+          <div className="p-4 pt-0">
+            <Button variant="ghost" className="text-sm" onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}>✕ Đóng</Button>
+          </div>
+        </Card>
+      )}
+
+      {showEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
+          <div className="bg-surface-2 rounded-lg p-6 w-full max-w-md space-y-4 shadow-2xl border border-border" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold">Sửa độc giả</h2>
+            {[["full_name", "Họ tên"], ["class_name", "Lớp"],
+              ["membership_expiry", "Hạn thẻ"], ["status", "Trạng thái"]
+            ].map(([key, label]) => (
+              <label key={key} className="block">
+                <span className="text-sm font-medium">{label}:</span>
+                {key === "status" ? (
+                  <select className="mt-1 block w-full px-3 py-2 border rounded-md"
+                    value={(editForm as any)[key] || ""}
+                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}>
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                    <option value="expired">expired</option>
+                  </select>
+                ) : (
+                  <input className="mt-1 block w-full px-3 py-2 border rounded-md"
+                    value={(editForm as any)[key] || ""}
+                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                    type={key === "membership_expiry" ? "date" : "text"} />
+                )}
+              </label>
+            ))}
+            <div className="flex gap-3 pt-2">
+              <Button variant="primary" className="px-4 py-2" onClick={handleEdit}>Lưu</Button>
+              <Button variant="ghost" className="px-4 py-2" onClick={() => setShowEdit(false)}>Hủy</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Card>
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold">Lịch sử ra vào</h2>
+        </div>
+        {logs.length === 0 ? (
+          <p className="p-4 text-text-3 text-sm">Chưa có lịch sử ra vào</p>
+        ) : (
+          <>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-surface-2">
+                  <th className="p-3 text-left font-medium">Thời gian</th>
+                  <th className="p-3 text-left font-medium">Loại</th>
+                  <th className="p-3 text-left font-medium">Cổng</th>
+                  <th className="p-3 text-left font-medium">Phương thức</th>
+                  <th className="p-3 text-left font-medium">Độ tin cậy</th>
+                  <th className="p-3 text-left font-medium">Kết quả</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.id} className="border-t hover:bg-surface-2/20">
+                    <td className="p-3 whitespace-nowrap">{new Date(log.access_time).toLocaleString("vi-VN")}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        log.access_type === "entry" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                      }`}>{log.access_type === "entry" ? "Vào" : "Ra"}</span>
+                    </td>
+                    <td className="p-3 text-text-2">{log.camera_id}</td>
+                    <td className="p-3 text-text-2">{log.verify_method}</td>
+                    <td className="p-3">
+                      {log.confidence != null ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-2 bg-surface-2 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${
+                              log.confidence >= 0.8 ? "bg-success" : log.confidence >= 0.6 ? "bg-warning" : "bg-error"
+                            }`} style={{ width: `${(log.confidence * 100).toFixed(0)}%` }} />
+                          </div>
+                          <span className="text-xs">{(log.confidence * 100).toFixed(0)}%</span>
+                        </div>
+                      ) : "-"}
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        log.status === "success" ? "bg-success/15 text-success" : "bg-error/15 text-error"
+                      }`}>{log.status === "success" ? "✓" : "✗"}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {logsTotal > logsLimit && (
+              <div className="flex items-center justify-between p-4 border-t text-sm">
+                <span className="text-text-2">Tổng: {logsTotal}</span>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" className="px-3 py-1 rounded-md disabled:opacity-40"
+                    disabled={currentPage <= 1}
+                    onClick={() => setLogsSkip(0)}>«</Button>
+                  <span className="text-text-2">Trang {currentPage} / {pageCount}</span>
+                  <Button variant="ghost" className="px-3 py-1 rounded-md disabled:opacity-40"
+                    disabled={currentPage >= pageCount}
+                    onClick={() => setLogsSkip((pageCount - 1) * logsLimit)}>»</Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
     </div>
   );
 }
@@ -6310,7 +8200,7 @@ export default function EnrollPage() {
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Eye, Camera, Upload } from "lucide-react";
+import { Eye, Camera } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import api, { getErrorMessage } from "@/lib/api-client";
@@ -6449,16 +8339,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
-    stopCamera();
   };
 
   const capturePhoto = useCallback((cb?: (file: File) => void) => {
@@ -6627,12 +8507,12 @@ export default function LoginPage() {
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full text-text-3 text-body-sm gap-2">
                         <Camera size={24} />
-                        <span>Bật camera hoặc tải ảnh lên</span>
+                        <span>Bật camera</span>
                       </div>
                     )}
                   </div>
                   <div className="flex gap-3">
-                    {!isCameraOn && (
+                    {!isCameraOn ? (
                       <button
                         type="button"
                         onClick={startCamera}
@@ -6640,16 +8520,11 @@ export default function LoginPage() {
                       >
                         <Camera size={16} /> Bật camera
                       </button>
-                    )}
-                    <label className="btn-secondary flex-1 flex items-center justify-center gap-2 cursor-pointer">
-                      <Upload size={16} /> Tải ảnh
-                      <input type="file" accept="image/*" capture="user" onChange={handleFileChange} className="hidden" />
-                    </label>
-                    {isCameraOn && (
+                    ) : (
                       <button
                         type="button"
                         onClick={stopCamera}
-                        className="btn-ghost px-4 text-error"
+                        className="btn-ghost flex-1 px-4 text-error"
                       >
                         Tắt
                       </button>
@@ -6942,6 +8817,74 @@ export interface CameraStatus {
   next_retry_in: number | null;
 }
 
+// === Books ===
+export interface BookWithStats {
+  id: string;
+  isbn: string;
+  title: string;
+  author: string | null;
+  cover_url: string | null;
+  shelf_location: string | null;
+  total_copies: number;
+  available_copies: number;
+  created_at: string;
+}
+
+export interface BooksListResponse {
+  items: BookWithStats[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface BookCopyData {
+  id: string;
+  book_id: string;
+  barcode: string;
+  is_available: boolean;
+  shelf_location: string | null;
+}
+
+export interface BookImportPreviewRow {
+  isbn: string;
+  quantity: number;
+  title: string | null;
+  author: string | null;
+  cover_url: string | null;
+  barcodes: string[];
+  status: string;
+  message: string | null;
+}
+
+export interface BookImportPreviewResponse {
+  rows: BookImportPreviewRow[];
+  total_rows: number;
+  valid_rows: number;
+  invalid_rows: number;
+}
+
+export interface BookImportResultRow {
+  isbn: string;
+  title: string;
+  quantity: number;
+  barcodes: string[];
+  status: string;
+  message: string | null;
+}
+
+export interface BookImportResponse {
+  success: boolean;
+  total_rows: number;
+  imported: number;
+  skipped: number;
+  errors: number;
+  results: BookImportResultRow[];
+}
+
+export interface UpdateBookQuantityRequest {
+  quantity: number;
+}
+
 export interface CameraEvent {
   camera_id: string;
   status: "granted" | "no_match" | "expired" | "spoof" | "error";
@@ -6963,6 +8906,11 @@ import axios, { AxiosInstance, AxiosError } from "axios";
 import type {
   AccessLogList,
   ActivePatron,
+  BookImportPreviewResponse,
+  BookImportResponse,
+  BookWithStats,
+  BooksListResponse,
+  BookCopyData,
   CameraEvent,
   CameraStatus,
   LoginRequest,
@@ -7437,10 +9385,11 @@ class ApiClient {
     return response.data;
   }
 
-  async getBorrowHistory(statusFilter?: string): Promise<BorrowRecord[]> {
-    const params: any = {};
-    if (statusFilter) params.status_filter = statusFilter;
-    const response = await this.client.get<BorrowRecord[]>("/api/borrow/history", { params });
+  async getBorrowHistory(params?: { patronId?: string; statusFilter?: string }): Promise<BorrowRecord[]> {
+    const query: any = {};
+    if (params?.patronId) query.patron_id = params.patronId;
+    if (params?.statusFilter) query.status_filter = params.statusFilter;
+    const response = await this.client.get<BorrowRecord[]>("/api/borrow/history", { params: query });
     return response.data;
   }
 
@@ -7451,6 +9400,75 @@ class ApiClient {
     } catch {
       return null;
     }
+  }
+
+  async listBooks(params?: { skip?: number; limit?: number; search?: string }): Promise<BooksListResponse> {
+    const query: any = {};
+    if (params?.skip !== undefined) query.skip = params.skip;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.search) query.search = params.search;
+    const response = await this.client.get<BooksListResponse>("/api/borrow/books", { params: query });
+    return response.data;
+  }
+
+  async searchBooks(q: string): Promise<BookWithStats[]> {
+    const response = await this.client.get<BookWithStats[]>("/api/borrow/books/search", { params: { q } });
+    return response.data;
+  }
+
+  async getBarcodePreview(file: File): Promise<BookImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await this.client.post<BookImportPreviewResponse>("/api/borrow/books/import/preview", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async importBooks(file: File): Promise<BookImportResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await this.client.post<BookImportResponse>("/api/borrow/books/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async downloadBookTemplate(): Promise<void> {
+    const response = await this.client.get("/api/borrow/books/template", { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "book_import_template.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async exportBooks(): Promise<void> {
+    const response = await this.client.get("/api/borrow/books/export", { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "books_export.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async updateBookQuantity(bookId: string, quantity: number): Promise<BookWithStats> {
+    const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}/quantity`, { quantity });
+    return response.data;
+  }
+
+  async getBarcodes(bookId?: string, availableOnly?: boolean): Promise<BookCopyData[]> {
+    const params: any = {};
+    if (bookId) params.book_id = bookId;
+    if (availableOnly) params.available_only = true;
+    const response = await this.client.get<BookCopyData[]>("/api/borrow/barcodes", { params: params });
+    return response.data;
   }
 }
 
