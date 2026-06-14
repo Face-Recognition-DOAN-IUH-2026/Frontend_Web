@@ -9,6 +9,7 @@ import { Bell, User, LogOut, ChevronRight } from "lucide-react";
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   "/dashboard": { title: "Tổng quan", subtitle: "Chào mừng bạn quay lại" },
   "/patrons": { title: "Quản lý độc giả", subtitle: "Danh sách và thông tin độc giả" },
+  "/books": { title: "Kho sách", subtitle: "Quản lý và nhập kho sách" },
   "/active": { title: "Đang hiện diện", subtitle: "Độc giả đang có mặt trong thư viện" },
   "/gate": { title: "Cổng ra vào", subtitle: "Xác thực khuôn mặt tại cổng" },
   "/history": { title: "Lịch sử ra vào", subtitle: "Nhật ký ra vào cửa thư viện" },

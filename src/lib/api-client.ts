@@ -2,6 +2,11 @@ import axios, { AxiosInstance, AxiosError } from "axios";
 import type {
   AccessLogList,
   ActivePatron,
+  BookImportPreviewResponse,
+  BookImportResponse,
+  BookWithStats,
+  BooksListResponse,
+  BookCopyData,
   CameraEvent,
   CameraStatus,
   LoginRequest,
@@ -476,10 +481,11 @@ class ApiClient {
     return response.data;
   }
 
-  async getBorrowHistory(statusFilter?: string): Promise<BorrowRecord[]> {
-    const params: any = {};
-    if (statusFilter) params.status_filter = statusFilter;
-    const response = await this.client.get<BorrowRecord[]>("/api/borrow/history", { params });
+  async getBorrowHistory(params?: { patronId?: string; statusFilter?: string }): Promise<BorrowRecord[]> {
+    const query: any = {};
+    if (params?.patronId) query.patron_id = params.patronId;
+    if (params?.statusFilter) query.status_filter = params.statusFilter;
+    const response = await this.client.get<BorrowRecord[]>("/api/borrow/history", { params: query });
     return response.data;
   }
 
@@ -490,6 +496,75 @@ class ApiClient {
     } catch {
       return null;
     }
+  }
+
+  async listBooks(params?: { skip?: number; limit?: number; search?: string }): Promise<BooksListResponse> {
+    const query: any = {};
+    if (params?.skip !== undefined) query.skip = params.skip;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.search) query.search = params.search;
+    const response = await this.client.get<BooksListResponse>("/api/borrow/books", { params: query });
+    return response.data;
+  }
+
+  async searchBooks(q: string): Promise<BookWithStats[]> {
+    const response = await this.client.get<BookWithStats[]>("/api/borrow/books/search", { params: { q } });
+    return response.data;
+  }
+
+  async getBarcodePreview(file: File): Promise<BookImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await this.client.post<BookImportPreviewResponse>("/api/borrow/books/import/preview", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async importBooks(file: File): Promise<BookImportResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await this.client.post<BookImportResponse>("/api/borrow/books/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async downloadBookTemplate(): Promise<void> {
+    const response = await this.client.get("/api/borrow/books/template", { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "book_import_template.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async exportBooks(): Promise<void> {
+    const response = await this.client.get("/api/borrow/books/export", { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "books_export.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async updateBookQuantity(bookId: string, quantity: number): Promise<BookWithStats> {
+    const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}/quantity`, { quantity });
+    return response.data;
+  }
+
+  async getBarcodes(bookId?: string, availableOnly?: boolean): Promise<BookCopyData[]> {
+    const params: any = {};
+    if (bookId) params.book_id = bookId;
+    if (availableOnly) params.available_only = true;
+    const response = await this.client.get<BookCopyData[]>("/api/borrow/barcodes", { params: params });
+    return response.data;
   }
 }
 

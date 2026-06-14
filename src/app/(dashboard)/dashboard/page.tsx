@@ -149,8 +149,8 @@ export default function DashboardPage() {
                         <p className="text-caption text-text-3">{log.student_code || log.patron_id}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <Badge variant={log.status === "granted" ? "success" : "error"} dot>
-                          {log.status === "granted" ? "Thành công" : "Thất bại"}
+                        <Badge variant={log.status === "success" ? "success" : "error"} dot>
+                          {log.status === "success" ? "Thành công" : "Thất bại"}
                         </Badge>
                         <p className="text-caption text-text-3 mt-1">
                           {new Date(log.access_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}

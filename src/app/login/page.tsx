@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Eye, Camera, Upload } from "lucide-react";
+import { Eye, Camera } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import api, { getErrorMessage } from "@/lib/api-client";
@@ -140,16 +140,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
-    stopCamera();
   };
 
   const capturePhoto = useCallback((cb?: (file: File) => void) => {
@@ -318,12 +308,12 @@ export default function LoginPage() {
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full text-text-3 text-body-sm gap-2">
                         <Camera size={24} />
-                        <span>Bật camera hoặc tải ảnh lên</span>
+                        <span>Bật camera</span>
                       </div>
                     )}
                   </div>
                   <div className="flex gap-3">
-                    {!isCameraOn && (
+                    {!isCameraOn ? (
                       <button
                         type="button"
                         onClick={startCamera}
@@ -331,16 +321,11 @@ export default function LoginPage() {
                       >
                         <Camera size={16} /> Bật camera
                       </button>
-                    )}
-                    <label className="btn-secondary flex-1 flex items-center justify-center gap-2 cursor-pointer">
-                      <Upload size={16} /> Tải ảnh
-                      <input type="file" accept="image/*" capture="user" onChange={handleFileChange} className="hidden" />
-                    </label>
-                    {isCameraOn && (
+                    ) : (
                       <button
                         type="button"
                         onClick={stopCamera}
-                        className="btn-ghost px-4 text-error"
+                        className="btn-ghost flex-1 px-4 text-error"
                       >
                         Tắt
                       </button>

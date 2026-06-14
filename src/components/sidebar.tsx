@@ -32,6 +32,7 @@ const libraryItems = [
 
 const circulationItems = [
   { href: "/return", label: "Trả sách", icon: BookMarked },
+  { href: "/books", label: "Kho sách", icon: Library },
 ];
 
 const aiItems = [

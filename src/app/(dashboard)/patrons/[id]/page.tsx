@@ -1,10 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api, { getErrorMessage } from "@/lib/api-client";
+import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
 import MultiAngleCapture from "@/components/MultiAngleCapture";
-import type { AccessLogPublic, PatronPublic, PatronUpdate } from "@/lib/types";
+import { BookOpen } from "lucide-react";
+import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
 import type { CaptureAngle } from "@/components/MultiAngleCapture";
 
 export default function PatronDetailPage() {
@@ -18,9 +22,10 @@ export default function PatronDetailPage() {
   const [logsSkip, setLogsSkip] = useState(0);
   const logsLimit = 20;
 
+  const [borrows, setBorrows] = useState<BorrowRecord[]>([]);
+
   const [editForm, setEditForm] = useState<PatronUpdate>({});
   const [showEdit, setShowEdit] = useState(false);
-
   const [showEnroll, setShowEnroll] = useState(false);
   const [consent, setConsent] = useState(false);
   const [enrollError, setEnrollError] = useState("");
@@ -43,14 +48,20 @@ export default function PatronDetailPage() {
     } catch { }
   }, [id, logsSkip]);
 
+  const loadBorrows = useCallback(async () => {
+    try {
+      const data = await api.getBorrowHistory({ patronId: id });
+      setBorrows(data);
+    } catch { /* silent fail */ }
+  }, [id]);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await loadPatron();
-      await loadLogs();
+      await Promise.all([loadPatron(), loadLogs(), loadBorrows()]);
       setLoading(false);
     })();
-  }, [loadPatron, loadLogs]);
+  }, [loadPatron, loadLogs, loadBorrows]);
 
   const handleEdit = async () => {
     if (!patron) return;
@@ -115,14 +126,14 @@ export default function PatronDetailPage() {
     }
   };
 
-  if (loading) return <p className="text-gray-500">Đang tải...</p>;
+  if (loading) return <p className="text-text-3">Đang tải...</p>;
   if (!patron) return (
     <div className="text-center py-12">
-      <p className="text-gray-500 text-lg mb-4">Không tìm thấy độc giả</p>
-      <p className="text-gray-400 text-sm mb-6">Độc giả có thể đã bị xóa hoặc ID không hợp lệ.</p>
-      <button onClick={() => router.push("/patrons")} className="px-4 py-2 bg-blue-600 text-white rounded-md">
+      <p className="text-text-2 text-lg mb-4">Không tìm thấy độc giả</p>
+      <p className="text-text-3 text-sm mb-6">Độc giả có thể đã bị xóa hoặc ID không hợp lệ.</p>
+      <Button variant="primary" onClick={() => router.push("/patrons")}>
         &larr; Quay lại danh sách
-      </button>
+      </Button>
     </div>
   );
 
@@ -131,75 +142,128 @@ export default function PatronDetailPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <button onClick={() => router.push("/patrons")} className="text-blue-600 hover:underline text-sm">&larr; Quay lại danh sách</button>
+      <button onClick={() => router.push("/patrons")} className="text-primary hover:underline text-sm">&larr; Quay lại danh sách</button>
 
-      <div className="border rounded-lg p-6 bg-white">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{patron.full_name}</h1>
-            <p className="text-gray-500">MSSV: {patron.student_code} &middot; Mã thẻ: {patron.card_number}</p>
+      <Card>
+        <div className="p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col">
+              <h1 className="text-2xl font-bold">{patron.full_name}</h1>
+              <p className="text-text-3">MSSV: {patron.student_code} &middot; Mã thẻ: {patron.card_number}</p>
+            </div>
+            <Badge variant={patron.status === "active" ? "success" : "error"}>
+              {patron.status}
+            </Badge>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            patron.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}>{patron.status}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-          <div><span className="text-gray-500">Họ tên:</span> <span className="font-medium">{patron.full_name}</span></div>
-          <div><span className="text-gray-500">MSSV:</span> <span className="font-medium">{patron.student_code}</span></div>
-          <div><span className="text-gray-500">Lớp:</span> <span className="font-medium">{patron.class_name || "-"}</span></div>
-          <div><span className="text-gray-500">Mã thẻ:</span> <span className="font-medium">{patron.card_number}</span></div>
-          <div><span className="text-gray-500">Ngày cấp thẻ:</span> <span className="font-medium">{patron.issue_date || "-"}</span></div>
-          <div><span className="text-gray-500">Hạn thẻ:</span>
-            <span className={`font-medium ml-1 ${new Date(patron.membership_expiry) < new Date() ? "text-red-600" : "text-green-600"}`}>
-              {patron.membership_expiry}
-            </span>
+          <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+            <div><span className="text-text-3">Họ tên:</span> <span className="font-medium">{patron.full_name}</span></div>
+            <div><span className="text-text-3">MSSV:</span> <span className="font-medium">{patron.student_code}</span></div>
+            <div><span className="text-text-3">Lớp:</span> <span className="font-medium">{patron.class_name || "-"}</span></div>
+            <div><span className="text-text-3">Mã thẻ:</span> <span className="font-medium">{patron.card_number}</span></div>
+            <div><span className="text-text-3">Ngày cấp thẻ:</span> <span className="font-medium">{patron.issue_date || "-"}</span></div>
+            <div><span className="text-text-3">Hạn thẻ:</span>
+              <span className={`font-medium ml-1 ${new Date(patron.membership_expiry) < new Date() ? "text-error" : "text-success"}`}>
+                {patron.membership_expiry}
+              </span>
+            </div>
+            <div><span className="text-text-3">Khuôn mặt:</span>
+              <span className={`font-medium ml-1 ${patron.has_face ? "text-success" : "text-text-3"}`}>
+                {patron.has_face ? "✓ Đã đăng ký" : "✗ Chưa đăng ký"}
+              </span>
+            </div>
+            <div><span className="text-text-3">Tạo lúc:</span> <span className="font-medium">{new Date(patron.created_at).toLocaleString("vi-VN")}</span></div>
           </div>
-          <div><span className="text-gray-500">Khuôn mặt:</span>
-            <span className={`font-medium ml-1 ${patron.has_face ? "text-green-600" : "text-gray-400"}`}>
-              {patron.has_face ? "✓ Đã đăng ký" : "✗ Chưa đăng ký"}
-            </span>
+          <div className="flex gap-3 mt-6 pt-4 border-t">
+            <Button variant="primary" className="text-sm" onClick={() => { setEditForm({
+              full_name: patron.full_name,
+              class_name: patron.class_name || undefined,
+              membership_expiry: patron.membership_expiry,
+              status: patron.status,
+            }); setShowEdit(true); }}>Sửa thông tin</Button>
+            <Button variant="secondary" className="text-sm" onClick={handleRenew}>Gia hạn thẻ</Button>
+            {!patron.has_face && (
+              <Button variant="ghost" className="text-sm" onClick={() => setShowEnroll(true)}>📷 Đăng ký khuôn mặt</Button>
+            )}
+            <Button variant="danger" className="text-sm" onClick={handleDelete}>Xóa</Button>
           </div>
-          <div><span className="text-gray-500">Tạo lúc:</span> <span className="font-medium">{new Date(patron.created_at).toLocaleString("vi-VN")}</span></div>
-        </div>
-        <div className="flex gap-3 mt-6 pt-4 border-t">
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm" onClick={() => { setEditForm({
-            full_name: patron.full_name, class_name: patron.class_name || undefined,
-            membership_expiry: patron.membership_expiry, status: patron.status,
-          }); setShowEdit(true); }}>Sửa thông tin</button>
-          <button className="px-4 py-2 bg-green-600 text-white rounded-md text-sm" onClick={handleRenew}>Gia hạn thẻ</button>
-          {!patron.has_face && (
-            <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm"
-              onClick={() => setShowEnroll(true)}>📷 Đăng ký khuôn mặt</button>
+          {enrollSuccess && (
+            <div className="mt-4 p-3 bg-success/5 border border-success/10 rounded-lg text-success text-sm flex items-center gap-2">
+              <span className="text-lg">✓</span> {enrollSuccess}
+            </div>
           )}
-          <button className="px-4 py-2 bg-red-600 text-white rounded-md text-sm ml-auto" onClick={handleDelete}>Xóa</button>
         </div>
-        {enrollSuccess && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
-            <span className="text-lg">✓</span> {enrollSuccess}
+      </Card>
+
+      <Card className="mt-6">
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <BookOpen size={20} className="text-primary" />
+            <h3 className="font-semibold text-lg">Lịch sử mượn sách</h3>
           </div>
+        </div>
+        {borrows.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3">
+              <BookOpen size={20} className="text-text-3" />
+            </div>
+            <p className="text-text-3 text-sm italic">Độc giả này chưa mượn cuốn sách nào.</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-surface-2">
+              <tr className="border-b border-border">
+                <th className="p-3 text-left font-medium">Mã sách</th>
+                <th className="p-3 text-left font-medium">Ngày mượn</th>
+                <th className="p-3 text-left font-medium">Hạn trả</th>
+                <th className="p-3 text-left font-medium">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {borrows.map((b) => {
+                const isOverdue = b.status === "borrowing" && new Date(b.due_at) < new Date();
+                return (
+                  <tr key={b.id} className="border-t hover:bg-surface-2/20">
+                    <td className="p-3 font-mono text-primary">{b.book_id}</td>
+                    <td className="p-3">{new Date(b.borrow_at).toLocaleDateString("vi-VN")}</td>
+                    <td className={`p-3 ${isOverdue ? "text-error font-semibold" : ""}`}>
+                      {new Date(b.due_at).toLocaleDateString("vi-VN")}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={isOverdue ? "error" : b.status === "returned" ? "neutral" : "success"}>
+                        {b.status === "returned" ? "Đã trả" : isOverdue ? "Quá hạn" : "Đang mượn"}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
-      </div>
+      </Card>
 
       {showEnroll && !patron.has_face && (
-        <div className="border rounded-lg p-4 bg-white">
-          <div className="flex items-center justify-between mb-4">
+        <Card>
+          <div className="p-4 border-b">
             <h3 className="font-semibold text-lg">Đăng ký khuôn mặt 4 góc</h3>
-            <button onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}
-              className="text-gray-500 hover:text-gray-700 text-sm">✕ Đóng</button>
           </div>
-          <MultiAngleCapture
-            consent={consent}
-            setConsent={setConsent}
-            onFilesReady={handleEnroll}
-          />
-          {enrollError && <p className="text-red-500 text-sm mt-2">{enrollError}</p>}
-          {enrollLoading && <p className="text-blue-600 text-sm mt-2">Đang đăng ký...</p>}
-        </div>
+          <div className="p-4">
+            <MultiAngleCapture
+              consent={consent}
+              setConsent={setConsent}
+              onFilesReady={handleEnroll}
+            />
+            {enrollError && <p className="text-error text-sm mt-2">{enrollError}</p>}
+            {enrollLoading && <p className="text-primary text-sm mt-2">Đang đăng ký...</p>}
+          </div>
+          <div className="p-4 pt-0">
+            <Button variant="ghost" className="text-sm" onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}>✕ Đóng</Button>
+          </div>
+        </Card>
       )}
 
       {showEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEdit(false)}>
-          <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface-2 rounded-lg p-6 w-full max-w-md space-y-4 shadow-2xl border border-border" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold">Sửa độc giả</h2>
             {[["full_name", "Họ tên"], ["class_name", "Lớp"],
               ["membership_expiry", "Hạn thẻ"], ["status", "Trạng thái"]
@@ -223,24 +287,24 @@ export default function PatronDetailPage() {
               </label>
             ))}
             <div className="flex gap-3 pt-2">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleEdit}>Lưu</button>
-              <button className="px-4 py-2 bg-gray-200 rounded-md" onClick={() => setShowEdit(false)}>Hủy</button>
+              <Button variant="primary" className="px-4 py-2" onClick={handleEdit}>Lưu</Button>
+              <Button variant="ghost" className="px-4 py-2" onClick={() => setShowEdit(false)}>Hủy</Button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="border rounded-lg bg-white">
+      <Card>
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">Lịch sử ra vào</h2>
         </div>
         {logs.length === 0 ? (
-          <p className="p-4 text-gray-500 text-sm">Chưa có lịch sử ra vào</p>
+          <p className="p-4 text-text-3 text-sm">Chưa có lịch sử ra vào</p>
         ) : (
           <>
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-gray-50">
+                <tr className="bg-surface-2">
                   <th className="p-3 text-left font-medium">Thời gian</th>
                   <th className="p-3 text-left font-medium">Loại</th>
                   <th className="p-3 text-left font-medium">Cổng</th>
@@ -251,21 +315,21 @@ export default function PatronDetailPage() {
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id} className="border-t hover:bg-gray-50">
+                  <tr key={log.id} className="border-t hover:bg-surface-2/20">
                     <td className="p-3 whitespace-nowrap">{new Date(log.access_time).toLocaleString("vi-VN")}</td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        log.access_type === "entry" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"
+                        log.access_type === "entry" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
                       }`}>{log.access_type === "entry" ? "Vào" : "Ra"}</span>
                     </td>
-                    <td className="p-3 text-gray-600">{log.camera_id}</td>
-                    <td className="p-3 text-gray-600">{log.verify_method}</td>
+                    <td className="p-3 text-text-2">{log.camera_id}</td>
+                    <td className="p-3 text-text-2">{log.verify_method}</td>
                     <td className="p-3">
                       {log.confidence != null ? (
                         <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="w-16 h-2 bg-surface-2 rounded-full overflow-hidden">
                             <div className={`h-full rounded-full ${
-                              log.confidence >= 0.8 ? "bg-green-500" : log.confidence >= 0.6 ? "bg-yellow-500" : "bg-red-500"
+                              log.confidence >= 0.8 ? "bg-success" : log.confidence >= 0.6 ? "bg-warning" : "bg-error"
                             }`} style={{ width: `${(log.confidence * 100).toFixed(0)}%` }} />
                           </div>
                           <span className="text-xs">{(log.confidence * 100).toFixed(0)}%</span>
@@ -274,7 +338,7 @@ export default function PatronDetailPage() {
                     </td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        log.status === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        log.status === "success" ? "bg-success/15 text-success" : "bg-error/15 text-error"
                       }`}>{log.status === "success" ? "✓" : "✗"}</span>
                     </td>
                   </tr>
@@ -283,21 +347,21 @@ export default function PatronDetailPage() {
             </table>
             {logsTotal > logsLimit && (
               <div className="flex items-center justify-between p-4 border-t text-sm">
-                <span className="text-gray-500">Tổng: {logsTotal}</span>
+                <span className="text-text-2">Tổng: {logsTotal}</span>
                 <div className="flex items-center gap-2">
-                  <button className="px-3 py-1 border rounded-md disabled:opacity-40"
+                  <Button variant="ghost" className="px-3 py-1 rounded-md disabled:opacity-40"
                     disabled={currentPage <= 1}
-                    onClick={() => setLogsSkip(0)}>«</button>
-                  <span>Trang {currentPage} / {pageCount}</span>
-                  <button className="px-3 py-1 border rounded-md disabled:opacity-40"
+                    onClick={() => setLogsSkip(0)}>«</Button>
+                  <span className="text-text-2">Trang {currentPage} / {pageCount}</span>
+                  <Button variant="ghost" className="px-3 py-1 rounded-md disabled:opacity-40"
                     disabled={currentPage >= pageCount}
-                    onClick={() => setLogsSkip((pageCount - 1) * logsLimit)}>»</button>
+                    onClick={() => setLogsSkip((pageCount - 1) * logsLimit)}>»</Button>
                 </div>
               </div>
             )}
           </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

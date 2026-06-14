@@ -273,6 +273,74 @@ export interface CameraStatus {
   next_retry_in: number | null;
 }
 
+// === Books ===
+export interface BookWithStats {
+  id: string;
+  isbn: string;
+  title: string;
+  author: string | null;
+  cover_url: string | null;
+  shelf_location: string | null;
+  total_copies: number;
+  available_copies: number;
+  created_at: string;
+}
+
+export interface BooksListResponse {
+  items: BookWithStats[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface BookCopyData {
+  id: string;
+  book_id: string;
+  barcode: string;
+  is_available: boolean;
+  shelf_location: string | null;
+}
+
+export interface BookImportPreviewRow {
+  isbn: string;
+  quantity: number;
+  title: string | null;
+  author: string | null;
+  cover_url: string | null;
+  barcodes: string[];
+  status: string;
+  message: string | null;
+}
+
+export interface BookImportPreviewResponse {
+  rows: BookImportPreviewRow[];
+  total_rows: number;
+  valid_rows: number;
+  invalid_rows: number;
+}
+
+export interface BookImportResultRow {
+  isbn: string;
+  title: string;
+  quantity: number;
+  barcodes: string[];
+  status: string;
+  message: string | null;
+}
+
+export interface BookImportResponse {
+  success: boolean;
+  total_rows: number;
+  imported: number;
+  skipped: number;
+  errors: number;
+  results: BookImportResultRow[];
+}
+
+export interface UpdateBookQuantityRequest {
+  quantity: number;
+}
+
 export interface CameraEvent {
   camera_id: string;
   status: "granted" | "no_match" | "expired" | "spoof" | "error";

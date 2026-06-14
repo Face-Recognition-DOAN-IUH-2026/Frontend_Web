@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api-client";
-import type { AccessLogPublic, ActivePatron, StatsResponse } from "@/lib/types";
+import type { AccessLogPublic, ActivePatron, BorrowRecord, StatsResponse } from "@/lib/types";
 import StatCard from "@/components/ui/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import { Users, BookOpen, LogIn, LogOut, Clock, TrendingUp, UserCheck } from "lucide-react";
+import { AlertTriangle, BookOpen, Clock, LogIn, LogOut, TrendingUp, UserCheck, Users } from "lucide-react";
 
 function toDateStr(d: Date) {
   return d.toISOString().split("T")[0];
@@ -16,20 +16,23 @@ export default function StatsPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [todayLogs, setTodayLogs] = useState<AccessLogPublic[]>([]);
   const [activePatrons, setActivePatrons] = useState<ActivePatron[]>([]);
+  const [borrows, setBorrows] = useState<BorrowRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
         const today = toDateStr(new Date());
-        const [s, logs, active] = await Promise.all([
+        const [s, logs, active, allBorrows] = await Promise.all([
           api.getStats(),
           api.getAccessLogs({ dateFrom: today, limit: 200 }),
           api.getActivePatrons(),
+          api.getBorrowHistory(),
         ]);
         setStats(s);
         setTodayLogs(logs.items);
         setActivePatrons(active.items);
+        setBorrows(allBorrows || []);
       } catch (err) {
         console.error("Failed to load stats:", err);
       } finally {
@@ -37,6 +40,24 @@ export default function StatsPage() {
       }
     })();
   }, []);
+
+  const borrowStats = useMemo(() => {
+    const active = borrows.filter((b) => b.status === "borrowing");
+    const overdue = active.filter((b) => new Date(b.due_at) < new Date());
+    return {
+      total: borrows.length,
+      active: active.length,
+      overdue: overdue.length,
+      returned: borrows.filter((b) => b.status === "returned").length,
+    };
+  }, [borrows]);
+
+  const recentBorrows = useMemo(() => {
+    return [...borrows]
+      .filter((b) => b.status === "borrowing")
+      .sort((a, b) => new Date(b.borrow_at).getTime() - new Date(a.borrow_at).getTime())
+      .slice(0, 15);
+  }, [borrows]);
 
   const hourlyData = useMemo(() => {
     const buckets = new Array(24).fill(0);
@@ -99,6 +120,31 @@ export default function StatsPage() {
           icon={LogOut}
           accentColor="warning"
           description="Từ 00:00"
+        />
+      </div>
+
+      {/* Borrow stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatCard
+          label="Tổng lượt mượn"
+          value={borrowStats.total}
+          icon={BookOpen}
+          accentColor="primary"
+          description="Tất cả"
+        />
+        <StatCard
+          label="Đang mượn"
+          value={borrowStats.active}
+          icon={BookOpen}
+          accentColor="success"
+          description="Chưa trả"
+        />
+        <StatCard
+          label="Quá hạn"
+          value={borrowStats.overdue}
+          icon={AlertTriangle}
+          accentColor="error"
+          description="Cần xử lý"
         />
       </div>
 
@@ -221,6 +267,63 @@ export default function StatsPage() {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Active borrows */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen size={16} className="text-text-3" />
+            Sách đang mượn ({borrowStats.active})
+            {borrowStats.overdue > 0 && (
+              <Badge variant="error" className="ml-2">{borrowStats.overdue} quá hạn</Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentBorrows.length === 0 ? (
+            <div className="text-center py-6">
+              <div className="w-10 h-10 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-2 text-text-3">
+                <BookOpen size={18} />
+              </div>
+              <p className="text-body-sm text-text-3">Không có sách đang được mượn</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Mã sách</th>
+                    <th>Mã thẻ</th>
+                    <th>Ngày mượn</th>
+                    <th>Hạn trả</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentBorrows.map((b) => {
+                    const isOverdue = b.status === "borrowing" && new Date(b.due_at) < new Date();
+                    return (
+                      <tr key={b.id} className={isOverdue ? "bg-error/5" : ""}>
+                        <td className="font-mono text-primary">{b.book_id}</td>
+                        <td className="font-mono text-text-3">{b.patron_id}</td>
+                        <td>{new Date(b.borrow_at).toLocaleDateString("vi-VN")}</td>
+                        <td className={isOverdue ? "text-error font-semibold" : ""}>
+                          {new Date(b.due_at).toLocaleDateString("vi-VN")}
+                        </td>
+                        <td>
+                          <Badge variant={isOverdue ? "error" : "success"}>
+                            {isOverdue ? "Quá hạn" : "Đúng hạn"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
