@@ -99,6 +99,9 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const res = await api.faceLogin(file);
+      if (!res.access_token) {
+        throw new Error("Backend did not return access_token");
+      }
       const payload = JSON.parse(atob(res.access_token.split(".")[1]));
       const email = payload?.email || "";
       const role = ((payload?.roles as string[])?.[0]) || "user";

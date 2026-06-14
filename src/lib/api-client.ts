@@ -28,7 +28,12 @@ import type {
   StaffReturnRequest,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
+const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
+const API_BASE_URL = RAW_API_BASE_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+function isNotFoundError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 404;
+}
 
 export function getErrorMessage(err: any): string {
   if (!err) return "Unknown error";
@@ -113,11 +118,21 @@ class ApiClient {
     if (!refreshToken) return false;
 
     try {
-      const response = await axios.post<TokenResponse>(
-        `${API_BASE_URL}/auth/refresh`,
-        { refresh_token: refreshToken }
-      );
+      let response;
+      try {
+        response = await axios.post<TokenResponse>(
+          `${API_BASE_URL}/auth/refresh`,
+          { refresh_token: refreshToken }
+        );
+      } catch (error) {
+        if (!isNotFoundError(error)) throw error;
+        response = await axios.post<TokenResponse>(
+          `${API_BASE_URL}/api/auth/refresh`,
+          { refresh_token: refreshToken }
+        );
+      }
       const { access_token } = response.data;
+      if (!access_token) return false;
       localStorage.setItem("access_token", access_token);
       return true;
     } catch {
@@ -127,12 +142,43 @@ class ApiClient {
 
   // === Auth (via face-recognition-api) ===
   async login(data: LoginRequest): Promise<TokenResponse> {
-    const response = await this.client.post<TokenResponse>("/auth/login", data);
-    return response.data;
+    try {
+      const response = await this.client.post<TokenResponse>("/auth/login", data);
+      return response.data;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      const response = await this.client.post<TokenResponse>("/api/auth/login", data);
+      return response.data;
+    }
   }
 
   async register(data: RegisterRequest): Promise<UserPublic> {
-    const response = await this.client.post<UserPublic>("/auth/register", data);
+    try {
+      const response = await this.client.post<UserPublic>("/auth/register", data);
+      return response.data;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      const response = await this.client.post<UserPublic>("/api/auth/register", data);
+      return response.data;
+    }
+  }
+
+  async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
+    try {
+      const response = await this.client.post<TokenResponse>("/auth/refresh", { refresh_token: refreshToken });
+      return response.data;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      const response = await this.client.post<TokenResponse>("/api/auth/refresh", { refresh_token: refreshToken });
+      return response.data;
+    }
+  }
+
+  async faceLogin(imageFile: File): Promise<TokenResponse> {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const response = await this.client.post<TokenResponse>("/api/auth/face-login", formData);
     return response.data;
   }
 
@@ -216,14 +262,6 @@ class ApiClient {
     formData.append("consent_given", String(consentGiven));
 
     const response = await this.client.post("/api/face/identify", formData);
-    return response.data;
-  }
-
-  async faceLogin(imageFile: File): Promise<TokenResponse> {
-    const formData = new FormData();
-    formData.append("file", imageFile);
-
-    const response = await this.client.post<TokenResponse>("/api/auth/face-login", formData);
     return response.data;
   }
 
