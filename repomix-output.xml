@@ -107,277 +107,6 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/__tests__/books/BooksPage.test.tsx">
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import BooksPage from "@/app/(dashboard)/books/page";
-import * as apiClient from "@/lib/api-client";
-
-jest.mock("@/lib/api-client", () => ({
-  api: {
-    listBooks: jest.fn(),
-    searchBooks: jest.fn(),
-    importBooks: jest.fn(),
-    getBarcodePreview: jest.fn(),
-    downloadBookTemplate: jest.fn(),
-    exportBooks: jest.fn(),
-    updateBookQuantity: jest.fn(),
-    getBarcodes: jest.fn(),
-  },
-  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
-}));
-
-const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
-
-const mockBooksResponse = {
-  items: [
-    {
-      id: "book-1",
-      isbn: "9780544003415",
-      title: "The Lord of the Rings",
-      author: "J.R.R. Tolkien",
-      cover_url: null,
-      shelf_location: "A-01",
-      total_copies: 5,
-      available_copies: 3,
-      created_at: "2026-01-01T00:00:00Z",
-    },
-    {
-      id: "book-2",
-      isbn: "9780439708180",
-      title: "Harry Potter",
-      author: "J.K. Rowling",
-      cover_url: null,
-      shelf_location: "B-02",
-      total_copies: 2,
-      available_copies: 0,
-      created_at: "2026-01-02T00:00:00Z",
-    },
-  ],
-  total: 2,
-  skip: 0,
-  limit: 10,
-};
-
-describe("BooksPage", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockApi.listBooks.mockResolvedValue(mockBooksResponse);
-    mockApi.searchBooks.mockResolvedValue(mockBooksResponse.items);
-    mockApi.getBarcodes.mockResolvedValue([]);
-  });
-
-  it("renders book list with data from API", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
-    });
-    expect(screen.getByText("Harry Potter")).toBeInTheDocument();
-  });
-
-  it("shows search input", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText(/tìm kiếm/i)).toBeInTheDocument();
-    });
-  });
-
-  it("opens quantity modal on row click", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
-    });
-
-    const bookRow = screen.getByText("The Lord of the Rings").closest("tr") || screen.getByText("The Lord of the Rings");
-    await userEvent.click(bookRow);
-
-    await waitFor(() => {
-      expect(screen.getByText(/số lượng/i)).toBeInTheDocument();
-    });
-  });
-
-  it("shows total and available copies in table", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("5")).toBeInTheDocument();
-      expect(screen.getByText("3")).toBeInTheDocument();
-    });
-  });
-
-  it("shows zero available copies for fully borrowed book", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("0")).toBeInTheDocument();
-    });
-  });
-
-  it("calls searchBooks when typing in search", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      const searchInput = screen.getByPlaceholderText(/tìm kiếm/i);
-      return searchInput;
-    });
-
-    const searchInput = screen.getByPlaceholderText(/tìm kiếm/i);
-    await userEvent.type(searchInput, "Harry");
-
-    await waitFor(() => {
-      expect(mockApi.searchBooks).toHaveBeenCalledWith("Harry");
-    });
-  });
-
-  it("renders download template button", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      const buttons = screen.getAllByRole("button");
-      const templateBtn = buttons.find((b) => b.textContent?.includes("Tải mẫu"));
-      expect(templateBtn).toBeTruthy();
-    });
-  });
-
-  it("renders export excel button", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      const buttons = screen.getAllByRole("button");
-      const exportBtn = buttons.find((b) => b.textContent?.includes("Xuất Excel"));
-      expect(exportBtn).toBeTruthy();
-    });
-  });
-
-  it("handles empty book list gracefully", async () => {
-    mockApi.listBooks.mockResolvedValueOnce({
-      items: [],
-      total: 0,
-      skip: 0,
-      limit: 10,
-    });
-
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/không tìm thấy/i)).toBeInTheDocument();
-    });
-  });
-
-  it("validates quantity >= 1 in modal", async () => {
-    render(<BooksPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
-    });
-
-    const bookRow = screen.getByText("The Lord of the Rings").closest("tr") || screen.getByText("The Lord of the Rings");
-    await userEvent.click(bookRow);
-
-    await waitFor(() => {
-      expect(screen.getByText(/số lượng/i)).toBeInTheDocument();
-    });
-
-    const quantityInput = screen.getByRole("spinbutton");
-    await userEvent.clear(quantityInput);
-    await userEvent.type(quantityInput, "-1");
-
-    const saveButton = screen.getByText("Lưu");
-    await userEvent.click(saveButton);
-
-    expect(mockApi.updateBookQuantity).not.toHaveBeenCalled();
-  });
-});
-</file>
-
-<file path="src/__tests__/books/BorrowFlow.test.tsx">
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import * as apiClient from "@/lib/api-client";
-
-jest.mock("@/lib/api-client", () => ({
-  api: {
-    borrowBook: jest.fn(),
-    staffReturnBook: jest.fn(),
-    getBorrowHistory: jest.fn(),
-    lookupBorrowByBarcode: jest.fn(),
-  },
-  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
-}));
-
-const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
-
-describe("Borrow API client", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it("borrowBook calls correct endpoint", async () => {
-    mockApi.borrowBook.mockResolvedValueOnce({
-      status: "success",
-      message: "Mượn sách thành công",
-      record: { id: "rec-1", status: "borrowed" } as any,
-      book: { id: "book-1", isbn: "123", title: "Test" } as any,
-    });
-
-    const result = await apiClient.api.borrowBook("LIB-123-001");
-    expect(mockApi.borrowBook).toHaveBeenCalledWith("LIB-123-001");
-    expect(result.status).toBe("success");
-  });
-
-  it("staffReturnBook calls correct endpoint", async () => {
-    mockApi.staffReturnBook.mockResolvedValueOnce({
-      status: "success",
-      message: "Trả sách thành công",
-      record: { id: "rec-1", status: "returned" } as any,
-    });
-
-    const result = await apiClient.api.staffReturnBook("LIB-123-001");
-    expect(mockApi.staffReturnBook).toHaveBeenCalledWith("LIB-123-001");
-    expect(result.status).toBe("success");
-  });
-
-  it("getBorrowHistory returns records", async () => {
-    mockApi.getBorrowHistory.mockResolvedValueOnce([
-      { id: "rec-1", status: "borrowed" } as any,
-      { id: "rec-2", status: "returned" } as any,
-    ]);
-
-    const result = await apiClient.api.getBorrowHistory({ statusFilter: "borrowed" });
-    expect(mockApi.getBorrowHistory).toHaveBeenCalledWith({ statusFilter: "borrowed" });
-    expect(result).toHaveLength(2);
-  });
-
-  it("lookupBorrowByBarcode returns null on error", async () => {
-    mockApi.lookupBorrowByBarcode.mockRejectedValueOnce(new Error("Not found"));
-
-    const result = await apiClient.api.lookupBorrowByBarcode("NONEXISTENT");
-    expect(result).toBeNull();
-  });
-});
-
-describe("getErrorMessage", () => {
-  it("returns detail from response", () => {
-    const err = { response: { data: { detail: "Sách không tồn tại" } } };
-    expect(apiClient.getErrorMessage(err)).toBe("Sách không tồn tại");
-  });
-
-  it("returns message for generic errors", () => {
-    const err = new Error("Network error");
-    expect(apiClient.getErrorMessage(err)).toBe("Network error");
-  });
-
-  it("returns Unknown error for null", () => {
-    expect(apiClient.getErrorMessage(null)).toBe("Unknown error");
-  });
-});
-</file>
-
 <file path="e2e/playwright.config.ts">
 import { defineConfig, devices } from "@playwright/test";
 
@@ -742,6 +471,277 @@ module.exports = {
   <rect width="100" height="100" rx="20" fill="#2563eb"/>
   <text x="50" y="68" font-family="Arial" font-size="55" font-weight="bold" fill="white" text-anchor="middle">F</text>
 </svg>
+</file>
+
+<file path="src/__tests__/books/BooksPage.test.tsx">
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import BooksPage from "@/app/(dashboard)/books/page";
+import * as apiClient from "@/lib/api-client";
+
+jest.mock("@/lib/api-client", () => ({
+  api: {
+    listBooks: jest.fn(),
+    searchBooks: jest.fn(),
+    importBooks: jest.fn(),
+    getBarcodePreview: jest.fn(),
+    downloadBookTemplate: jest.fn(),
+    exportBooks: jest.fn(),
+    updateBookQuantity: jest.fn(),
+    getBarcodes: jest.fn(),
+  },
+  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
+}));
+
+const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
+
+const mockBooksResponse = {
+  items: [
+    {
+      id: "book-1",
+      isbn: "9780544003415",
+      title: "The Lord of the Rings",
+      author: "J.R.R. Tolkien",
+      cover_url: null,
+      shelf_location: "A-01",
+      total_copies: 5,
+      available_copies: 3,
+      created_at: "2026-01-01T00:00:00Z",
+    },
+    {
+      id: "book-2",
+      isbn: "9780439708180",
+      title: "Harry Potter",
+      author: "J.K. Rowling",
+      cover_url: null,
+      shelf_location: "B-02",
+      total_copies: 2,
+      available_copies: 0,
+      created_at: "2026-01-02T00:00:00Z",
+    },
+  ],
+  total: 2,
+  skip: 0,
+  limit: 10,
+};
+
+describe("BooksPage", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockApi.listBooks.mockResolvedValue(mockBooksResponse);
+    mockApi.searchBooks.mockResolvedValue(mockBooksResponse.items);
+    mockApi.getBarcodes.mockResolvedValue([]);
+  });
+
+  it("renders book list with data from API", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Harry Potter")).toBeInTheDocument();
+  });
+
+  it("shows search input", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/tìm kiếm/i)).toBeInTheDocument();
+    });
+  });
+
+  it("opens quantity modal on row click", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
+    });
+
+    const bookRow = screen.getByText("The Lord of the Rings").closest("tr") || screen.getByText("The Lord of the Rings");
+    await userEvent.click(bookRow);
+
+    await waitFor(() => {
+      expect(screen.getByText(/số lượng/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows total and available copies in table", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("5")).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
+    });
+  });
+
+  it("shows zero available copies for fully borrowed book", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("0")).toBeInTheDocument();
+    });
+  });
+
+  it("calls searchBooks when typing in search", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      const searchInput = screen.getByPlaceholderText(/tìm kiếm/i);
+      return searchInput;
+    });
+
+    const searchInput = screen.getByPlaceholderText(/tìm kiếm/i);
+    await userEvent.type(searchInput, "Harry");
+
+    await waitFor(() => {
+      expect(mockApi.searchBooks).toHaveBeenCalledWith("Harry");
+    });
+  });
+
+  it("renders download template button", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      const templateBtn = buttons.find((b) => b.textContent?.includes("Tải mẫu"));
+      expect(templateBtn).toBeTruthy();
+    });
+  });
+
+  it("renders export excel button", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      const exportBtn = buttons.find((b) => b.textContent?.includes("Xuất Excel"));
+      expect(exportBtn).toBeTruthy();
+    });
+  });
+
+  it("handles empty book list gracefully", async () => {
+    mockApi.listBooks.mockResolvedValueOnce({
+      items: [],
+      total: 0,
+      skip: 0,
+      limit: 10,
+    });
+
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/không tìm thấy/i)).toBeInTheDocument();
+    });
+  });
+
+  it("validates quantity >= 1 in modal", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("The Lord of the Rings")).toBeInTheDocument();
+    });
+
+    const bookRow = screen.getByText("The Lord of the Rings").closest("tr") || screen.getByText("The Lord of the Rings");
+    await userEvent.click(bookRow);
+
+    await waitFor(() => {
+      expect(screen.getByText(/số lượng/i)).toBeInTheDocument();
+    });
+
+    const quantityInput = screen.getByRole("spinbutton");
+    await userEvent.clear(quantityInput);
+    await userEvent.type(quantityInput, "-1");
+
+    const saveButton = screen.getByText("Lưu");
+    await userEvent.click(saveButton);
+
+    expect(mockApi.updateBookQuantity).not.toHaveBeenCalled();
+  });
+});
+</file>
+
+<file path="src/__tests__/books/BorrowFlow.test.tsx">
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import * as apiClient from "@/lib/api-client";
+
+jest.mock("@/lib/api-client", () => ({
+  api: {
+    borrowBook: jest.fn(),
+    staffReturnBook: jest.fn(),
+    getBorrowHistory: jest.fn(),
+    lookupBorrowByBarcode: jest.fn(),
+  },
+  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
+}));
+
+const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
+
+describe("Borrow API client", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("borrowBook calls correct endpoint", async () => {
+    mockApi.borrowBook.mockResolvedValueOnce({
+      status: "success",
+      message: "Mượn sách thành công",
+      record: { id: "rec-1", status: "borrowed" } as any,
+      book: { id: "book-1", isbn: "123", title: "Test" } as any,
+    });
+
+    const result = await apiClient.api.borrowBook("LIB-123-001");
+    expect(mockApi.borrowBook).toHaveBeenCalledWith("LIB-123-001");
+    expect(result.status).toBe("success");
+  });
+
+  it("staffReturnBook calls correct endpoint", async () => {
+    mockApi.staffReturnBook.mockResolvedValueOnce({
+      status: "success",
+      message: "Trả sách thành công",
+      record: { id: "rec-1", status: "returned" } as any,
+    });
+
+    const result = await apiClient.api.staffReturnBook("LIB-123-001");
+    expect(mockApi.staffReturnBook).toHaveBeenCalledWith("LIB-123-001");
+    expect(result.status).toBe("success");
+  });
+
+  it("getBorrowHistory returns records", async () => {
+    mockApi.getBorrowHistory.mockResolvedValueOnce([
+      { id: "rec-1", status: "borrowed" } as any,
+      { id: "rec-2", status: "returned" } as any,
+    ]);
+
+    const result = await apiClient.api.getBorrowHistory({ statusFilter: "borrowed" });
+    expect(mockApi.getBorrowHistory).toHaveBeenCalledWith({ statusFilter: "borrowed" });
+    expect(result).toHaveLength(2);
+  });
+
+  it("lookupBorrowByBarcode returns null on error", async () => {
+    mockApi.lookupBorrowByBarcode.mockRejectedValueOnce(new Error("Not found"));
+
+    const result = await apiClient.api.lookupBorrowByBarcode("NONEXISTENT");
+    expect(result).toBeNull();
+  });
+});
+
+describe("getErrorMessage", () => {
+  it("returns detail from response", () => {
+    const err = { response: { data: { detail: "Sách không tồn tại" } } };
+    expect(apiClient.getErrorMessage(err)).toBe("Sách không tồn tại");
+  });
+
+  it("returns message for generic errors", () => {
+    const err = new Error("Network error");
+    expect(apiClient.getErrorMessage(err)).toBe("Network error");
+  });
+
+  it("returns Unknown error for null", () => {
+    expect(apiClient.getErrorMessage(null)).toBe("Unknown error");
+  });
+});
 </file>
 
 <file path="src/__tests__/components/JobPoll.test.tsx">
@@ -1526,423 +1526,6 @@ export default function BooksPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-</file>
-
-<file path="src/app/(kiosk)/gate/page.tsx">
-'use client';
-
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import api, { getErrorMessage } from '@/lib/api-client';
-import CameraFeed from '@/components/gate/CameraFeed';
-import MssvInput from '@/components/gate/MssvInput';
-import GateButton from '@/components/gate/GateButton';
-import ResultCard from '@/components/gate/ResultCard';
-import PulseAnimation from '@/components/gate/PulseAnimation';
-import type { CameraEvent, KioskResult, PatronLookupResult } from '@/lib/types';
-
-interface TodayCounts { entries: number; exits: number; no_match: number; spoof: number; }
-
-const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || 'http://192.168.1.121:8080/video';
-const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || 'http://192.168.1.240:8080/video';
-const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || 'entry_gate';
-const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || 'exit_gate';
-
-type Step = 'idle' | 'verify' | 'result';
-
-interface Toast {
-  id: number;
-  type: 'entry' | 'exit' | 'error' | 'info';
-  message: string;
-  patron_name?: string;
-}
-
-let toastId = 0;
-
-export default function GatePage() {
-  const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const [step, setStep] = useState<Step>('idle');
-  const [mssv, setMssv] = useState('');
-  const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
-  const [result, setResult] = useState<KioskResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState('');
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [todayCounts, setTodayCounts] = useState<TodayCounts>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('gate_today_counts');
-      if (cached) {
-        try { return JSON.parse(cached) as TodayCounts; } catch {}
-      }
-    }
-    return { entries: 0, exits: 0, no_match: 0, spoof: 0 };
-  });
-  const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
-  const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
-  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
-
-  const addToast = useCallback((t: Omit<Toast, 'id'>) => {
-    const id = ++toastId;
-    setToasts((prev) => [{ ...t, id }, ...prev.slice(0, 4)]);
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => stopCamera();
-  }, [stopCamera]);
-
-  const startCamera = useCallback(async () => {
-    try {
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch {
-      addToast({ type: 'error', message: 'Không thể mở camera' });
-    }
-  }, [addToast]);
-
-  const captureImage = useCallback((): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      const video = videoRef.current;
-      if (!video || !video.videoWidth) {
-        reject(new Error('Camera chưa sẵn sàng'));
-        return;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { reject(new Error('Không thể tạo canvas')); return; }
-      ctx.drawImage(video, 0, 0);
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], 'face_capture.jpg', { type: 'image/jpeg' });
-          resolve(file);
-        } else {
-          reject(new Error('Không thể tạo ảnh'));
-        }
-      }, 'image/jpeg', 0.9);
-    });
-  }, []);
-
-  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      await new Promise((r) => setTimeout(r, intervalMs));
-      try {
-        const task = await api.getTaskStatus(jobId);
-        if (task.status === 'SUCCESS') return task.result;
-        if (task.status === 'FAILURE') throw new Error(task.result?.error || 'Task failed');
-        setStatusText(task.result?.status === 'granted' ? 'Đã ghi nhận...' : 'Đang xử lý...');
-      } catch {}
-    }
-    throw new Error('Timeout waiting for result');
-  }, []);
-
-  const handleLookup = async (inputMssv: string) => {
-    if (!inputMssv.trim()) return;
-    setMssv(inputMssv.trim());
-    setLoading(true);
-    setStatusText('Đang tra cứu...');
-    try {
-      const res = await api.kioskLookup(inputMssv.trim());
-      setLookup(res);
-      if (res.exists && res.has_face && !res.is_expired) {
-        setStep('verify');
-        setStatusText('Mở camera...');
-        await startCamera();
-      } else if (res.exists && !res.has_face) {
-        setStep('result');
-        setResult({
-          success: false,
-          message: 'Tài khoản chưa được đăng ký khuôn mặt. Vui lòng đăng ký tại quầy.',
-          patron: res.patron,
-          job_id: null,
-        });
-      } else if (res.exists && res.is_expired) {
-        setStep('result');
-        setResult({ success: false, message: 'Thẻ hội viên đã hết hạn', patron: res.patron, job_id: null });
-      } else {
-        setStep('result');
-        setResult({ success: false, message: 'Không tìm thấy tài khoản. Vui lòng đăng ký tại quầy.', patron: null, job_id: null });
-      }
-    } catch (err: any) {
-      setStep('result');
-      setResult({ success: false, message: getErrorMessage(err) || 'Tra cứu thất bại', patron: null, job_id: null });
-    } finally {
-      setLoading(false);
-      setStatusText('');
-    }
-  };
-
-  const handleVerify = async () => {
-    setLoading(true);
-    setStatusText('Đang chụp ảnh...');
-    try {
-      const imageFile = await captureImage();
-      stopCamera();
-      setStatusText('Đang xác thực khuôn mặt...');
-      const res = await api.kioskEnter(imageFile, mssv);
-      if (res.job_id) {
-        const taskResult = await pollTask(res.job_id);
-        const success = taskResult?.status === 'success';
-        const confidence = taskResult?.score ?? taskResult?.confidence;
-        setResult({
-          success,
-          message: success
-            ? `Xác thực thành công — ${taskResult?.access_type === 'exit' ? 'Ra' : 'Vào'} thư viện`
-            : (taskResult?.error || 'Xác thực thất bại'),
-          patron: res.patron,
-          job_id: res.job_id,
-          confidence,
-        });
-      } else {
-        setResult(res);
-      }
-      setStep('result');
-    } catch (err: any) {
-      const msg = getErrorMessage(err) || 'Xác thực thất bại';
-      setResult({ success: false, message: msg, patron: null, job_id: null });
-      setStep('result');
-      addToast({ type: 'error', message: msg });
-    } finally {
-      setLoading(false);
-      setStatusText('');
-    }
-  };
-
-  const reset = () => {
-    setStep('idle');
-    setMssv('');
-    setLookup(null);
-    setResult(null);
-    stopCamera();
-  };
-
-  useEffect(() => {
-    api.getStats().then((s) => {
-      if (s) {
-        const fresh: TodayCounts = { entries: s.today_entries ?? 0, exits: s.today_exits ?? 0, no_match: 0, spoof: 0 };
-        setTodayCounts(fresh);
-        localStorage.setItem('gate_today_counts', JSON.stringify(fresh));
-      }
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('gate_today_counts', JSON.stringify(todayCounts));
-  }, [todayCounts]);
-
-  useEffect(() => {
-    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
-      if (event.bbox || event.landmarks) {
-        const overlay = { bbox: event.bbox, landmarks: event.landmarks };
-        if (event.camera_id === ENTRY_CAM_ID) {
-          setEntryOverlay({ ...overlay, status: event.status });
-        } else if (event.camera_id === EXIT_CAM_ID) {
-          setExitOverlay({ ...overlay, status: event.status });
-        }
-        if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
-        overlayTimeoutRef.current = setTimeout(() => {
-          setEntryOverlay(null);
-          setExitOverlay(null);
-        }, 2000);
-      }
-      if (event.status === 'granted') {
-        const type = event.access_type === 'entry' ? 'entry' : 'exit';
-        addToast({
-          type,
-          message: `${event.full_name} — ${type === 'entry' ? 'Vào' : 'Ra'} thư viện`,
-          patron_name: event.full_name,
-        });
-        setTodayCounts((prev: TodayCounts) => ({ ...prev, [type === 'entry' ? 'entries' : 'exits']: prev[type === 'entry' ? 'entries' : 'exits'] + 1 }));
-      } else if (event.status === 'no_match') {
-        setTodayCounts((prev: TodayCounts) => ({ ...prev, no_match: prev.no_match + 1 }));
-        addToast({ type: 'info', message: 'Khuôn mặt mới — không nhận diện được' });
-      } else if (event.status === 'spoof') {
-        setTodayCounts((prev: TodayCounts) => ({ ...prev, spoof: prev.spoof + 1 }));
-        addToast({ type: 'error', message: 'Phát hiện giả mạo!' });
-      }
-    });
-    return cleanup;
-  }, [addToast]);
-
-  const getResultStatus = () => {
-    if (!result) return 'processing';
-    if (result.success) return 'success';
-    if (result.message?.includes('đăng ký tại quầy')) return 'unregistered';
-    return 'error';
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-900">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <button onClick={() => router.push('/dashboard')} className="text-slate-400 hover:text-amber-400 transition-colors text-sm mb-2">
-              ← Quay lại Dashboard
-            </button>
-            <h1 className="text-3xl font-bold text-white font-['Outfit',sans-serif]">
-              <span className="text-amber-400">Cổng</span> Thư Viện
-            </h1>
-          </div>
-          <div className="flex gap-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-emerald-400">{todayCounts.entries}</p>
-              <p className="text-xs text-slate-400">Vào hôm nay</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-orange-400">{todayCounts.exits}</p>
-              <p className="text-xs text-slate-400">Ra hôm nay</p>
-            </div>
-          </div>
-        </div>
-
-        {toasts.length > 0 && (
-          <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
-            {toasts.map((t) => (
-              <div
-                key={t.id}
-                className={`px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium ${
-                  t.type === 'entry' ? 'bg-emerald-600' :
-                  t.type === 'exit' ? 'bg-orange-600' :
-                  t.type === 'error' ? 'bg-red-600' : 'bg-slate-700'
-                }`}
-              >
-                {t.patron_name && <strong>{t.patron_name}</strong>} {t.message}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="grid grid-cols-3 gap-6 mb-6">
-          <div className="col-span-2 grid grid-cols-2 gap-4">
-            <CameraFeed
-              src={`${ENTRY_CAM}`}
-              label="Cổng vào"
-              overlay={entryOverlay}
-              onStatusChange={(ok) => {}}
-            />
-            <CameraFeed
-              src={`${EXIT_CAM}`}
-              label="Cổng ra"
-              overlay={exitOverlay}
-              onStatusChange={(ok) => {}}
-            />
-          </div>
-
-          <div className="space-y-4">
-            {step === 'idle' && (
-              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-semibold text-white">Chào mừng</h2>
-                  <p className="text-slate-400 text-sm mt-1">Nhập MSSV để xác thực khuôn mặt</p>
-                </div>
-                <MssvInput onSubmit={handleLookup} disabled={loading} />
-                {loading && (
-                  <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
-                    <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm">{statusText || 'Đang xử lý...'}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {step === 'verify' && (
-              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
-                <div className="text-center mb-4">
-                  <h2 className="text-xl font-semibold text-white">Xác thực khuôn mặt</h2>
-                  <p className="text-slate-400 text-sm mt-1">
-                    {lookup?.patron?.full_name || mssv}
-                  </p>
-                </div>
-                <div className="relative bg-black rounded-xl overflow-hidden mb-4 aspect-[4/3]">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-32 h-32 border-2 border-amber-400/50 rounded-full" />
-                  </div>
-                  {loading && (
-                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-                      <div className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mb-3" />
-                      <p className="text-white text-sm">{statusText}</p>
-                    </div>
-                  )}
-                </div>
-                <GateButton onClick={handleVerify} disabled={loading} fullWidth>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Xác thực & Vào cổng
-                </GateButton>
-                <button
-                  onClick={reset}
-                  className="mt-3 w-full py-3 text-slate-400 hover:text-white transition-colors text-sm"
-                >
-                  Hủy
-                </button>
-              </div>
-            )}
-
-            {step === 'result' && (
-              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
-                <ResultCard
-                  status={getResultStatus()}
-                  patronInfo={result?.patron ? {
-                    fullName: result.patron.full_name || '',
-                    mssv: result.patron.student_code || result?.patron?.id || '',
-                    faculty: '',
-                  } : undefined}
-                  message={result?.message}
-                />
-                <GateButton onClick={reset} variant="secondary" fullWidth className="mt-4">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Thử lại
-                </GateButton>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-          <div className="flex items-center gap-2 text-slate-400 text-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Hệ thống đang hoạt động
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -3923,6 +3506,423 @@ export default function ReturnPage() {
           <p className="text-body-md font-medium">{result.message}</p>
         </div>
       )}
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(kiosk)/gate/page.tsx">
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import api, { getErrorMessage } from '@/lib/api-client';
+import CameraFeed from '@/components/gate/CameraFeed';
+import MssvInput from '@/components/gate/MssvInput';
+import GateButton from '@/components/gate/GateButton';
+import ResultCard from '@/components/gate/ResultCard';
+import PulseAnimation from '@/components/gate/PulseAnimation';
+import type { CameraEvent, KioskResult, PatronLookupResult } from '@/lib/types';
+
+interface TodayCounts { entries: number; exits: number; no_match: number; spoof: number; }
+
+const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || 'http://192.168.1.121:8080/video';
+const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || 'http://192.168.1.240:8080/video';
+const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || 'entry_gate';
+const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || 'exit_gate';
+
+type Step = 'idle' | 'verify' | 'result';
+
+interface Toast {
+  id: number;
+  type: 'entry' | 'exit' | 'error' | 'info';
+  message: string;
+  patron_name?: string;
+}
+
+let toastId = 0;
+
+export default function GatePage() {
+  const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const [step, setStep] = useState<Step>('idle');
+  const [mssv, setMssv] = useState('');
+  const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
+  const [result, setResult] = useState<KioskResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState('');
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [todayCounts, setTodayCounts] = useState<TodayCounts>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('gate_today_counts');
+      if (cached) {
+        try { return JSON.parse(cached) as TodayCounts; } catch {}
+      }
+    }
+    return { entries: 0, exits: 0, no_match: 0, spoof: 0 };
+  });
+  const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
+  const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
+  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const addToast = useCallback((t: Omit<Toast, 'id'>) => {
+    const id = ++toastId;
+    setToasts((prev) => [{ ...t, id }, ...prev.slice(0, 4)]);
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, [stopCamera]);
+
+  const startCamera = useCallback(async () => {
+    try {
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Không thể mở camera' });
+    }
+  }, [addToast]);
+
+  const captureImage = useCallback((): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const video = videoRef.current;
+      if (!video || !video.videoWidth) {
+        reject(new Error('Camera chưa sẵn sàng'));
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Không thể tạo canvas')); return; }
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], 'face_capture.jpg', { type: 'image/jpeg' });
+          resolve(file);
+        } else {
+          reject(new Error('Không thể tạo ảnh'));
+        }
+      }, 'image/jpeg', 0.9);
+    });
+  }, []);
+
+  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      try {
+        const task = await api.getTaskStatus(jobId);
+        if (task.status === 'SUCCESS') return task.result;
+        if (task.status === 'FAILURE') throw new Error(task.result?.error || 'Task failed');
+        setStatusText(task.result?.status === 'granted' ? 'Đã ghi nhận...' : 'Đang xử lý...');
+      } catch {}
+    }
+    throw new Error('Timeout waiting for result');
+  }, []);
+
+  const handleLookup = async (inputMssv: string) => {
+    if (!inputMssv.trim()) return;
+    setMssv(inputMssv.trim());
+    setLoading(true);
+    setStatusText('Đang tra cứu...');
+    try {
+      const res = await api.kioskLookup(inputMssv.trim());
+      setLookup(res);
+      if (res.exists && res.has_face && !res.is_expired) {
+        setStep('verify');
+        setStatusText('Mở camera...');
+        await startCamera();
+      } else if (res.exists && !res.has_face) {
+        setStep('result');
+        setResult({
+          success: false,
+          message: 'Tài khoản chưa được đăng ký khuôn mặt. Vui lòng đăng ký tại quầy.',
+          patron: res.patron,
+          job_id: null,
+        });
+      } else if (res.exists && res.is_expired) {
+        setStep('result');
+        setResult({ success: false, message: 'Thẻ hội viên đã hết hạn', patron: res.patron, job_id: null });
+      } else {
+        setStep('result');
+        setResult({ success: false, message: 'Không tìm thấy tài khoản. Vui lòng đăng ký tại quầy.', patron: null, job_id: null });
+      }
+    } catch (err: any) {
+      setStep('result');
+      setResult({ success: false, message: getErrorMessage(err) || 'Tra cứu thất bại', patron: null, job_id: null });
+    } finally {
+      setLoading(false);
+      setStatusText('');
+    }
+  };
+
+  const handleVerify = async () => {
+    setLoading(true);
+    setStatusText('Đang chụp ảnh...');
+    try {
+      const imageFile = await captureImage();
+      stopCamera();
+      setStatusText('Đang xác thực khuôn mặt...');
+      const res = await api.kioskEnter(imageFile, mssv);
+      if (res.job_id) {
+        const taskResult = await pollTask(res.job_id);
+        const success = taskResult?.status === 'success';
+        const confidence = taskResult?.score ?? taskResult?.confidence;
+        setResult({
+          success,
+          message: success
+            ? `Xác thực thành công — ${taskResult?.access_type === 'exit' ? 'Ra' : 'Vào'} thư viện`
+            : (taskResult?.error || 'Xác thực thất bại'),
+          patron: res.patron,
+          job_id: res.job_id,
+          confidence,
+        });
+      } else {
+        setResult(res);
+      }
+      setStep('result');
+    } catch (err: any) {
+      const msg = getErrorMessage(err) || 'Xác thực thất bại';
+      setResult({ success: false, message: msg, patron: null, job_id: null });
+      setStep('result');
+      addToast({ type: 'error', message: msg });
+    } finally {
+      setLoading(false);
+      setStatusText('');
+    }
+  };
+
+  const reset = () => {
+    setStep('idle');
+    setMssv('');
+    setLookup(null);
+    setResult(null);
+    stopCamera();
+  };
+
+  useEffect(() => {
+    api.getStats().then((s) => {
+      if (s) {
+        const fresh: TodayCounts = { entries: s.today_entries ?? 0, exits: s.today_exits ?? 0, no_match: 0, spoof: 0 };
+        setTodayCounts(fresh);
+        localStorage.setItem('gate_today_counts', JSON.stringify(fresh));
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('gate_today_counts', JSON.stringify(todayCounts));
+  }, [todayCounts]);
+
+  useEffect(() => {
+    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
+      if (event.bbox || event.landmarks) {
+        const overlay = { bbox: event.bbox, landmarks: event.landmarks };
+        if (event.camera_id === ENTRY_CAM_ID) {
+          setEntryOverlay({ ...overlay, status: event.status });
+        } else if (event.camera_id === EXIT_CAM_ID) {
+          setExitOverlay({ ...overlay, status: event.status });
+        }
+        if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
+        overlayTimeoutRef.current = setTimeout(() => {
+          setEntryOverlay(null);
+          setExitOverlay(null);
+        }, 2000);
+      }
+      if (event.status === 'granted') {
+        const type = event.access_type === 'entry' ? 'entry' : 'exit';
+        addToast({
+          type,
+          message: `${event.full_name} — ${type === 'entry' ? 'Vào' : 'Ra'} thư viện`,
+          patron_name: event.full_name,
+        });
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, [type === 'entry' ? 'entries' : 'exits']: prev[type === 'entry' ? 'entries' : 'exits'] + 1 }));
+      } else if (event.status === 'no_match') {
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, no_match: prev.no_match + 1 }));
+        addToast({ type: 'info', message: 'Khuôn mặt mới — không nhận diện được' });
+      } else if (event.status === 'spoof') {
+        setTodayCounts((prev: TodayCounts) => ({ ...prev, spoof: prev.spoof + 1 }));
+        addToast({ type: 'error', message: 'Phát hiện giả mạo!' });
+      }
+    });
+    return cleanup;
+  }, [addToast]);
+
+  const getResultStatus = () => {
+    if (!result) return 'processing';
+    if (result.success) return 'success';
+    if (result.message?.includes('đăng ký tại quầy')) return 'unregistered';
+    return 'error';
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <button onClick={() => router.push('/dashboard')} className="text-slate-400 hover:text-amber-400 transition-colors text-sm mb-2">
+              ← Quay lại Dashboard
+            </button>
+            <h1 className="text-3xl font-bold text-white font-['Outfit',sans-serif]">
+              <span className="text-amber-400">Cổng</span> Thư Viện
+            </h1>
+          </div>
+          <div className="flex gap-6">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-emerald-400">{todayCounts.entries}</p>
+              <p className="text-xs text-slate-400">Vào hôm nay</p>
+            </div>
+            <div className="text-center">
+              <p className="text-3xl font-bold text-orange-400">{todayCounts.exits}</p>
+              <p className="text-xs text-slate-400">Ra hôm nay</p>
+            </div>
+          </div>
+        </div>
+
+        {toasts.length > 0 && (
+          <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+            {toasts.map((t) => (
+              <div
+                key={t.id}
+                className={`px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium ${
+                  t.type === 'entry' ? 'bg-emerald-600' :
+                  t.type === 'exit' ? 'bg-orange-600' :
+                  t.type === 'error' ? 'bg-red-600' : 'bg-slate-700'
+                }`}
+              >
+                {t.patron_name && <strong>{t.patron_name}</strong>} {t.message}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          <div className="col-span-2 grid grid-cols-2 gap-4">
+            <CameraFeed
+              src={`${ENTRY_CAM}`}
+              label="Cổng vào"
+              overlay={entryOverlay}
+              onStatusChange={(ok) => {}}
+            />
+            <CameraFeed
+              src={`${EXIT_CAM}`}
+              label="Cổng ra"
+              overlay={exitOverlay}
+              onStatusChange={(ok) => {}}
+            />
+          </div>
+
+          <div className="space-y-4">
+            {step === 'idle' && (
+              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold text-white">Chào mừng</h2>
+                  <p className="text-slate-400 text-sm mt-1">Nhập MSSV để xác thực khuôn mặt</p>
+                </div>
+                <MssvInput onSubmit={handleLookup} disabled={loading} />
+                {loading && (
+                  <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
+                    <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm">{statusText || 'Đang xử lý...'}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {step === 'verify' && (
+              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
+                <div className="text-center mb-4">
+                  <h2 className="text-xl font-semibold text-white">Xác thực khuôn mặt</h2>
+                  <p className="text-slate-400 text-sm mt-1">
+                    {lookup?.patron?.full_name || mssv}
+                  </p>
+                </div>
+                <div className="relative bg-black rounded-xl overflow-hidden mb-4 aspect-[4/3]">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-32 h-32 border-2 border-amber-400/50 rounded-full" />
+                  </div>
+                  {loading && (
+                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+                      <div className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mb-3" />
+                      <p className="text-white text-sm">{statusText}</p>
+                    </div>
+                  )}
+                </div>
+                <GateButton onClick={handleVerify} disabled={loading} fullWidth>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Xác thực & Vào cổng
+                </GateButton>
+                <button
+                  onClick={reset}
+                  className="mt-3 w-full py-3 text-slate-400 hover:text-white transition-colors text-sm"
+                >
+                  Hủy
+                </button>
+              </div>
+            )}
+
+            {step === 'result' && (
+              <div className="bg-slate-800/80 rounded-2xl p-6 border border-slate-700">
+                <ResultCard
+                  status={getResultStatus()}
+                  patronInfo={result?.patron ? {
+                    fullName: result.patron.full_name || '',
+                    mssv: result.patron.student_code || result?.patron?.id || '',
+                    faculty: '',
+                  } : undefined}
+                  message={result?.message}
+                />
+                <GateButton onClick={reset} variant="secondary" fullWidth className="mt-4">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Thử lại
+                </GateButton>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+          <div className="flex items-center gap-2 text-slate-400 text-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Hệ thống đang hoạt động
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -7945,6 +7945,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const data: LoginRequest = { email, password };
     const response = await api.login(data);
+    if (!response.access_token) {
+      throw new Error("Backend did not return access_token");
+    }
 
     localStorage.setItem("access_token", response.access_token);
     setTokenCookie(response.access_token);
@@ -7998,8 +8001,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const refreshToken = localStorage.getItem("refresh_token");
       if (!refreshToken) return false;
 
-      const resp = await api.client.post("/auth/refresh", { refresh_token: refreshToken });
-      const { access_token } = resp.data;
+      const { access_token } = await api.refreshAuthToken(refreshToken);
       if (access_token) {
         localStorage.setItem("access_token", access_token);
         setTokenCookie(access_token);
@@ -8298,6 +8300,9 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const res = await api.faceLogin(file);
+      if (!res.access_token) {
+        throw new Error("Backend did not return access_token");
+      }
       const payload = JSON.parse(atob(res.access_token.split(".")[1]));
       const email = payload?.email || "";
       const role = ((payload?.roles as string[])?.[0]) || "user";
@@ -8932,7 +8937,12 @@ import type {
   StaffReturnRequest,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
+const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
+const API_BASE_URL = RAW_API_BASE_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+function isNotFoundError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 404;
+}
 
 export function getErrorMessage(err: any): string {
   if (!err) return "Unknown error";
@@ -9017,11 +9027,21 @@ class ApiClient {
     if (!refreshToken) return false;
 
     try {
-      const response = await axios.post<TokenResponse>(
-        `${API_BASE_URL}/auth/refresh`,
-        { refresh_token: refreshToken }
-      );
+      let response;
+      try {
+        response = await axios.post<TokenResponse>(
+          `${API_BASE_URL}/auth/refresh`,
+          { refresh_token: refreshToken }
+        );
+      } catch (error) {
+        if (!isNotFoundError(error)) throw error;
+        response = await axios.post<TokenResponse>(
+          `${API_BASE_URL}/api/auth/refresh`,
+          { refresh_token: refreshToken }
+        );
+      }
       const { access_token } = response.data;
+      if (!access_token) return false;
       localStorage.setItem("access_token", access_token);
       return true;
     } catch {
@@ -9031,12 +9051,43 @@ class ApiClient {
 
   // === Auth (via face-recognition-api) ===
   async login(data: LoginRequest): Promise<TokenResponse> {
-    const response = await this.client.post<TokenResponse>("/auth/login", data);
-    return response.data;
+    try {
+      const response = await this.client.post<TokenResponse>("/auth/login", data);
+      return response.data;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      const response = await this.client.post<TokenResponse>("/api/auth/login", data);
+      return response.data;
+    }
   }
 
   async register(data: RegisterRequest): Promise<UserPublic> {
-    const response = await this.client.post<UserPublic>("/auth/register", data);
+    try {
+      const response = await this.client.post<UserPublic>("/auth/register", data);
+      return response.data;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      const response = await this.client.post<UserPublic>("/api/auth/register", data);
+      return response.data;
+    }
+  }
+
+  async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
+    try {
+      const response = await this.client.post<TokenResponse>("/auth/refresh", { refresh_token: refreshToken });
+      return response.data;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      const response = await this.client.post<TokenResponse>("/api/auth/refresh", { refresh_token: refreshToken });
+      return response.data;
+    }
+  }
+
+  async faceLogin(imageFile: File): Promise<TokenResponse> {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const response = await this.client.post<TokenResponse>("/api/auth/face-login", formData);
     return response.data;
   }
 
@@ -9120,14 +9171,6 @@ class ApiClient {
     formData.append("consent_given", String(consentGiven));
 
     const response = await this.client.post("/api/face/identify", formData);
-    return response.data;
-  }
-
-  async faceLogin(imageFile: File): Promise<TokenResponse> {
-    const formData = new FormData();
-    formData.append("file", imageFile);
-
-    const response = await this.client.post<TokenResponse>("/api/auth/face-login", formData);
     return response.data;
   }
 

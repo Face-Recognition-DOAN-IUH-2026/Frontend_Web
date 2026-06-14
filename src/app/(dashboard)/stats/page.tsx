@@ -254,16 +254,28 @@ export default function StatsPage() {
                       </td>
                       <td className="font-medium">{l.patron_name || l.student_code || "-"}</td>
                       <td>
-                        <Badge variant={l.access_type === "entry" ? "success" : "warning"} dot>
-                          {l.access_type === "entry" ? "Vào" : "Ra"}
-                        </Badge>
+                        {l.access_type === "entry" ? (
+                          <Badge variant="success" dot>Vào</Badge>
+                        ) : l.access_type === "exit" ? (
+                          <Badge variant="warning" dot>Ra</Badge>
+                        ) : (
+                          <Badge variant="neutral" dot>{l.access_type || "?"}</Badge>
+                        )}
                       </td>
-                      <td className="font-mono text-text-3">{l.camera_id}</td>
-                      <td className="text-text-3">{l.verify_method}</td>
+                      <td className="font-mono text-text-3">{l.camera_id || "-"}</td>
+                      <td className="text-text-3">{l.verify_method || "-"}</td>
                       <td>
-                        <Badge variant={l.status === "granted" ? "success" : "error"} dot>
-                          {l.status === "granted" ? "Thành công" : "Thất bại"}
-                        </Badge>
+                        {(l.status === "success") ? (
+                          <Badge variant="success" dot>Thành công</Badge>
+                        ) : l.status === "no_match" ? (
+                          <Badge variant="warning" dot>Không khớp</Badge>
+                        ) : l.status === "expired" ? (
+                          <Badge variant="warning" dot>Hết hạn</Badge>
+                        ) : l.status === "spoof" ? (
+                          <Badge variant="error" dot>Giả mạo</Badge>
+                        ) : (
+                          <Badge variant="error" dot>{l.status === "denied" ? "Từ chối" : "Thất bại"}</Badge>
+                        )}
                       </td>
                     </tr>
                   ))}

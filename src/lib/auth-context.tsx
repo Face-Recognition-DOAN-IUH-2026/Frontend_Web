@@ -69,6 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const data: LoginRequest = { email, password };
     const response = await api.login(data);
+    if (!response.access_token) {
+      throw new Error("Backend did not return access_token");
+    }
 
     localStorage.setItem("access_token", response.access_token);
     setTokenCookie(response.access_token);
@@ -122,8 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const refreshToken = localStorage.getItem("refresh_token");
       if (!refreshToken) return false;
 
-      const resp = await api.client.post("/auth/refresh", { refresh_token: refreshToken });
-      const { access_token } = resp.data;
+      const { access_token } = await api.refreshAuthToken(refreshToken);
       if (access_token) {
         localStorage.setItem("access_token", access_token);
         setTokenCookie(access_token);
