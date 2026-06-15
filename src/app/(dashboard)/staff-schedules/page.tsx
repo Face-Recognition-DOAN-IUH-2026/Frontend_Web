@@ -385,7 +385,10 @@ export default function StaffSchedulesPage() {
   };
 
   const deleteZone = async (zone: LibraryZone) => {
-    if (typeof window !== "undefined" && !window.confirm(`Xóa ${displayZoneName(zone)} khỏi lịch trực?`)) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Xóa ${displayZoneName(zone)} khỏi lịch trực? Các lịch chưa hoàn tất ở tầng này sẽ bị hủy.`)
+    ) return;
     setSaving(true);
     setError(null);
     try {
@@ -399,7 +402,10 @@ export default function StaffSchedulesPage() {
   };
 
   const deleteShift = async (shift: StaffShift) => {
-    if (typeof window !== "undefined" && !window.confirm(`Xóa ca trực "${shift.name}"?`)) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Xóa ca trực "${shift.name}"? Các lịch chưa hoàn tất dùng ca này sẽ bị hủy.`)
+    ) return;
     setSaving(true);
     setError(null);
     try {
