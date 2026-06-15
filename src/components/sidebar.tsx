@@ -20,6 +20,7 @@ import {
   DoorOpen,
   LogOut,
   Library,
+  CalendarDays,
 } from "lucide-react";
 
 const libraryItems = [
@@ -33,6 +34,10 @@ const libraryItems = [
 const circulationItems = [
   { href: "/return", label: "Trả sách", icon: BookMarked },
   { href: "/books", label: "Kho sách", icon: Library },
+];
+
+const staffItems = [
+  { href: "/staff-schedules", label: "Lich truc", icon: CalendarDays },
 ];
 
 const aiItems = [
@@ -142,6 +147,17 @@ export default function Sidebar() {
             <SectionLabel>Mượn / Trả</SectionLabel>
             <div className="space-y-0.5">
               {circulationItems.map((item) => (
+                <NavItem key={item.href} {...item} active={pathname === item.href} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {role === "admin" || role === "staff" ? (
+          <div>
+            <SectionLabel>Nhan su</SectionLabel>
+            <div className="space-y-0.5">
+              {staffItems.map((item) => (
                 <NavItem key={item.href} {...item} active={pathname === item.href} />
               ))}
             </div>

@@ -173,6 +173,35 @@ export interface BorrowRecord {
   book?: BookInfo | null;
 }
 
+export interface StaffPatronSummary {
+  id: string;
+  full_name: string | null;
+  student_code: string;
+  email: string | null;
+  card_number: string | null;
+  current_status: string | null;
+}
+
+export interface StaffPatronActiveBorrowsResponse {
+  patron: StaffPatronSummary;
+  records: BorrowRecord[];
+  total: number;
+  overdue_count: number;
+}
+
+export interface StaffActiveBorrowerSummary {
+  patron: StaffPatronSummary;
+  total_borrowed: number;
+  overdue_count: number;
+  latest_borrow_at: string;
+  nearest_due_at: string;
+}
+
+export interface StaffActiveBorrowersResponse {
+  items: StaffActiveBorrowerSummary[];
+  total: number;
+}
+
 export interface BorrowResponse {
   status: string;
   message: string;
@@ -355,4 +384,72 @@ export interface CameraEvent {
   error?: string;
   bbox?: [number, number, number, number];
   landmarks?: [number, number][];
+}
+
+// === Staff Schedule ===
+export interface ScheduleStaff {
+  id: string;
+  fullName: string | null;
+  email: string;
+  role: string;
+  status: string;
+}
+
+export interface LibraryZone {
+  id: string;
+  floor: number;
+  zoneName: string;
+  description: string | null;
+  isActive: boolean;
+}
+
+export interface StaffShift {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  minStaff: number;
+  isActive: boolean;
+}
+
+export interface StaffScheduleAssignment {
+  id: string;
+  staffId: string;
+  shiftId: string;
+  zoneId: string;
+  workDate: string;
+  status: string;
+  assignedBy: string | null;
+  note: string | null;
+  shift?: StaffShift | null;
+  zone?: LibraryZone | null;
+  staff?: ScheduleStaff | null;
+  attendance?: StaffAttendance | null;
+}
+
+export interface StaffAttendance {
+  id: string;
+  scheduleId: string;
+  staffId: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  status: string;
+  method: string;
+}
+
+export interface StaffAvailabilityRequest {
+  id: string;
+  staffId: string;
+  dateFrom: string;
+  dateTo: string;
+  type: string;
+  reason: string | null;
+  status: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+}
+
+export interface ScheduleAssignmentList {
+  items: StaffScheduleAssignment[];
+  total: number;
 }
