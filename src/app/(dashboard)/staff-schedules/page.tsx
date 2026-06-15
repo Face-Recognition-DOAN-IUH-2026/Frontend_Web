@@ -15,6 +15,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Building2,
   Loader2,
   MapPin,
   Move,
@@ -125,22 +126,31 @@ function DraggableAssignment({ item }: { item: StaffScheduleAssignment }) {
 function DropCell({
   id,
   assignments,
+  minStaff,
 }: {
   id: string;
   assignments: StaffScheduleAssignment[];
+  minStaff: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  const isUnderstaffed = assignments.length < minStaff;
 
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[94px] rounded-md border border-dashed p-2 transition ${
-        isOver ? "border-primary bg-primary/10" : "border-border bg-surface/70"
+      className={`min-h-[112px] rounded-md border border-dashed p-2 transition ${
+        isOver ? "border-primary bg-primary/10" : isUnderstaffed ? "border-warning/60 bg-warning/5" : "border-border bg-surface/70"
       }`}
     >
+      <div className="mb-2 flex items-center justify-between text-[11px]">
+        <span className={isUnderstaffed ? "font-semibold text-warning" : "text-text-3"}>
+          {assignments.length}/{minStaff} nhan vien
+        </span>
+        {isUnderstaffed ? <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-warning">Thieu</span> : null}
+      </div>
       {assignments.length === 0 ? (
         <div className="flex h-full min-h-[64px] items-center justify-center text-center text-[11px] text-text-3">
-          Tha nhan vien vao day
+          Tha mot hoac nhieu nhan vien vao ca nay
         </div>
       ) : (
         <div className="space-y-2">
@@ -202,6 +212,8 @@ export default function StaffSchedulesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState({ dateFrom: toDateInput(new Date()), dateTo: toDateInput(new Date()), reason: "" });
+  const [zoneForm, setZoneForm] = useState({ floor: "1", zoneName: "" });
+  const [shiftForm, setShiftForm] = useState({ name: "", startTime: "08:00", endTime: "12:00", minStaff: "1" });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -261,6 +273,50 @@ export default function StaffSchedulesPage() {
           ]);
       setZones(createdZones);
       setShifts(createdShifts);
+      await loadData();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const createZone = async () => {
+    if (!zoneForm.zoneName.trim()) {
+      setError("Vui long nhap ten khu vuc/tang");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.createScheduleZone({
+        floor: Number(zoneForm.floor) || 1,
+        zoneName: zoneForm.zoneName.trim(),
+      });
+      setZoneForm((value) => ({ ...value, zoneName: "" }));
+      await loadData();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const createShift = async () => {
+    if (!shiftForm.name.trim()) {
+      setError("Vui long nhap ten ca truc");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.createScheduleShift({
+        name: shiftForm.name.trim(),
+        startTime: shiftForm.startTime,
+        endTime: shiftForm.endTime,
+        minStaff: Math.max(1, Number(shiftForm.minStaff) || 1),
+      });
+      setShiftForm((value) => ({ ...value, name: "" }));
       await loadData();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -382,23 +438,115 @@ export default function StaffSchedulesPage() {
           <Loader2 className="animate-spin text-primary" size={30} />
         </div>
       ) : isAdmin ? (
-        <div className="grid gap-5 xl:grid-cols-[280px_1fr]">
-          <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Users size={18} className="text-primary" />
-                <h3 className="font-semibold text-text">Staff pool</h3>
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Users size={18} className="text-primary" />
+                  <h3 className="font-semibold text-text">Staff pool</h3>
+                </div>
+                <p className="mb-3 text-caption text-text-3">Keo nhan vien vao bat ky o ca truc. Moi ca co the co nhieu nhan vien.</p>
+                <div className="space-y-2">
+                  {staff.length ? staff.map((item) => <DraggableStaff key={item.id} staff={item} />) : (
+                    <p className="text-body-sm text-text-3">Chua lay duoc danh sach staff tu user-service.</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                {staff.length ? staff.map((item) => <DraggableStaff key={item.id} staff={item} />) : (
-                  <p className="text-body-sm text-text-3">Chua lay duoc danh sach staff tu user-service.</p>
-                )}
-              </div>
-            </div>
-            <EmptySetup zones={zones} shifts={shifts} onCreateDefaults={createDefaults} loading={saving} />
-          </div>
 
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Building2 size={18} className="text-primary" />
+                  <h3 className="font-semibold text-text">Cau hinh tang va ca</h3>
+                </div>
+                <div className="space-y-4">
+                  <div className="rounded-md bg-surface-2 p-3">
+                    <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-text-3">Them tang / khu vuc</p>
+                    <div className="grid grid-cols-[80px_1fr] gap-2">
+                      <label className="text-caption text-text-2">
+                        Tang
+                        <input
+                          type="number"
+                          min={1}
+                          value={zoneForm.floor}
+                          onChange={(event) => setZoneForm((value) => ({ ...value, floor: event.target.value }))}
+                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                        />
+                      </label>
+                      <label className="text-caption text-text-2">
+                        Khu vuc
+                        <input
+                          value={zoneForm.zoneName}
+                          onChange={(event) => setZoneForm((value) => ({ ...value, zoneName: event.target.value }))}
+                          placeholder="VD: Tang 3 - Phong doc"
+                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                        />
+                      </label>
+                    </div>
+                    <button
+                      onClick={createZone}
+                      disabled={saving}
+                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-primary/50 px-3 py-2 text-body-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"
+                    >
+                      <Plus size={15} /> Them khu vuc
+                    </button>
+                  </div>
+
+                  <div className="rounded-md bg-surface-2 p-3">
+                    <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-text-3">Them ca truc</p>
+                    <label className="block text-caption text-text-2">
+                      Ten ca
+                      <input
+                        value={shiftForm.name}
+                        onChange={(event) => setShiftForm((value) => ({ ...value, name: event.target.value }))}
+                        placeholder="VD: Ca toi tang 4"
+                        className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                      />
+                    </label>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <label className="text-caption text-text-2">
+                        Bat dau
+                        <input
+                          type="time"
+                          value={shiftForm.startTime}
+                          onChange={(event) => setShiftForm((value) => ({ ...value, startTime: event.target.value }))}
+                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                        />
+                      </label>
+                      <label className="text-caption text-text-2">
+                        Ket thuc
+                        <input
+                          type="time"
+                          value={shiftForm.endTime}
+                          onChange={(event) => setShiftForm((value) => ({ ...value, endTime: event.target.value }))}
+                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                        />
+                      </label>
+                      <label className="text-caption text-text-2">
+                        So NV
+                        <input
+                          type="number"
+                          min={1}
+                          value={shiftForm.minStaff}
+                          onChange={(event) => setShiftForm((value) => ({ ...value, minStaff: event.target.value }))}
+                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                        />
+                      </label>
+                    </div>
+                    <button
+                      onClick={createShift}
+                      disabled={saving}
+                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-primary/50 px-3 py-2 text-body-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"
+                    >
+                      <Plus size={15} /> Them ca truc
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <EmptySetup zones={zones} shifts={shifts} onCreateDefaults={createDefaults} loading={saving} />
+            </div>
+
             <div className="overflow-x-auto rounded-lg border border-border bg-surface p-4">
               <div className="min-w-[980px]">
                 <div className="grid grid-cols-[170px_repeat(7,minmax(110px,1fr))] gap-2">
@@ -436,6 +584,7 @@ export default function StaffSchedulesPage() {
                                 <DropCell
                                   id={`cell:${date}:${zone.id}:${shift.id}`}
                                   assignments={assignmentsForCell(date, zone.id, shift.id)}
+                                  minStaff={shift.minStaff || 1}
                                 />
                               </div>
                             );
@@ -447,8 +596,8 @@ export default function StaffSchedulesPage() {
                 </div>
               </div>
             </div>
-          </DndContext>
-        </div>
+          </div>
+        </DndContext>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
           <div className="rounded-lg border border-border bg-surface p-4">
