@@ -1,62 +1,118 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import api, { getErrorMessage } from "@/lib/api-client";
-import type {
-  BookWithStats,
-  BookImportPreviewRow,
-  BookImportResultRow,
-} from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
-import StatCard from "@/components/ui/StatCard";
-import { useToast } from "@/components/ui/Toast";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  BookOpen,
-  Upload,
-  FileSpreadsheet,
-  Search,
-  X,
-  CheckCircle,
-  AlertCircle,
-  SkipForward,
-  Eye,
-  Download,
-  Printer,
-  Package,
-  Library,
-  RefreshCw,
-} from "lucide-react";
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  IconButton,
+  InputAdornment,
+  Paper,
+  Snackbar,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import DownloadIcon from "@mui/icons-material/DownloadOutlined";
+import EyeIcon from "@mui/icons-material/VisibilityOutlined";
+import FileIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
+import PrintIcon from "@mui/icons-material/PrintOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SearchIcon from "@mui/icons-material/Search";
+import UploadIcon from "@mui/icons-material/UploadFileOutlined";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
+
+type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
+
+function statusColor(status: string): "success" | "info" | "warning" | "error" | "default" {
+  if (["new", "imported"].includes(status)) return "success";
+  if (["updated"].includes(status)) return "info";
+  if (["exists", "skipped"].includes(status)) return "default";
+  if (["warning"].includes(status)) return "warning";
+  return "error";
+}
+
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    exists: "Đã có",
+    new: "Mới",
+    warning: "Cảnh báo",
+    invalid: "Lỗi",
+    imported: "Thành công",
+    updated: "Cập nhật",
+    skipped: "Bỏ qua",
+    error: "Lỗi",
+  };
+  return labels[status] || status;
+}
+
+function MetricCard({ label, value, description, icon: Icon, color }: any) {
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>{label}</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 900 }}>{value}</Typography>
+            <Typography variant="caption" color="text.secondary">{description}</Typography>
+          </Box>
+          <Avatar sx={{ bgcolor: color, color: "primary.contrastText" }}>
+            <Icon />
+          </Avatar>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function BooksPage() {
-  const { addToast } = useToast();
+  const theme = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [books, setBooks] = useState<BookWithStats[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<BookWithStats[]>([]);
   const [searching, setSearching] = useState(false);
-
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<BookImportPreviewRow[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [importing, setImporting] = useState(false);
-
   const [importResults, setImportResults] = useState<BookImportResultRow[] | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [recentlyPrinted, setRecentlyPrinted] = useState<string[]>([]);
-
   const [page, setPage] = useState(0);
   const limit = 30;
-
   const [selectedBook, setSelectedBook] = useState<BookWithStats | null>(null);
-  const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [editQuantity, setEditQuantity] = useState(0);
   const [savingQuantity, setSavingQuantity] = useState(false);
   const [quantityError, setQuantityError] = useState("");
+  const [notice, setNotice] = useState<Notice>(null);
+
+  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
@@ -65,52 +121,38 @@ export default function BooksPage() {
       setBooks(data.items ?? []);
       setTotal(data.total ?? 0);
     } catch (err) {
-      addToast({ type: "error", title: "Lỗi tải dữ liệu", description: getErrorMessage(err) });
+      showNotice("error", getErrorMessage(err) || "Lỗi tải dữ liệu sách");
       setBooks([]);
       setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [page, addToast]);
-
-  const handleRowClick = (book: BookWithStats) => {
-    setSelectedBook(book);
-    setEditQuantity(book.total_copies);
-    setQuantityError("");
-    setShowQuantityModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setShowQuantityModal(false);
-    setSelectedBook(null);
-    setEditQuantity(0);
-    setQuantityError("");
-  };
-
-  useEffect(() => { loadBooks(); }, [loadBooks]);
+  }, [page]);
 
   useEffect(() => {
-    if (!showQuantityModal) return;
-    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleCloseModal(); };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [showQuantityModal, handleCloseModal]);
+    loadBooks();
+  }, [loadBooks]);
 
   useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults([]); return; }
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await api.searchBooks(searchQuery);
-        setSearchResults(results);
-      } catch { /* ignore */ }
-      finally { setSearching(false); }
+        setSearchResults(await api.searchBooks(searchQuery));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
     }, 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
     setPreviewFile(file);
     setPreviewData(null);
@@ -119,11 +161,12 @@ export default function BooksPage() {
     try {
       const data = await api.getBarcodePreview(file);
       setPreviewData(data.rows);
-      addToast({ type: "info", title: "Xem trước file", description: `Đã đọc ${data.total_rows} dòng (hiển thị tối đa 100)` });
+      showNotice("info", `Đã đọc ${data.total_rows} dòng từ file Excel`);
     } catch (err) {
-      addToast({ type: "error", title: "Lỗi đọc file", description: getErrorMessage(err) });
+      showNotice("error", getErrorMessage(err) || "Lỗi đọc file");
     } finally {
       setPreviewLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -140,13 +183,11 @@ export default function BooksPage() {
       setSearchQuery("");
       setPage(0);
       await loadBooks();
-      if (result.errors === 0) {
-        addToast({ type: "success", title: "Nhập kho thành công", description: `Đã nhập ${result.imported} đầu sách (${result.skipped} bị bỏ qua)` });
-      } else {
-        addToast({ type: "warning", title: "Nhập kho hoàn thành (có lỗi)", description: `${result.imported} nhập thành công, ${result.errors} lỗi` });
-      }
+      showNotice(result.errors === 0 ? "success" : "warning", result.errors === 0
+        ? `Đã nhập ${result.imported} đầu sách`
+        : `${result.imported} nhập thành công, ${result.errors} lỗi`);
     } catch (err) {
-      addToast({ type: "error", title: "Lỗi nhập kho", description: getErrorMessage(err) });
+      showNotice("error", getErrorMessage(err) || "Lỗi nhập kho");
     } finally {
       setImporting(false);
     }
@@ -156,7 +197,7 @@ export default function BooksPage() {
     if (!selectedBook) return;
     const borrowed = selectedBook.total_copies - selectedBook.available_copies;
     if (editQuantity < borrowed) {
-      setQuantityError(`Tối thiểu ${borrowed} bản (${borrowed} bản đang mượn)`);
+      setQuantityError(`Tối thiểu ${borrowed} bản vì đang có ${borrowed} bản được mượn`);
       return;
     }
     if (editQuantity < 1) {
@@ -166,12 +207,12 @@ export default function BooksPage() {
     setSavingQuantity(true);
     try {
       const updated = await api.updateBookQuantity(selectedBook.id, editQuantity);
-      setBooks(prev => prev.map(b => b.id === updated.id ? updated : b));
-      setSearchResults(prev => prev.map(b => b.id === updated.id ? updated : b));
-      addToast({ type: "success", title: "Đã cập nhật", description: `Số lượng: ${updated.total_copies} bản` });
-      handleCloseModal();
+      setBooks((prev) => prev.map((book) => book.id === updated.id ? updated : book));
+      setSearchResults((prev) => prev.map((book) => book.id === updated.id ? updated : book));
+      showNotice("success", `Đã cập nhật số lượng: ${updated.total_copies} bản`);
+      setSelectedBook(null);
     } catch (err) {
-      addToast({ type: "error", title: "Lỗi", description: getErrorMessage(err) });
+      showNotice("error", getErrorMessage(err) || "Cập nhật thất bại");
     } finally {
       setSavingQuantity(false);
     }
@@ -181,383 +222,283 @@ export default function BooksPage() {
     try {
       const barcodes = await api.getBarcodes(bookId);
       if (barcodes.length === 0) {
-        addToast({ type: "info", title: "Không có mã vạch", description: "Không tìm thấy mã vạch để in" });
+        showNotice("info", "Không tìm thấy mã vạch để in");
         return;
       }
-      setRecentlyPrinted(barcodes.map(b => b.barcode));
-      addToast({ type: "success", title: "Đã sinh mã vạch", description: `${barcodes.length} mã vạch sẵn sàng in (xem bảng bên dưới)` });
+      setRecentlyPrinted(barcodes.map((item) => item.barcode));
+      showNotice("success", `${barcodes.length} mã vạch sẵn sàng in`);
     } catch (err) {
-      addToast({ type: "error", title: "Lỗi", description: getErrorMessage(err) });
+      showNotice("error", getErrorMessage(err) || "Không thể lấy mã vạch");
     }
+  };
+
+  const openQuantityDialog = (book: BookWithStats) => {
+    setSelectedBook(book);
+    setEditQuantity(book.total_copies);
+    setQuantityError("");
   };
 
   const stats = {
     totalBooks: total,
-    totalCopies: (books ?? []).reduce((s, b) => s + (b?.total_copies ?? 0), 0),
-    availableCopies: (books ?? []).reduce((s, b) => s + (b?.available_copies ?? 0), 0),
-    borrowedCopies: (books ?? []).reduce((s, b) => s + ((b?.total_copies ?? 0) - (b?.available_copies ?? 0)), 0),
+    totalCopies: books.reduce((sum, book) => sum + book.total_copies, 0),
+    availableCopies: books.reduce((sum, book) => sum + book.available_copies, 0),
+    borrowedCopies: books.reduce((sum, book) => sum + (book.total_copies - book.available_copies), 0),
   };
-
   const displayBooks = searchQuery.trim() ? searchResults : books;
 
   return (
-    <div className="space-y-6">
-      {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Tổng đầu sách" value={stats.totalBooks} icon={Library} accentColor="primary" description="Trong hệ thống" />
-        <StatCard label="Tổng bản sao" value={stats.totalCopies} icon={Package} accentColor="info" description="Tất cả các bản" />
-        <StatCard label="Sẵn sàng" value={stats.availableCopies} icon={CheckCircle} accentColor="success" description="Có thể mượn" />
-        <StatCard label="Đang được mượn" value={stats.borrowedCopies} icon={BookOpen} accentColor="warning" description="Đang lưu hành" />
-      </div>
+    <Stack spacing={3}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
+        <MetricCard label="Tổng đầu sách" value={stats.totalBooks} icon={BookIcon} color={theme.palette.primary.main} description="Trong hệ thống" />
+        <MetricCard label="Tổng bản sao" value={stats.totalCopies} icon={InventoryIcon} color={theme.palette.info.main} description="Tất cả các bản" />
+        <MetricCard label="Sẵn sàng" value={stats.availableCopies} icon={CheckIcon} color={theme.palette.success.main} description="Có thể mượn" />
+        <MetricCard label="Đang được mượn" value={stats.borrowedCopies} icon={AlertIcon} color={theme.palette.warning.main} description="Đang lưu hành" />
+      </Box>
 
-      {/* Search + Import */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="flex-1 min-w-[280px] relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-3" />
-          <input
-            className="input pl-10 pr-10"
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ alignItems: { lg: "center" } }}>
+          <TextField
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm kiếm sách (ISBN, tên, tác giả)..."
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Tìm kiếm sách theo ISBN, tên, tác giả..."
+            size="small"
+            fullWidth
+            slotProps={{
+              input: {
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                endAdornment: searchQuery ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchQuery("")}>{searching ? <CircularProgress size={16} /> : <CloseIcon fontSize="small" />}</IconButton>
+                  </InputAdornment>
+                ) : undefined,
+              },
+            }}
           />
-          {searching && (
-            <RefreshCw size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-3 animate-spin" />
-          )}
-          {searchQuery && !searching && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-3 hover:text-text">
-              <X size={14} />
-            </button>
-          )}
-        </div>
-        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
-        <Button variant="secondary" icon={<Upload size={15} />} onClick={() => fileInputRef.current?.click()}>
-          Nhập kho Excel
-        </Button>
-        <Button variant="ghost" icon={<RefreshCw size={15} />} onClick={() => { setPage(0); setSearchQuery(""); loadBooks(); }}>
-          Tải lại
-        </Button>
-        <Button variant="ghost" icon={<Download size={15} />} onClick={() => api.downloadBookTemplate()}>
-          Tải mẫu .xlsx
-        </Button>
-        <Button variant="ghost" icon={<Download size={15} />} onClick={() => api.exportBooks()}>
-          Xuất Excel
-        </Button>
-      </div>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
+            <Button variant="contained" startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Nhập Excel</Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => { setPage(0); setSearchQuery(""); loadBooks(); }}>Tải lại</Button>
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.downloadBookTemplate()}>Tải mẫu</Button>
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.exportBooks()}>Xuất Excel</Button>
+          </Stack>
+        </Stack>
+      </Paper>
 
-      {/* Search results hint */}
-      {searchQuery.trim() && (
-        <Card padding="none">
-          <CardContent className="p-0">
-            <div className="p-3 border-b border-border flex items-center justify-between">
-              <p className="text-body-sm text-text-3">
-                Kết quả tìm kiếm: <span className="text-text font-medium">{searchResults.length}</span> cuốn sách
-              </p>
-              {searchResults.length > 0 && (
-                <Button size="sm" variant="ghost" icon={<Eye size={14} />} onClick={() => handlePrintBarcodes()}>
-                  In mã vạch
+      {searchQuery.trim() ? (
+        <Alert
+          severity="info"
+          action={searchResults.length > 0 ? <Button color="inherit" size="small" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()}>In mã vạch</Button> : undefined}
+        >
+          Kết quả tìm kiếm: {searchResults.length} cuốn sách
+        </Alert>
+      ) : null}
+
+      {previewFile ? (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", gap: 1.5, mb: 2 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <FileIcon color="primary" />
+              <Box>
+                <Typography variant="h6">Xem trước: {previewFile.name}</Typography>
+                <Typography variant="body2" color="text.secondary">Kiểm tra dữ liệu trước khi nhập kho</Typography>
+              </Box>
+            </Stack>
+            <Button variant="text" color="inherit" onClick={() => { setPreviewFile(null); setPreviewData(null); }}>Hủy</Button>
+          </Stack>
+          {previewLoading ? (
+            <Box sx={{ py: 5, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+          ) : previewData?.length ? (
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                <Chip color="success" label={`${previewData.filter((row) => row.status !== "invalid").length} hàng hợp lệ`} />
+                <Chip color="error" label={`${previewData.filter((row) => row.status === "invalid").length} hàng lỗi`} />
+              </Stack>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>ISBN</TableCell>
+                      <TableCell>Tên sách</TableCell>
+                      <TableCell>Tác giả</TableCell>
+                      <TableCell>Số lượng</TableCell>
+                      <TableCell>Mã vạch mẫu</TableCell>
+                      <TableCell>Trạng thái</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {previewData.slice(0, 50).map((row, index) => (
+                      <TableRow key={`${row.isbn}-${index}`} selected={row.status === "invalid"}>
+                        <TableCell sx={{ fontFamily: "monospace" }}>{row.isbn || "-"}</TableCell>
+                        <TableCell>{row.title || "-"}</TableCell>
+                        <TableCell>{row.author || "-"}</TableCell>
+                        <TableCell>{row.quantity}</TableCell>
+                        <TableCell sx={{ fontFamily: "monospace" }}>{row.barcodes[0] || "-"}</TableCell>
+                        <TableCell><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+                <Button variant="outlined" onClick={() => { setPreviewFile(null); setPreviewData(null); }}>Hủy</Button>
+                <Button variant="contained" startIcon={<CheckIcon />} onClick={handleImport} disabled={importing}>
+                  {importing ? "Đang nhập..." : "Xác nhận nhập kho"}
                 </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </Stack>
+            </Stack>
+          ) : null}
+        </Paper>
+      ) : null}
 
-      {/* Upload zone / Preview */}
-      {previewFile && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSpreadsheet size={16} className="text-primary" />
-              Xem trước: {previewFile.name}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {previewLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw size={20} className="animate-spin text-text-3" />
-                <span className="ml-3 text-text-3">Đang đọc file...</span>
-              </div>
-            ) : previewData && previewData.length > 0 ? (
-              <>
-                <div className="flex items-center gap-3 text-body-sm text-text-3">
-                  <span className="px-2 py-0.5 rounded bg-success/15 text-success">{previewData.filter(r => r.status !== "invalid").length} hàng hợp lệ</span>
-                  <span className="px-2 py-0.5 rounded bg-error/15 text-error">{previewData.filter(r => r.status === "invalid").length} hàng lỗi</span>
-                </div>
-                <div className="overflow-x-auto max-h-72 overflow-y-auto border border-border rounded-lg">
-                  <table className="table">
-                    <thead className="sticky top-0 bg-surface-2">
-                      <tr>
-                        <th>ISBN</th>
-                        <th>Tên sách</th>
-                        <th>Tác giả</th>
-                        <th>SL</th>
-                        <th>Mã vạch mẫu</th>
-                        <th>Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {previewData.slice(0, 20).map((row, i) => (
-                        <tr key={i} className={row.status === "invalid" ? "bg-error/5" : ""}>
-                          <td className="font-mono text-sm">{row.isbn || "-"}</td>
-                          <td className="text-sm max-w-[200px] truncate">{row.title || "-"}</td>
-                          <td className="text-text-3 text-sm">{row.author || "-"}</td>
-                          <td className="text-center font-mono">{row.quantity}</td>
-                          <td className="font-mono text-xs text-text-3">{row.barcodes[0] || "-"}</td>
-                          <td>
-                            <Badge variant={row.status === "exists" ? "neutral" : row.status === "new" ? "success" : row.status === "warning" ? "warning" : "error"}>
-                              {row.status === "exists" ? "Đã có" : row.status === "new" ? "Mới" : row.status === "warning" ? "Cảnh báo" : "Lỗi"}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {previewData.length > 20 && (
-                  <p className="text-caption text-text-3 text-center">...và {previewData.length - 20} dòng nữa</p>
-                )}
-                <div className="flex gap-3 justify-end">
-                  <Button variant="ghost" onClick={() => { setPreviewFile(null); setPreviewData(null); }}>
-                    Hủy
-                  </Button>
-                  <Button icon={<CheckCircle size={15} />} onClick={handleImport} loading={importing}>
-                    Xác nhận nhập kho
-                  </Button>
-                </div>
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
+      {showResults && importResults ? (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6">Kết quả nhập kho</Typography>
+          <TableContainer component={Paper} variant="outlined" sx={{ mt: 2, maxHeight: 320 }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ISBN</TableCell>
+                  <TableCell>Tên sách</TableCell>
+                  <TableCell>Số lượng</TableCell>
+                  <TableCell>Barcode mẫu</TableCell>
+                  <TableCell>Trạng thái</TableCell>
+                  <TableCell>Thông báo</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {importResults.map((row, index) => (
+                  <TableRow key={`${row.isbn}-${index}`} selected={row.status === "error" || row.status === "warning"}>
+                    <TableCell sx={{ fontFamily: "monospace" }}>{row.isbn || "-"}</TableCell>
+                    <TableCell>{row.title || "-"}</TableCell>
+                    <TableCell>{row.quantity}</TableCell>
+                    <TableCell sx={{ fontFamily: "monospace" }}>{row.barcodes[0] || "-"}</TableCell>
+                    <TableCell><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
+                    <TableCell>{row.message || "-"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {importResults.some((row) => row.status === "imported" || row.status === "warning") ? (
+            <Button sx={{ mt: 2 }} variant="outlined" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()}>
+              In mã vạch vừa tạo
+            </Button>
+          ) : null}
+        </Paper>
+      ) : null}
 
-      {/* Import results */}
-      {showResults && importResults && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle size={16} className="text-success" />
-              Kết quả nhập kho
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-3 text-body-sm">
-              <span className="px-2 py-0.5 rounded bg-success/15 text-success">Nhập: {importResults.filter(r => r.status === "imported").length}</span>
-              <span className="px-2 py-0.5 rounded bg-info/15 text-info">Cập nhật: {importResults.filter(r => r.status === "updated").length}</span>
-              <span className="px-2 py-0.5 rounded bg-warning/15 text-warning">Cảnh báo: {importResults.filter(r => r.status === "warning").length}</span>
-              <span className="px-2 py-0.5 rounded bg-text-2/15 text-text-2">Bỏ qua: {importResults.filter(r => r.status === "skipped").length}</span>
-              <span className="px-2 py-0.5 rounded bg-error/15 text-error">Lỗi: {importResults.filter(r => r.status === "error").length}</span>
-            </div>
-            <div className="overflow-x-auto max-h-64 overflow-y-auto border border-border rounded-lg">
-              <table className="table">
-                <thead className="sticky top-0 bg-surface-2">
-                  <tr>
-                    <th>ISBN</th>
-                    <th>Tên sách</th>
-                    <th>SL</th>
-                    <th>Barcode mẫu</th>
-                    <th>Trạng thái</th>
-                    <th>Thông báo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {importResults.map((row, i) => (
-                    <tr key={i} className={row.status === "error" ? "bg-error/5" : row.status === "warning" ? "bg-warning/5" : ""}>
-                      <td className="font-mono text-sm">{row.isbn || "-"}</td>
-                      <td className="text-sm max-w-[200px] truncate">{row.title || "-"}</td>
-                      <td className="text-center font-mono">{row.quantity}</td>
-                      <td className="font-mono text-xs text-text-3">{row.barcodes[0] || "-"}</td>
-                      <td>
-                        <Badge variant={row.status === "imported" ? "success" : row.status === "updated" ? "info" : row.status === "warning" ? "warning" : row.status === "skipped" ? "neutral" : "error"}>
-                          {row.status === "updated" ? "Cập nhật" : row.status === "imported" ? "Thành công" : row.status === "warning" ? "Cảnh báo" : row.status === "skipped" ? "Bỏ qua" : "Lỗi"}
-                        </Badge>
-                      </td>
-                      <td className="text-caption text-text-3 max-w-[200px] truncate">{row.message || ""}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {importResults.some(r => r.status === "imported" || r.status === "warning") && (
-              <div className="flex gap-3">
-                <Button size="sm" variant="secondary" icon={<Printer size={14} />} onClick={() => handlePrintBarcodes()}>
-                  In mã vạch vừa tạo
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {recentlyPrinted.length > 0 ? (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6">Mã vạch sẵn sàng in ({recentlyPrinted.length})</Typography>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", mt: 2 }}>
+            {recentlyPrinted.map((barcode) => <Chip key={barcode} label={barcode} sx={{ fontFamily: "monospace" }} />)}
+          </Stack>
+        </Paper>
+      ) : null}
 
-      {/* Recently printed barcodes */}
-      {recentlyPrinted.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Printer size={16} className="text-text-3" />
-              Mã vạch sẵn sàng in ({recentlyPrinted.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {recentlyPrinted.map((bc) => (
-                <div key={bc} className="flex flex-col items-center p-2 border border-border rounded-lg bg-surface-2 min-w-[120px]">
-                  <span className="font-mono text-sm font-bold text-text">{bc}</span>
-                </div>
+      <Paper variant="outlined">
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>ISBN</TableCell>
+                <TableCell>Tiêu đề</TableCell>
+                <TableCell>Tác giả</TableCell>
+                <TableCell align="center">Tổng</TableCell>
+                <TableCell align="center">Sẵn sàng</TableCell>
+                <TableCell align="center">Mượn</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
+                </TableRow>
+              ) : displayBooks.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                    <Typography color="text.secondary">{searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : displayBooks.map((book) => (
+                <TableRow key={book.id} hover sx={{ cursor: "pointer" }} onClick={() => openQuantityDialog(book)}>
+                  <TableCell sx={{ fontFamily: "monospace", color: "primary.main" }}>{book.isbn}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                      {book.cover_url ? (
+                        <Box component="img" src={book.cover_url} alt={book.title} sx={{ width: 34, height: 44, objectFit: "cover", borderRadius: 1, border: 1, borderColor: "divider" }} />
+                      ) : (
+                        <Avatar variant="rounded" sx={{ width: 34, height: 44, bgcolor: "background.default" }}><BookIcon fontSize="small" /></Avatar>
+                      )}
+                      <Typography variant="body2" sx={{ fontWeight: 800 }}>{book.title}</Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell>{book.author || "-"}</TableCell>
+                  <TableCell align="center">{book.total_copies}</TableCell>
+                  <TableCell align="center"><Chip size="small" color={book.available_copies > 0 ? "success" : "error"} label={book.available_copies} /></TableCell>
+                  <TableCell align="center">{book.total_copies - book.available_copies}</TableCell>
+                </TableRow>
               ))}
-            </div>
-            <p className="text-caption text-text-3 mt-3">Sử dụng trình in mã vạch của hệ thống hoặc copy danh sách barcode để in theo template.</p>
-          </CardContent>
-        </Card>
-      )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {!searchQuery && total > limit ? (
+          <>
+            <Divider />
+            <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", p: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                Hiển thị {page * limit + 1}-{Math.min((page + 1) * limit, total)} / {total} đầu sách
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button size="small" variant="outlined" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Trước</Button>
+                <Button size="small" variant="outlined" disabled={(page + 1) * limit >= total} onClick={() => setPage((value) => value + 1)}>Sau</Button>
+              </Stack>
+            </Stack>
+          </>
+        ) : null}
+      </Paper>
 
-      {/* Book listing */}
-      <Card padding="none">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>ISBN</th>
-                  <th>Tiêu đề</th>
-                  <th>Tác giả</th>
-                  <th className="text-center">Tổng</th>
-                  <th className="text-center">Sẵn sàng</th>
-                  <th className="text-center">Mượn</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-text-3">
-                      <RefreshCw size={18} className="animate-spin mx-auto" />
-                    </td>
-                  </tr>
-                ) : displayBooks.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-12">
-                      <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3 text-text-3">
-                        <BookOpen size={20} />
-                      </div>
-                      <p className="text-text-3">
-                        {searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  displayBooks.map((book) => (
-                    <tr key={book.id} className="group cursor-pointer hover:bg-surface-2/50 transition-colors" onClick={() => handleRowClick(book)}>
-                      <td className="font-mono text-sm text-primary">{book.isbn}</td>
-                      <td>
-                        <div className="flex items-center gap-3">
-                          {book.cover_url ? (
-                            <img src={book.cover_url} alt={book.title} className="w-8 h-10 object-cover rounded border border-border" />
-                          ) : (
-                            <div className="w-8 h-10 rounded border border-border bg-surface-2 flex items-center justify-center">
-                              <BookOpen size={14} className="text-text-3" />
-                            </div>
-                          )}
-                          <span className="font-medium text-sm">{book.title}</span>
-                        </div>
-                      </td>
-                      <td className="text-text-3 text-sm">{book.author || "-"}</td>
-                      <td className="text-center font-mono">{book.total_copies}</td>
-                      <td className="text-center">
-                        <Badge variant={book.available_copies > 0 ? "success" : "error"}>
-                          {book.available_copies}
-                        </Badge>
-                      </td>
-                      <td className="text-center font-mono text-text-3">
-                        {book.total_copies - book.available_copies}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {!searchQuery && total > limit && (
-            <div className="flex items-center justify-between p-4 border-t border-border">
-              <p className="text-caption text-text-3">
-                Hiển thị {page * limit + 1}–{Math.min((page + 1) * limit, total)} / {total} đầu sách
-              </p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
-                  Trước
-                </Button>
-                <Button size="sm" variant="ghost" disabled={(page + 1) * limit >= total} onClick={() => setPage(p => p + 1)}>
-                  Sau
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Dialog open={!!selectedBook} onClose={() => setSelectedBook(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Sửa số lượng sách</DialogTitle>
+        <DialogContent>
+          {selectedBook ? (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                {selectedBook.cover_url ? (
+                  <Box component="img" src={selectedBook.cover_url} alt={selectedBook.title} sx={{ width: 48, height: 64, objectFit: "cover", borderRadius: 1 }} />
+                ) : <Avatar variant="rounded"><BookIcon /></Avatar>}
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 900 }} noWrap>{selectedBook.title}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>ISBN: {selectedBook.isbn}</Typography>
+                </Box>
+              </Stack>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
+                <Alert severity="info">Tổng: {selectedBook.total_copies}</Alert>
+                <Alert severity="success">Sẵn sàng: {selectedBook.available_copies}</Alert>
+                <Alert severity="warning">Đang mượn: {selectedBook.total_copies - selectedBook.available_copies}</Alert>
+              </Box>
+              <TextField
+                label="Số lượng mới"
+                type="number"
+                value={editQuantity}
+                onChange={(event) => { setEditQuantity(Number(event.target.value) || 0); setQuantityError(""); }}
+                error={!!quantityError}
+                helperText={quantityError || "Số lượng không được nhỏ hơn số bản đang mượn"}
+                fullWidth
+                slotProps={{ htmlInput: { min: 1 } }}
+              />
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedBook(null)}>Hủy</Button>
+          <Button variant="contained" onClick={handleQuantitySave} disabled={savingQuantity}>{savingQuantity ? "Đang lưu..." : "Lưu thay đổi"}</Button>
+        </DialogActions>
+      </Dialog>
 
-      {/* Quantity edit modal */}
-      {showQuantityModal && selectedBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={handleCloseModal}>
-          <div className="bg-surface rounded-xl border border-border shadow-xl w-full max-w-md animate-fade-in-up" onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center gap-3 p-5 border-b border-border">
-              {selectedBook.cover_url ? (
-                <img src={selectedBook.cover_url} alt={selectedBook.title} className="w-10 h-13 object-cover rounded border border-border" />
-              ) : (
-                <div className="w-10 h-13 rounded border border-border bg-surface-2 flex items-center justify-center">
-                  <BookOpen size={16} className="text-text-3" />
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <h3 className="font-display font-semibold text-text truncate">{selectedBook.title}</h3>
-                <p className="text-body-sm text-text-3 font-mono">ISBN: {selectedBook.isbn}</p>
-              </div>
-              <button onClick={handleCloseModal} className="text-text-3 hover:text-text transition-colors p-1">
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-5 space-y-5">
-              <div className="flex gap-4 text-center">
-                <div className="flex-1 p-3 rounded-lg bg-surface-2">
-                  <p className="text-body-sm text-text-3">Tổng</p>
-                  <p className="font-display font-bold text-text text-xl">{selectedBook.total_copies}</p>
-                </div>
-                <div className="flex-1 p-3 rounded-lg bg-surface-2">
-                  <p className="text-body-sm text-text-3">Sẵn sàng</p>
-                  <p className="font-display font-bold text-success text-xl">{selectedBook.available_copies}</p>
-                </div>
-                <div className="flex-1 p-3 rounded-lg bg-surface-2">
-                  <p className="text-body-sm text-text-3">Đang mượn</p>
-                  <p className="font-display font-bold text-warning text-xl">{selectedBook.total_copies - selectedBook.available_copies}</p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-body-sm font-medium text-text-2 mb-1.5">Số lượng mới</label>
-                <input
-                  type="number"
-                  min={1}
-                  className={`input ${quantityError ? "border-error focus:border-error focus:ring-error/30" : ""}`}
-                  value={editQuantity}
-                  onChange={e => { setEditQuantity(parseInt(e.target.value) || 0); setQuantityError(""); }}
-                />
-                {quantityError && (
-                  <p className="mt-1.5 text-body-sm text-error flex items-center gap-1">
-                    <AlertCircle size={13} />
-                    {quantityError}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex gap-3 justify-end p-5 border-t border-border">
-              <Button variant="ghost" onClick={handleCloseModal}>Huỷ</Button>
-              <Button loading={savingQuantity} onClick={handleQuantitySave}>Lưu thay đổi</Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
+        {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
+      </Snackbar>
+    </Stack>
   );
 }

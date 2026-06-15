@@ -1,22 +1,74 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  InputAdornment,
+  MenuItem,
+  Paper,
+  Snackbar,
+  Stack,
+  Step,
+  StepLabel,
+  Stepper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import EditIcon from "@mui/icons-material/EditOutlined";
+import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SearchIcon from "@mui/icons-material/Search";
+import UpdateIcon from "@mui/icons-material/UpdateOutlined";
+import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import type { PatronPublic, PatronCreate, PatronUpdate } from "@/lib/types";
-import MultiAngleCapture from "@/components/MultiAngleCapture";
 import type { CaptureAngle } from "@/components/MultiAngleCapture";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
-import { Users, Search, Plus, X } from "lucide-react";
+import MultiAngleCapture from "@/components/MultiAngleCapture";
+import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 
-type Step = 1 | 2 | 3;
+type StepValue = 1 | 2 | 3;
+type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 const defaultIssueDate = new Date().toISOString().split("T")[0];
 const defaultExpiry = new Date();
 defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
 const defaultExpiryStr = defaultExpiry.toISOString().split("T")[0];
+
+function emptyCreateForm(): PatronCreate {
+  return {
+    full_name: "",
+    student_code: "",
+    class_name: "",
+    issue_date: defaultIssueDate,
+    membership_expiry: defaultExpiryStr,
+  };
+}
+
+function formatStatus(status: string) {
+  if (status === "active") return "Hoạt động";
+  if (status === "inactive") return "Tạm khóa";
+  if (status === "expired") return "Hết hạn";
+  return status;
+}
 
 export default function PatronsPage() {
   const router = useRouter();
@@ -24,312 +76,320 @@ export default function PatronsPage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [createStep, setCreateStep] = useState<Step>(1);
-  const [createForm, setCreateForm] = useState<PatronCreate>({
-    full_name: "", student_code: "", class_name: "",
-    issue_date: defaultIssueDate, membership_expiry: defaultExpiryStr,
-  });
+  const [createStep, setCreateStep] = useState<StepValue>(1);
+  const [createForm, setCreateForm] = useState<PatronCreate>(emptyCreateForm());
   const [createError, setCreateError] = useState("");
   const [enrollFiles, setEnrollFiles] = useState<Record<CaptureAngle, File> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [editTarget, setEditTarget] = useState<PatronPublic | null>(null);
   const [editForm, setEditForm] = useState<PatronUpdate>({});
+  const [deleteTarget, setDeleteTarget] = useState<PatronPublic | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
+
+  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.searchPatrons(query || undefined);
-      setPatrons(data);
+      setPatrons(await api.searchPatrons(query || undefined));
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Không thể tải danh sách độc giả");
     } finally {
       setLoading(false);
     }
   }, [query]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const closeCreate = () => {
-    setShowCreate(false); setCreateStep(1);
-    setCreateForm({ full_name: "", student_code: "", class_name: "", issue_date: defaultIssueDate, membership_expiry: defaultExpiryStr });
-    setCreateError(""); setEnrollFiles(null);
+    setShowCreate(false);
+    setCreateStep(1);
+    setCreateForm(emptyCreateForm());
+    setCreateError("");
+    setEnrollFiles(null);
   };
 
   const handleCreateStep1 = () => {
-    if (!createForm.full_name.trim()) { setCreateError("Vui lòng nhập họ tên"); return; }
-    if (!createForm.student_code.trim()) { setCreateError("Vui lòng nhập MSSV"); return; }
-    setCreateError(""); setCreateStep(2);
+    if (!createForm.full_name.trim()) {
+      setCreateError("Vui lòng nhập họ tên");
+      return;
+    }
+    if (!createForm.student_code.trim()) {
+      setCreateError("Vui lòng nhập MSSV");
+      return;
+    }
+    setCreateError("");
+    setCreateStep(2);
   };
 
   const handleFilesReady = (files: Record<CaptureAngle, File>) => {
-    setEnrollFiles(files); setCreateStep(3);
+    setEnrollFiles(files);
+    setCreateStep(3);
   };
 
   const handleSubmit = async () => {
     if (!enrollFiles) return;
-    setSubmitting(true); setCreateError("");
+    setSubmitting(true);
+    setCreateError("");
     try {
       const newPatron = await api.createPatron(createForm);
       await api.enrollPatronFaceBatch(newPatron.id, enrollFiles);
-      closeCreate(); load();
+      closeCreate();
+      await load();
+      showNotice("success", "Đã tạo độc giả và đăng ký khuôn mặt");
     } catch (err: any) {
-      if (err?.response?.status === 409) setCreateError("MSSV hoặc Mã thẻ đã tồn tại");
+      if (err?.response?.status === 409) setCreateError("MSSV hoặc mã thẻ đã tồn tại");
       else setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
-    } finally { setSubmitting(false); }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const openEdit = (p: PatronPublic) => {
-    setEditTarget(p);
+  const openEdit = (patron: PatronPublic) => {
+    setEditTarget(patron);
     setEditForm({
-      full_name: p.full_name, identity_number: p.identity_number || undefined,
-      email: p.email || undefined, phone: p.phone || undefined,
-      membership_expiry: p.membership_expiry, status: p.status,
+      full_name: patron.full_name,
+      identity_number: patron.identity_number || undefined,
+      email: patron.email || undefined,
+      phone: patron.phone || undefined,
+      membership_expiry: patron.membership_expiry,
+      status: patron.status,
     });
   };
 
   const handleEdit = async () => {
     if (!editTarget) return;
-    await api.updatePatron(editTarget.id, editForm);
-    setEditTarget(null); setEditForm({}); load();
-  };
-
-  const handleRenew = async (p: PatronPublic) => {
-    const next = new Date(p.membership_expiry); next.setFullYear(next.getFullYear() + 1);
-    await api.updatePatron(p.id, { membership_expiry: next.toISOString().split("T")[0] }); load();
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Xóa độc giả này?")) return;
-    setPatrons((prev) => prev.filter((p) => p.id !== id));
-    try { await api.deletePatron(id); }
-    catch (err: any) {
-      if (err?.response?.status === 404) alert("Độc giả đã bị xóa trước đó.");
-      else { alert("Xóa thất bại: " + (getErrorMessage(err) || "Lỗi không xác định")); load(); }
+    try {
+      await api.updatePatron(editTarget.id, editForm);
+      setEditTarget(null);
+      setEditForm({});
+      await load();
+      showNotice("success", "Đã cập nhật độc giả");
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Cập nhật thất bại");
     }
   };
 
-  const cardNumber = createForm.student_code ? `THV-${createForm.student_code}` : 'THV-XXXXXXXX';
+  const handleRenew = async (patron: PatronPublic) => {
+    const next = new Date(patron.membership_expiry);
+    next.setFullYear(next.getFullYear() + 1);
+    try {
+      await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
+      await load();
+      showNotice("success", "Đã gia hạn thẻ thêm 1 năm");
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Gia hạn thất bại");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    setPatrons((prev) => prev.filter((patron) => patron.id !== target.id));
+    try {
+      await api.deletePatron(target.id);
+      showNotice("success", "Đã xóa độc giả");
+    } catch (err: any) {
+      if (err?.response?.status === 404) showNotice("info", "Độc giả đã bị xóa trước đó");
+      else {
+        showNotice("error", getErrorMessage(err) || "Xóa thất bại");
+        await load();
+      }
+    }
+  };
+
+  const cardNumber = useMemo(
+    () => createForm.student_code ? `THV-${createForm.student_code}` : "THV-XXXXXXXX",
+    [createForm.student_code],
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Action bar */}
-      <div className="flex items-center justify-end">
-        <Button onClick={() => setShowCreate(true)} icon={<Plus size={16} />}>
-          Thêm độc giả
-        </Button>
-      </div>
+    <Stack spacing={3}>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}>
+          <TextField
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && load()}
+            placeholder="Tìm theo tên, MSSV, mã thẻ..."
+            size="small"
+            fullWidth
+            slotProps={{
+              input: {
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+              },
+            }}
+          />
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load}>Tìm</Button>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreate(true)}>Thêm độc giả</Button>
+          </Stack>
+        </Stack>
+      </Paper>
 
-      {/* Search */}
-      <div className="flex gap-3">
-        <div className="flex-1 relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-3" />
-          <input className="input pl-10" value={query} onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && load()} placeholder="Tìm theo tên, MSSV, mã thẻ..." />
-        </div>
-        <Button variant="secondary" onClick={load}>Tìm</Button>
-      </div>
-
-      {/* Table */}
-      <Card padding="none">
-        <div className="overflow-x-auto">
-          {loading && patrons.length === 0 ? (
-            <div className="p-8 text-center text-text-3 text-body-sm">Đang tải...</div>
-          ) : patrons.length === 0 ? (
-            <div className="p-8 text-center text-text-3 text-body-sm">Không có độc giả nào</div>
-          ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Họ tên</th>
-                  <th>MSSV</th>
-                  <th>Email</th>
-                  <th>SĐT</th>
-                  <th>Hạn thẻ</th>
-                  <th>Trạng thái</th>
-                  <th>Khuôn mặt</th>
-                  <th>Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {patrons.map((p) => (
-                  <tr key={p.id} className="cursor-pointer" onClick={() => router.push(`/patrons/${p.id}`)}>
-                    <td className="font-medium text-text">{p.full_name}</td>
-                    <td className="font-mono text-text-3">{p.student_code}</td>
-                    <td className="text-text-3">{p.email || "-"}</td>
-                    <td className="text-text-3">{p.phone || "-"}</td>
-                    <td className="text-text-3">{p.membership_expiry}</td>
-                    <td>
-                      <Badge variant={p.status === "active" ? "success" : "error"}>
-                        {p.status === "active" ? "Hoạt động" : p.status}
-                      </Badge>
-                    </td>
-                    <td>
-                      <span className={`text-body-sm ${p.has_face ? "text-success" : "text-text-3"}`}>
-                        {p.has_face ? "✓ Đã đăng ký" : "✗ Chưa có"}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button className="btn-ghost px-2.5 py-1 text-body-sm" onClick={() => openEdit(p)}>Sửa</button>
-                        <button className="btn-ghost px-2.5 py-1 text-body-sm text-success" onClick={() => handleRenew(p)}>Gia hạn</button>
-                        <button className="btn-ghost px-2.5 py-1 text-body-sm text-error" onClick={() => handleDelete(p.id)}>Xóa</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </Card>
-
-      {/* Create modal */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={closeCreate}>
-          <div className="bg-surface-2 rounded-2xl w-full max-w-lg mx-4 shadow-2xl border border-border" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center justify-between">
-                <h2 className="text-heading-lg text-text">Thêm độc giả mới</h2>
-                <button onClick={closeCreate} className="text-text-3 hover:text-text transition-colors">
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="flex items-center gap-2 mt-4">
-                {([1, 2, 3] as Step[]).map((s, i) => (
-                  <div key={s} className="flex items-center gap-2 flex-1">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                      createStep > s ? "bg-success text-bg" : createStep === s ? "bg-primary text-bg" : "bg-surface-3 text-text-3"
-                    }`}>
-                      {createStep > s ? "✓" : s}
-                    </div>
-                    <span className={`text-body-sm hidden sm:block ${createStep === s ? "text-text" : "text-text-3"}`}>
-                      {s === 1 ? "Thông tin" : s === 2 ? "Khuôn mặt" : "Xác nhận"}
-                    </span>
-                    {i < 2 && <div className={`flex-1 h-0.5 ${createStep > s ? "bg-success" : "bg-surface-3"}`} />}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {createError && (
-                <div className="p-3 bg-error/10 border border-error/20 rounded-lg text-error text-body-sm">{createError}</div>
-              )}
-
-              {createStep === 1 && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-body-sm font-medium text-text-2 mb-1.5">Họ tên <span className="text-error">*</span></label>
-                    <input value={createForm.full_name}
-                      onChange={(e) => { setCreateForm({ ...createForm, full_name: e.target.value }); setCreateError(""); }}
-                      placeholder="Nguyễn Văn A" className="input" />
-                  </div>
-                  <div>
-                    <label className="block text-body-sm font-medium text-text-2 mb-1.5">MSSV <span className="text-error">*</span></label>
-                    <input value={createForm.student_code}
-                      onChange={(e) => { setCreateForm({ ...createForm, student_code: e.target.value }); setCreateError(""); }}
-                      placeholder="21001234" className="input font-mono" />
-                  </div>
-                  <div>
-                    <label className="block text-body-sm font-medium text-text-2 mb-1.5">Lớp</label>
-                    <input value={createForm.class_name}
-                      onChange={(e) => setCreateForm({ ...createForm, class_name: e.target.value })}
-                      placeholder="CNTT K61" className="input" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-body-sm font-medium text-text-2 mb-1.5">Ngày cấp thẻ</label>
-                      <input type="date" value={createForm.issue_date}
-                        onChange={(e) => setCreateForm({ ...createForm, issue_date: e.target.value })} className="input" />
-                    </div>
-                    <div>
-                      <label className="block text-body-sm font-medium text-text-2 mb-1.5">Hạn thẻ</label>
-                      <input type="date" value={createForm.membership_expiry}
-                        onChange={(e) => setCreateForm({ ...createForm, membership_expiry: e.target.value })} className="input" />
-                    </div>
-                  </div>
-                  <Button onClick={handleCreateStep1} className="w-full">Tiếp tục →</Button>
-                </div>
-              )}
-
-              {createStep === 2 && (
-                <div className="space-y-4">
-                  <p className="text-body-sm text-text-3 text-center">Chụp khuôn mặt từ 4 góc để đăng ký nhận diện tại cổng</p>
-                  <MultiAngleCapture consent={true} onFilesReady={handleFilesReady} />
-                  <button onClick={() => setCreateStep(1)} className="w-full py-2.5 text-text-3 hover:text-text transition-colors text-body-sm">
-                    ← Quay lại
-                  </button>
-                </div>
-              )}
-
-              {createStep === 3 && enrollFiles && (
-                <div className="space-y-4">
-                  <div className="bg-surface-3 rounded-xl p-4 border border-border">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
-                        <Users size={18} className="text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-text font-semibold">{createForm.full_name}</p>
-                        <p className="text-primary font-mono text-sm">{cardNumber}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-body-sm">
-                      <div className="text-text-3">MSSV: <span className="text-text">{createForm.student_code}</span></div>
-                      <div className="text-text-3">Lớp: <span className="text-text">{createForm.class_name || "-"}</span></div>
-                      <div className="text-text-3">Cấp: <span className="text-text">{createForm.issue_date}</span></div>
-                      <div className="text-text-3">Hạn: <span className="text-text">{createForm.membership_expiry}</span></div>
-                    </div>
-                  </div>
-                  <Button onClick={handleSubmit} loading={submitting} className="w-full" icon={<Plus size={16} />}>
-                    Tạo độc giả
-                  </Button>
-                  <button onClick={() => setCreateStep(2)} className="w-full py-2.5 text-text-3 hover:text-text transition-colors text-body-sm">
-                    ← Quay lại chụp ảnh
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit modal */}
-      {editTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditTarget(null)}>
-          <div className="bg-surface-2 rounded-2xl p-6 w-full max-w-md border border-border" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-heading-lg text-text mb-4">Sửa độc giả</h2>
-            <div className="space-y-3">
-              {([["full_name", "Họ tên"], ["identity_number", "CMND/CCCD"], ["email", "Email"], ["phone", "SĐT"]] as [string, string][]).map(([key, label]) => (
-                <div key={key}>
-                  <label className="block text-body-sm font-medium text-text-2 mb-1.5">{label}</label>
-                  <input className="input"
-                    value={(editForm as any)[key] || ""}
-                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })} />
-                </div>
+      <Paper variant="outlined">
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Họ tên</TableCell>
+                <TableCell>MSSV</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>SĐT</TableCell>
+                <TableCell>Hạn thẻ</TableCell>
+                <TableCell>Trạng thái</TableCell>
+                <TableCell>Khuôn mặt</TableCell>
+                <TableCell align="right">Hành động</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading && patrons.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
+                </TableRow>
+              ) : patrons.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                    <Typography color="text.secondary">Không có độc giả nào</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : patrons.map((patron) => (
+                <TableRow key={patron.id} hover sx={{ cursor: "pointer" }} onClick={() => router.push(`/patrons/${patron.id}`)}>
+                  <TableCell>
+                    <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                      <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 900 }}>
+                        {patron.full_name?.charAt(0).toUpperCase() || "?"}
+                      </Avatar>
+                      <Typography variant="body2" sx={{ fontWeight: 900 }}>{patron.full_name}</Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={{ fontFamily: "monospace" }}>{patron.student_code}</TableCell>
+                  <TableCell>{patron.email || "-"}</TableCell>
+                  <TableCell>{patron.phone || "-"}</TableCell>
+                  <TableCell>{patron.membership_expiry}</TableCell>
+                  <TableCell>
+                    <Chip size="small" color={patron.status === "active" ? "success" : "error"} label={formatStatus(patron.status)} />
+                  </TableCell>
+                  <TableCell>
+                    <Chip size="small" color={patron.has_face ? "success" : "default"} icon={<FaceIcon />} label={patron.has_face ? "Đã đăng ký" : "Chưa có"} />
+                  </TableCell>
+                  <TableCell align="right">
+                    <Stack direction="row" spacing={0.75} sx={{ justifyContent: "flex-end" }} onClick={(event) => event.stopPropagation()}>
+                      <IconButton size="small" title="Sửa" onClick={() => openEdit(patron)}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" color="success" title="Gia hạn" onClick={() => handleRenew(patron)}><UpdateIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" color="error" title="Xóa" onClick={() => setDeleteTarget(patron)}><DeleteIcon fontSize="small" /></IconButton>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
               ))}
-              <div>
-                <label className="block text-body-sm font-medium text-text-2 mb-1.5">Hạn thẻ</label>
-                <input type="date" className="input"
-                  value={editForm.membership_expiry || ""}
-                  onChange={(e) => setEditForm({ ...editForm, membership_expiry: e.target.value })} />
-              </div>
-              <div>
-                <label className="block text-body-sm font-medium text-text-2 mb-1.5">Trạng thái</label>
-                <select className="input"
-                  value={editForm.status || ""}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
-                  <option value="active">active</option>
-                  <option value="inactive">inactive</option>
-                  <option value="expired">expired</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-5">
-              <Button onClick={handleEdit} className="flex-1">Lưu</Button>
-              <Button variant="ghost" onClick={() => setEditTarget(null)} className="flex-1">Hủy</Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Dialog open={showCreate} onClose={closeCreate} fullWidth maxWidth="md">
+        <DialogTitle>
+          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+            <Typography variant="h6">Thêm độc giả mới</Typography>
+            <IconButton onClick={closeCreate}><CloseIcon /></IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stepper activeStep={createStep - 1} sx={{ mb: 3 }}>
+            <Step><StepLabel>Thông tin</StepLabel></Step>
+            <Step><StepLabel>Khuôn mặt</StepLabel></Step>
+            <Step><StepLabel>Xác nhận</StepLabel></Step>
+          </Stepper>
+
+          {createError ? <Alert severity="error" sx={{ mb: 2 }}>{createError}</Alert> : null}
+
+          {createStep === 1 ? (
+            <Stack spacing={2}>
+              <TextField label="Họ tên" value={createForm.full_name} onChange={(event) => { setCreateForm({ ...createForm, full_name: event.target.value }); setCreateError(""); }} required fullWidth />
+              <TextField label="MSSV" value={createForm.student_code} onChange={(event) => { setCreateForm({ ...createForm, student_code: event.target.value }); setCreateError(""); }} required fullWidth />
+              <TextField label="Lớp" value={createForm.class_name || ""} onChange={(event) => setCreateForm({ ...createForm, class_name: event.target.value })} fullWidth />
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
+                <TextField label="Ngày cấp thẻ" type="date" value={createForm.issue_date} onChange={(event) => setCreateForm({ ...createForm, issue_date: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+                <TextField label="Hạn thẻ" type="date" value={createForm.membership_expiry} onChange={(event) => setCreateForm({ ...createForm, membership_expiry: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+              </Box>
+            </Stack>
+          ) : null}
+
+          {createStep === 2 ? (
+            <Stack spacing={2}>
+              <Alert severity="info">Chụp khuôn mặt từ 4 góc để đăng ký nhận diện tại cổng.</Alert>
+              <MultiAngleCapture consent={true} onFilesReady={handleFilesReady} />
+            </Stack>
+          ) : null}
+
+          {createStep === 3 && enrollFiles ? (
+            <Stack spacing={2}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 2 }}>
+                  <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText" }}><UsersIcon /></Avatar>
+                  <Box>
+                    <Typography sx={{ fontWeight: 900 }}>{createForm.full_name}</Typography>
+                    <Typography variant="caption" color="primary" sx={{ fontFamily: "monospace" }}>{cardNumber}</Typography>
+                  </Box>
+                </Stack>
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
+                  <Typography variant="body2">MSSV: <strong>{createForm.student_code}</strong></Typography>
+                  <Typography variant="body2">Lớp: <strong>{createForm.class_name || "-"}</strong></Typography>
+                  <Typography variant="body2">Cấp: <strong>{createForm.issue_date}</strong></Typography>
+                  <Typography variant="body2">Hạn: <strong>{createForm.membership_expiry}</strong></Typography>
+                </Box>
+              </Paper>
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          {createStep > 1 ? <Button onClick={() => setCreateStep((value) => (value - 1) as StepValue)}>Quay lại</Button> : <Button onClick={closeCreate}>Hủy</Button>}
+          {createStep === 1 ? <Button variant="contained" onClick={handleCreateStep1}>Tiếp tục</Button> : null}
+          {createStep === 3 ? <Button variant="contained" onClick={handleSubmit} disabled={submitting}>{submitting ? "Đang tạo..." : "Tạo độc giả"}</Button> : null}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!editTarget} onClose={() => setEditTarget(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Sửa độc giả</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField label="Họ tên" value={editForm.full_name || ""} onChange={(event) => setEditForm({ ...editForm, full_name: event.target.value })} fullWidth />
+            <TextField label="CMND/CCCD" value={editForm.identity_number || ""} onChange={(event) => setEditForm({ ...editForm, identity_number: event.target.value })} fullWidth />
+            <TextField label="Email" value={editForm.email || ""} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} fullWidth />
+            <TextField label="SĐT" value={editForm.phone || ""} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} fullWidth />
+            <TextField label="Hạn thẻ" type="date" value={editForm.membership_expiry || ""} onChange={(event) => setEditForm({ ...editForm, membership_expiry: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            <TextField label="Trạng thái" value={editForm.status || "active"} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} select fullWidth>
+              <MenuItem value="active">Hoạt động</MenuItem>
+              <MenuItem value="inactive">Tạm khóa</MenuItem>
+              <MenuItem value="expired">Hết hạn</MenuItem>
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditTarget(null)}>Hủy</Button>
+          <Button variant="contained" onClick={handleEdit}>Lưu</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+        <DialogTitle>Xóa độc giả?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Xóa độc giả {deleteTarget?.full_name || deleteTarget?.student_code}? Thao tác này không thể hoàn tác từ giao diện.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>Hủy</Button>
+          <Button color="error" variant="contained" onClick={handleDelete}>Xóa</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
+        {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
+      </Snackbar>
+    </Stack>
   );
 }

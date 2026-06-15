@@ -1,7 +1,24 @@
-'use client';
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, RefreshCw } from "lucide-react";
+import {
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  CircularProgress,
+  FormControlLabel,
+  Grid,
+  Paper,
+  Stack,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import AddAPhotoOutlinedIcon from "@mui/icons-material/AddAPhotoOutlined";
+import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 
 export type CaptureAngle = "frontal" | "right" | "left" | "down";
 export type MultiAngleCaptureStatus = "pending" | "capturing" | "done";
@@ -29,9 +46,9 @@ export interface MultiAngleCaptureProps {
 
 function captureFromVideo(video: HTMLVideoElement, cameraReady: boolean) {
   return new Promise<{ file: File; dataUrl: string }>((resolve, reject) => {
-    if (!cameraReady) return reject(new Error("Camera not ready"));
+    if (!cameraReady) return reject(new Error("Camera chưa sẵn sàng"));
     if (video.videoWidth === 0 || video.videoHeight === 0) {
-      return reject(new Error("Camera not initialized"));
+      return reject(new Error("Camera chưa khởi tạo"));
     }
 
     const canvas = document.createElement("canvas");
@@ -39,13 +56,13 @@ function captureFromVideo(video: HTMLVideoElement, cameraReady: boolean) {
     canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return reject(new Error("Could not create canvas"));
+    if (!ctx) return reject(new Error("Không thể tạo canvas"));
 
     ctx.drawImage(video, 0, 0);
     const dataUrl = canvas.toDataURL("image/jpeg");
     canvas.toBlob(
       (blob) => {
-        if (!blob) return reject(new Error("Could not create image"));
+        if (!blob) return reject(new Error("Không thể tạo ảnh"));
         resolve({ file: new File([blob], "face_capture.jpg", { type: "image/jpeg" }), dataUrl });
       },
       "image/jpeg",
@@ -68,6 +85,13 @@ function getCameraErrorMessage(err: unknown) {
   return "Không thể mở camera. Hãy kiểm tra quyền truy cập, thiết bị camera và thử lại.";
 }
 
+const ANGLE_LABELS: Record<CaptureAngle, string> = {
+  frontal: "Nhìn thẳng",
+  right: "Quay phải",
+  left: "Quay trái",
+  down: "Cúi xuống",
+};
+
 export default function MultiAngleCapture({
   angles,
   consent,
@@ -75,18 +99,17 @@ export default function MultiAngleCapture({
   onFilesReady,
   className,
 }: MultiAngleCaptureProps) {
+  const theme = useTheme();
   const defaultAngles = useMemo<AngleConfig[]>(
     () =>
       angles ?? [
         { angle: "frontal", instruction: "Nhìn thẳng", tip: "Giữ mặt thẳng, mắt mở tự nhiên" },
-        { angle: "right", instruction: "Quay phải", tip: "Xoay đầu sang phải khoảng 30°" },
-        { angle: "left", instruction: "Quay trái", tip: "Xoay đầu sang trái khoảng 30°" },
+        { angle: "right", instruction: "Quay phải", tip: "Xoay đầu sang phải khoảng 30 độ" },
+        { angle: "left", instruction: "Quay trái", tip: "Xoay đầu sang trái khoảng 30 độ" },
         { angle: "down", instruction: "Cúi xuống", tip: "Cúi nhẹ cằm xuống ngực" },
       ],
     [angles]
   );
-
-  const ANGLE_CONFIG = defaultAngles;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -94,22 +117,20 @@ export default function MultiAngleCapture({
   const [cameraReady, setCameraReady] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState("");
-
   const [isSequenceRunning, setIsSequenceRunning] = useState(false);
   const [currentAngleIdx, setCurrentAngleIdx] = useState(-1);
   const [countdown, setCountdown] = useState<number | null>(null);
-
   const [captures, setCaptures] = useState<CapturedAngle[]>(
-    ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null }))
+    defaultAngles.map((item) => ({ angle: item.angle, status: "pending", file: null, dataUrl: null }))
   );
 
   useEffect(() => {
-    setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
-  }, [ANGLE_CONFIG]);
+    setCaptures(defaultAngles.map((item) => ({ angle: item.angle, status: "pending", file: null, dataUrl: null })));
+  }, [defaultAngles]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     setIsCameraOn(false);
@@ -121,10 +142,7 @@ export default function MultiAngleCapture({
       setCameraError("");
       setCameraReady(false);
       setIsCameraOn(false);
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      }
+      stopCamera();
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -138,19 +156,18 @@ export default function MultiAngleCapture({
       streamRef.current = stream;
       setIsCameraOn(true);
       return true;
-    } catch (err: any) {
+    } catch (err) {
       setIsCameraOn(false);
       setCameraReady(false);
       setCameraError(getCameraErrorMessage(err));
       return false;
     }
-  }, []);
+  }, [stopCamera]);
 
   useEffect(() => {
     if (!isCameraOn || !videoRef.current || !streamRef.current) return;
 
     const video = videoRef.current;
-
     const onReady = () => setCameraReady(true);
     const handleError = () => setCameraReady(false);
 
@@ -160,11 +177,10 @@ export default function MultiAngleCapture({
     video.srcObject = streamRef.current;
 
     if (video.readyState >= 2) onReady();
-
-    const t = setTimeout(() => setCameraReady(true), 3000);
+    const timer = setTimeout(() => setCameraReady(true), 3000);
 
     return () => {
-      clearTimeout(t);
+      clearTimeout(timer);
       video.onloadedmetadata = null;
       video.onplaying = null;
       video.onerror = null;
@@ -172,16 +188,12 @@ export default function MultiAngleCapture({
     };
   }, [isCameraOn]);
 
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, [stopCamera]);
+  useEffect(() => () => stopCamera(), [stopCamera]);
 
   const retakeAngle = useCallback(
     async (idx: number) => {
       setCaptures((prev) =>
-        prev.map((s, i) => (i === idx ? { ...s, status: "pending", file: null, dataUrl: null } : s))
+        prev.map((item, index) => (index === idx ? { ...item, status: "pending", file: null, dataUrl: null } : item))
       );
       const opened = await startCamera();
       if (!opened) return;
@@ -192,7 +204,7 @@ export default function MultiAngleCapture({
   );
 
   const startSequence = useCallback(async () => {
-    setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
+    setCaptures(defaultAngles.map((item) => ({ angle: item.angle, status: "pending", file: null, dataUrl: null })));
     setCountdown(null);
     const opened = await startCamera();
     if (!opened) {
@@ -202,43 +214,42 @@ export default function MultiAngleCapture({
     }
     setCurrentAngleIdx(0);
     setIsSequenceRunning(true);
-  }, [ANGLE_CONFIG, startCamera]);
+  }, [defaultAngles, startCamera]);
 
   useEffect(() => {
-    if (currentAngleIdx < 0 || currentAngleIdx >= ANGLE_CONFIG.length) return;
+    if (currentAngleIdx < 0 || currentAngleIdx >= defaultAngles.length) return;
     if (!cameraReady || !isSequenceRunning) return;
 
     let cancelled = false;
-    let c = 5;
+    let currentCountdown = 5;
 
-    setCountdown(c);
-    setCaptures((prev) => prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "capturing" } : s)));
+    setCountdown(currentCountdown);
+    setCaptures((prev) => prev.map((item, index) => (index === currentAngleIdx ? { ...item, status: "capturing" } : item)));
 
     const timer = window.setInterval(async () => {
-      c--;
+      currentCountdown--;
       if (cancelled) {
         clearInterval(timer);
         return;
       }
 
-      if (c <= 0) {
+      if (currentCountdown <= 0) {
         clearInterval(timer);
         setCountdown(null);
 
         try {
           const video = videoRef.current;
-          if (!video) throw new Error("Video not found");
+          if (!video) throw new Error("Không tìm thấy video");
 
           const { file, dataUrl } = await captureFromVideo(video, cameraReady);
-
           if (cancelled) return;
 
           setCaptures((prev) =>
-            prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "done", file, dataUrl } : s))
+            prev.map((item, index) => (index === currentAngleIdx ? { ...item, status: "done", file, dataUrl } : item))
           );
 
           const nextIdx = currentAngleIdx + 1;
-          if (nextIdx >= ANGLE_CONFIG.length) {
+          if (nextIdx >= defaultAngles.length) {
             setIsSequenceRunning(false);
             setCurrentAngleIdx(-1);
             stopCamera();
@@ -250,13 +261,13 @@ export default function MultiAngleCapture({
         } catch (err) {
           if (cancelled) return;
           setCameraError(getCameraErrorMessage(err));
-          setCaptures((prev) => prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "pending" } : s)));
+          setCaptures((prev) => prev.map((item, index) => (index === currentAngleIdx ? { ...item, status: "pending" } : item)));
           setIsSequenceRunning(false);
           setCurrentAngleIdx(-1);
           stopCamera();
         }
       } else {
-        setCountdown(c);
+        setCountdown(currentCountdown);
       }
     }, 1000);
 
@@ -264,187 +275,226 @@ export default function MultiAngleCapture({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [currentAngleIdx, cameraReady, isSequenceRunning, ANGLE_CONFIG.length, stopCamera]);
+  }, [currentAngleIdx, cameraReady, isSequenceRunning, defaultAngles.length, stopCamera]);
 
-  const allCaptured = captures.every((c) => c.status === "done" && !!c.file);
+  const allCaptured = captures.every((item) => item.status === "done" && Boolean(item.file));
+  const doneCount = captures.filter((item) => item.status === "done").length;
 
   const capturedFiles = useMemo(() => {
     const result = {} as Record<CaptureAngle, File>;
-    for (const c of captures) {
-      if (c.status === "done" && c.file) {
-        result[c.angle] = c.file;
+    for (const item of captures) {
+      if (item.status === "done" && item.file) {
+        result[item.angle] = item.file;
       }
     }
     return result;
   }, [captures]);
 
   const submit = useCallback(async () => {
-    if (!consent) return;
-    if (!allCaptured) return;
+    if (!consent || !allCaptured) return;
     await onFilesReady(capturedFiles);
   }, [allCaptured, capturedFiles, consent, onFilesReady]);
 
-  const instructionLabels: Record<CaptureAngle, string> = {
-    frontal: "Nhìn thẳng",
-    right: "Quay phải",
-    left: "Quay trái",
-    down: "Cúi xuống",
-  };
+  const currentConfig = currentAngleIdx >= 0 ? defaultAngles[currentAngleIdx] : null;
 
   return (
-    <div className={className}>
+    <Box className={className}>
       {!allCaptured && !isSequenceRunning && currentAngleIdx < 0 && (
-        <div className="text-center py-6">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
-            <Camera className="w-8 h-8 text-amber-400" />
-          </div>
-          <p className="text-slate-300 mb-1">Chụp khuôn mặt từ 4 góc</p>
-          <p className="text-slate-500 text-sm mb-2">Nhận diện nhanh hơn, chính xác hơn tại cổng</p>
-          <div className="bg-slate-900/50 rounded-lg p-3 mb-4 text-left text-xs text-slate-400 space-y-1">
-            <p className="text-amber-400 font-medium">Lưu ý khi chụp:</p>
-            <p>• Đủ ánh sáng, không ngược sáng</p>
-            <p>• Giữ yên khi đếm ngược về 0</p>
-            <p>• Mặt vừa đủ trong khung tròn</p>
-          </div>
-          {cameraError && (
-            <div className="mb-4 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-left text-sm text-red-200">
-              {cameraError}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={startSequence}
-            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25"
-          >
-            <Camera className="w-5 h-5 inline mr-2" />
-            Bắt đầu chụp
-          </button>
-        </div>
+        <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
+          <Stack spacing={2} sx={{ alignItems: "center" }}>
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+              }}
+            >
+              <PhotoCameraOutlinedIcon fontSize="large" />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 850 }}>
+                Chụp khuôn mặt từ 4 góc
+              </Typography>
+              <Typography color="text.secondary">
+                Nhận diện nhanh hơn, chính xác hơn tại cổng.
+              </Typography>
+            </Box>
+
+            <Paper variant="outlined" sx={{ p: 2, width: "100%", bgcolor: "action.hover", textAlign: "left" }}>
+              <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 850, mb: 1 }}>
+                Lưu ý khi chụp
+              </Typography>
+              <Stack spacing={0.5}>
+                <Typography variant="body2" color="text.secondary">- Đủ ánh sáng, không ngược sáng.</Typography>
+                <Typography variant="body2" color="text.secondary">- Giữ yên khi đếm ngược về 0.</Typography>
+                <Typography variant="body2" color="text.secondary">- Mặt vừa đủ trong khung tròn.</Typography>
+              </Stack>
+            </Paper>
+
+            {cameraError && <Alert severity="warning" sx={{ width: "100%" }}>{cameraError}</Alert>}
+
+            <Button variant="contained" size="large" startIcon={<PhotoCameraOutlinedIcon />} onClick={startSequence}>
+              Bắt đầu chụp
+            </Button>
+          </Stack>
+        </Paper>
       )}
 
       {(isSequenceRunning || currentAngleIdx >= 0) && (
-        <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-contain"
-          />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-32 h-32 border-2 border-amber-400/50 rounded-full" />
-          </div>
+        <Paper
+          variant="outlined"
+          sx={{
+            position: "relative",
+            aspectRatio: "16 / 9",
+            overflow: "hidden",
+            bgcolor: "black",
+          }}
+        >
+          <Box component="video" ref={videoRef} autoPlay playsInline muted sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+            }}
+          >
+            <Box sx={{ width: 150, height: 150, border: 2, borderColor: "primary.main", borderRadius: "50%", opacity: 0.75 }} />
+          </Box>
+
           {!cameraReady && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-slate-300">
-              <div className="text-center">
-                <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-sm">{cameraError || "Đang mở camera..."}</p>
-              </div>
-            </div>
+            <Stack
+              spacing={1}
+              sx={{
+                position: "absolute",
+                inset: 0,
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "rgba(0,0,0,.65)",
+                color: "common.white",
+              }}
+            >
+              <CircularProgress color="inherit" size={30} />
+              <Typography variant="body2">{cameraError || "Đang mở camera..."}</Typography>
+            </Stack>
           )}
-          {countdown !== null && currentAngleIdx >= 0 && currentAngleIdx < ANGLE_CONFIG.length && (() => {
-            const cfg = ANGLE_CONFIG[currentAngleIdx];
-            return (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/75">
-                <div className="text-center">
-                  <p className="text-white text-xl font-semibold mb-1">{cfg.instruction}</p>
-                  <p className="text-slate-300 text-sm mb-4">{cfg.tip}</p>
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    {ANGLE_CONFIG.map((c, i) => (
-                      <span
-                        key={c.angle}
-                        className={`w-3 h-3 rounded-full transition-colors ${
-                          i < captures.filter((x) => x.status === "done").length
-                            ? "bg-emerald-500"
-                            : i === currentAngleIdx
-                              ? "bg-amber-400 animate-pulse"
-                              : "bg-slate-600"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  {countdown === 1 && (
-                    <p className="text-red-400 text-lg font-bold mb-2 animate-pulse">GIỮ YÊN!</p>
-                  )}
-                  <p className="text-white text-6xl font-bold drop-shadow-lg">{countdown}</p>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+
+          {countdown !== null && currentConfig && (
+            <Stack
+              spacing={2}
+              sx={{
+                position: "absolute",
+                inset: 0,
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "rgba(0,0,0,.78)",
+                color: "common.white",
+                textAlign: "center",
+                p: 2,
+              }}
+            >
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 850 }}>{currentConfig.instruction}</Typography>
+                <Typography variant="body2" sx={{ color: "grey.300", mt: 0.5 }}>{currentConfig.tip}</Typography>
+              </Box>
+              <Stack direction="row" spacing={1}>
+                {defaultAngles.map((item, index) => (
+                  <Box
+                    key={item.angle}
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      bgcolor: index < doneCount ? "success.main" : index === currentAngleIdx ? "primary.main" : "grey.600",
+                    }}
+                  />
+                ))}
+              </Stack>
+              {countdown === 1 && <Chip color="error" label="GIỮ YÊN!" />}
+              <Typography sx={{ fontSize: 64, fontWeight: 900, lineHeight: 1 }}>{countdown}</Typography>
+            </Stack>
+          )}
+        </Paper>
       )}
 
       {allCaptured && (
-        <>
-          <div className="grid grid-cols-4 gap-2">
-            {captures.map((c, i) => (
-              <div
-                key={c.angle}
-                className={`relative aspect-square rounded-lg overflow-hidden border-2 ${
-                  c.status === "done" ? "border-emerald-500" : "border-slate-600"
-                }`}
-              >
-                {c.dataUrl ? (
-                  <img src={c.dataUrl} alt={c.angle} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-slate-800 text-slate-500">
-                    <Camera className="w-6 h-6" />
-                  </div>
-                )}
-                <div className="absolute bottom-1 left-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded capitalize">
-                  {instructionLabels[c.angle]}
-                </div>
-                {c.status === "done" && (
-                  <div className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full p-0.5">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-2 mt-3">
-            {captures.map((c, i) =>
-              c.status === "done" ? (
-                <button
-                  key={c.angle}
-                  type="button"
-                  onClick={() => retakeAngle(i)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs transition-colors"
+        <Stack spacing={2}>
+          <Grid container spacing={1.5}>
+            {captures.map((item, index) => (
+              <Grid key={item.angle} size={{ xs: 6, sm: 3 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    position: "relative",
+                    aspectRatio: "1 / 1",
+                    overflow: "hidden",
+                    borderColor: item.status === "done" ? "success.main" : "divider",
+                  }}
                 >
-                  <RefreshCw className="w-3 h-3" />
-                  {instructionLabels[c.angle]}
-                </button>
-              ) : null
-            )}
-          </div>
+                  {item.dataUrl ? (
+                    <Box component="img" src={item.dataUrl} alt={item.angle} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center", bgcolor: "action.hover", color: "text.secondary" }}>
+                      <PhotoCameraOutlinedIcon />
+                    </Stack>
+                  )}
+                  <Chip
+                    size="small"
+                    label={ANGLE_LABELS[item.angle]}
+                    sx={{ position: "absolute", left: 6, bottom: 6, bgcolor: "rgba(0,0,0,.72)", color: "common.white" }}
+                  />
+                  {item.status === "done" && (
+                    <Box sx={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", bgcolor: "success.main", color: "success.contrastText", display: "grid", placeItems: "center" }}>
+                      <CheckOutlinedIcon sx={{ fontSize: 16 }} />
+                    </Box>
+                  )}
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
 
-          <div className="flex items-center gap-3 mt-4 p-3 bg-slate-900/50 rounded-xl border border-slate-700">
-            <input
-              type="checkbox"
-              id="consent-multi"
-              checked={consent}
-              onChange={(e) => setConsent?.(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500"
-              disabled={!setConsent}
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            {captures.map((item, index) => (
+              <Button
+                key={item.angle}
+                variant="outlined"
+                size="small"
+                startIcon={<RestartAltOutlinedIcon />}
+                onClick={() => retakeAngle(index)}
+                sx={{ flex: 1 }}
+              >
+                {ANGLE_LABELS[item.angle]}
+              </Button>
+            ))}
+          </Stack>
+
+          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "action.hover" }}>
+            <FormControlLabel
+              control={<Checkbox checked={consent} onChange={(event) => setConsent?.(event.target.checked)} disabled={!setConsent} />}
+              label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện tại cổng."
+              sx={{ m: 0, color: "text.secondary" }}
             />
-            <label htmlFor="consent-multi" className="text-sm text-slate-400">
-              Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện tại cổng
-            </label>
-          </div>
+          </Paper>
 
-          <button
-            type="button"
+          <Button
+            variant="contained"
+            color="success"
+            size="large"
+            startIcon={<AddAPhotoOutlinedIcon />}
             onClick={submit}
             disabled={!consent}
-            className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
+            fullWidth
           >
-            Xác nhận {captures.filter((c) => c.status === "done").length} góc ảnh
-          </button>
-        </>
+            Xác nhận {doneCount} góc ảnh
+          </Button>
+        </Stack>
       )}
-    </div>
+    </Box>
   );
 }

@@ -1,15 +1,41 @@
 "use client";
 
-import { useAuth } from "@/lib/auth-context";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import api from "@/lib/api-client";
-import StatCard from "@/components/ui/StatCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import { Users, UserCheck, LogIn, LogOut, BookOpen, AlertCircle, Clock, ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-
+import { useRouter } from "next/navigation";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardActionArea,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Divider,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import ClockIcon from "@mui/icons-material/ScheduleOutlined";
+import LoginIcon from "@mui/icons-material/LoginOutlined";
+import LogoutIcon from "@mui/icons-material/LogoutOutlined";
+import PersonAddIcon from "@mui/icons-material/PersonAddAltOutlined";
+import StatsIcon from "@mui/icons-material/BarChartOutlined";
+import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
+import UsersIcon from "@mui/icons-material/GroupsOutlined";
+import api from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import type { AccessLogPublic } from "@/lib/types";
 
 interface Stats {
@@ -19,17 +45,84 @@ interface Stats {
   today_exits: number;
 }
 
+function formatTime(value?: string) {
+  if (!value) return "--:--";
+  return new Date(value).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+}
+
+function statusChip(status?: string) {
+  if (status === "success" || status === "granted") return <Chip size="small" color="success" label="Thành công" />;
+  if (status === "denied") return <Chip size="small" color="error" label="Từ chối" />;
+  return <Chip size="small" color="warning" label={status || "Không rõ"} />;
+}
+
+function accessTypeChip(type?: string) {
+  if (type === "entry") return <Chip size="small" color="success" label="Vào" />;
+  if (type === "exit") return <Chip size="small" color="warning" label="Ra" />;
+  return <Chip size="small" label={type || "-"} />;
+}
+
+function MetricCard({ label, value, description, icon: Icon, color }: any) {
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>{label}</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 900, mt: 0.5 }}>{value}</Typography>
+            <Typography variant="caption" color="text.secondary">{description}</Typography>
+          </Box>
+          <Avatar sx={{ bgcolor: color, color: "primary.contrastText" }}>
+            <Icon />
+          </Avatar>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function QuickAction({
+  href,
+  icon: Icon,
+  label,
+  description,
+  color,
+}: {
+  href: string;
+  icon: any;
+  label: string;
+  description: string;
+  color: string;
+}) {
+  return (
+    <Card variant="outlined">
+      <CardActionArea component={Link} href={href} sx={{ p: 1.5 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+          <Avatar sx={{ width: 38, height: 38, bgcolor: color, color: "primary.contrastText" }}>
+            <Icon fontSize="small" />
+          </Avatar>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>{label}</Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>{description}</Typography>
+          </Box>
+          <ArrowForwardIcon fontSize="small" color="disabled" />
+        </Stack>
+      </CardActionArea>
+    </Card>
+  );
+}
+
 export default function DashboardPage() {
+  const theme = useTheme();
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login");
-    }
+    if (!isLoading && !isAuthenticated) router.push("/login");
   }, [isLoading, isAuthenticated, router]);
 
   useEffect(() => {
@@ -37,6 +130,7 @@ export default function DashboardPage() {
 
     async function fetchData() {
       try {
+        setLoadError("");
         const [statsData, logsData] = await Promise.all([
           api.getStats().catch(() => null),
           api.getRecentLogs().catch(() => null),
@@ -51,11 +145,9 @@ export default function DashboardPage() {
           });
         }
 
-        if (logsData?.items) {
-          setRecentLogs(logsData.items.slice(0, 8));
-        }
+        if (logsData?.items) setRecentLogs(logsData.items.slice(0, 8));
       } catch {
-        // silently fail
+        setLoadError("Không thể tải dữ liệu tổng quan.");
       } finally {
         setLoadingData(false);
       }
@@ -66,153 +158,98 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
+  const role = user?.role || "staff";
+  const quickActions = useMemo(() => {
+    const adminActions = role === "admin"
+      ? [
+          { href: "/enroll", icon: PersonAddIcon, label: "Đăng ký khuôn mặt", description: "Tạo dữ liệu nhận diện", color: theme.palette.primary.main },
+          { href: "/patrons", icon: UsersIcon, label: "Quản lý độc giả", description: "Tra cứu và cập nhật hồ sơ", color: theme.palette.info.main },
+          { href: "/return", icon: BookIcon, label: "Trả sách", description: "Xử lý sách đang mượn", color: theme.palette.warning.main },
+          { href: "/stats", icon: StatsIcon, label: "Xem thống kê", description: "Theo dõi vận hành trong ngày", color: theme.palette.success.main },
+        ]
+      : [];
+    return [
+      ...adminActions,
+      { href: "/active", icon: UserCheckIcon, label: "Đang có mặt", description: "Danh sách trong thư viện", color: theme.palette.success.main },
+      { href: "/history", icon: ClockIcon, label: "Lịch sử ra vào", description: "Nhật ký camera và kiosk", color: theme.palette.info.main },
+    ];
+  }, [role, theme.palette.info.main, theme.palette.primary.main, theme.palette.success.main, theme.palette.warning.main]);
+
   if (isLoading || !isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-body-sm text-text-3">Đang tải...</p>
-        </div>
-      </div>
+      <Box sx={{ minHeight: 400, display: "grid", placeItems: "center" }}>
+        <Stack spacing={2} sx={{ alignItems: "center" }}>
+          <CircularProgress />
+          <Typography variant="body2" color="text.secondary">Đang tải...</Typography>
+        </Stack>
+      </Box>
     );
   }
 
-  const role = user?.role || "staff";
-
   return (
-    <div className="space-y-6">
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Tổng độc giả"
-          value={stats?.total_patrons ?? "—"}
-          icon={Users}
-          accentColor="primary"
-          description="Đã đăng ký"
-        />
-        <StatCard
-          label="Đang có mặt"
-          value={stats?.active_patrons ?? "—"}
-          icon={UserCheck}
-          accentColor="success"
-          description="Trong thư viện"
-        />
-        <StatCard
-          label="Lượt vào hôm nay"
-          value={stats?.today_entries ?? "—"}
-          icon={LogIn}
-          accentColor="info"
-          description="Ra vào cửa"
-        />
-        <StatCard
-          label="Lượt ra hôm nay"
-          value={stats?.today_exits ?? "—"}
-          icon={LogOut}
-          accentColor="warning"
-          description="Ra về"
-        />
-      </div>
+    <Stack spacing={3}>
+      {loadError ? <Alert severity="warning">{loadError}</Alert> : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent activity */}
-        <div className="lg:col-span-2">
-          <Card padding="none">
-            <CardHeader className="p-4 border-b border-border">
-              <CardTitle>Hoạt động gần đây</CardTitle>
-              <Link href="/history" className="text-body-sm text-primary hover:text-primary/80 flex items-center gap-1">
-                Xem tất cả <ArrowRight size={14} />
-              </Link>
-            </CardHeader>
-            <CardContent className="p-0">
-              {loadingData ? (
-                <div className="p-8 text-center text-text-3 text-body-sm">Đang tải...</div>
-              ) : recentLogs.length === 0 ? (
-                <div className="p-8 text-center">
-                  <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center mx-auto mb-3 text-text-3">
-                    <Clock size={20} />
-                  </div>
-                  <p className="text-body-sm text-text-3">Chưa có hoạt động nào</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
+        <MetricCard label="Tổng độc giả" value={stats?.total_patrons ?? "—"} icon={UsersIcon} color={theme.palette.primary.main} description="Đã đăng ký" />
+        <MetricCard label="Đang có mặt" value={stats?.active_patrons ?? "—"} icon={UserCheckIcon} color={theme.palette.success.main} description="Trong thư viện" />
+        <MetricCard label="Lượt vào hôm nay" value={stats?.today_entries ?? "—"} icon={LoginIcon} color={theme.palette.info.main} description="Từ 00:00" />
+        <MetricCard label="Lượt ra hôm nay" value={stats?.today_exits ?? "—"} icon={LogoutIcon} color={theme.palette.warning.main} description="Từ 00:00" />
+      </Box>
+
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1.45fr) minmax(320px, 0.85fr)" }, gap: 3 }}>
+        <Paper variant="outlined">
+          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", p: 2 }}>
+            <Box>
+              <Typography variant="h6">Hoạt động gần đây</Typography>
+              <Typography variant="body2" color="text.secondary">Các lượt ra/vào mới nhất</Typography>
+            </Box>
+            <Button component={Link} href="/history" endIcon={<ArrowForwardIcon />} size="small">Xem tất cả</Button>
+          </Stack>
+          <Divider />
+          {loadingData ? (
+            <Box sx={{ p: 5, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+          ) : recentLogs.length === 0 ? (
+            <Alert severity="info" sx={{ m: 2 }}>Chưa có hoạt động nào.</Alert>
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Thời gian</TableCell>
+                    <TableCell>Độc giả</TableCell>
+                    <TableCell>Loại</TableCell>
+                    <TableCell>Trạng thái</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                   {recentLogs.map((log) => (
-                    <div key={log.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                        log.access_type === "entry"
-                          ? "bg-success/15 text-success"
-                          : "bg-error/15 text-error"
-                      }`}>
-                        {log.access_type === "entry" ? <LogIn size={16} /> : <LogOut size={16} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-body-sm font-medium text-text truncate">{log.patron_name || "—"}</p>
-                        <p className="text-caption text-text-3">{log.student_code || log.patron_id}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <Badge variant={log.status === "success" ? "success" : "error"} dot>
-                          {log.status === "success" ? "Thành công" : "Thất bại"}
-                        </Badge>
-                        <p className="text-caption text-text-3 mt-1">
-                          {new Date(log.access_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                      </div>
-                    </div>
+                    <TableRow key={log.id} hover>
+                      <TableCell sx={{ fontFamily: "monospace" }}>{formatTime(log.access_time)}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>{log.patron_name || "Không rõ tên"}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+                          {log.student_code || log.patron_id || "---"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{accessTypeChip(log.access_type)}</TableCell>
+                      <TableCell>{statusChip(log.status)}</TableCell>
+                    </TableRow>
                   ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
 
-        {/* Quick access */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Thao tác nhanh</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {role === "admin" && (
-                <>
-                  <QuickAction href="/enroll" icon={<LogIn size={16} />} label="Đăng ký khuôn mặt" color="primary" />
-                  <QuickAction href="/patrons" icon={<Users size={16} />} label="Quản lý độc giả" color="info" />
-                  <QuickAction href="/return" icon={<BookOpen size={16} />} label="Trả sách" color="warning" />
-                  <QuickAction href="/stats" icon={<AlertCircle size={16} />} label="Xem thống kê" color="success" />
-                </>
-              )}
-              <QuickAction href="/active" icon={<UserCheck size={16} />} label="Đang có mặt" color="success" />
-              <QuickAction href="/history" icon={<Clock size={16} />} label="Lịch sử ra vào" color="info" />
-            </CardContent>
-          </Card>
-
-          
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function QuickAction({ href, icon, label, color }: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  color: "primary" | "success" | "error" | "warning" | "info";
-}) {
-  const colorMap = {
-    primary: "text-primary hover:bg-primary/10",
-    success: "text-success hover:bg-success/10",
-    error: "text-error hover:bg-error/10",
-    warning: "text-warning hover:bg-warning/10",
-    info: "text-info hover:bg-info/10",
-  };
-
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${colorMap[color]}`}
-    >
-      <span className="shrink-0">{icon}</span>
-      <span className="text-body-sm font-medium">{label}</span>
-      <ArrowRight size={14} className="ml-auto shrink-0 opacity-50" />
-    </Link>
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6">Thao tác nhanh</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Đi đến các luồng vận hành thường dùng</Typography>
+          <Stack spacing={1.25}>
+            {quickActions.map((action) => <QuickAction key={action.href} {...action} />)}
+          </Stack>
+        </Paper>
+      </Box>
+    </Stack>
   );
 }

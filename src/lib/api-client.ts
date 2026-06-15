@@ -53,6 +53,30 @@ function clearStoredAuth() {
   document.cookie = "access_token=; path=/; max-age=0";
 }
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const base64Url = token.split(".")[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`)
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpiringSoon(token: string, skewSeconds = 30): boolean {
+  const payload = decodeJwtPayload(token);
+  const exp = typeof payload?.exp === "number" ? payload.exp : null;
+  if (!exp) return false;
+  return Date.now() >= (exp - skewSeconds) * 1000;
+}
+
 function isNotFoundError(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
 }
@@ -99,9 +123,17 @@ class ApiClient {
     });
 
     this.client.interceptors.request.use(
-      (config) => {
+      async (config) => {
         if (typeof window !== "undefined") {
-          const token = localStorage.getItem("access_token");
+          let token = localStorage.getItem("access_token");
+          if (token && isTokenExpiringSoon(token) && !isAuthEndpoint(config.url)) {
+            if (!this.refreshPromise) {
+              this.refreshPromise = this.refreshToken();
+            }
+            const refreshed = await this.refreshPromise;
+            this.refreshPromise = null;
+            token = refreshed ? localStorage.getItem("access_token") : token;
+          }
           if (token) {
             config.headers.Authorization = `Bearer ${token}`;
           }

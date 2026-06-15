@@ -1,6 +1,15 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
+import {
+  Box,
+  Chip,
+  CircularProgress,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 
 interface CameraFeedProps {
   src: string;
@@ -14,10 +23,10 @@ interface CameraFeedProps {
 }
 
 const OVERLAY_COLORS: Record<string, string> = {
-  granted: '#22c55e',
-  wrong_direction: '#eab308',
-  expired: '#f97316',
-  spoof: '#ef4444',
+  granted: "#22c55e",
+  wrong_direction: "#eab308",
+  expired: "#f97316",
+  spoof: "#ef4444",
 };
 
 export default function CameraFeed({ src, label, overlay, onStatusChange }: CameraFeedProps) {
@@ -42,14 +51,13 @@ export default function CameraFeed({ src, label, overlay, onStatusChange }: Came
 
     canvas.width = rect.width;
     canvas.height = rect.height;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (overlay.bbox) {
       const [x1, y1, x2, y2] = overlay.bbox;
-      ctx.strokeStyle = OVERLAY_COLORS[overlay.status || 'granted'] || '#22c55e';
+      ctx.strokeStyle = OVERLAY_COLORS[overlay.status || "granted"] || "#22c55e";
       ctx.lineWidth = 3;
       ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
     }
@@ -58,37 +66,48 @@ export default function CameraFeed({ src, label, overlay, onStatusChange }: Came
       overlay.landmarks.forEach(([x, y]) => {
         ctx.beginPath();
         ctx.arc(x * scaleX, y * scaleY, 4, 0, 2 * Math.PI);
-        ctx.fillStyle = '#ef4444';
+        ctx.fillStyle = "#ef4444";
         ctx.fill();
       });
     }
   }, [overlay]);
 
   return (
-    <div className="bg-slate-800/50 rounded-xl overflow-hidden border border-slate-700">
-      <div className="bg-slate-800 px-4 py-2 flex items-center gap-2 border-b border-slate-700">
-        <span className={`w-2 h-2 rounded-full ${ok === null ? 'bg-yellow-400 animate-pulse' : ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
-        <span className="text-sm font-medium text-slate-300">{label}</span>
-      </div>
-      <div className="relative aspect-video">
-        <img
+    <Paper variant="outlined" sx={{ overflow: "hidden", height: "100%" }}>
+      <Stack
+        direction="row"
+        spacing={1.25}
+        sx={{ alignItems: "center", justifyContent: "space-between", px: 2, py: 1.25, borderBottom: 1, borderColor: "divider" }}
+      >
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <VideocamOutlinedIcon color="disabled" fontSize="small" />
+          <Typography sx={{ fontWeight: 800 }}>{label}</Typography>
+        </Stack>
+        <Chip
+          size="small"
+          color={ok === null ? "warning" : ok ? "success" : "error"}
+          label={ok === null ? "Đang nối" : ok ? "Online" : "Mất tín hiệu"}
+        />
+      </Stack>
+
+      <Box sx={{ position: "relative", aspectRatio: "16 / 9", bgcolor: "common.black" }}>
+        <Box
+          component="img"
           ref={imgRef}
           src={`${src}?_t=${ts}`}
-          className="w-full h-full object-contain bg-black"
           onLoad={() => setOk(true)}
           onError={() => setOk(false)}
           alt={label}
+          sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
         />
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-        />
+        <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
         {ok === null && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <div className="text-slate-400 text-sm">Đang kết nối...</div>
-          </div>
+          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+            <CircularProgress color="inherit" size={28} />
+            <Typography variant="body2">Đang kết nối...</Typography>
+          </Stack>
         )}
-      </div>
-    </div>
+      </Box>
+    </Paper>
   );
 }

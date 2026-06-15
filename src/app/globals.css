@@ -6,6 +6,29 @@
 
 @layer base {
   :root {
+    --color-bg: 246 248 251;
+    --color-surface: 255 255 255;
+    --color-surface-2: 241 245 249;
+    --color-surface-3: 226 232 240;
+    --color-primary: 122 84 14;
+    --color-primary-dark: 91 62 10;
+    --color-primary-dim: 146 104 25;
+    --color-secondary: 34 107 66;
+    --color-secondary-dark: 27 84 52;
+    --color-tertiary: 23 92 211;
+    --color-success: 34 107 66;
+    --color-success-bg: 232 246 238;
+    --color-error: 180 35 24;
+    --color-error-bg: 254 243 242;
+    --color-warning: 154 98 15;
+    --color-warning-bg: 255 248 235;
+    --color-info: 23 92 211;
+    --color-info-bg: 239 248 255;
+    --color-text: 16 24 40;
+    --color-text-2: 52 64 84;
+    --color-text-3: 102 112 133;
+    --color-border: 208 215 226;
+    --color-border-2: 180 190 205;
     /* Light mode — not used but kept for compatibility */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -29,6 +52,29 @@
 
   /* Dark mode — primary design system */
   .dark {
+    --color-bg: 18 21 30;
+    --color-surface: 28 32 48;
+    --color-surface-2: 36 40 56;
+    --color-surface-3: 44 48 66;
+    --color-primary: 212 168 83;
+    --color-primary-dark: 168 132 48;
+    --color-primary-dim: 138 106 40;
+    --color-secondary: 74 140 92;
+    --color-secondary-dark: 61 115 80;
+    --color-tertiary: 91 155 213;
+    --color-success: 74 140 92;
+    --color-success-bg: 26 46 31;
+    --color-error: 196 78 78;
+    --color-error-bg: 46 26 26;
+    --color-warning: 196 154 60;
+    --color-warning-bg: 46 37 24;
+    --color-info: 91 155 213;
+    --color-info-bg: 26 37 48;
+    --color-text: 237 232 223;
+    --color-text-2: 184 176 164;
+    --color-text-3: 122 115 104;
+    --color-border: 46 51 69;
+    --color-border-2: 58 64 82;
     --background: 222 30% 7%;
     --foreground: 35 18% 91%;
     --card: 222 30% 11%;
