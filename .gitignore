@@ -37,6 +37,7 @@ Thumbs.db
 *.swo
 
 # === Generated / Agent files ===
+repomix-output.xml
 repomix-output.xml/
 SkillAgent/
 CLAUDE.md
