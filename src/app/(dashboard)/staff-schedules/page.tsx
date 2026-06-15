@@ -398,6 +398,20 @@ export default function StaffSchedulesPage() {
     }
   };
 
+  const deleteShift = async (shift: StaffShift) => {
+    if (typeof window !== "undefined" && !window.confirm(`Xóa ca trực "${shift.name}"?`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.deleteScheduleShift(shift.id);
+      await loadData();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submitAvailability = async () => {
     setSaving(true);
     setError(null);
@@ -598,6 +612,30 @@ export default function StaffSchedulesPage() {
                     >
                       <Plus size={15} /> Thêm ca trực
                     </button>
+
+                    {shifts.length ? (
+                      <div className="mt-3 space-y-1.5">
+                        {shifts.map((shift) => (
+                          <div key={shift.id} className="flex items-center justify-between rounded-md border border-border bg-bg/70 px-2 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-body-sm font-semibold text-text">{shift.name}</p>
+                              <p className="text-[11px] text-text-3">
+                                {normalizeTime(shift.startTime)}-{normalizeTime(shift.endTime)} · {shift.minStaff} nhân viên
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => deleteShift(shift)}
+                              disabled={saving}
+                              className="rounded p-1.5 text-text-3 hover:bg-error/10 hover:text-error disabled:opacity-60"
+                              title="Xóa ca trực"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

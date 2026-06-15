@@ -697,6 +697,11 @@ class ApiClient {
     return response.data;
   }
 
+  async deleteScheduleShift(id: string): Promise<{ deleted: boolean; id: string }> {
+    const response = await this.client.delete<{ deleted: boolean; id: string }>(`/api/schedules/shifts/${id}`);
+    return response.data;
+  }
+
   async getScheduleAssignments(params?: { from?: string; to?: string; staffId?: string; zoneId?: string; status?: string }): Promise<ScheduleAssignmentList> {
     const query: any = {};
     if (params?.from) query.from = params.from;
