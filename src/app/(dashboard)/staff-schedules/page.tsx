@@ -59,7 +59,7 @@ function normalizeTime(time?: string) {
 
 function displayZoneName(zone: LibraryZone) {
   const compact = zone.zoneName.match(/^(Tang|Tầng)\s*(\d+)/i);
-  return compact ? `Tang ${compact[2]}` : zone.zoneName;
+  return compact ? `Tầng ${compact[2]}` : zone.zoneName;
 }
 
 function initials(name?: string | null, email?: string) {
@@ -120,7 +120,7 @@ function DraggableAssignment({ item }: { item: StaffScheduleAssignment }) {
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-caption font-semibold text-text">{item.staff?.fullName || item.staff?.email || item.staffId}</p>
-          <p className="truncate text-[11px] text-text-3">{item.staff?.email || "Nhan vien truc"}</p>
+          <p className="truncate text-[11px] text-text-3">{item.staff?.email || "Nhân viên trực"}</p>
         </div>
         <Move size={13} className="shrink-0 text-text-3" />
       </div>
@@ -149,13 +149,13 @@ function DropCell({
     >
       <div className="mb-2 flex items-center justify-between text-[11px]">
         <span className={isUnderstaffed ? "font-semibold text-warning" : "text-text-3"}>
-          {assignments.length}/{minStaff} nhan vien
+          {assignments.length}/{minStaff} nhân viên
         </span>
-        {isUnderstaffed ? <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-warning">Thieu</span> : null}
+        {isUnderstaffed ? <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-warning">Thiếu</span> : null}
       </div>
       {assignments.length === 0 ? (
         <div className="flex h-full min-h-[64px] items-center justify-center text-center text-[11px] text-text-3">
-          Tha mot hoac nhieu nhan vien vao ca nay
+          Thả một hoặc nhiều nhân viên vào ca này
         </div>
       ) : (
         <div className="space-y-2">
@@ -186,9 +186,9 @@ function EmptySetup({
       <div className="flex items-start gap-3">
         <AlertCircle className="mt-0.5 text-warning" size={20} />
         <div className="flex-1">
-          <h3 className="font-semibold text-text">Chua co cau hinh lich truc</h3>
+          <h3 className="font-semibold text-text">Chưa có cấu hình lịch trực</h3>
           <p className="mt-1 text-body-sm text-text-2">
-            Can it nhat mot khu vuc va mot ca truc de bat dau dieu phoi. Ban co the tao bo mau nhanh cho demo.
+            Cần ít nhất một tầng và một ca trực để bắt đầu điều phối. Bạn có thể tạo bộ mẫu nhanh cho demo.
           </p>
         </div>
         <button
@@ -197,7 +197,7 @@ function EmptySetup({
           className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-body-sm font-semibold text-bg disabled:opacity-60"
         >
           {loading ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-          Tao mau
+          Tạo mẫu
         </button>
       </div>
     </div>
@@ -266,15 +266,15 @@ export default function StaffSchedulesPage() {
       const createdZones = zones.length
         ? zones
         : await Promise.all([
-            api.createScheduleZone({ floor: 1, zoneName: "Tang 1" }),
-            api.createScheduleZone({ floor: 2, zoneName: "Tang 2" }),
+            api.createScheduleZone({ floor: 1, zoneName: "Tầng 1" }),
+            api.createScheduleZone({ floor: 2, zoneName: "Tầng 2" }),
           ]);
       const createdShifts = shifts.length
         ? shifts
         : await Promise.all([
-            api.createScheduleShift({ name: "Ca sang", startTime: "07:30", endTime: "11:30", minStaff: 1 }),
-            api.createScheduleShift({ name: "Ca chieu", startTime: "13:00", endTime: "17:00", minStaff: 1 }),
-            api.createScheduleShift({ name: "Ca toi", startTime: "17:30", endTime: "20:30", minStaff: 1 }),
+            api.createScheduleShift({ name: "Ca sáng", startTime: "07:30", endTime: "11:30", minStaff: 1 }),
+            api.createScheduleShift({ name: "Ca chiều", startTime: "13:00", endTime: "17:00", minStaff: 1 }),
+            api.createScheduleShift({ name: "Ca tối", startTime: "17:30", endTime: "20:30", minStaff: 1 }),
           ]);
       setZones(createdZones);
       setShifts(createdShifts);
@@ -293,7 +293,7 @@ export default function StaffSchedulesPage() {
     try {
       await api.createScheduleZone({
         floor,
-        zoneName: zoneForm.zoneName.trim() || `Tang ${floor}`,
+        zoneName: zoneForm.zoneName.trim() || `Tầng ${floor}`,
       });
       setZoneForm((value) => ({ ...value, zoneName: "" }));
       await loadData();
@@ -306,7 +306,7 @@ export default function StaffSchedulesPage() {
 
   const createShift = async () => {
     if (!shiftForm.name.trim()) {
-      setError("Vui long nhap ten ca truc");
+      setError("Vui lòng nhập tên ca trực");
       return;
     }
     setSaving(true);
@@ -384,7 +384,7 @@ export default function StaffSchedulesPage() {
   if (!isStaff) {
     return (
       <div className="rounded-lg border border-border bg-surface p-6 text-text">
-        Ban khong co quyen xem lich truc.
+        Bạn không có quyền xem lịch trực.
       </div>
     );
   }
@@ -397,8 +397,8 @@ export default function StaffSchedulesPage() {
             <CalendarDays size={22} />
           </div>
           <div>
-            <h2 className="text-heading-md text-text">Bang dieu phoi lich truc</h2>
-            <p className="text-body-sm text-text-3">Quan ly theo tuan, tang, khu vuc va ca truc.</p>
+            <h2 className="text-heading-md text-text">Bảng điều phối lịch trực</h2>
+            <p className="text-body-sm text-text-3">Quản lý theo tuần, tầng, khu vực và ca trực.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -406,7 +406,7 @@ export default function StaffSchedulesPage() {
             onClick={() => setWeekStart((value) => new Date(value.setDate(value.getDate() - 7)))}
             className="rounded-md border border-border px-3 py-2 text-body-sm text-text hover:bg-surface-2"
           >
-            Tuan truoc
+            Tuần trước
           </button>
           <div className="rounded-md bg-surface-2 px-3 py-2 text-body-sm font-semibold text-text">
             {from} - {to}
@@ -415,7 +415,7 @@ export default function StaffSchedulesPage() {
             onClick={() => setWeekStart((value) => new Date(value.setDate(value.getDate() + 7)))}
             className="rounded-md border border-border px-3 py-2 text-body-sm text-text hover:bg-surface-2"
           >
-            Tuan sau
+            Tuần sau
           </button>
           <button
             onClick={loadData}
@@ -423,7 +423,7 @@ export default function StaffSchedulesPage() {
             className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-body-sm text-text hover:bg-surface-2 disabled:opacity-60"
           >
             <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-            Tai lai
+            Tải lại
           </button>
         </div>
       </div>
@@ -448,10 +448,10 @@ export default function StaffSchedulesPage() {
                   <Users size={18} className="text-primary" />
                   <h3 className="font-semibold text-text">Staff pool</h3>
                 </div>
-                <p className="mb-3 text-caption text-text-3">Keo nhan vien vao bat ky o ca truc. Moi ca co the co nhieu nhan vien.</p>
+                <p className="mb-3 text-caption text-text-3">Kéo nhân viên vào bất kỳ ô ca trực. Mỗi ca có thể có nhiều nhân viên.</p>
                 <div className="space-y-2">
                   {staff.length ? staff.map((item) => <DraggableStaff key={item.id} staff={item} />) : (
-                    <p className="text-body-sm text-text-3">Chua lay duoc danh sach staff tu user-service.</p>
+                    <p className="text-body-sm text-text-3">Chưa lấy được danh sách nhân viên từ user-service.</p>
                   )}
                 </div>
               </div>
@@ -459,14 +459,14 @@ export default function StaffSchedulesPage() {
               <div className="rounded-lg border border-border bg-surface p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Building2 size={18} className="text-primary" />
-                  <h3 className="font-semibold text-text">Cau hinh tang va ca</h3>
+                  <h3 className="font-semibold text-text">Cấu hình tầng và ca</h3>
                 </div>
                 <div className="space-y-4">
                   <div className="rounded-md bg-surface-2 p-3">
-                    <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-text-3">Them tang / khu vuc</p>
+                    <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-text-3">Thêm tầng</p>
                     <div className="grid grid-cols-[80px_1fr] gap-2">
                       <label className="text-caption text-text-2">
-                        Tang
+                        Tầng
                         <input
                           type="number"
                           min={1}
@@ -476,11 +476,11 @@ export default function StaffSchedulesPage() {
                         />
                       </label>
                       <label className="text-caption text-text-2">
-                        Ten hien thi
+                        Tên hiển thị
                         <input
                           value={zoneForm.zoneName}
                           onChange={(event) => setZoneForm((value) => ({ ...value, zoneName: event.target.value }))}
-                          placeholder="VD: Tang 3"
+                          placeholder="VD: Tầng 3"
                           className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
                         />
                       </label>
@@ -490,18 +490,18 @@ export default function StaffSchedulesPage() {
                       disabled={saving}
                       className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-primary/50 px-3 py-2 text-body-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"
                     >
-                      <Plus size={15} /> Them khu vuc
+                      <Plus size={15} /> Thêm tầng
                     </button>
                   </div>
 
                   <div className="rounded-md bg-surface-2 p-3">
-                    <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-text-3">Them ca truc</p>
+                    <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-text-3">Thêm ca trực</p>
                     <label className="block text-caption text-text-2">
-                      Ten ca
+                      Tên ca
                       <input
                         value={shiftForm.name}
                         onChange={(event) => setShiftForm((value) => ({ ...value, name: event.target.value }))}
-                        placeholder="VD: Ca toi tang 4"
+                        placeholder="VD: Ca tối tầng 4"
                         className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
                       />
                     </label>
@@ -540,7 +540,7 @@ export default function StaffSchedulesPage() {
                       disabled={saving}
                       className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-primary/50 px-3 py-2 text-body-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"
                     >
-                      <Plus size={15} /> Them ca truc
+                      <Plus size={15} /> Thêm ca trực
                     </button>
                   </div>
                 </div>
@@ -569,7 +569,7 @@ export default function StaffSchedulesPage() {
                           <MapPin size={16} className="text-primary" />
                           <span className="font-semibold">{displayZoneName(zone)}</span>
                         </div>
-                        <p className="mt-1 text-caption text-text-3">Tang {zone.floor}</p>
+                        <p className="mt-1 text-caption text-text-3">Tầng {zone.floor}</p>
                       </div>
                       {days.map((day) => (
                         <div key={`${zone.id}-${day.toISOString()}`} className="space-y-2">
@@ -605,7 +605,7 @@ export default function StaffSchedulesPage() {
           <div className="rounded-lg border border-border bg-surface p-4">
             <div className="mb-4 flex items-center gap-2">
               <UserCheck size={18} className="text-primary" />
-              <h3 className="font-semibold text-text">Lich tuan cua toi</h3>
+              <h3 className="font-semibold text-text">Lịch tuần của tôi</h3>
             </div>
             <div className="space-y-3">
               {assignments.length ? assignments.map((item) => (
@@ -614,14 +614,14 @@ export default function StaffSchedulesPage() {
                     <div>
                       <p className="font-semibold text-text">{item.workDate} - {item.shift?.name || item.shiftId}</p>
                       <p className="mt-1 text-body-sm text-text-3">
-                        {normalizeTime(item.shift?.startTime)}-{normalizeTime(item.shift?.endTime)} tai {item.zone ? displayZoneName(item.zone) : item.zoneId}
+                        {normalizeTime(item.shift?.startTime)}-{normalizeTime(item.shift?.endTime)} tại {item.zone ? displayZoneName(item.zone) : item.zoneId}
                       </p>
                     </div>
                     <span className="rounded-full bg-primary/15 px-2 py-1 text-caption font-semibold text-primary">{item.status}</span>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button onClick={() => runAssignmentAction(item.id, "confirm")} disabled={saving} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-body-sm text-text hover:bg-bg">
-                      <CheckCircle2 size={15} /> Xac nhan
+                      <CheckCircle2 size={15} /> Xác nhận
                     </button>
                     <button onClick={() => runAssignmentAction(item.id, "check-in")} disabled={saving} className="inline-flex items-center gap-2 rounded-md bg-success px-3 py-2 text-body-sm font-semibold text-white disabled:opacity-60">
                       <Clock size={15} /> Check-in
@@ -633,29 +633,29 @@ export default function StaffSchedulesPage() {
                 </div>
               )) : (
                 <div className="rounded-md border border-dashed border-border p-8 text-center text-text-3">
-                  Ban chua co ca truc trong tuan nay.
+                  Bạn chưa có ca trực trong tuần này.
                 </div>
               )}
             </div>
           </div>
 
           <div className="rounded-lg border border-border bg-surface p-4">
-            <h3 className="font-semibold text-text">Dang ky ngay nghi</h3>
+            <h3 className="font-semibold text-text">Đăng ký ngày nghỉ</h3>
             <div className="mt-4 space-y-3">
               <label className="block text-body-sm text-text-2">
-                Tu ngay
+                Từ ngày
                 <input value={availability.dateFrom} onChange={(event) => setAvailability((value) => ({ ...value, dateFrom: event.target.value }))} type="date" className="mt-1 w-full rounded-md border border-border bg-bg px-3 py-2 text-text" />
               </label>
               <label className="block text-body-sm text-text-2">
-                Den ngay
+                Đến ngày
                 <input value={availability.dateTo} onChange={(event) => setAvailability((value) => ({ ...value, dateTo: event.target.value }))} type="date" className="mt-1 w-full rounded-md border border-border bg-bg px-3 py-2 text-text" />
               </label>
               <label className="block text-body-sm text-text-2">
-                Ly do
+                Lý do
                 <textarea value={availability.reason} onChange={(event) => setAvailability((value) => ({ ...value, reason: event.target.value }))} className="mt-1 min-h-24 w-full rounded-md border border-border bg-bg px-3 py-2 text-text" />
               </label>
               <button onClick={submitAvailability} disabled={saving} className="w-full rounded-md bg-primary px-3 py-2 text-body-sm font-semibold text-bg disabled:opacity-60">
-                Gui yeu cau
+                Gửi yêu cầu
               </button>
             </div>
           </div>
