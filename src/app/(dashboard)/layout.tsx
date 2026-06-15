@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   AppBar,
   Avatar,
@@ -20,23 +20,6 @@ import UserIcon from "@mui/icons-material/PersonOutlined";
 import { useAuth } from "@/lib/auth-context";
 import { useColorMode } from "@/lib/mui-theme";
 import Sidebar from "@/components/sidebar";
-
-const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard": { title: "Tổng quan", subtitle: "Chào mừng bạn quay lại" },
-  "/patrons": { title: "Quản lý độc giả", subtitle: "Danh sách và thông tin độc giả" },
-  "/books": { title: "Kho sách", subtitle: "Quản lý và nhập kho sách" },
-  "/active": { title: "Đang hiện diện", subtitle: "Độc giả đang có mặt trong thư viện" },
-  "/gate": { title: "Cổng ra vào", subtitle: "Xác thực khuôn mặt tại cổng" },
-  "/history": { title: "Lịch sử ra vào", subtitle: "Nhật ký ra vào của thư viện" },
-  "/return": { title: "Trả sách", subtitle: "Xử lý trả sách cho độc giả" },
-  "/stats": { title: "Thống kê", subtitle: "Báo cáo và biểu đồ hoạt động" },
-  "/enroll": { title: "Đăng ký khuôn mặt", subtitle: "Cập nhật thông tin khuôn mặt" },
-  "/verify": { title: "Xác thực khuôn mặt", subtitle: "Kiểm tra đối chiếu khuôn mặt" },
-  "/identify": { title: "Nhận diện", subtitle: "Tìm kiếm độc giả qua khuôn mặt" },
-  "/liveness": { title: "Kiểm tra sống", subtitle: "Xác minh khuôn mặt thật" },
-  "/dashboard/admin": { title: "Quản trị hệ thống", subtitle: "Quản lý người dùng và phân quyền" },
-  "/staff-schedules": { title: "Lịch trực", subtitle: "Điều phối ca trực theo tuần và tầng" },
-};
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();
@@ -81,7 +64,6 @@ function Topbar({ user }: { user: any }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -102,32 +84,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!isAuthenticated) return null;
 
-  const pageInfo = PAGE_TITLES[pathname]
-    || PAGE_TITLES[pathname.split("/").slice(0, 2).join("/")]
-    || { title: "", subtitle: "" };
-
-  if (pathname === "/staff-schedules") {
-    return <Box component="main" sx={{ minHeight: "100vh", bgcolor: "background.default" }}>{children}</Box>;
-  }
-
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       <Sidebar />
       <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <Topbar user={user} />
         <Box component="main" sx={{ p: { xs: 2, md: 3 } }}>
-          {pageInfo.title ? (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h4" color="text.primary" sx={{ fontWeight: 850 }}>
-                {pageInfo.title}
-              </Typography>
-              {pageInfo.subtitle ? (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>
-                  {pageInfo.subtitle}
-                </Typography>
-              ) : null}
-            </Box>
-          ) : null}
           {children}
         </Box>
       </Box>
