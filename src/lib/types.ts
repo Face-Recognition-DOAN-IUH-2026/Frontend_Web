@@ -173,6 +173,35 @@ export interface BorrowRecord {
   book?: BookInfo | null;
 }
 
+export interface StaffPatronSummary {
+  id: string;
+  full_name: string | null;
+  student_code: string;
+  email: string | null;
+  card_number: string | null;
+  current_status: string | null;
+}
+
+export interface StaffPatronActiveBorrowsResponse {
+  patron: StaffPatronSummary;
+  records: BorrowRecord[];
+  total: number;
+  overdue_count: number;
+}
+
+export interface StaffActiveBorrowerSummary {
+  patron: StaffPatronSummary;
+  total_borrowed: number;
+  overdue_count: number;
+  latest_borrow_at: string;
+  nearest_due_at: string;
+}
+
+export interface StaffActiveBorrowersResponse {
+  items: StaffActiveBorrowerSummary[];
+  total: number;
+}
+
 export interface BorrowResponse {
   status: string;
   message: string;

@@ -25,6 +25,8 @@ import type {
   BorrowRecord,
   BorrowResponse,
   ReturnResponse,
+  StaffActiveBorrowersResponse,
+  StaffPatronActiveBorrowsResponse,
   StaffReturnRequest,
 } from "./types";
 
@@ -386,15 +388,19 @@ class ApiClient {
     return response.data;
   }
 
-  connectAccessSSE(onEvent: (event: CameraEvent) => void): () => void {
+  connectAccessSSE(
+    onEvent: (event: CameraEvent) => void,
+    onConnectionChange?: (connected: boolean) => void,
+  ): () => void {
     const es = new EventSource(`${API_BASE_URL}/api/access/events`);
+    es.addEventListener("open", () => onConnectionChange?.(true));
     es.addEventListener("camera_event", (msg: MessageEvent) => {
       try {
         const data = JSON.parse(msg.data) as CameraEvent;
         onEvent(data);
       } catch { /* ignore parse errors */ }
     });
-    es.addEventListener("error", () => { /* will auto-reconnect */ });
+    es.addEventListener("error", () => { onConnectionChange?.(false); });
     return () => es.close();
   }
 
@@ -546,6 +552,23 @@ class ApiClient {
 
   async staffReturnBook(barcode: string): Promise<ReturnResponse> {
     const response = await this.client.post<ReturnResponse>("/api/borrow/staff-return", { barcode } as StaffReturnRequest);
+    return response.data;
+  }
+
+  async getActiveBorrowers(): Promise<StaffActiveBorrowersResponse> {
+    const response = await this.client.get<StaffActiveBorrowersResponse>("/api/borrow/staff/active-borrowers");
+    return response.data;
+  }
+
+  async getActiveBorrowsByStudentCode(studentCode: string): Promise<StaffPatronActiveBorrowsResponse> {
+    const response = await this.client.get<StaffPatronActiveBorrowsResponse>(
+      `/api/borrow/staff/patrons/${encodeURIComponent(studentCode)}/active`
+    );
+    return response.data;
+  }
+
+  async staffReturnBorrowRecord(recordId: string): Promise<ReturnResponse> {
+    const response = await this.client.post<ReturnResponse>(`/api/borrow/staff-return/record/${recordId}`);
     return response.data;
   }
 
