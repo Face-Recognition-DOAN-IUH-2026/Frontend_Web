@@ -220,10 +220,13 @@ export default function PatronDetailPage() {
             </thead>
             <tbody>
               {borrows.map((b) => {
-                const isOverdue = b.status === "borrowing" && new Date(b.due_at) < new Date();
+                const isOverdue = b.status === "borrowed" && new Date(b.due_at) < new Date();
                 return (
                   <tr key={b.id} className="border-t hover:bg-surface-2/20">
-                    <td className="p-3 font-mono text-primary">{b.book_id}</td>
+                    <td className="p-3">
+                      <div className="font-medium text-text">{b.book?.title || b.book_id}</div>
+                      <div className="font-mono text-xs text-text-3">{b.book?.isbn || b.book_id}</div>
+                    </td>
                     <td className="p-3">{new Date(b.borrow_at).toLocaleDateString("vi-VN")}</td>
                     <td className={`p-3 ${isOverdue ? "text-error font-semibold" : ""}`}>
                       {new Date(b.due_at).toLocaleDateString("vi-VN")}

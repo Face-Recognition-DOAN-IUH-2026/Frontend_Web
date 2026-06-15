@@ -551,9 +551,11 @@ class ApiClient {
 
   async getBorrowHistory(params?: { patronId?: string; statusFilter?: string }): Promise<BorrowRecord[]> {
     const query: any = {};
-    if (params?.patronId) query.patron_id = params.patronId;
     if (params?.statusFilter) query.status_filter = params.statusFilter;
-    const response = await this.client.get<BorrowRecord[]>("/api/borrow/history", { params: query });
+    const endpoint = params?.patronId
+      ? `/api/borrow/staff/patrons/id/${params.patronId}/history`
+      : "/api/borrow/history";
+    const response = await this.client.get<BorrowRecord[]>(endpoint, { params: query });
     return response.data;
   }
 

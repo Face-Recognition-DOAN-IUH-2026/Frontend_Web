@@ -170,6 +170,7 @@ export interface BorrowRecord {
   return_at: string | null;
   shelf_location: string | null;
   status: string;
+  book?: BookInfo | null;
 }
 
 export interface BorrowResponse {

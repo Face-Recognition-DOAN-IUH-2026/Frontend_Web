@@ -54,6 +54,20 @@ function captureFromVideo(video: HTMLVideoElement, cameraReady: boolean) {
   });
 }
 
+function getCameraErrorMessage(err: unknown) {
+  const name = err instanceof DOMException ? err.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Không có quyền truy cập camera. Hãy cấp quyền camera cho trình duyệt rồi thử lại.";
+  }
+  if (name === "NotFoundError" || name === "OverconstrainedError") {
+    return "Không tìm thấy camera phù hợp. Hãy kiểm tra thiết bị camera rồi thử lại.";
+  }
+  if (name === "NotReadableError" || name === "AbortError") {
+    return "Camera đang được ứng dụng khác sử dụng hoặc không mở được. Hãy đóng ứng dụng khác rồi thử lại.";
+  }
+  return "Không thể mở camera. Hãy kiểm tra quyền truy cập, thiết bị camera và thử lại.";
+}
+
 export default function MultiAngleCapture({
   angles,
   consent,
@@ -79,6 +93,7 @@ export default function MultiAngleCapture({
 
   const [cameraReady, setCameraReady] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
+  const [cameraError, setCameraError] = useState("");
 
   const [isSequenceRunning, setIsSequenceRunning] = useState(false);
   const [currentAngleIdx, setCurrentAngleIdx] = useState(-1);
@@ -103,6 +118,7 @@ export default function MultiAngleCapture({
 
   const startCamera = useCallback(async () => {
     try {
+      setCameraError("");
       setCameraReady(false);
       setIsCameraOn(false);
 
@@ -121,9 +137,12 @@ export default function MultiAngleCapture({
 
       streamRef.current = stream;
       setIsCameraOn(true);
+      return true;
     } catch (err: any) {
       setIsCameraOn(false);
       setCameraReady(false);
+      setCameraError(getCameraErrorMessage(err));
+      return false;
     }
   }, []);
 
@@ -164,7 +183,9 @@ export default function MultiAngleCapture({
       setCaptures((prev) =>
         prev.map((s, i) => (i === idx ? { ...s, status: "pending", file: null, dataUrl: null } : s))
       );
-      await startCamera();
+      const opened = await startCamera();
+      if (!opened) return;
+      setIsSequenceRunning(true);
       setTimeout(() => setCurrentAngleIdx(idx), 500);
     },
     [startCamera]
@@ -172,10 +193,15 @@ export default function MultiAngleCapture({
 
   const startSequence = useCallback(async () => {
     setCaptures(ANGLE_CONFIG.map((c) => ({ angle: c.angle, status: "pending", file: null, dataUrl: null })));
+    setCountdown(null);
+    const opened = await startCamera();
+    if (!opened) {
+      setCurrentAngleIdx(-1);
+      setIsSequenceRunning(false);
+      return;
+    }
     setCurrentAngleIdx(0);
     setIsSequenceRunning(true);
-    setCountdown(null);
-    await startCamera();
   }, [ANGLE_CONFIG, startCamera]);
 
   useEffect(() => {
@@ -221,8 +247,9 @@ export default function MultiAngleCapture({
               if (!cancelled) setCurrentAngleIdx(nextIdx);
             }, 800);
           }
-        } catch {
+        } catch (err) {
           if (cancelled) return;
+          setCameraError(getCameraErrorMessage(err));
           setCaptures((prev) => prev.map((s, i) => (i === currentAngleIdx ? { ...s, status: "pending" } : s)));
           setIsSequenceRunning(false);
           setCurrentAngleIdx(-1);
@@ -279,6 +306,11 @@ export default function MultiAngleCapture({
             <p>• Giữ yên khi đếm ngược về 0</p>
             <p>• Mặt vừa đủ trong khung tròn</p>
           </div>
+          {cameraError && (
+            <div className="mb-4 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-left text-sm text-red-200">
+              {cameraError}
+            </div>
+          )}
           <button
             type="button"
             onClick={startSequence}
@@ -306,7 +338,7 @@ export default function MultiAngleCapture({
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-slate-300">
               <div className="text-center">
                 <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-sm">Đang mở camera...</p>
+                <p className="text-sm">{cameraError || "Đang mở camera..."}</p>
               </div>
             </div>
           )}
