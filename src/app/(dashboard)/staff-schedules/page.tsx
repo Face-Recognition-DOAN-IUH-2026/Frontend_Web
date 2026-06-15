@@ -384,6 +384,20 @@ export default function StaffSchedulesPage() {
     }
   };
 
+  const deleteZone = async (zone: LibraryZone) => {
+    if (typeof window !== "undefined" && !window.confirm(`Xóa ${displayZoneName(zone)} khỏi lịch trực?`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.deleteScheduleZone(zone.id);
+      await loadData();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submitAvailability = async () => {
     setSaving(true);
     setError(null);
@@ -512,6 +526,28 @@ export default function StaffSchedulesPage() {
                     >
                       <Plus size={15} /> Thêm tầng
                     </button>
+
+                    {zones.length ? (
+                      <div className="mt-3 space-y-1.5">
+                        {zones.map((zone) => (
+                          <div key={zone.id} className="flex items-center justify-between rounded-md border border-border bg-bg/70 px-2 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-body-sm font-semibold text-text">{displayZoneName(zone)}</p>
+                              <p className="text-[11px] text-text-3">Tầng {zone.floor}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => deleteZone(zone)}
+                              disabled={saving}
+                              className="rounded p-1.5 text-text-3 hover:bg-error/10 hover:text-error disabled:opacity-60"
+                              title="Xóa tầng"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="rounded-md bg-surface-2 p-3">

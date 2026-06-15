@@ -682,6 +682,11 @@ class ApiClient {
     return response.data;
   }
 
+  async deleteScheduleZone(id: string): Promise<{ deleted: boolean; id: string }> {
+    const response = await this.client.delete<{ deleted: boolean; id: string }>(`/api/schedules/zones/${id}`);
+    return response.data;
+  }
+
   async getScheduleShifts(): Promise<StaffShift[]> {
     const response = await this.client.get<StaffShift[]>("/api/schedules/shifts");
     return response.data;
