@@ -13,8 +13,6 @@ import {
 import {
   AlertCircle,
   CalendarDays,
-  CheckCircle2,
-  Clock,
   Building2,
   Loader2,
   MapPin,
@@ -366,21 +364,6 @@ export default function StaffSchedulesPage() {
     }
   };
 
-  const runAssignmentAction = async (id: string, action: "confirm" | "check-in" | "check-out") => {
-    setSaving(true);
-    setError(null);
-    try {
-      if (action === "confirm") await api.confirmScheduleAssignment(id);
-      if (action === "check-in") await api.checkInScheduleAssignment(id);
-      if (action === "check-out") await api.checkOutScheduleAssignment(id);
-      await loadData();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (!isStaff) {
     return (
       <div className="rounded-lg border border-border bg-surface p-6 text-text">
@@ -617,18 +600,6 @@ export default function StaffSchedulesPage() {
                         {normalizeTime(item.shift?.startTime)}-{normalizeTime(item.shift?.endTime)} tại {item.zone ? displayZoneName(item.zone) : item.zoneId}
                       </p>
                     </div>
-                    <span className="rounded-full bg-primary/15 px-2 py-1 text-caption font-semibold text-primary">{item.status}</span>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button onClick={() => runAssignmentAction(item.id, "confirm")} disabled={saving} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-body-sm text-text hover:bg-bg">
-                      <CheckCircle2 size={15} /> Xác nhận
-                    </button>
-                    <button onClick={() => runAssignmentAction(item.id, "check-in")} disabled={saving} className="inline-flex items-center gap-2 rounded-md bg-success px-3 py-2 text-body-sm font-semibold text-white disabled:opacity-60">
-                      <Clock size={15} /> Check-in
-                    </button>
-                    <button onClick={() => runAssignmentAction(item.id, "check-out")} disabled={saving} className="inline-flex items-center gap-2 rounded-md bg-warning px-3 py-2 text-body-sm font-semibold text-bg disabled:opacity-60">
-                      <Clock size={15} /> Check-out
-                    </button>
                   </div>
                 </div>
               )) : (
