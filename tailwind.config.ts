@@ -10,46 +10,46 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: "#12151E",
+        bg: "rgb(var(--color-bg) / <alpha-value>)",
         surface: {
-          DEFAULT: "#1C2030",
-          2: "#242838",
-          3: "#2C3042",
+          DEFAULT: "rgb(var(--color-surface) / <alpha-value>)",
+          2: "rgb(var(--color-surface-2) / <alpha-value>)",
+          3: "rgb(var(--color-surface-3) / <alpha-value>)",
         },
         primary: {
-          DEFAULT: "#D4A853",
-          dark: "#A88430",
-          dim: "#8A6A28",
+          DEFAULT: "rgb(var(--color-primary) / <alpha-value>)",
+          dark: "rgb(var(--color-primary-dark) / <alpha-value>)",
+          dim: "rgb(var(--color-primary-dim) / <alpha-value>)",
         },
         secondary: {
-          DEFAULT: "#4A8C5C",
-          dark: "#3D7350",
+          DEFAULT: "rgb(var(--color-secondary) / <alpha-value>)",
+          dark: "rgb(var(--color-secondary-dark) / <alpha-value>)",
         },
-        tertiary: "#5B9BD5",
+        tertiary: "rgb(var(--color-tertiary) / <alpha-value>)",
         success: {
-          DEFAULT: "#4A8C5C",
-          bg: "#1A2E1F",
+          DEFAULT: "rgb(var(--color-success) / <alpha-value>)",
+          bg: "rgb(var(--color-success-bg) / <alpha-value>)",
         },
         error: {
-          DEFAULT: "#C44E4E",
-          bg: "#2E1A1A",
+          DEFAULT: "rgb(var(--color-error) / <alpha-value>)",
+          bg: "rgb(var(--color-error-bg) / <alpha-value>)",
         },
         warning: {
-          DEFAULT: "#C49A3C",
-          bg: "#2E2518",
+          DEFAULT: "rgb(var(--color-warning) / <alpha-value>)",
+          bg: "rgb(var(--color-warning-bg) / <alpha-value>)",
         },
         info: {
-          DEFAULT: "#5B9BD5",
-          bg: "#1A2530",
+          DEFAULT: "rgb(var(--color-info) / <alpha-value>)",
+          bg: "rgb(var(--color-info-bg) / <alpha-value>)",
         },
         text: {
-          DEFAULT: "#EDE8DF",
-          2: "#B8B0A4",
-          3: "#7A7368",
+          DEFAULT: "rgb(var(--color-text) / <alpha-value>)",
+          2: "rgb(var(--color-text-2) / <alpha-value>)",
+          3: "rgb(var(--color-text-3) / <alpha-value>)",
         },
         border: {
-          DEFAULT: "#2E3345",
-          2: "#3A4052",
+          DEFAULT: "rgb(var(--color-border) / <alpha-value>)",
+          2: "rgb(var(--color-border-2) / <alpha-value>)",
         },
       },
       fontFamily: {

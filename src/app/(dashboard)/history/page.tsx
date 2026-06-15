@@ -1,16 +1,83 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Grid,
+  InputAdornment,
+  LinearProgress,
+  MenuItem,
+  Paper,
+  Stack,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import SensorsOutlinedIcon from "@mui/icons-material/SensorsOutlined";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import api from "@/lib/api-client";
-import FrequencyChart from "@/components/frequency-chart";
 import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
 
 const PAGE_SIZES = [20, 50, 100];
 
+const CAMERA_LABELS: Record<string, string> = {
+  entry_gate: "Cổng vào",
+  exit_gate: "Cổng ra",
+  kiosk: "Kiosk",
+  web_login: "Đăng nhập web",
+};
+
+function getStatusLabel(status: string) {
+  if (status === "success" || status === "granted") return "Thành công";
+  if (status === "expired") return "Hết hạn";
+  if (status === "spoof") return "Giả mạo";
+  return "Thất bại";
+}
+
+function getStatusColor(status: string): "success" | "warning" | "error" {
+  if (status === "success" || status === "granted") return "success";
+  if (status === "expired") return "warning";
+  return "error";
+}
+
+function mapEventStatus(status: CameraEvent["status"]) {
+  return status === "granted" ? "success" : status;
+}
+
 export default function HistoryPage() {
+  const theme = useTheme();
   const [logs, setLogs] = useState<AccessLogPublic[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(true);
 
   const [search, setSearch] = useState("");
@@ -27,9 +94,10 @@ export default function HistoryPage() {
   const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
   const [freqLoading, setFreqLoading] = useState(false);
 
-  const load = useCallback(async (append = false) => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
+      setError(null);
       const data = await api.getAccessLogs({
         search: search || undefined,
         accessType: accessType || undefined,
@@ -39,12 +107,10 @@ export default function HistoryPage() {
         skip,
         limit,
       });
-      if (append) {
-        setLogs((prev) => [...prev, ...data.items]);
-      } else {
-        setLogs(data.items);
-      }
+      setLogs(data.items);
       setTotal(data.total);
+    } catch {
+      setError("Không thể tải lịch sử ra/vào.");
     } finally {
       setLoading(false);
     }
@@ -69,18 +135,23 @@ export default function HistoryPage() {
 
   const liveCleanup = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (!live) {
-      if (liveCleanup.current) { liveCleanup.current(); liveCleanup.current = null; }
+    if (!live || skip !== 0) {
+      if (liveCleanup.current) {
+        liveCleanup.current();
+        liveCleanup.current = null;
+      }
       return;
     }
-    if (skip !== 0) return;
+
     const cleanup = api.connectAccessSSE((event: CameraEvent) => {
+      const mappedStatus = mapEventStatus(event.status);
       if (search) {
         const q = search.toLowerCase();
         if (!event.full_name?.toLowerCase().includes(q) && !event.student_code?.toLowerCase().includes(q)) return;
       }
-      if (status && event.status !== status) return;
+      if (status && mappedStatus !== status) return;
       if (accessType && event.access_type !== accessType) return;
+
       const newLog: AccessLogPublic = {
         id: `sse-${Date.now()}`,
         patron_id: event.patron_id || null,
@@ -91,233 +162,345 @@ export default function HistoryPage() {
         confidence: event.score || null,
         camera_id: event.camera_id,
         access_time: new Date().toISOString(),
-        status: event.status === "granted" ? "success" : event.status,
+        status: mappedStatus,
       };
-      setLogs((prev) => {
-        const idx = prev.findIndex((l) => l.id.startsWith("sse-"));
-        if (idx >= 0) return [newLog, ...prev.slice(0, idx)];
-        return [newLog, ...prev];
-      });
+      setLogs((prev) => [newLog, ...prev.filter((log) => !log.id.startsWith("sse-")).slice(0, limit - 1)]);
       setTotal((prev) => prev + 1);
     });
     liveCleanup.current = cleanup;
     return cleanup;
-  }, [live, skip, search, status, accessType]);
+  }, [live, skip, search, status, accessType, limit]);
 
-  const handleSearch = () => {
-    setSkip(0);
-    load();
+  const handleFilter = () => {
+    if (skip === 0) {
+      load();
+    } else {
+      setSkip(0);
+    }
   };
 
   const goToPage = (page: number) => {
     setSkip((page - 1) * limit);
   };
 
+  const entryTotal = useMemo(() => frequency.reduce((sum, day) => sum + day.entry, 0), [frequency]);
+  const exitTotal = useMemo(() => frequency.reduce((sum, day) => sum + day.exit, 0), [frequency]);
+
   return (
-    <div className="space-y-4">
-      {/* Filter bar */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-caption text-text-3">Tìm kiếm</label>
-          <input
-            className="input w-44"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="MSSV hoặc tên..."
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-caption text-text-3">Loại</label>
-          <select
-            className="input w-32"
-            value={accessType}
-            onChange={(e) => setAccessType(e.target.value)}
-          >
-            <option value="">Tất cả</option>
-            <option value="entry">Vào</option>
-            <option value="exit">Ra</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-caption text-text-3">Kết quả</label>
-          <select
-            className="input w-36"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="">Tất cả</option>
-            <option value="success">Thành công</option>
-            <option value="failed">Thất bại</option>
-            <option value="expired">Hết hạn</option>
-            <option value="spoof">Giả mạo</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-caption text-text-3">Từ ngày</label>
-          <input
-            type="date"
-            className="input w-40"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-caption text-text-3">Đến ngày</label>
-          <input
-            type="date"
-            className="input w-40"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-          />
-        </div>
-        <button
-          className="btn-primary px-4 py-2.5"
-          onClick={handleSearch}
-          disabled={loading}
+    <Stack spacing={3}>
+      <Paper variant="outlined" sx={{ p: 3 }}>
+        <Stack
+          direction={{ xs: "column", lg: "row" }}
+          spacing={2}
+          sx={{ alignItems: { lg: "center" }, justifyContent: "space-between" }}
         >
-          {loading ? "..." : "Lọc"}
-        </button>
-        <label className="flex items-center gap-2 text-body-sm ml-auto cursor-pointer">
-          <span className="text-text-3">Live</span>
-          <input
-            type="checkbox"
-            className="toggle"
-            checked={live}
-            onChange={(e) => setLive(e.target.checked)}
-          />
-        </label>
-        <span className="text-body-sm text-text-3 ml-auto self-center">Tổng: {total}</span>
-      </div>
+          <Box>
+            <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+              <HistoryOutlinedIcon color="primary" />
+              <Typography variant="h4" sx={{ fontWeight: 850 }}>
+                Lịch sử ra/vào
+              </Typography>
+            </Stack>
+            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+              Tra cứu log theo độc giả, trạng thái, thời gian và theo dõi live từ camera.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+            <Chip color={live ? "success" : "default"} icon={<SensorsOutlinedIcon />} label={live ? "Live đang bật" : "Live đang tắt"} />
+            <Chip label={`Tổng: ${total}`} />
+          </Stack>
+        </Stack>
+      </Paper>
 
-      {/* Frequency chart */}
-      {frequency.length > 0 && (
-        <FrequencyChart data={frequency} loading={freqLoading} />
-      )}
+      <Paper variant="outlined" sx={{ p: 2.5 }}>
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", mb: 2 }}>
+          <FilterAltOutlinedIcon color="disabled" />
+          <Typography variant="h6" sx={{ fontWeight: 850 }}>
+            Bộ lọc
+          </Typography>
+        </Stack>
 
-      <div className="overflow-x-auto border border-border rounded-lg">
-        {loading && logs.length === 0 ? (
-          <div className="p-8 text-center text-text-3 text-body-sm">Đang tải...</div>
-        ) : logs.length === 0 ? (
-          <div className="p-8 text-center text-text-3 text-body-sm">Không có dữ liệu</div>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Thời gian</th>
-                <th>Họ tên</th>
-                <th>MSSV</th>
-                <th>Loại</th>
-                <th>Phương thức</th>
-                <th>Cổng</th>
-                <th>Độ tin cậy</th>
-                <th>Kết quả</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <tr key={log.id}>
-                  <td className="whitespace-nowrap font-mono text-text-3">
-                    {new Date(log.access_time).toLocaleString("vi-VN")}
-                  </td>
-                  <td className="font-medium">{log.patron_name || "-"}</td>
-                  <td className="font-mono text-text-3">{log.student_code || "-"}</td>
-                  <td>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      log.access_type === "entry"
-                        ? "bg-success/15 text-success"
-                        : "bg-warning/15 text-warning"
-                    }`}>
-                      {log.access_type === "entry" ? "Vào" : "Ra"}
-                    </span>
-                  </td>
-                  <td className="text-text-3">{log.verify_method}</td>
-                  <td className="font-mono text-text-3">{log.camera_id}</td>
-                  <td>
-                    {log.confidence != null ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              log.confidence >= 0.8 ? "bg-success" : log.confidence >= 0.6 ? "bg-warning" : "bg-error"
-                            }`}
-                            style={{ width: `${(log.confidence * 100).toFixed(0)}%` }}
-                          />
-                        </div>
-                        <span className="text-caption text-text-3">{(log.confidence * 100).toFixed(0)}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-text-3">-</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      log.status === "success"
-                        ? "bg-success/15 text-success"
-                        : log.status === "expired"
-                        ? "bg-warning/15 text-warning"
-                        : log.status === "spoof"
-                        ? "bg-error/15 text-error"
-                        : "bg-error/15 text-error"
-                    }`}>
-                      {log.status === "success" ? "✓" : log.status === "expired" ? "!" : "✗"} {log.status === "success" ? "Thành công" : log.status === "expired" ? "Hết hạn" : "Thất bại"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+        <Grid container spacing={1.5} sx={{ alignItems: "center" }}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              label="Tìm kiếm"
+              placeholder="MSSV hoặc tên..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleFilter()}
+              fullWidth
+              size="small"
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchOutlinedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 1.7 }}>
+            <TextField select label="Loại" value={accessType} onChange={(event) => setAccessType(event.target.value)} fullWidth size="small">
+              <MenuItem value="">Tất cả</MenuItem>
+              <MenuItem value="entry">Vào</MenuItem>
+              <MenuItem value="exit">Ra</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 1.9 }}>
+            <TextField select label="Kết quả" value={status} onChange={(event) => setStatus(event.target.value)} fullWidth size="small">
+              <MenuItem value="">Tất cả</MenuItem>
+              <MenuItem value="success">Thành công</MenuItem>
+              <MenuItem value="failed">Thất bại</MenuItem>
+              <MenuItem value="expired">Hết hạn</MenuItem>
+              <MenuItem value="spoof">Giả mạo</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 1.8 }}>
+            <TextField
+              label="Từ ngày"
+              type="date"
+              value={dateFrom}
+              onChange={(event) => setDateFrom(event.target.value)}
+              fullWidth
+              size="small"
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 1.8 }}>
+            <TextField
+              label="Đến ngày"
+              type="date"
+              value={dateTo}
+              onChange={(event) => setDateTo(event.target.value)}
+              fullWidth
+              size="small"
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 1.3 }}>
+            <Button variant="contained" onClick={handleFilter} disabled={loading} fullWidth>
+              Lọc
+            </Button>
+          </Grid>
+          <Grid size={{ xs: 12, md: 1.5 }}>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", justifyContent: { xs: "flex-start", md: "flex-end" } }}>
+              <Typography variant="body2" color="text.secondary">Live</Typography>
+              <Switch checked={live} onChange={(event) => setLive(event.target.checked)} />
+            </Stack>
+          </Grid>
+        </Grid>
+      </Paper>
 
-      <div className="flex items-center justify-between text-body-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-text-3">Số dòng:</span>
-          <select
-            className="input py-1.5 w-20"
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
+            <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", mb: 2 }}>
+              <BarChartOutlinedIcon color="disabled" />
+              <Typography variant="h6" sx={{ fontWeight: 850 }}>
+                Tần suất ra/vào theo ngày
+              </Typography>
+            </Stack>
+
+            {freqLoading ? (
+              <Stack sx={{ height: 260, alignItems: "center", justifyContent: "center" }}>
+                <CircularProgress size={28} />
+              </Stack>
+            ) : frequency.length === 0 ? (
+              <Alert severity="info">Chưa có dữ liệu tần suất trong khoảng thời gian đã chọn.</Alert>
+            ) : (
+              <Box sx={{ height: 270 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={frequency} margin={{ top: 8, right: 20, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                    <XAxis
+                      dataKey="date"
+                      fontSize={12}
+                      tick={{ fill: theme.palette.text.secondary }}
+                      tickFormatter={(value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                    />
+                    <YAxis allowDecimals={false} fontSize={12} tick={{ fill: theme.palette.text.secondary }} />
+                    <Tooltip
+                      cursor={{ fill: theme.palette.action.hover }}
+                      contentStyle={{
+                        background: theme.palette.background.paper,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 8,
+                        color: theme.palette.text.primary,
+                      }}
+                      labelFormatter={(value) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", {
+                        weekday: "long",
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      })}
+                    />
+                    <Legend />
+                    <Bar dataKey="entry" fill={theme.palette.success.main} name="Vào" radius={[5, 5, 0, 0]} />
+                    <Bar dataKey="exit" fill={theme.palette.warning.main} name="Ra" radius={[5, 5, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Stack spacing={2} sx={{ height: "100%" }}>
+            <Card variant="outlined" sx={{ flex: 1 }}>
+              <CardContent>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                  <LoginOutlinedIcon color="success" />
+                  <Box>
+                    <Typography color="text.secondary">Lượt vào trong biểu đồ</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 850 }}>{entryTotal}</Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
+            <Card variant="outlined" sx={{ flex: 1 }}>
+              <CardContent>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                  <LogoutOutlinedIcon color="warning" />
+                  <Box>
+                    <Typography color="text.secondary">Lượt ra trong biểu đồ</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 850 }}>{exitTotal}</Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Stack>
+        </Grid>
+      </Grid>
+
+      <Paper variant="outlined" sx={{ overflow: "hidden" }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ p: 2, alignItems: { md: "center" }, justifyContent: "space-between" }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 850 }}>
+              Nhật ký truy cập
+            </Typography>
+            <Typography color="text.secondary" variant="body2">
+              Trang {currentPage} / {totalPages}
+            </Typography>
+          </Box>
+          {error && <Alert severity="error" sx={{ py: 0 }}>{error}</Alert>}
+        </Stack>
+
+        <TableContainer>
+          <Table size="small" sx={{ minWidth: 980 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Thời gian</TableCell>
+                <TableCell>Độc giả</TableCell>
+                <TableCell>MSSV</TableCell>
+                <TableCell>Loại</TableCell>
+                <TableCell>Phương thức</TableCell>
+                <TableCell>Cổng</TableCell>
+                <TableCell>Độ tin cậy</TableCell>
+                <TableCell>Kết quả</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading && logs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8}>
+                    <Stack sx={{ py: 6, alignItems: "center" }}>
+                      <CircularProgress size={28} />
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ) : logs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8}>
+                    <Alert severity="info">Không có dữ liệu lịch sử phù hợp.</Alert>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                logs.map((log) => {
+                  const confidence = log.confidence == null ? null : Math.round(log.confidence * 100);
+                  const statusColor = getStatusColor(log.status);
+                  return (
+                    <TableRow key={log.id} hover>
+                      <TableCell sx={{ whiteSpace: "nowrap", fontFamily: "monospace", color: "text.secondary" }}>
+                        {new Date(log.access_time).toLocaleString("vi-VN")}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>{log.patron_name || "-"}</TableCell>
+                      <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{log.student_code || "-"}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          color={log.access_type === "entry" ? "success" : "warning"}
+                          label={log.access_type === "entry" ? "Vào" : "Ra"}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ color: "text.secondary" }}>{log.verify_method}</TableCell>
+                      <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>
+                        {CAMERA_LABELS[log.camera_id] || log.camera_id}
+                      </TableCell>
+                      <TableCell sx={{ minWidth: 150 }}>
+                        {confidence == null ? (
+                          <Typography color="text.secondary">-</Typography>
+                        ) : (
+                          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={confidence}
+                              color={confidence >= 80 ? "success" : confidence >= 60 ? "warning" : "error"}
+                              sx={{ width: 80, height: 7, borderRadius: 99 }}
+                            />
+                            <Typography variant="caption" color="text.secondary">{confidence}%</Typography>
+                          </Stack>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" color={statusColor} label={getStatusLabel(log.status)} />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}`, alignItems: { sm: "center" }, justifyContent: "space-between" }}
+        >
+          <TextField
+            select
+            label="Số dòng"
             value={limit}
-            onChange={(e) => { setLimit(Number(e.target.value)); setSkip(0); }}
+            onChange={(event) => { setLimit(Number(event.target.value)); setSkip(0); }}
+            size="small"
+            sx={{ width: 120 }}
           >
-            {PAGE_SIZES.map((s) => (
-              <option key={s} value={s}>{s}</option>
+            {PAGE_SIZES.map((size) => (
+              <MenuItem key={size} value={size}>{size}</MenuItem>
             ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            className="btn-ghost px-3 py-1.5"
-            disabled={currentPage <= 1}
-            onClick={() => goToPage(1)}
-          >
-            ««
-          </button>
-          <button
-            className="btn-ghost px-3 py-1.5"
-            disabled={currentPage <= 1}
-            onClick={() => goToPage(currentPage - 1)}
-          >
-            «
-          </button>
-          <span className="px-3 py-1.5 text-text-2">
-            Trang {currentPage} / {totalPages}
-          </span>
-          <button
-            className="btn-ghost px-3 py-1.5"
-            disabled={currentPage >= totalPages}
-            onClick={() => goToPage(currentPage + 1)}
-          >
-            »
-          </button>
-          <button
-            className="btn-ghost px-3 py-1.5"
-            disabled={currentPage >= totalPages}
-            onClick={() => goToPage(totalPages)}
-          >
-            »»
-          </button>
-        </div>
-      </div>
-    </div>
+          </TextField>
+
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Button variant="outlined" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+              Đầu
+            </Button>
+            <Button variant="outlined" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+              Trước
+            </Button>
+            <Typography color="text.secondary" sx={{ px: 1 }}>
+              {currentPage} / {totalPages}
+            </Typography>
+            <Button variant="outlined" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}>
+              Sau
+            </Button>
+            <Button variant="outlined" disabled={currentPage >= totalPages} onClick={() => goToPage(totalPages)}>
+              Cuối
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+    </Stack>
   );
 }
-

@@ -1,23 +1,35 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Grid,
+  InputAdornment,
+  LinearProgress,
+  Paper,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
+import DoorFrontOutlinedIcon from "@mui/icons-material/DoorFrontOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import api from "@/lib/api-client";
 import type { ActivePatron } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { EmptyState } from "@/components/ui/EmptyState";
-import {
-  Clock,
-  DoorOpen,
-  MapPin,
-  RefreshCw,
-  Search,
-  ShieldCheck,
-  UserCheck,
-  Users,
-} from "lucide-react";
 
 const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);
 
@@ -56,6 +68,7 @@ function normalizeQuery(value: string) {
 }
 
 export default function ActivePage() {
+  const theme = useTheme();
   const [patrons, setPatrons] = useState<ActivePatron[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +85,7 @@ export default function ActivePage() {
       setPatrons(allowed);
       setLastUpdate(new Date());
     } catch {
-      setError("Không thể tải danh sách độc giả đang trong thư viện");
+      setError("Không thể tải danh sách độc giả đang trong thư viện.");
     } finally {
       setLoading(false);
     }
@@ -93,185 +106,226 @@ export default function ActivePage() {
     ));
   }, [patrons, search]);
 
-  const cameraCounts = useMemo(() => {
-    return patrons.reduce<Record<string, number>>((acc, patron) => {
+  const cameraCounts = useMemo(() => (
+    patrons.reduce<Record<string, number>>((acc, patron) => {
       acc[patron.camera_id] = (acc[patron.camera_id] || 0) + 1;
       return acc;
-    }, {});
-  }, [patrons]);
+    }, {})
+  ), [patrons]);
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-        <Card variant="elevated" className="overflow-hidden">
-          <CardContent className="p-0">
-            <div className="grid min-h-[180px] grid-cols-1 md:grid-cols-[220px_1fr]">
-              <div className="flex flex-col justify-between bg-success/10 p-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/15 text-success">
-                  <Users size={24} />
-                </div>
-                <div>
-                  <p className="text-label text-success">Đang trong thư viện</p>
-                  <p className="mt-2 text-display-2xl text-text">{patrons.length}</p>
-                </div>
-              </div>
-              <div className="flex flex-col justify-between p-6">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="success" dot>Đang cập nhật</Badge>
-                    <span className="text-caption text-text-3">
-                      Làm mới mỗi 10 giây
+    <Stack spacing={3}>
+      <Paper
+        variant="outlined"
+        sx={{
+          overflow: "hidden",
+          background: `linear-gradient(135deg, ${theme.palette.success.dark}33, ${theme.palette.background.paper} 55%)`,
+        }}
+      >
+        <Grid container>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Box sx={{ p: 3, height: "100%", borderRight: { md: `1px solid ${theme.palette.divider}` } }}>
+              <Stack spacing={2.5} sx={{ height: "100%", justifyContent: "space-between" }}>
+                <Avatar sx={{ bgcolor: "success.main", color: "success.contrastText", width: 52, height: 52 }}>
+                  <GroupsOutlinedIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant="overline" color="success.main" sx={{ fontWeight: 800 }}>
+                    Đang trong thư viện
+                  </Typography>
+                  <Typography variant="h2" sx={{ mt: 0.5, fontWeight: 900, letterSpacing: 0 }}>
+                    {patrons.length}
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Chỉ tính lượt hợp lệ từ cổng vào, cổng ra và kiosk.
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Stack spacing={2.5} sx={{ p: 3 }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ justifyContent: "space-between" }}>
+                <Box>
+                  <Typography variant="h4" sx={{ fontWeight: 850 }}>
+                    Hiện diện trong thư viện
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Theo dõi nhanh độc giả đang ở trong thư viện theo dữ liệu camera/kiosk.
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                  <Chip color={error ? "error" : "success"} label={error ? "Lỗi cập nhật" : "Đang cập nhật"} />
+                  <Tooltip title="Làm mới danh sách">
+                    <span>
+                      <Button
+                        variant="outlined"
+                        startIcon={<RefreshOutlinedIcon />}
+                        onClick={load}
+                        disabled={loading}
+                      >
+                        Làm mới
+                      </Button>
                     </span>
-                  </div>
-                  <h2 className="mt-4 text-heading-xl text-text">Danh sách hiện diện</h2>
-                  <p className="mt-2 max-w-2xl text-body-sm text-text-3">
-                    Chỉ hiển thị độc giả được ghi nhận qua cổng vào, cổng ra hoặc kiosk.
-                  </p>
-                </div>
-                <div className="mt-5 flex flex-wrap items-center gap-3 text-body-sm text-text-2">
-                  <span className="flex items-center gap-2">
-                    <RefreshCw size={14} />
-                    Cập nhật {lastUpdate.toLocaleTimeString("vi-VN")}
-                  </span>
-                  {error && <Badge variant="error">{error}</Badge>}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  </Tooltip>
+                </Stack>
+              </Stack>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck size={18} className="text-text-3" />
-              Nguồn ghi nhận
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={load}
-              disabled={loading}
-              title="Làm mới"
-            >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            </Button>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-3">
-            {Object.entries(CAMERA_LABELS).map(([cameraId, label]) => (
-              <div key={cameraId} className="rounded-lg border border-border bg-surface-2 p-3">
-                <p className="text-caption text-text-3">{label}</p>
-                <p className="mt-1 text-heading-lg text-text">{cameraCounts[cameraId] || 0}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
+              {error && <Alert severity="error">{error}</Alert>}
 
-      <Card>
-        <CardHeader className="items-start gap-4 md:items-center">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <UserCheck size={18} className="text-text-3" />
+              <Grid container spacing={1.5}>
+                {Object.entries(CAMERA_LABELS).map(([cameraId, label]) => (
+                  <Grid key={cameraId} size={{ xs: 12, sm: 4 }}>
+                    <Card variant="outlined" sx={{ height: "100%" }}>
+                      <CardContent>
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                          <Avatar sx={{ bgcolor: "action.hover", color: "text.secondary" }}>
+                            <ShieldOutlinedIcon fontSize="small" />
+                          </Avatar>
+                          <Box>
+                            <Typography color="text.secondary" variant="body2">
+                              {label}
+                            </Typography>
+                            <Typography variant="h5" sx={{ fontWeight: 850 }}>
+                              {cameraCounts[cameraId] || 0}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+
+              <Typography variant="caption" color="text.secondary">
+                Cập nhật lần cuối: {lastUpdate.toLocaleTimeString("vi-VN")}
+              </Typography>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 2.5 }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          sx={{ alignItems: { md: "center" }, justifyContent: "space-between", mb: 2.5 }}
+        >
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 850 }}>
               Độc giả đang có mặt
-            </CardTitle>
-            <p className="mt-1 text-body-sm text-text-3">
+            </Typography>
+            <Typography color="text.secondary" variant="body2">
               {filteredPatrons.length} kết quả hiển thị
-            </p>
-          </div>
-          <div className="w-full md:max-w-sm">
-            <Input
-              placeholder="Tìm theo tên hoặc MSSV..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              icon={<Search size={16} />}
-            />
-          </div>
-        </CardHeader>
+            </Typography>
+          </Box>
+          <TextField
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm theo tên hoặc MSSV..."
+            size="small"
+            sx={{ width: { xs: "100%", md: 360 } }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchOutlinedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+        </Stack>
 
-        <CardContent>
-          {loading && patrons.length === 0 ? (
-            <div className="flex min-h-[280px] items-center justify-center">
-              <div className="flex flex-col items-center gap-3">
-                <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                <p className="text-body-sm text-text-3">Đang tải danh sách...</p>
-              </div>
-            </div>
-          ) : patrons.length === 0 ? (
-            <div className="py-12">
-              <EmptyState
-                icon={<DoorOpen size={24} />}
-                title="Chưa có độc giả trong thư viện"
-                description="Danh sách sẽ tự cập nhật khi có lượt vào hợp lệ từ cổng hoặc kiosk."
-              />
-            </div>
-          ) : filteredPatrons.length === 0 ? (
-            <div className="py-12">
-              <EmptyState
-                icon={<Search size={24} />}
-                title="Không tìm thấy độc giả"
-                description="Thử tìm bằng MSSV hoặc một phần họ tên khác."
-              />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              {filteredPatrons.map((patron) => (
-                <div
-                  key={patron.id}
-                  className="group rounded-lg border border-border bg-surface-2 p-4 transition-colors hover:border-success/40"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-body-lg font-bold text-primary">
-                      {initials(patron.full_name)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-body-md font-semibold text-text">
-                            {patron.full_name || "Chưa có tên"}
-                          </p>
-                          <p className="mt-0.5 font-mono text-caption text-text-3">
-                            {patron.student_code}
-                          </p>
-                        </div>
-                        <Badge variant="success" dot>Đang ở trong</Badge>
-                      </div>
+        {loading && patrons.length === 0 ? (
+          <Stack spacing={2} sx={{ minHeight: 280, alignItems: "center", justifyContent: "center" }}>
+            <CircularProgress size={32} />
+            <Typography color="text.secondary">Đang tải danh sách...</Typography>
+          </Stack>
+        ) : patrons.length === 0 ? (
+          <Alert icon={<DoorFrontOutlinedIcon />} severity="info">
+            Chưa có độc giả trong thư viện. Danh sách sẽ tự cập nhật khi có lượt vào hợp lệ.
+          </Alert>
+        ) : filteredPatrons.length === 0 ? (
+          <Alert icon={<SearchOutlinedIcon />} severity="warning">
+            Không tìm thấy độc giả phù hợp với từ khóa hiện tại.
+          </Alert>
+        ) : (
+          <Grid container spacing={1.5}>
+            {filteredPatrons.map((patron) => {
+              const percent = patron.confidence == null ? null : Math.round(patron.confidence * 100);
+              return (
+                <Grid key={patron.id} size={{ xs: 12, xl: 6 }}>
+                  <Card variant="outlined" sx={{ height: "100%" }}>
+                    <CardContent>
+                      <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start" }}>
+                        <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 800 }}>
+                          {initials(patron.full_name)}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1}
+                            sx={{ justifyContent: "space-between", alignItems: { sm: "flex-start" } }}
+                          >
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography noWrap sx={{ fontWeight: 800 }}>
+                                {patron.full_name || "Chưa có tên"}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+                                {patron.student_code}
+                              </Typography>
+                            </Box>
+                            <Chip color="success" label="Đang ở trong" size="small" />
+                          </Stack>
 
-                      <div className="mt-4 grid gap-3 text-body-sm text-text-2 sm:grid-cols-3">
-                        <span className="flex items-center gap-2">
-                          <Clock size={14} className="shrink-0 text-text-3" />
-                          {formatTime(patron.entered_at)}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <MapPin size={14} className="shrink-0 text-text-3" />
-                          {CAMERA_LABELS[patron.camera_id] || patron.camera_id}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <UserCheck size={14} className="shrink-0 text-text-3" />
-                          {formatDuration(patron.entered_at)}
-                        </span>
-                      </div>
+                          <Grid container spacing={1.5} sx={{ mt: 2 }}>
+                            <Grid size={{ xs: 12, sm: 4 }}>
+                              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                                <AccessTimeOutlinedIcon color="disabled" fontSize="small" />
+                                <Typography variant="body2">{formatTime(patron.entered_at)}</Typography>
+                              </Stack>
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}>
+                              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                                <LocationOnOutlinedIcon color="disabled" fontSize="small" />
+                                <Typography variant="body2">
+                                  {CAMERA_LABELS[patron.camera_id] || patron.camera_id}
+                                </Typography>
+                              </Stack>
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}>
+                              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                                <VerifiedUserOutlinedIcon color="disabled" fontSize="small" />
+                                <Typography variant="body2">{formatDuration(patron.entered_at)}</Typography>
+                              </Stack>
+                            </Grid>
+                          </Grid>
 
-                      {patron.confidence != null && (
-                        <div className="mt-4 flex items-center gap-3">
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
-                            <div
-                              className="h-full rounded-full bg-success"
-                              style={{ width: `${Math.round(patron.confidence * 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-caption font-medium text-success">
-                            {Math.round(patron.confidence * 100)}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                          {percent != null && (
+                            <Stack direction="row" spacing={1.5} sx={{ mt: 2, alignItems: "center" }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={percent}
+                                color={percent >= 80 ? "success" : percent >= 60 ? "warning" : "error"}
+                                sx={{ flex: 1, height: 7, borderRadius: 99 }}
+                              />
+                              <Typography variant="caption" color="text.secondary" sx={{ minWidth: 38, textAlign: "right" }}>
+                                {percent}%
+                              </Typography>
+                            </Stack>
+                          )}
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        )}
+      </Paper>
+    </Stack>
   );
 }

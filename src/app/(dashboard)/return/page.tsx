@@ -1,28 +1,46 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import api, { getErrorMessage } from "@/lib/api-client";
-import type {
-  BorrowRecord,
-  StaffActiveBorrowerSummary,
-  StaffPatronActiveBorrowsResponse,
-} from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { EmptyState } from "@/components/ui/EmptyState";
 import {
-  AlertTriangle,
-  BookCheck,
-  BookOpen,
-  CheckCircle,
-  Clock,
-  RefreshCw,
-  Search,
-  UserRound,
-  Users,
-} from "lucide-react";
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Divider,
+  InputAdornment,
+  List,
+  ListItemButton,
+  Paper,
+  Snackbar,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from "@mui/material";
+import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SearchIcon from "@mui/icons-material/Search";
+import UsersIcon from "@mui/icons-material/GroupsOutlined";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
 
 type BorrowerFilter = "all" | "overdue" | "active";
 
@@ -43,15 +61,15 @@ function formatDate(value?: string) {
   return new Date(value).toLocaleDateString("vi-VN");
 }
 
-function dueBadge(record: BorrowRecord) {
-  const left = daysUntil(record.due_at);
-  if (left < 0) return <Badge variant="error" dot>Quá hạn {Math.abs(left)} ngày</Badge>;
-  if (left <= 2) return <Badge variant="warning" dot>Sắp đến hạn</Badge>;
-  return <Badge variant="success" dot>Đúng hạn</Badge>;
-}
-
 function borrowerName(borrower: StaffActiveBorrowerSummary) {
   return borrower.patron.full_name || borrower.patron.student_code || "Không rõ tên";
+}
+
+function dueChip(record: BorrowRecord) {
+  const left = daysUntil(record.due_at);
+  if (left < 0) return <Chip size="small" color="error" label={`Quá hạn ${Math.abs(left)} ngày`} />;
+  if (left <= 2) return <Chip size="small" color="warning" label="Sắp đến hạn" />;
+  return <Chip size="small" color="success" label="Đúng hạn" />;
 }
 
 export default function ReturnPage() {
@@ -63,8 +81,9 @@ export default function ReturnPage() {
   const [loadingBorrowers, setLoadingBorrowers] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [returningId, setReturningId] = useState<string | null>(null);
+  const [confirmRecord, setConfirmRecord] = useState<BorrowRecord | null>(null);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error"; message: string } | null>(null);
 
   const loadBorrowers = useCallback(async () => {
     setLoadingBorrowers(true);
@@ -102,11 +121,8 @@ export default function ReturnPage() {
   }, [loadBorrowers]);
 
   useEffect(() => {
-    if (selectedStudentCode) {
-      loadPatronDetail(selectedStudentCode);
-    } else {
-      setDetail(null);
-    }
+    if (selectedStudentCode) loadPatronDetail(selectedStudentCode);
+    else setDetail(null);
   }, [selectedStudentCode, loadPatronDetail]);
 
   const filteredBorrowers = useMemo(() => {
@@ -115,294 +131,233 @@ export default function ReturnPage() {
       const matchesSearch = !q
         || borrower.patron.student_code.toLowerCase().includes(q)
         || (borrower.patron.full_name || "").toLowerCase().includes(q);
-      const matchesFilter =
-        filter === "all"
+      const matchesFilter = filter === "all"
         || (filter === "overdue" && borrower.overdue_count > 0)
         || (filter === "active" && borrower.overdue_count === 0);
       return matchesSearch && matchesFilter;
     });
   }, [borrowers, filter, search]);
 
-  const totals = useMemo(() => {
-    return {
-      borrowers: borrowers.length,
-      books: borrowers.reduce((sum, item) => sum + item.total_borrowed, 0),
-      overdue: borrowers.reduce((sum, item) => sum + item.overdue_count, 0),
-    };
-  }, [borrowers]);
+  const totals = useMemo(() => ({
+    borrowers: borrowers.length,
+    books: borrowers.reduce((sum, item) => sum + item.total_borrowed, 0),
+    overdue: borrowers.reduce((sum, item) => sum + item.overdue_count, 0),
+  }), [borrowers]);
 
   const selectedBorrower = useMemo(
     () => borrowers.find((item) => item.patron.student_code === selectedStudentCode) ?? null,
     [borrowers, selectedStudentCode],
   );
 
-  const handleReturnRecord = async (record: BorrowRecord) => {
-    setReturningId(record.id);
-    setResult(null);
+  const handleReturnRecord = async () => {
+    if (!confirmRecord) return;
+    setReturningId(confirmRecord.id);
     setError("");
     try {
-      await api.staffReturnBorrowRecord(record.id);
-      setResult({ success: true, message: "Trả sách thành công" });
+      await api.staffReturnBorrowRecord(confirmRecord.id);
+      setSnackbar({ severity: "success", message: "Trả sách thành công" });
+      setConfirmRecord(null);
       await loadBorrowers();
-      if (selectedStudentCode) {
-        await loadPatronDetail(selectedStudentCode);
-      }
+      if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
     } catch (err: any) {
-      setResult({ success: false, message: getErrorMessage(err) || "Trả sách thất bại" });
+      setSnackbar({ severity: "error", message: getErrorMessage(err) || "Trả sách thất bại" });
     } finally {
       setReturningId(null);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card accent="primary">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-label">Độc giả đang mượn</p>
-              <p className="text-display-xl text-text">{totals.borrowers}</p>
-            </div>
-            <Users className="text-primary" size={24} />
-          </div>
-        </Card>
-        <Card accent="success">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-label">Sách chưa trả</p>
-              <p className="text-display-xl text-text">{totals.books}</p>
-            </div>
-            <BookOpen className="text-success" size={24} />
-          </div>
-        </Card>
-        <Card accent="error">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-label">Sách quá hạn</p>
-              <p className="text-display-xl text-text">{totals.overdue}</p>
-            </div>
-            <AlertTriangle className="text-error" size={24} />
-          </div>
-        </Card>
-      </div>
+    <Stack spacing={3}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 2 }}>
+        {[
+          { label: "Độc giả đang mượn", value: totals.borrowers, icon: UsersIcon, color: "primary.main" },
+          { label: "Sách chưa trả", value: totals.books, icon: BookIcon, color: "success.main" },
+          { label: "Sách quá hạn", value: totals.overdue, icon: AlertIcon, color: "error.main" },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <Card key={item.label} variant="outlined">
+              <CardContent>
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>{item.label}</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 900 }}>{item.value}</Typography>
+                  </Box>
+                  <Avatar sx={{ bgcolor: item.color, color: "primary.contrastText" }}>
+                    <Icon />
+                  </Avatar>
+                </Stack>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </Box>
 
-      {error ? (
-        <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-body-sm text-error">
-          {error}
-        </div>
-      ) : null}
+      {error ? <Alert severity="error" onClose={() => setError("")}>{error}</Alert> : null}
 
-      {result ? (
-        <div className={`rounded-lg border px-4 py-3 text-body-sm ${
-          result.success ? "border-success/30 bg-success/10 text-success" : "border-error/30 bg-error/10 text-error"
-        }`}>
-          <div className="flex items-center gap-2">
-            {result.success ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
-            <span>{result.message}</span>
-          </div>
-        </div>
-      ) : null}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", xl: "420px minmax(0, 1fr)" }, gap: 3 }}>
+        <Paper variant="outlined" sx={{ minHeight: 620, p: 2 }}>
+          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
+            <Box>
+              <Typography variant="h6">Độc giả đang mượn</Typography>
+              <Typography variant="body2" color="text.secondary">Chọn độc giả để xem sách cần trả</Typography>
+            </Box>
+            <Button startIcon={<RefreshIcon />} onClick={loadBorrowers} disabled={loadingBorrowers}>Tải lại</Button>
+          </Stack>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
-        <Card className="min-h-[620px]">
-          <CardHeader>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Users size={17} className="text-text-3" />
-                Độc giả đang mượn
-              </CardTitle>
-              <p className="mt-1 text-body-sm text-text-3">Chọn độc giả để xem sách cần trả</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={loadBorrowers}
-              disabled={loadingBorrowers}
-              title="Tải lại"
-            >
-              <RefreshCw size={16} className={loadingBorrowers ? "animate-spin" : ""} />
-            </Button>
-          </CardHeader>
+          <TextField
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm theo MSSV hoặc tên..."
+            fullWidth
+            size="small"
+            slotProps={{
+              input: {
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+              },
+            }}
+          />
 
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Tìm theo MSSV hoặc tên..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              icon={<Search size={16} />}
-            />
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            value={filter}
+            onChange={(_, value) => value && setFilter(value)}
+            sx={{ mt: 2 }}
+          >
+            <ToggleButton value="all">Tất cả</ToggleButton>
+            <ToggleButton value="overdue">Quá hạn</ToggleButton>
+            <ToggleButton value="active">Đúng hạn</ToggleButton>
+          </ToggleButtonGroup>
 
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: "all", label: "Tất cả" },
-                { value: "overdue", label: "Quá hạn" },
-                { value: "active", label: "Đang mượn" },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => setFilter(item.value as BorrowerFilter)}
-                  className={`rounded-md border px-3 py-2 text-body-sm font-medium transition-colors ${
-                    filter === item.value
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border bg-surface-2 text-text-2 hover:text-text"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+          <Divider sx={{ my: 2 }} />
 
-            {loadingBorrowers ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              </div>
-            ) : borrowers.length === 0 ? (
-              <EmptyState
-                icon={<BookCheck size={24} />}
-                title="Không có độc giả đang mượn sách"
-                description="Tất cả sách đã được trả hoặc chưa có phiếu mượn đang hoạt động."
-              />
-            ) : filteredBorrowers.length === 0 ? (
-              <EmptyState
-                icon={<Search size={24} />}
-                title="Không tìm thấy độc giả phù hợp"
-                description="Thử đổi từ khóa tìm kiếm hoặc bộ lọc."
-              />
-            ) : (
-              <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">
-                {filteredBorrowers.map((borrower) => {
-                  const selected = borrower.patron.student_code === selectedStudentCode;
-                  return (
-                    <button
-                      key={borrower.patron.id}
-                      onClick={() => {
-                        setSelectedStudentCode(borrower.patron.student_code);
-                        setResult(null);
-                      }}
-                      className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                        selected
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-surface-2/60 hover:border-primary/40 hover:bg-surface-2"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-body-sm font-semibold text-text">{borrowerName(borrower)}</p>
-                          <p className="mt-1 font-mono text-caption text-text-3">{borrower.patron.student_code}</p>
-                        </div>
-                        {borrower.overdue_count > 0 ? (
-                          <Badge variant="error">{borrower.overdue_count} quá hạn</Badge>
-                        ) : (
-                          <Badge variant="success">Đúng hạn</Badge>
-                        )}
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-caption text-text-3">
-                        <span>{borrower.total_borrowed} sách đang mượn</span>
-                        <span className="text-right">Hạn gần nhất {formatDate(borrower.nearest_due_at)}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {loadingBorrowers ? (
+            <Box sx={{ py: 8, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+          ) : borrowers.length === 0 ? (
+            <Alert severity="info">Không có độc giả đang mượn sách.</Alert>
+          ) : filteredBorrowers.length === 0 ? (
+            <Alert severity="info">Không tìm thấy độc giả phù hợp.</Alert>
+          ) : (
+            <List disablePadding sx={{ maxHeight: 430, overflowY: "auto" }}>
+              {filteredBorrowers.map((borrower) => {
+                const selected = borrower.patron.student_code === selectedStudentCode;
+                return (
+                  <ListItemButton
+                    key={borrower.patron.id}
+                    selected={selected}
+                    onClick={() => setSelectedStudentCode(borrower.patron.student_code)}
+                    sx={{ mb: 1, border: 1, borderColor: selected ? "primary.main" : "divider", borderRadius: 1 }}
+                  >
+                    <Box sx={{ minWidth: 0, flex: 1, pr: 1 }}>
+                      <Typography sx={{ fontWeight: 900 }} noWrap>{borrowerName(borrower)}</Typography>
+                      <Typography variant="caption" sx={{ display: "block", mt: 0.5, fontFamily: "monospace" }}>
+                        {borrower.patron.student_code}
+                      </Typography>
+                      <Stack direction="row" spacing={1} sx={{ mt: 0.75, alignItems: "center", justifyContent: "space-between" }}>
+                        <Typography variant="caption" color="text.secondary">{borrower.total_borrowed} sách đang mượn</Typography>
+                        <Typography variant="caption" color="text.secondary">Hạn gần nhất {formatDate(borrower.nearest_due_at)}</Typography>
+                      </Stack>
+                    </Box>
+                    <Chip
+                      size="small"
+                      color={borrower.overdue_count > 0 ? "error" : "success"}
+                      label={borrower.overdue_count > 0 ? `${borrower.overdue_count} quá hạn` : "Đúng hạn"}
+                    />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          )}
+        </Paper>
 
-        <Card className="min-h-[620px]">
-          <CardHeader>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <UserRound size={17} className="text-text-3" />
-                Chi tiết trả sách
-              </CardTitle>
-              <p className="mt-1 text-body-sm text-text-3">
-                {selectedBorrower ? `${borrowerName(selectedBorrower)} - ${selectedBorrower.patron.student_code}` : "Chọn một độc giả ở danh sách bên trái"}
-              </p>
-            </div>
-          </CardHeader>
+        <Paper variant="outlined" sx={{ minHeight: 620, p: 2 }}>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6">Chi tiết trả sách</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {selectedBorrower ? `${borrowerName(selectedBorrower)} - ${selectedBorrower.patron.student_code}` : "Chọn một độc giả ở danh sách bên trái"}
+            </Typography>
+          </Box>
 
-          <CardContent>
-            {!selectedStudentCode ? (
-              <EmptyState
-                icon={<UserRound size={24} />}
-                title="Chưa chọn độc giả"
-                description="Chọn một độc giả đang mượn để xem sách và xác nhận trả."
-                className="min-h-[420px]"
-              />
-            ) : loadingDetail ? (
-              <div className="flex min-h-[420px] items-center justify-center">
-                <div className="h-9 w-9 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              </div>
-            ) : !detail || detail.records.length === 0 ? (
-              <EmptyState
-                icon={<BookCheck size={24} />}
-                title="Đã trả hết sách"
-                description="Độc giả này không còn sách đang mượn."
-                className="min-h-[420px]"
-              />
-            ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
-                  <Badge variant="primary">{detail.total} sách đang mượn</Badge>
-                  {detail.overdue_count > 0 ? (
-                    <Badge variant="error">{detail.overdue_count} quá hạn</Badge>
-                  ) : (
-                    <Badge variant="success">Không quá hạn</Badge>
-                  )}
-                  {detail.patron.email ? <span className="text-body-sm text-text-3">{detail.patron.email}</span> : null}
-                </div>
+          {!selectedStudentCode ? (
+            <Alert severity="info">Chọn một độc giả đang mượn để xem sách và xác nhận trả.</Alert>
+          ) : loadingDetail ? (
+            <Box sx={{ minHeight: 420, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+          ) : !detail || detail.records.length === 0 ? (
+            <Alert severity="success">Độc giả này đã trả hết sách.</Alert>
+          ) : (
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                <Chip color="primary" label={`${detail.total} sách đang mượn`} />
+                <Chip color={detail.overdue_count > 0 ? "error" : "success"} label={detail.overdue_count > 0 ? `${detail.overdue_count} quá hạn` : "Không quá hạn"} />
+                {detail.patron.email ? <Chip variant="outlined" label={detail.patron.email} /> : null}
+              </Stack>
 
-                {detail.records.map((record) => {
-                  const overdue = isOverdue(record);
-                  const book = record.book;
-                  return (
-                    <div
-                      key={record.id}
-                      className={`rounded-lg border p-4 ${
-                        overdue ? "border-error/40 bg-error/5" : "border-border bg-surface-2/50"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {dueBadge(record)}
-                            <span className="font-mono text-caption text-text-3">{book?.isbn || record.book_id}</span>
-                          </div>
-                          <h3 className="mt-2 text-heading-md text-text">
-                            {book?.title || record.book_id}
-                          </h3>
-                          {book?.author ? (
-                            <p className="mt-1 text-body-sm text-text-3">{book.author}</p>
-                          ) : null}
-                          <div className="mt-3 grid grid-cols-1 gap-2 text-body-sm text-text-3 sm:grid-cols-3">
-                            <span className="flex items-center gap-1.5">
-                              <Clock size={14} />
-                              Mượn {formatDate(record.borrow_at)}
-                            </span>
-                            <span className={overdue ? "font-semibold text-error" : ""}>
-                              Hạn {formatDate(record.due_at)}
-                            </span>
-                            <span>Kệ {record.shelf_location || book?.shelf_location || "-"}</span>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => handleReturnRecord(record)}
-                          loading={returningId === record.id}
-                          disabled={!!returningId}
-                          icon={<CheckCircle size={16} />}
-                          className="shrink-0"
-                        >
-                          Xác nhận trả
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Sách</TableCell>
+                      <TableCell>ISBN</TableCell>
+                      <TableCell>Ngày mượn</TableCell>
+                      <TableCell>Hạn trả</TableCell>
+                      <TableCell>Vị trí</TableCell>
+                      <TableCell>Trạng thái</TableCell>
+                      <TableCell align="right">Thao tác</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {detail.records.map((record) => (
+                      <TableRow key={record.id} selected={isOverdue(record)}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{record.book?.title || record.book_id}</Typography>
+                          {record.book?.author ? <Typography variant="caption" color="text.secondary">{record.book.author}</Typography> : null}
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: "monospace" }}>{record.book?.isbn || record.book_id}</TableCell>
+                        <TableCell>{formatDate(record.borrow_at)}</TableCell>
+                        <TableCell>{formatDate(record.due_at)}</TableCell>
+                        <TableCell>{record.shelf_location || record.book?.shelf_location || "-"}</TableCell>
+                        <TableCell>{dueChip(record)}</TableCell>
+                        <TableCell align="right">
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<CheckIcon />}
+                            disabled={!!returningId}
+                            onClick={() => setConfirmRecord(record)}
+                          >
+                            Xác nhận trả
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Stack>
+          )}
+        </Paper>
+      </Box>
+
+      <Dialog open={!!confirmRecord} onClose={() => setConfirmRecord(null)}>
+        <DialogTitle>Xác nhận trả sách</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Trả sách "{confirmRecord?.book?.title || confirmRecord?.book_id}" cho độc giả {detail?.patron.full_name || detail?.patron.student_code}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmRecord(null)}>Hủy</Button>
+          <Button variant="contained" onClick={handleReturnRecord} disabled={!!returningId}>
+            {returningId ? "Đang trả..." : "Xác nhận trả"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)}>
+        {snackbar ? <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>{snackbar.message}</Alert> : undefined}
+      </Snackbar>
+    </Stack>
   );
 }

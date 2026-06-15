@@ -1,12 +1,25 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { CheckCircle, AlertCircle, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Divider,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
+import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
+import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 
 export default function EnrollPage() {
   const [consent, setConsent] = useState(false);
@@ -14,7 +27,6 @@ export default function EnrollPage() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
-
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -31,22 +43,18 @@ export default function EnrollPage() {
         if (data.status === "SUCCESS") {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           const inner = data.result;
-          if (inner?.status === "error") {
-            setError(inner.error || "Enrollment failed");
-            setResult(inner);
-          } else {
-            setResult(inner);
-          }
+          if (inner?.status === "error") setError(inner.error || "Đăng ký thất bại.");
+          setResult(inner);
           setIsLoading(false);
         } else if (data.status === "FAILURE") {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          setError(data.result?.error || "Enrollment failed");
+          setError(data.result?.error || "Đăng ký thất bại.");
           setResult(data.result);
           setIsLoading(false);
         }
       } catch {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        setError("Failed to poll task status");
+        setError("Không thể lấy trạng thái tác vụ.");
         setIsLoading(false);
       }
     }, 2000);
@@ -62,7 +70,7 @@ export default function EnrollPage() {
       setJobId(data.job_id);
       await pollForResult(data.job_id);
     } catch (err: any) {
-      setError(getErrorMessage(err) || "Multi-angle enrollment failed");
+      setError(getErrorMessage(err) || "Đăng ký nhiều góc thất bại.");
       setIsLoading(false);
     }
   };
@@ -75,81 +83,72 @@ export default function EnrollPage() {
     setIsLoading(false);
   };
 
-  const failedCount = result?.results?.filter((r: any) => r.status !== "success").length || 0;
+  const failedCount = result?.results?.filter((item: any) => item.status !== "success").length || 0;
+  const success = result && result.status !== "error";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {error && (
-        <div className="p-4 bg-error/10 border border-error/20 rounded-lg flex items-center gap-3 text-error">
-          <AlertCircle size={18} />
-          {error}
-        </div>
-      )}
+    <Stack spacing={3} sx={{ maxWidth: 920, mx: "auto" }}>
+      <Paper variant="outlined" sx={{ p: 3 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+          <FaceRetouchingNaturalOutlinedIcon color="primary" />
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 850 }}>Đăng ký khuôn mặt</Typography>
+            <Typography color="text.secondary">Chụp đủ 4 góc để hệ thống tạo hồ sơ nhận diện ổn định hơn.</Typography>
+          </Box>
+        </Stack>
+      </Paper>
+
+      {error && <Alert icon={<ErrorOutlineOutlinedIcon />} severity="error">{error}</Alert>}
 
       {result ? (
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                result.status === "error" ? "bg-error/15" : "bg-success/15"
-              }`}>
-                {result.status === "error" ? (
-                  <AlertCircle size={24} className="text-error" />
-                ) : (
-                  <CheckCircle size={24} className="text-success" />
-                )}
-              </div>
-              <div>
-                <h2 className="text-heading-lg text-text">
-                  {result.status === "error" ? "Đăng ký thất bại một phần" : "Đăng ký thành công!"}
-                </h2>
-                <p className="text-body-sm text-text-3 mt-0.5">
-                  {result.status === "error"
-                    ? `${failedCount} góc ảnh thất bại.`
-                    : "Khuôn mặt của bạn đã được đăng ký thành công."}
-                </p>
-              </div>
-            </div>
+        <Card variant="outlined">
+          <CardContent>
+            <Stack spacing={2.5}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                {success ? <CheckCircleOutlineOutlinedIcon color="success" sx={{ fontSize: 44 }} /> : <ErrorOutlineOutlinedIcon color="error" sx={{ fontSize: 44 }} />}
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 850 }}>
+                    {success ? "Đăng ký thành công" : "Đăng ký thất bại một phần"}
+                  </Typography>
+                  <Typography color="text.secondary">
+                    {success ? "Khuôn mặt đã được ghi nhận vào hệ thống." : `${failedCount} góc ảnh chưa đạt yêu cầu.`}
+                  </Typography>
+                </Box>
+              </Stack>
 
-            {result.results && (
-              <div className="border-t border-border pt-4 space-y-2">
-                <p className="text-caption text-text-3 uppercase tracking-wide">Kết quả từng góc</p>
-                {result.results.map((r: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-                    <span className="text-body-sm text-text-2 capitalize">{r.angle}</span>
-                    <Badge variant={r.status === "success" ? "success" : "error"} dot>
-                      {r.status === "success" ? "Thành công" : "Thất bại"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
+              {result.results && (
+                <>
+                  <Divider />
+                  <Stack spacing={1}>
+                    <Typography variant="overline" color="text.secondary">Kết quả từng góc</Typography>
+                    {result.results.map((item: any, index: number) => (
+                      <Stack key={`${item.angle}-${index}`} direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <Typography sx={{ textTransform: "capitalize" }}>{item.angle}</Typography>
+                        <Chip size="small" color={item.status === "success" ? "success" : "error"} label={item.status === "success" ? "Thành công" : "Thất bại"} />
+                      </Stack>
+                    ))}
+                  </Stack>
+                </>
+              )}
 
-            <Button onClick={handleReset} icon={<RotateCcw size={16} />}>
-              {result.status === "error" ? "Thử lại" : "Đăng ký thêm"}
-            </Button>
+              <Button variant="contained" startIcon={<RestartAltOutlinedIcon />} onClick={handleReset} sx={{ alignSelf: "flex-start" }}>
+                {success ? "Đăng ký thêm" : "Thử lại"}
+              </Button>
+            </Stack>
           </CardContent>
         </Card>
-      ) : jobId && !result ? (
-        <Card>
-          <CardContent className="p-8 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
-            <div>
-              <h2 className="text-heading-md text-text">Đang xử lý...</h2>
-              <p className="text-body-sm text-text-3 font-mono mt-1">Job ID: {jobId}</p>
-            </div>
-          </CardContent>
-        </Card>
+      ) : jobId ? (
+        <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
+          <CircularProgress />
+          <Typography variant="h6" sx={{ mt: 2, fontWeight: 800 }}>Đang xử lý...</Typography>
+          <Typography color="text.secondary" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>Job ID: {jobId}</Typography>
+        </Paper>
       ) : (
-        <Card padding="none">
-          <CardContent className="p-6 space-y-6">
-            <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleFilesReady} />
-            {isLoading && (
-              <div className="text-center text-body-sm text-text-3">Đang gửi đăng ký...</div>
-            )}
-          </CardContent>
-        </Card>
+        <Paper variant="outlined" sx={{ p: 2.5 }}>
+          <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleFilesReady} />
+          {isLoading && <Alert severity="info" sx={{ mt: 2 }}>Đang gửi dữ liệu đăng ký...</Alert>}
+        </Paper>
       )}
-    </div>
+    </Stack>
   );
 }

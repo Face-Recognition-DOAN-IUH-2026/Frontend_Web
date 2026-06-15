@@ -1,8 +1,19 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, Upload, RefreshCw } from "lucide-react";
-import Button from "@/components/ui/Button";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import AddAPhotoOutlinedIcon from "@mui/icons-material/AddAPhotoOutlined";
+import CameraswitchOutlinedIcon from "@mui/icons-material/CameraswitchOutlined";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 
 export default function CameraCapture({
   onCapture,
@@ -10,19 +21,27 @@ export default function CameraCapture({
   onCapture: (file: File, dataUrl: string) => void;
 }) {
   const [image, setImage] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [error, setError] = useState<string>("");
   const [cameraReady, setCameraReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraOn(false);
+    setCameraReady(false);
+  }, []);
 
   const startCamera = useCallback(async () => {
     try {
       setError("");
       setCameraReady(false);
-      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 640, min: 320 }, height: { ideal: 480, min: 240 } },
         audio: false,
@@ -30,12 +49,12 @@ export default function CameraCapture({
       streamRef.current = stream;
       setIsCameraOn(true);
     } catch (err: any) {
-      if (err.name === "NotAllowedError") setError("Không có quyền truy cập camera.");
+      if (err.name === "NotAllowedError") setError("Không có quyền truy cập camera. Hãy cấp quyền camera cho trình duyệt rồi thử lại.");
       else if (err.name === "NotFoundError") setError("Không tìm thấy camera trên thiết bị.");
       else setError("Không thể khởi động camera.");
       setIsCameraOn(false);
     }
-  }, []);
+  }, [stopCamera]);
 
   useEffect(() => {
     if (!isCameraOn || !videoRef.current || !streamRef.current) return;
@@ -43,7 +62,7 @@ export default function CameraCapture({
     const onReady = () => setCameraReady(true);
     video.onloadedmetadata = onReady;
     video.onplaying = onReady;
-    video.onerror = () => setError("Lỗi camera");
+    video.onerror = () => setError("Camera gặp lỗi khi phát hình.");
     video.srcObject = streamRef.current;
     if (video.readyState >= 2) onReady();
     readyTimeoutRef.current = setTimeout(() => setCameraReady(true), 3000);
@@ -56,44 +75,36 @@ export default function CameraCapture({
     };
   }, [isCameraOn]);
 
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setIsCameraOn(false);
-    setCameraReady(false);
-  }, []);
-
   const capturePhoto = () => {
     if (!videoRef.current || !cameraReady || videoRef.current.videoWidth === 0) {
-      setError("Camera chưa sẵn sàng.");
+      setError("Camera chưa sẵn sàng, vui lòng đợi thêm một chút.");
       return;
     }
     const canvas = document.createElement("canvas");
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     const ctx = canvas.getContext("2d");
-    if (!ctx) { setError("Không thể chụp ảnh"); return; }
+    if (!ctx) {
+      setError("Không thể chụp ảnh từ camera.");
+      return;
+    }
     ctx.drawImage(videoRef.current, 0, 0);
     canvas.toBlob((blob) => {
       if (!blob) return;
       const capturedFile = new File([blob], "face_capture.jpg", { type: "image/jpeg" });
       const dataUrl = canvas.toDataURL("image/jpeg");
-      setFile(capturedFile);
       setImage(dataUrl);
       onCapture(capturedFile, dataUrl);
       stopCamera();
     }, "image/jpeg", 0.9);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setFile(selectedFile);
+    reader.onload = (loadEvent) => {
+      const dataUrl = loadEvent.target?.result as string;
       setImage(dataUrl);
       onCapture(selectedFile, dataUrl);
     };
@@ -102,68 +113,76 @@ export default function CameraCapture({
 
   const reset = () => {
     setImage(null);
-    setFile(null);
     setError("");
     stopCamera();
   };
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  if (image) {
-    return (
-      <div className="space-y-3">
-        <div className="aspect-video bg-black rounded-lg overflow-hidden">
-          <img src={image} alt="Captured" className="w-full h-full object-contain" />
-        </div>
-        <Button variant="secondary" onClick={reset} icon={<RefreshCw size={15} />} className="w-full">
-          Chụp lại
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-        {isCameraOn ? (
+    <Stack spacing={1.5}>
+      <Paper
+        variant="outlined"
+        sx={{
+          position: "relative",
+          overflow: "hidden",
+          bgcolor: "black",
+          aspectRatio: "16 / 9",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {image ? (
+          <Box component="img" src={image} alt="Ảnh đã chụp" sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        ) : isCameraOn ? (
           <>
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
+            <Box component="video" ref={videoRef} autoPlay playsInline muted sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
             {!cameraReady && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-text-3 text-body-sm">
-                Đang kết nối camera...
-              </div>
+              <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+                <CircularProgress size={26} color="inherit" />
+                <Typography variant="body2">Đang kết nối camera...</Typography>
+              </Stack>
             )}
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-center p-4">
-            <p className="text-text-3 text-body-sm">{error || "Bật camera hoặc tải ảnh lên"}</p>
-          </div>
+          <Stack spacing={1} sx={{ alignItems: "center", textAlign: "center", color: "grey.300", p: 3 }}>
+            <PhotoCameraOutlinedIcon sx={{ fontSize: 42 }} />
+            <Typography>{error || "Bật camera hoặc tải ảnh lên để bắt đầu."}</Typography>
+          </Stack>
         )}
-      </div>
+      </Paper>
 
-      <div className="flex gap-2">
-        {!isCameraOn ? (
-          <Button variant="secondary" onClick={startCamera} icon={<Camera size={15} />} className="flex-1">
+      {error && !isCameraOn && <Alert severity="warning">{error}</Alert>}
+
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+        {image ? (
+          <Button variant="outlined" startIcon={<CameraswitchOutlinedIcon />} onClick={reset} fullWidth>
+            Chụp lại
+          </Button>
+        ) : !isCameraOn ? (
+          <Button variant="contained" startIcon={<PhotoCameraOutlinedIcon />} onClick={startCamera} fullWidth>
             Bật camera
           </Button>
         ) : (
-          <Button onClick={capturePhoto} disabled={!cameraReady} className="flex-1">
+          <Button variant="contained" startIcon={<AddAPhotoOutlinedIcon />} onClick={capturePhoto} disabled={!cameraReady} fullWidth>
             Chụp ảnh
           </Button>
         )}
-        <label className="flex-1">
-          <div className="btn-secondary flex items-center justify-center gap-2 w-full px-4 py-2.5 cursor-pointer">
-            <Upload size={15} />
+
+        {!image && (
+          <Button variant="outlined" component="label" startIcon={<UploadFileOutlinedIcon />} fullWidth>
             Tải ảnh
-          </div>
-          <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-        </label>
-        {isCameraOn && (
-          <Button variant="ghost" onClick={stopCamera} className="text-error px-3">
+            <input type="file" accept="image/*" onChange={handleFileChange} hidden />
+          </Button>
+        )}
+
+        {isCameraOn && !image && (
+          <Button color="error" variant="text" onClick={stopCamera}>
             Tắt
           </Button>
         )}
-      </div>
-    </div>
+      </Stack>
+    </Stack>
   );
 }

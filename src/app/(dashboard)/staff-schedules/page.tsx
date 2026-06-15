@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
   PointerSensor,
   useDraggable,
   useDroppable,
@@ -11,23 +14,49 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import {
-  AlertCircle,
-  CalendarDays,
-  Building2,
-  Loader2,
-  MapPin,
-  Move,
-  Plus,
-  RefreshCw,
-  Trash2,
-  UserCheck,
-  Users,
-} from "lucide-react";
+  alpha,
+  Alert,
+  AppBar,
+  Avatar,
+  Box,
+  Button,
+  Card,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Divider,
+  IconButton,
+  Paper,
+  Stack,
+  TextField,
+  Toolbar,
+  Tooltip,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CalendarIcon from "@mui/icons-material/CalendarMonth";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import MapIcon from "@mui/icons-material/MapOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { useColorMode } from "@/lib/mui-theme";
 import type { LibraryZone, ScheduleStaff, StaffScheduleAssignment, StaffShift } from "@/lib/types";
 
 const DAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+
+type ConfirmState =
+  | { type: "assignment"; id: string; title: string; message: string }
+  | { type: "zone"; zone: LibraryZone; title: string; message: string }
+  | { type: "shift"; shift: StaffShift; title: string; message: string }
+  | null;
 
 function toDateInput(date: Date) {
   const year = date.getFullYear();
@@ -63,87 +92,142 @@ function displayZoneName(zone: LibraryZone) {
 
 function initials(name?: string | null, email?: string) {
   const source = name || email || "S";
-  return source
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  return source.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 }
 
-function DraggableStaff({ staff }: { staff: ScheduleStaff }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `staff:${staff.id}`,
-  });
+function timeStateLabel(item: StaffScheduleAssignment) {
+  const now = new Date();
+  const today = toDateInput(now);
+  if (item.workDate < today) return { label: "Đã qua", color: "default" as const };
+  if (item.workDate > today) return { label: "Sắp tới", color: "info" as const };
+  const current = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const start = normalizeTime(item.shift?.startTime);
+  const end = normalizeTime(item.shift?.endTime);
+  if (start && end && current >= start && current <= end) return { label: "Đang trực", color: "success" as const };
+  return { label: "Hôm nay", color: "primary" as const };
+}
+
+function StaffCard({ staff }: { staff: ScheduleStaff }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `staff:${staff.id}` });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
 
   return (
-    <button
+    <Paper
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
-      className={`w-full rounded-md border border-border bg-surface-2 p-3 text-left transition ${
-        isDragging ? "opacity-60 ring-2 ring-primary" : "hover:border-primary/60"
-      }`}
+      variant="outlined"
+      sx={{
+        p: 1.5,
+        minHeight: 66,
+        cursor: "grab",
+        touchAction: "none",
+        userSelect: "none",
+        opacity: isDragging ? 0.65 : 1,
+        borderColor: isDragging ? "primary.main" : "divider",
+        bgcolor: "background.paper",
+        boxShadow: isDragging ? 4 : 0,
+        transition: "border-color 120ms ease, box-shadow 120ms ease",
+        "&:hover": {
+          borderColor: "primary.main",
+          boxShadow: 2,
+        },
+      }}
     >
-      <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+        <Avatar sx={{ width: 40, height: 40, bgcolor: "primary.main", color: "primary.contrastText", fontSize: 13, fontWeight: 900 }}>
           {initials(staff.fullName, staff.email)}
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate text-body-sm font-semibold text-text">{staff.fullName || staff.email}</span>
-          <span className="block truncate text-caption text-text-3">{staff.email}</span>
-        </span>
-      </div>
-    </button>
+        </Avatar>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>{staff.fullName || staff.email}</Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>{staff.email}</Typography>
+        </Box>
+      </Stack>
+    </Paper>
   );
 }
 
-function DraggableAssignment({
-  item,
-  onDelete,
-}: {
-  item: StaffScheduleAssignment;
-  onDelete: (id: string) => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `assignment:${item.id}`,
-  });
+function AssignmentCard({ item, onDelete }: { item: StaffScheduleAssignment; onDelete: (item: StaffScheduleAssignment) => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `assignment:${item.id}` });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+  const state = timeStateLabel(item);
+  const displayName = item.staff?.fullName || item.staff?.email || item.staffId;
+  const displayEmail = item.staff?.email || "Nh?n vi?n tr?c";
 
   return (
-    <div
+    <Paper
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
-      className={`rounded-md border border-border bg-bg/80 p-2 shadow-sm transition ${
-        isDragging ? "opacity-70 ring-2 ring-primary" : ""
-      }`}
+      variant="outlined"
+      sx={{
+        position: "relative",
+        p: 1.25,
+        pr: 4.5,
+        minHeight: 92,
+        opacity: isDragging ? 0.7 : 1,
+        bgcolor: "background.paper",
+        cursor: "grab",
+        touchAction: "none",
+        userSelect: "none",
+        borderColor: "divider",
+        overflow: "hidden",
+        "&:hover": { borderColor: "primary.main" },
+      }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-caption font-semibold text-text">{item.staff?.fullName || item.staff?.email || item.staffId}</p>
-          <p className="truncate text-[11px] text-text-3">{item.staff?.email || "Nhân viên trực"}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(item.id);
+      <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", minWidth: 0 }}>
+        <Avatar sx={{ width: 30, height: 30, bgcolor: "primary.main", color: "primary.contrastText", fontSize: 11, fontWeight: 900 }}>
+          {initials(item.staff?.fullName, item.staff?.email || item.staffId)}
+        </Avatar>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 900, lineHeight: 1.25 }} noWrap title={displayName}>
+            {displayName}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.35 }} noWrap title={displayEmail}>
+            {displayEmail}
+          </Typography>
+          <Chip
+            size="small"
+            color={state.color}
+            label={state.label}
+            sx={{
+              mt: 0.75,
+              height: 22,
+              minWidth: 74,
+              maxWidth: "none",
+              "& .MuiChip-label": {
+                px: 1,
+                overflow: "visible",
+                textOverflow: "clip",
+                whiteSpace: "nowrap",
+              },
             }}
-            className="rounded p-1 text-text-3 hover:bg-error/10 hover:text-error"
-            title="Xóa lịch"
-          >
-            <Trash2 size={13} />
-          </button>
-          <Move size={13} className="text-text-3" />
-        </div>
-      </div>
-    </div>
+          />
+        </Box>
+      </Stack>
+      <Tooltip title="X?a l?ch">
+        <IconButton
+          size="small"
+          color="error"
+          sx={{
+            position: "absolute",
+            right: 6,
+            top: 6,
+            bgcolor: "background.default",
+            "&:hover": { bgcolor: "error.main", color: "error.contrastText" },
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(item);
+          }}
+        >
+          <DeleteIcon fontSize="inherit" />
+        </IconButton>
+      </Tooltip>
+    </Paper>
   );
 }
 
@@ -151,81 +235,85 @@ function DropCell({
   id,
   assignments,
   minStaff,
-  onDeleteAssignment,
+  onDelete,
 }: {
   id: string;
   assignments: StaffScheduleAssignment[];
   minStaff: number;
-  onDeleteAssignment: (id: string) => void;
+  onDelete: (item: StaffScheduleAssignment) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
-  const isUnderstaffed = assignments.length < minStaff;
+  const understaffed = assignments.length < minStaff;
+  const theme = useTheme();
 
   return (
-    <div
+    <Box
       ref={setNodeRef}
-      className={`min-h-[112px] rounded-md border border-dashed p-2 transition ${
-        isOver ? "border-primary bg-primary/10" : isUnderstaffed ? "border-warning/60 bg-warning/5" : "border-border bg-surface/70"
-      }`}
+      sx={{
+        minHeight: 156,
+        border: 2,
+        borderStyle: "dashed",
+        borderColor: isOver ? "primary.main" : understaffed ? "warning.main" : "divider",
+        bgcolor: isOver
+          ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.22 : 0.12)
+          : understaffed
+            ? alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.16 : 0.1)
+            : alpha(theme.palette.background.default, theme.palette.mode === "dark" ? 0.72 : 0.88),
+        color: "text.primary",
+        borderRadius: 1,
+        p: 1.25,
+        transition: "background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease",
+        boxShadow: isOver ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}` : "none",
+      }}
     >
-      <div className="mb-2 flex items-center justify-between text-[11px]">
-        <span className={isUnderstaffed ? "font-semibold text-warning" : "text-text-3"}>
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+        <Typography
+          variant="caption"
+          color={understaffed && !isOver ? "warning.main" : "text.secondary"}
+          noWrap
+          sx={{ fontWeight: 800, minWidth: 92, flexShrink: 0 }}
+        >
           {assignments.length}/{minStaff} nhân viên
-        </span>
-        {isUnderstaffed ? <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-warning">Thiếu</span> : null}
-      </div>
-      {assignments.length === 0 ? (
-        <div className="flex h-full min-h-[64px] items-center justify-center text-center text-[11px] text-text-3">
-          Thả một hoặc nhiều nhân viên vào ca này
-        </div>
+        </Typography>
+        {understaffed ? <Chip size="small" color="warning" label="Thiếu" sx={{ height: 20, flexShrink: 0, minWidth: 58 }} /> : null}
+      </Stack>
+      {assignments.length ? (
+        <Stack spacing={1}>
+          {assignments.map((item) => <AssignmentCard key={item.id} item={item} onDelete={onDelete} />)}
+        </Stack>
       ) : (
-        <div className="space-y-2">
-          {assignments.map((item) => (
-            <DraggableAssignment key={item.id} item={item} onDelete={onDeleteAssignment} />
-          ))}
-        </div>
+        <Box sx={{ minHeight: 104, display: "grid", placeItems: "center", textAlign: "center", color: "text.secondary", borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.06 : 0.04) }}>
+          <Typography variant="body2" sx={{ fontWeight: 800 }}>Thả nhân viên vào đây</Typography>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 }
 
-function EmptySetup({
-  zones,
-  shifts,
-  onCreateDefaults,
-  loading,
-}: {
-  zones: LibraryZone[];
-  shifts: StaffShift[];
-  onCreateDefaults: () => void;
-  loading: boolean;
-}) {
-  if (zones.length && shifts.length) return null;
-
-  return (
-    <div className="rounded-lg border border-warning/30 bg-warning/10 p-4">
-      <div className="flex items-start gap-3">
-        <AlertCircle className="mt-0.5 text-warning" size={20} />
-        <div className="flex-1">
-          <h3 className="font-semibold text-text">Chưa có cấu hình lịch trực</h3>
-          <p className="mt-1 text-body-sm text-text-2">
-            Cần ít nhất một tầng và một ca trực để bắt đầu điều phối. Bạn có thể tạo bộ mẫu nhanh cho demo.
-          </p>
-        </div>
-        <button
-          onClick={onCreateDefaults}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-body-sm font-semibold text-bg disabled:opacity-60"
-        >
-          {loading ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-          Tạo mẫu
-        </button>
-      </div>
-    </div>
-  );
+function DragPreview({ staff, assignment }: { staff?: ScheduleStaff | null; assignment?: StaffScheduleAssignment | null }) {
+  if (staff) {
+    return (
+      <Paper elevation={12} sx={{ width: 300, p: 1.75, border: 2, borderColor: "primary.main", bgcolor: "background.paper" }}>
+        <Typography variant="body2" sx={{ fontWeight: 900 }}>{staff.fullName || staff.email}</Typography>
+        <Typography variant="caption" color="text.secondary">{staff.email}</Typography>
+      </Paper>
+    );
+  }
+  if (assignment) {
+    return (
+      <Paper elevation={12} sx={{ width: 260, p: 1.5, border: 2, borderColor: "primary.main", bgcolor: "background.paper" }}>
+        <Typography variant="body2" sx={{ fontWeight: 900 }}>{assignment.staff?.fullName || assignment.staff?.email || assignment.staffId}</Typography>
+        <Typography variant="caption" color="text.secondary">{assignment.shift?.name}</Typography>
+      </Paper>
+    );
+  }
+  return null;
 }
 
 export default function StaffSchedulesPage() {
+  const router = useRouter();
+  const theme = useTheme();
+  const { mode, toggleMode } = useColorMode();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const isStaff = user?.role === "admin" || user?.role === "staff";
@@ -239,6 +327,8 @@ export default function StaffSchedulesPage() {
   const [error, setError] = useState<string | null>(null);
   const [zoneForm, setZoneForm] = useState({ floor: "1", zoneName: "" });
   const [shiftForm, setShiftForm] = useState({ name: "", startTime: "08:00", endTime: "12:00", minStaff: "1" });
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -283,21 +373,19 @@ export default function StaffSchedulesPage() {
     setSaving(true);
     setError(null);
     try {
-      const createdZones = zones.length
-        ? zones
-        : await Promise.all([
-            api.createScheduleZone({ floor: 1, zoneName: "Tầng 1" }),
-            api.createScheduleZone({ floor: 2, zoneName: "Tầng 2" }),
-          ]);
-      const createdShifts = shifts.length
-        ? shifts
-        : await Promise.all([
-            api.createScheduleShift({ name: "Ca sáng", startTime: "07:30", endTime: "11:30", minStaff: 1 }),
-            api.createScheduleShift({ name: "Ca chiều", startTime: "13:00", endTime: "17:00", minStaff: 1 }),
-            api.createScheduleShift({ name: "Ca tối", startTime: "17:30", endTime: "20:30", minStaff: 1 }),
-          ]);
-      setZones(createdZones);
-      setShifts(createdShifts);
+      if (!zones.length) {
+        await Promise.all([
+          api.createScheduleZone({ floor: 1, zoneName: "Tầng 1" }),
+          api.createScheduleZone({ floor: 2, zoneName: "Tầng 2" }),
+        ]);
+      }
+      if (!shifts.length) {
+        await Promise.all([
+          api.createScheduleShift({ name: "Ca sáng", startTime: "07:30", endTime: "11:30", minStaff: 1 }),
+          api.createScheduleShift({ name: "Ca chiều", startTime: "13:00", endTime: "17:00", minStaff: 1 }),
+          api.createScheduleShift({ name: "Ca tối", startTime: "17:30", endTime: "20:30", minStaff: 1 }),
+        ]);
+      }
       await loadData();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -311,10 +399,7 @@ export default function StaffSchedulesPage() {
     setSaving(true);
     setError(null);
     try {
-      await api.createScheduleZone({
-        floor,
-        zoneName: zoneForm.zoneName.trim() || `Tầng ${floor}`,
-      });
+      await api.createScheduleZone({ floor, zoneName: zoneForm.zoneName.trim() || `Tầng ${floor}` });
       setZoneForm((value) => ({ ...value, zoneName: "" }));
       await loadData();
     } catch (err) {
@@ -348,33 +433,59 @@ export default function StaffSchedulesPage() {
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveDragId(null);
     const overId = String(event.over?.id || "");
     const activeId = String(event.active.id || "");
     if (!overId.startsWith("cell:")) return;
 
     const [, workDate, zoneId, shiftId] = overId.split(":");
+    const movingAssignment = activeId.startsWith("assignment:")
+      ? assignments.find((item) => item.id === activeId.replace("assignment:", ""))
+      : null;
+    const staffId = activeId.startsWith("staff:") ? activeId.replace("staff:", "") : movingAssignment?.staffId;
+    if (!staffId) return;
+
+    if (movingAssignment && movingAssignment.workDate === workDate && movingAssignment.zoneId === zoneId && movingAssignment.shiftId === shiftId) return;
+
+    const duplicateAssignment = assignments.find((item) => (
+      item.id !== movingAssignment?.id
+      && item.staffId === staffId
+      && item.workDate === workDate
+      && item.zoneId === zoneId
+      && item.shiftId === shiftId
+      && item.status !== "cancelled"
+      && item.status !== "completed"
+    ));
+    if (duplicateAssignment) {
+      setError("Nhân viên này đã có trong đúng ô ca trực này.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
       if (activeId.startsWith("staff:")) {
-        await api.createScheduleAssignment({ staffId: activeId.replace("staff:", ""), workDate, zoneId, shiftId });
+        await api.createScheduleAssignment({ staffId, workDate, zoneId, shiftId });
       } else if (activeId.startsWith("assignment:")) {
         await api.moveScheduleAssignment(activeId.replace("assignment:", ""), { workDate, zoneId, shiftId });
       }
       await loadData();
-    } catch (err) {
-      setError(getErrorMessage(err));
+    } catch (err: any) {
+      setError(err?.response?.status === 409 ? "Nhân viên này đã có trong đúng ô ca trực này." : getErrorMessage(err));
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteAssignment = async (id: string) => {
-    if (typeof window !== "undefined" && !window.confirm("Xóa ca trực đã phân?")) return;
+  const runConfirm = async () => {
+    if (!confirm) return;
     setSaving(true);
     setError(null);
     try {
-      await api.deleteScheduleAssignment(id);
+      if (confirm.type === "assignment") await api.deleteScheduleAssignment(confirm.id);
+      if (confirm.type === "zone") await api.deleteScheduleZone(confirm.zone.id);
+      if (confirm.type === "shift") await api.deleteScheduleShift(confirm.shift.id);
+      setConfirm(null);
       await loadData();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -383,335 +494,317 @@ export default function StaffSchedulesPage() {
     }
   };
 
-  const deleteZone = async (zone: LibraryZone) => {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(`Xóa ${displayZoneName(zone)} khỏi lịch trực? Các lịch chưa hoàn tất ở tầng này sẽ bị hủy.`)
-    ) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await api.deleteScheduleZone(zone.id);
-      await loadData();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const deleteShift = async (shift: StaffShift) => {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(`Xóa ca trực "${shift.name}"? Các lịch chưa hoàn tất dùng ca này sẽ bị hủy.`)
-    ) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await api.deleteScheduleShift(shift.id);
-      await loadData();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
+  const activeDragStaff = activeDragId?.startsWith("staff:") ? staff.find((item) => item.id === activeDragId.replace("staff:", "")) : null;
+  const activeDragAssignment = activeDragId?.startsWith("assignment:")
+    ? assignments.find((item) => item.id === activeDragId.replace("assignment:", ""))
+    : null;
 
   if (!isStaff) {
-    return (
-      <div className="rounded-lg border border-border bg-surface p-6 text-text">
-        Bạn không có quyền xem lịch trực.
-      </div>
-    );
+    return <Alert severity="error">Bạn không có quyền xem lịch trực.</Alert>;
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <CalendarDays size={22} />
-          </div>
-          <div>
-            <h2 className="text-heading-md text-text">Bảng điều phối lịch trực</h2>
-            <p className="text-body-sm text-text-3">Quản lý theo tuần, tầng, khu vực và ca trực.</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setWeekStart((value) => new Date(value.setDate(value.getDate() - 7)))}
-            className="rounded-md border border-border px-3 py-2 text-body-sm text-text hover:bg-surface-2"
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+      <AppBar position="sticky" color="default" elevation={0} sx={{ borderBottom: 1, borderColor: "divider", bgcolor: "background.paper" }}>
+        <Toolbar sx={{ gap: 1.5, minHeight: 68 }}>
+          <IconButton
+            color="inherit"
+            title="Quay lại"
+            aria-label="Quay lại"
+            onClick={() => {
+              if (window.history.length > 1) router.back();
+              else router.push("/dashboard");
+            }}
           >
-            Tuần trước
-          </button>
-          <div className="rounded-md bg-surface-2 px-3 py-2 text-body-sm font-semibold text-text">
-            {from} - {to}
-          </div>
-          <button
-            onClick={() => setWeekStart((value) => new Date(value.setDate(value.getDate() + 7)))}
-            className="rounded-md border border-border px-3 py-2 text-body-sm text-text hover:bg-surface-2"
+            <ArrowBackIcon />
+          </IconButton>
+          <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText", borderRadius: 2 }}>
+            <CalendarIcon />
+          </Avatar>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="h6" noWrap>Bảng điều phối lịch trực</Typography>
+            <Typography variant="body2" color="text.secondary" noWrap>Quản lý theo tuần, tầng và ca trực</Typography>
+          </Box>
+          <Button variant="outlined" onClick={() => setWeekStart((value) => new Date(value.setDate(value.getDate() - 7)))}>Tuần trước</Button>
+          <Chip label={`${from} - ${to}`} sx={{ fontWeight: 800 }} />
+          <Button variant="outlined" onClick={() => setWeekStart((value) => new Date(value.setDate(value.getDate() + 7)))}>Tuần sau</Button>
+          <Tooltip title={mode === "dark" ? "Chế độ sáng" : "Chế độ tối"}>
+            <IconButton color="inherit" onClick={toggleMode}>{mode === "dark" ? "☀" : "☾"}</IconButton>
+          </Tooltip>
+          <Button variant="contained" startIcon={<RefreshIcon />} onClick={loadData} disabled={loading}>Tải lại</Button>
+        </Toolbar>
+      </AppBar>
+
+      <Box sx={{ p: 2 }}>
+        {error ? <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert> : null}
+        {loading ? (
+          <Paper variant="outlined" sx={{ minHeight: 360, display: "grid", placeItems: "center" }}>
+            <CircularProgress />
+          </Paper>
+        ) : isAdmin ? (
+          <DndContext
+            sensors={sensors}
+            onDragStart={(event: DragStartEvent) => setActiveDragId(String(event.active.id || ""))}
+            onDragEnd={handleDragEnd}
+            onDragCancel={() => setActiveDragId(null)}
           >
-            Tuần sau
-          </button>
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-body-sm text-text hover:bg-surface-2 disabled:opacity-60"
-          >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-            Tải lại
-          </button>
-        </div>
-      </div>
+            <Stack spacing={2}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2,
+                  gridTemplateColumns: { xs: "1fr", md: "minmax(360px, 0.8fr) minmax(620px, 1.2fr)" },
+                  alignItems: "start",
+                }}
+              >
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
+                    <UsersIcon color="primary" />
+                    <Typography sx={{ fontWeight: 900 }}>Danh sách nhân viên</Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Kéo nhân viên vào bất kỳ ô ca trực. Một nhân viên có thể làm nhiều ca trong ngày.
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gap: 1,
+                      gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", xl: "repeat(3, minmax(0, 1fr))" },
+                      maxHeight: 260,
+                      overflowY: "auto",
+                      pr: 0.5,
+                    }}
+                  >
+                    {staff.length ? staff.map((item) => <StaffCard key={item.id} staff={item} />) : (
+                      <Alert severity="warning">Chưa lấy được danh sách nhân viên từ user-service.</Alert>
+                    )}
+                  </Box>
+                </Paper>
 
-      {error ? (
-        <div className="flex items-start gap-3 rounded-lg border border-error/40 bg-error/10 p-4 text-error">
-          <AlertCircle size={18} className="mt-0.5" />
-          <p className="text-body-sm">{error}</p>
-        </div>
-      ) : null}
-
-      {loading ? (
-        <div className="flex h-56 items-center justify-center rounded-lg border border-border bg-surface">
-          <Loader2 className="animate-spin text-primary" size={30} />
-        </div>
-      ) : isAdmin ? (
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
-            <div className="space-y-4">
-              <div className="rounded-lg border border-border bg-surface p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <Users size={18} className="text-primary" />
-                  <h3 className="font-semibold text-text">Staff pool</h3>
-                </div>
-                <p className="mb-3 text-caption text-text-3">Kéo nhân viên vào bất kỳ ô ca trực. Mỗi ca có thể có nhiều nhân viên.</p>
-                <div className="space-y-2">
-                  {staff.length ? staff.map((item) => <DraggableStaff key={item.id} staff={item} />) : (
-                    <p className="text-body-sm text-text-3">Chưa lấy được danh sách nhân viên từ user-service.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-surface p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <Building2 size={18} className="text-primary" />
-                  <h3 className="font-semibold text-text">Cấu hình tầng và ca</h3>
-                </div>
-                <div className="space-y-4">
-                  <div className="rounded-md bg-surface-2 p-3">
-                    <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-text-3">Thêm tầng</p>
-                    <div className="grid grid-cols-[80px_1fr] gap-2">
-                      <label className="text-caption text-text-2">
-                        Tầng
-                        <input
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
+                    <MapIcon color="primary" />
+                    <Typography sx={{ fontWeight: 900 }}>Cấu hình tầng và ca</Typography>
+                  </Stack>
+                  <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
+                    <Card variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>THÊM TẦNG</Typography>
+                      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                        <TextField
+                          label="Tầng"
                           type="number"
-                          min={1}
+                          size="small"
                           value={zoneForm.floor}
                           onChange={(event) => setZoneForm((value) => ({ ...value, floor: event.target.value }))}
-                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                          slotProps={{ htmlInput: { min: 1 } }}
+                          sx={{ width: 92 }}
                         />
-                      </label>
-                      <label className="text-caption text-text-2">
-                        Tên hiển thị
-                        <input
+                        <TextField
+                          label="Tên hiển thị"
+                          size="small"
                           value={zoneForm.zoneName}
                           onChange={(event) => setZoneForm((value) => ({ ...value, zoneName: event.target.value }))}
                           placeholder="VD: Tầng 3"
-                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                          fullWidth
                         />
-                      </label>
-                    </div>
-                    <button
-                      onClick={createZone}
-                      disabled={saving}
-                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-primary/50 px-3 py-2 text-body-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"
-                    >
-                      <Plus size={15} /> Thêm tầng
-                    </button>
-
-                    {zones.length ? (
-                      <div className="mt-3 space-y-1.5">
+                      </Stack>
+                      <Button fullWidth variant="outlined" startIcon={<AddIcon />} onClick={createZone} disabled={saving} sx={{ mt: 1.5 }}>
+                        Thêm tầng
+                      </Button>
+                      <Stack spacing={1} sx={{ mt: 1.5 }}>
                         {zones.map((zone) => (
-                          <div key={zone.id} className="flex items-center justify-between rounded-md border border-border bg-bg/70 px-2 py-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-body-sm font-semibold text-text">{displayZoneName(zone)}</p>
-                              <p className="text-[11px] text-text-3">Tầng {zone.floor}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => deleteZone(zone)}
-                              disabled={saving}
-                              className="rounded p-1.5 text-text-3 hover:bg-error/10 hover:text-error disabled:opacity-60"
-                              title="Xóa tầng"
+                          <Paper key={zone.id} variant="outlined" sx={{ p: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>{displayZoneName(zone)}</Typography>
+                              <Typography variant="caption" color="text.secondary">Tầng {zone.floor}</Typography>
+                            </Box>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => setConfirm({
+                                type: "zone",
+                                zone,
+                                title: `Xóa ${displayZoneName(zone)}?`,
+                                message: "Các lịch chưa hoàn tất ở tầng này sẽ bị hủy.",
+                              })}
                             >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Paper>
                         ))}
-                      </div>
-                    ) : null}
-                  </div>
+                      </Stack>
+                    </Card>
 
-                  <div className="rounded-md bg-surface-2 p-3">
-                    <p className="mb-2 text-caption font-semibold uppercase tracking-wide text-text-3">Thêm ca trực</p>
-                    <label className="block text-caption text-text-2">
-                      Tên ca
-                      <input
+                    <Card variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>THÊM CA TRỰC</Typography>
+                      <TextField
+                        label="Tên ca"
+                        size="small"
                         value={shiftForm.name}
                         onChange={(event) => setShiftForm((value) => ({ ...value, name: event.target.value }))}
                         placeholder="VD: Ca tối tầng 4"
-                        className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                        fullWidth
+                        sx={{ mt: 1 }}
                       />
-                    </label>
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      <label className="text-caption text-text-2">
-                        Bat dau
-                        <input
-                          type="time"
-                          value={shiftForm.startTime}
-                          onChange={(event) => setShiftForm((value) => ({ ...value, startTime: event.target.value }))}
-                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
-                        />
-                      </label>
-                      <label className="text-caption text-text-2">
-                        Ket thuc
-                        <input
-                          type="time"
-                          value={shiftForm.endTime}
-                          onChange={(event) => setShiftForm((value) => ({ ...value, endTime: event.target.value }))}
-                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
-                        />
-                      </label>
-                      <label className="text-caption text-text-2">
-                        So NV
-                        <input
+                      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1, mt: 1 }}>
+                        <TextField label="Bắt đầu" type="time" size="small" value={shiftForm.startTime} onChange={(event) => setShiftForm((value) => ({ ...value, startTime: event.target.value }))} fullWidth />
+                        <TextField label="Kết thúc" type="time" size="small" value={shiftForm.endTime} onChange={(event) => setShiftForm((value) => ({ ...value, endTime: event.target.value }))} fullWidth />
+                        <TextField
+                          label="Số nhân viên tối thiểu"
                           type="number"
-                          min={1}
+                          size="small"
                           value={shiftForm.minStaff}
                           onChange={(event) => setShiftForm((value) => ({ ...value, minStaff: event.target.value }))}
-                          className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
+                          slotProps={{ htmlInput: { min: 1 } }}
+                          sx={{ gridColumn: { xs: "auto", sm: "1 / -1" } }}
+                          fullWidth
                         />
-                      </label>
-                    </div>
-                    <button
-                      onClick={createShift}
-                      disabled={saving}
-                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-primary/50 px-3 py-2 text-body-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"
-                    >
-                      <Plus size={15} /> Thêm ca trực
-                    </button>
-
-                    {shifts.length ? (
-                      <div className="mt-3 space-y-1.5">
+                      </Box>
+                      <Button fullWidth variant="outlined" startIcon={<AddIcon />} onClick={createShift} disabled={saving} sx={{ mt: 1.5 }}>
+                        Thêm ca trực
+                      </Button>
+                      <Stack spacing={1} sx={{ mt: 1.5 }}>
                         {shifts.map((shift) => (
-                          <div key={shift.id} className="flex items-center justify-between rounded-md border border-border bg-bg/70 px-2 py-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-body-sm font-semibold text-text">{shift.name}</p>
-                              <p className="text-[11px] text-text-3">
+                          <Paper key={shift.id} variant="outlined" sx={{ p: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>{shift.name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
                                 {normalizeTime(shift.startTime)}-{normalizeTime(shift.endTime)} · {shift.minStaff} nhân viên
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => deleteShift(shift)}
-                              disabled={saving}
-                              className="rounded p-1.5 text-text-3 hover:bg-error/10 hover:text-error disabled:opacity-60"
-                              title="Xóa ca trực"
+                              </Typography>
+                            </Box>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => setConfirm({
+                                type: "shift",
+                                shift,
+                                title: `Xóa ca trực "${shift.name}"?`,
+                                message: "Các lịch chưa hoàn tất dùng ca này sẽ bị hủy.",
+                              })}
                             >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Paper>
                         ))}
-                      </div>
+                      </Stack>
+                    </Card>
+
+                    {(!zones.length || !shifts.length) ? (
+                      <Alert
+                        severity="warning"
+                        action={<Button color="inherit" size="small" onClick={createDefaults} disabled={saving}>Tạo mẫu</Button>}
+                      >
+                        Cần ít nhất một tầng và một ca trực để bắt đầu điều phối.
+                      </Alert>
                     ) : null}
-                  </div>
-                </div>
-              </div>
+                  </Box>
+                </Paper>
+              </Box>
 
-              <EmptySetup zones={zones} shifts={shifts} onCreateDefaults={createDefaults} loading={saving} />
-            </div>
+              <Paper variant="outlined" sx={{ p: 2, overflow: "auto", maxHeight: { xl: "calc(100vh - 390px)" } }}>
+                <Box sx={{ minWidth: 1740 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "200px repeat(7, minmax(215px, 1fr))", gap: 1.25 }}>
+                    <Box />
+                    {days.map((day, index) => (
+                      <Paper key={day.toISOString()} variant="outlined" sx={{ p: 1, textAlign: "center", bgcolor: "background.default" }}>
+                        <Typography variant="caption" color="primary" sx={{ fontWeight: 900 }}>{DAY_LABELS[index]}</Typography>
+                        <Typography variant="body2">{toDateInput(day).slice(5)}</Typography>
+                      </Paper>
+                    ))}
+                  </Box>
+                  <Stack spacing={2} sx={{ mt: 1.5 }}>
+                    {zones.map((zone) => (
+                      <Box key={zone.id} sx={{ display: "grid", gridTemplateColumns: "200px repeat(7, minmax(215px, 1fr))", gap: 1.25 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "background.default" }}>
+                          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                            <MapIcon color="primary" fontSize="small" />
+                            <Typography sx={{ fontWeight: 900 }}>{displayZoneName(zone)}</Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">Tầng {zone.floor}</Typography>
+                        </Paper>
+                        {days.map((day) => (
+                          <Stack key={`${zone.id}-${day.toISOString()}`} spacing={1}>
+                            {shifts.map((shift) => {
+                              const date = toDateInput(day);
+                              return (
+                                <Paper
+                                  key={`${date}-${zone.id}-${shift.id}`}
+                                  variant="outlined"
+                                  sx={{
+                                    p: 1.25,
+                                    bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === "dark" ? 0.92 : 1),
+                                    borderColor: "divider",
+                                  }}
+                                >
+                                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 900 }} noWrap>{shift.name}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{normalizeTime(shift.startTime)}-{normalizeTime(shift.endTime)}</Typography>
+                                  </Stack>
+                                  <DropCell
+                                    id={`cell:${date}:${zone.id}:${shift.id}`}
+                                    assignments={assignmentsForCell(date, zone.id, shift.id)}
+                                    minStaff={shift.minStaff || 1}
+                                    onDelete={(item) => setConfirm({
+                                      type: "assignment",
+                                      id: item.id,
+                                      title: "Xóa lịch trực đã phân?",
+                                      message: `${item.staff?.fullName || item.staff?.email || "Nhân viên"} sẽ được gỡ khỏi ca ${shift.name} ngày ${date}.`,
+                                    })}
+                                  />
+                                </Paper>
+                              );
+                            })}
+                          </Stack>
+                        ))}
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              </Paper>
+            </Stack>
+            <DragOverlay dropAnimation={null}>
+              <DragPreview staff={activeDragStaff} assignment={activeDragAssignment} />
+            </DragOverlay>
+          </DndContext>
+        ) : (
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Lịch tuần của tôi</Typography>
+            {assignments.length ? (
+              <Stack spacing={1.5}>
+                {assignments.map((item) => {
+                  const state = timeStateLabel(item);
+                  return (
+                    <Paper key={item.id} variant="outlined" sx={{ p: 2 }}>
+                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ justifyContent: "space-between" }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: 900 }}>{item.workDate} - {item.shift?.name || item.shiftId}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {normalizeTime(item.shift?.startTime)}-{normalizeTime(item.shift?.endTime)} tại {item.zone ? displayZoneName(item.zone) : item.zoneId}
+                          </Typography>
+                        </Box>
+                        <Chip size="small" color={state.color} label={state.label} />
+                      </Stack>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            ) : (
+              <Alert severity="info">Bạn chưa có ca trực trong tuần này.</Alert>
+            )}
+          </Paper>
+        )}
+      </Box>
 
-            <div className="overflow-x-auto rounded-lg border border-border bg-surface p-4">
-              <div className="min-w-[980px]">
-                <div className="grid grid-cols-[170px_repeat(7,minmax(110px,1fr))] gap-2">
-                  <div />
-                  {days.map((day, index) => (
-                    <div key={day.toISOString()} className="rounded-md bg-surface-2 p-2 text-center">
-                      <p className="text-caption font-semibold text-primary">{DAY_LABELS[index]}</p>
-                      <p className="text-body-sm text-text">{toDateInput(day).slice(5)}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-3 space-y-4">
-                  {zones.map((zone) => (
-                    <div key={zone.id} className="grid grid-cols-[170px_repeat(7,minmax(110px,1fr))] gap-2">
-                      <div className="rounded-md border border-border bg-bg/60 p-3">
-                        <div className="flex items-center gap-2 text-text">
-                          <MapPin size={16} className="text-primary" />
-                          <span className="font-semibold">{displayZoneName(zone)}</span>
-                        </div>
-                        <p className="mt-1 text-caption text-text-3">Tầng {zone.floor}</p>
-                      </div>
-                      {days.map((day) => (
-                        <div key={`${zone.id}-${day.toISOString()}`} className="space-y-2">
-                          {shifts.map((shift) => {
-                            const date = toDateInput(day);
-                            return (
-                              <div key={`${date}-${zone.id}-${shift.id}`} className="rounded-md bg-surface-2 p-2">
-                                <div className="mb-2 flex items-center justify-between gap-2">
-                                  <span className="truncate text-[11px] font-semibold text-text">{shift.name}</span>
-                                  <span className="text-[10px] text-text-3">
-                                    {normalizeTime(shift.startTime)}-{normalizeTime(shift.endTime)}
-                                  </span>
-                                </div>
-                                <DropCell
-                                  id={`cell:${date}:${zone.id}:${shift.id}`}
-                                  assignments={assignmentsForCell(date, zone.id, shift.id)}
-                                  minStaff={shift.minStaff || 1}
-                                  onDeleteAssignment={deleteAssignment}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </DndContext>
-      ) : (
-        <div className="grid gap-5">
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <UserCheck size={18} className="text-primary" />
-              <h3 className="font-semibold text-text">Lịch tuần của tôi</h3>
-            </div>
-            <div className="space-y-3">
-              {assignments.length ? assignments.map((item) => (
-                <div key={item.id} className="rounded-md border border-border bg-surface-2 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-text">{item.workDate} - {item.shift?.name || item.shiftId}</p>
-                      <p className="mt-1 text-body-sm text-text-3">
-                        {normalizeTime(item.shift?.startTime)}-{normalizeTime(item.shift?.endTime)} tại {item.zone ? displayZoneName(item.zone) : item.zoneId}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )) : (
-                <div className="rounded-md border border-dashed border-border p-8 text-center text-text-3">
-                  Bạn chưa có ca trực trong tuần này.
-                </div>
-              )}
-            </div>
-          </div>
-
-        </div>
-      )}
-    </div>
+      <Dialog open={!!confirm} onClose={() => setConfirm(null)}>
+        <DialogTitle>{confirm?.title}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{confirm?.message}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirm(null)}>Hủy</Button>
+          <Button color="error" variant="contained" onClick={runConfirm} disabled={saving}>Xóa</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }
