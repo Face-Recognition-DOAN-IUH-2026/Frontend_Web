@@ -19,6 +19,7 @@ import {
   Move,
   Plus,
   RefreshCw,
+  Trash2,
   UserCheck,
   Users,
 } from "lucide-react";
@@ -99,7 +100,13 @@ function DraggableStaff({ staff }: { staff: ScheduleStaff }) {
   );
 }
 
-function DraggableAssignment({ item }: { item: StaffScheduleAssignment }) {
+function DraggableAssignment({
+  item,
+  onDelete,
+}: {
+  item: StaffScheduleAssignment;
+  onDelete: (id: string) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `assignment:${item.id}`,
   });
@@ -120,7 +127,21 @@ function DraggableAssignment({ item }: { item: StaffScheduleAssignment }) {
           <p className="truncate text-caption font-semibold text-text">{item.staff?.fullName || item.staff?.email || item.staffId}</p>
           <p className="truncate text-[11px] text-text-3">{item.staff?.email || "Nhân viên trực"}</p>
         </div>
-        <Move size={13} className="shrink-0 text-text-3" />
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(item.id);
+            }}
+            className="rounded p-1 text-text-3 hover:bg-error/10 hover:text-error"
+            title="Xóa lịch"
+          >
+            <Trash2 size={13} />
+          </button>
+          <Move size={13} className="text-text-3" />
+        </div>
       </div>
     </div>
   );
@@ -130,10 +151,12 @@ function DropCell({
   id,
   assignments,
   minStaff,
+  onDeleteAssignment,
 }: {
   id: string;
   assignments: StaffScheduleAssignment[];
   minStaff: number;
+  onDeleteAssignment: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const isUnderstaffed = assignments.length < minStaff;
@@ -158,7 +181,7 @@ function DropCell({
       ) : (
         <div className="space-y-2">
           {assignments.map((item) => (
-            <DraggableAssignment key={item.id} item={item} />
+            <DraggableAssignment key={item.id} item={item} onDelete={onDeleteAssignment} />
           ))}
         </div>
       )}
@@ -339,6 +362,20 @@ export default function StaffSchedulesPage() {
       } else if (activeId.startsWith("assignment:")) {
         await api.moveScheduleAssignment(activeId.replace("assignment:", ""), { workDate, zoneId, shiftId });
       }
+      await loadData();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteAssignment = async (id: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Xóa ca trực đã phân?")) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.deleteScheduleAssignment(id);
       await loadData();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -570,6 +607,7 @@ export default function StaffSchedulesPage() {
                                   id={`cell:${date}:${zone.id}:${shift.id}`}
                                   assignments={assignmentsForCell(date, zone.id, shift.id)}
                                   minStaff={shift.minStaff || 1}
+                                  onDeleteAssignment={deleteAssignment}
                                 />
                               </div>
                             );

@@ -713,6 +713,11 @@ class ApiClient {
     return response.data;
   }
 
+  async deleteScheduleAssignment(id: string): Promise<{ deleted: boolean; id: string }> {
+    const response = await this.client.delete<{ deleted: boolean; id: string }>(`/api/schedules/assignments/${id}`);
+    return response.data;
+  }
+
   async getMySchedules(params?: { from?: string; to?: string }): Promise<ScheduleAssignmentList> {
     const response = await this.client.get<ScheduleAssignmentList>("/api/schedules/me", { params });
     return response.data;
