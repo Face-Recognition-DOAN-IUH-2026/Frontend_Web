@@ -31,8 +31,36 @@ import type {
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
 const API_BASE_URL = RAW_API_BASE_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
 
+function setStoredAccessToken(token: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("access_token", token);
+  document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=lax`;
+}
+
+function clearStoredAuth() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("user");
+  document.cookie = "access_token=; path=/; max-age=0";
+}
+
 function isNotFoundError(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 404;
+}
+
+function isAuthEndpoint(url?: string): boolean {
+  if (!url) return false;
+  return [
+    "/auth/login",
+    "/api/auth/login",
+    "/auth/register",
+    "/api/auth/register",
+    "/auth/refresh",
+    "/api/auth/refresh",
+    "/api/patrons/login",
+    "/api/patrons/register",
+  ].some((path) => url.includes(path));
 }
 
 export function getErrorMessage(err: any): string {
@@ -80,6 +108,9 @@ class ApiClient {
       async (error: AxiosError) => {
         const originalRequest = error.config;
         if (error.response?.status === 401 && originalRequest) {
+          if (isAuthEndpoint(originalRequest.url)) {
+            return Promise.reject(error);
+          }
           return this.handleUnauthorized(originalRequest);
         }
         return Promise.reject(error);
@@ -88,6 +119,11 @@ class ApiClient {
   }
 
   private async handleUnauthorized(originalRequest: any): Promise<any> {
+    if (originalRequest._retry) {
+      return Promise.reject(new Error("Session expired"));
+    }
+    originalRequest._retry = true;
+
     if (!this.refreshPromise) {
       this.refreshPromise = this.refreshToken();
     }
@@ -99,15 +135,9 @@ class ApiClient {
       return this.client(originalRequest);
     }
 
-    const hasAccessToken = typeof window !== "undefined" && !!localStorage.getItem("access_token");
-    const hasRefreshToken = typeof window !== "undefined" && !!localStorage.getItem("refresh_token");
-    if (!hasAccessToken && !hasRefreshToken) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("user");
-        window.location.href = "/login";
-      }
+    if (typeof window !== "undefined") {
+      clearStoredAuth();
+      window.location.href = "/login";
     }
 
     return Promise.reject(new Error("Session expired"));
@@ -133,7 +163,7 @@ class ApiClient {
       }
       const { access_token } = response.data;
       if (!access_token) return false;
-      localStorage.setItem("access_token", access_token);
+      setStoredAccessToken(access_token);
       return true;
     } catch {
       return false;

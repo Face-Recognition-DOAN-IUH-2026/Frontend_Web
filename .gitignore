@@ -1,6 +1,12 @@
 # === Node.js ===
 node_modules/
 
+# === Environment ===
+.env
+.env.local
+.env*.local
+!.env.example
+
 # === Next.js ===
 .next/
 out/
@@ -35,6 +41,8 @@ repomix-output.xml/
 SkillAgent/
 CLAUDE.md
 AGENTS.md
+test-results/
+playwright-report/
 
 # === TypeScript ===
 *.tsbuildinfo
