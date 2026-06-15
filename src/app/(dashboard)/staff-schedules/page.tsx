@@ -120,7 +120,7 @@ function DraggableAssignment({ item }: { item: StaffScheduleAssignment }) {
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-caption font-semibold text-text">{item.staff?.fullName || item.staff?.email || item.staffId}</p>
-          <p className="text-[11px] text-text-3">{item.status}</p>
+          <p className="truncate text-[11px] text-text-3">{item.staff?.email || "Nhan vien truc"}</p>
         </div>
         <Move size={13} className="shrink-0 text-text-3" />
       </div>
