@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import type {
   AccessLogList,
+  AccessLogPublic,
   ActivePatron,
   BookImportPreviewResponse,
   BookImportResponse,
@@ -38,6 +39,22 @@ import type {
 
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
 const API_BASE_URL = RAW_API_BASE_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+function normalizeAccessLog(log: any): AccessLogPublic {
+  const user = log?.user || {};
+  return {
+    ...log,
+    patron_id: log?.patron_id || log?.patronId || user.id || null,
+    patron_name: log?.patron_name || log?.full_name || log?.fullName || user.full_name || user.fullName || null,
+    student_code: log?.student_code || log?.studentCode || user.student_code || user.studentCode || null,
+    access_type: log?.access_type || log?.accessType || "",
+    verify_method: log?.verify_method || log?.verifyMethod || "face",
+    confidence: log?.confidence ?? null,
+    camera_id: log?.camera_id || log?.cameraId || "",
+    access_time: log?.access_time || log?.accessTime || log?.created_at || log?.createdAt || "",
+    status: log?.status || "",
+  };
+}
 
 function setStoredAccessToken(token: string) {
   if (typeof window === "undefined") return;
@@ -416,14 +433,29 @@ class ApiClient {
       if (params.cameraId) query.camera_id = params.cameraId;
       if (params.status) query.status = params.status;
       if (params.accessType) query.access_type = params.accessType;
-      if (params.dateFrom) query.date_from = params.dateFrom;
-      if (params.dateTo) query.date_to = params.dateTo;
+      if (params.dateFrom) {
+        query.date_from = params.dateFrom;
+        query.dateFrom = params.dateFrom;
+      }
+      if (params.dateTo) {
+        query.date_to = params.dateTo;
+        query.dateTo = params.dateTo;
+      }
       if (params.search) query.search = params.search;
       query.skip = params.skip ?? 0;
       query.limit = Math.min(params.limit ?? 50, 200);
     }
-    const response = await this.client.get<AccessLogList>("/api/access/logs", { params: query });
-    return response.data;
+    const response = await this.client.get<AccessLogList | AccessLogPublic[]>("/api/access/logs", { params: query });
+    const data = response.data;
+    if (Array.isArray(data)) {
+      const items = data.map(normalizeAccessLog);
+      return { items, total: items.length };
+    }
+    const items = Array.isArray(data?.items) ? data.items.map(normalizeAccessLog) : [];
+    return {
+      items,
+      total: typeof data?.total === "number" ? data.total : items.length,
+    };
   }
 
   connectAccessSSE(
@@ -443,21 +475,65 @@ class ApiClient {
   }
 
   async getRecentLogs(): Promise<AccessLogList> {
-    const response = await this.client.get<AccessLogList>("/api/access/recent");
-    return response.data;
+    const response = await this.client.get<AccessLogList | AccessLogPublic[]>("/api/access/recent");
+    const data = response.data;
+    if (Array.isArray(data)) {
+      const items = data.map(normalizeAccessLog);
+      return { items, total: items.length };
+    }
+    const items = Array.isArray(data?.items) ? data.items.map(normalizeAccessLog) : [];
+    return {
+      items,
+      total: typeof data?.total === "number" ? data.total : items.length,
+    };
   }
 
   async getActivePatrons(): Promise<{ items: ActivePatron[]; total: number }> {
-    const response = await this.client.get<{ items: ActivePatron[]; total: number }>("/api/access/active");
-    return response.data;
+    const response = await this.client.get<{ items: ActivePatron[]; total: number } | any[]>("/api/access/active");
+    const data = response.data;
+    const rawItems = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+    const items = rawItems.map((item: any) => ({
+      ...item,
+      id: item.id || item.patron_id,
+      full_name: item.full_name || item.fullName || "",
+      student_code: item.student_code || item.studentCode || "",
+      entered_at: item.entered_at || item.last_entry_at || item.lastEntryAt || "",
+      camera_id: item.camera_id || item.last_entry_camera || item.lastEntryCamera || "",
+      image_url: item.image_url || null,
+      confidence: item.confidence ?? null,
+    }));
+    return {
+      items,
+      total: typeof (data as any)?.total === "number" ? (data as any).total : items.length,
+    };
   }
 
   async getAccessFrequency(params?: { dateFrom?: string; dateTo?: string }): Promise<AccessFrequencyResponse> {
     const query: any = {};
-    if (params?.dateFrom) query.date_from = params.dateFrom;
-    if (params?.dateTo) query.date_to = params.dateTo;
-    const response = await this.client.get<AccessFrequencyResponse>("/api/access/frequency", { params: query });
-    return response.data;
+    if (params?.dateFrom) {
+      query.date_from = params.dateFrom;
+      query.dateFrom = params.dateFrom;
+    }
+    if (params?.dateTo) {
+      query.date_to = params.dateTo;
+      query.dateTo = params.dateTo;
+    }
+    const response = await this.client.get<AccessFrequencyResponse | any[]>("/api/access/frequency", { params: query });
+    const data = response.data;
+    if (!Array.isArray(data)) {
+      return { daily: Array.isArray(data?.daily) ? data.daily : [] };
+    }
+    const byDate = new Map<string, { date: string; entry: number; exit: number }>();
+    data.forEach((row: any) => {
+      const date = new Date(row.date).toISOString().split("T")[0];
+      const item = byDate.get(date) || { date, entry: 0, exit: 0 };
+      const type = row.access_type || row.accessType;
+      const count = Number(row.count || 0);
+      if (type === "entry") item.entry += count;
+      if (type === "exit") item.exit += count;
+      byDate.set(date, item);
+    });
+    return { daily: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)) };
   }
 
   async getStats(): Promise<StatsResponse> {

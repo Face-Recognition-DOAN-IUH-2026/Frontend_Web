@@ -126,7 +126,7 @@ export default function HistoryPage() {
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
         });
-        setFrequency(data.daily);
+        setFrequency(Array.isArray(data.daily) ? data.daily : []);
       } finally {
         setFreqLoading(false);
       }
