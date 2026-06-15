@@ -237,7 +237,6 @@ export default function StaffSchedulesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [availability, setAvailability] = useState({ dateFrom: toDateInput(new Date()), dateTo: toDateInput(new Date()), reason: "" });
   const [zoneForm, setZoneForm] = useState({ floor: "1", zoneName: "" });
   const [shiftForm, setShiftForm] = useState({ name: "", startTime: "08:00", endTime: "12:00", minStaff: "1" });
 
@@ -411,23 +410,6 @@ export default function StaffSchedulesPage() {
     try {
       await api.deleteScheduleShift(shift.id);
       await loadData();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submitAvailability = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      await api.createMyAvailability({
-        dateFrom: availability.dateFrom,
-        dateTo: availability.dateTo,
-        reason: availability.reason || null,
-      });
-      setAvailability((value) => ({ ...value, reason: "" }));
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -702,7 +684,7 @@ export default function StaffSchedulesPage() {
           </div>
         </DndContext>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="grid gap-5">
           <div className="rounded-lg border border-border bg-surface p-4">
             <div className="mb-4 flex items-center gap-2">
               <UserCheck size={18} className="text-primary" />
@@ -728,26 +710,6 @@ export default function StaffSchedulesPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <h3 className="font-semibold text-text">Đăng ký ngày nghỉ</h3>
-            <div className="mt-4 space-y-3">
-              <label className="block text-body-sm text-text-2">
-                Từ ngày
-                <input value={availability.dateFrom} onChange={(event) => setAvailability((value) => ({ ...value, dateFrom: event.target.value }))} type="date" className="mt-1 w-full rounded-md border border-border bg-bg px-3 py-2 text-text" />
-              </label>
-              <label className="block text-body-sm text-text-2">
-                Đến ngày
-                <input value={availability.dateTo} onChange={(event) => setAvailability((value) => ({ ...value, dateTo: event.target.value }))} type="date" className="mt-1 w-full rounded-md border border-border bg-bg px-3 py-2 text-text" />
-              </label>
-              <label className="block text-body-sm text-text-2">
-                Lý do
-                <textarea value={availability.reason} onChange={(event) => setAvailability((value) => ({ ...value, reason: event.target.value }))} className="mt-1 min-h-24 w-full rounded-md border border-border bg-bg px-3 py-2 text-text" />
-              </label>
-              <button onClick={submitAvailability} disabled={saving} className="w-full rounded-md bg-primary px-3 py-2 text-body-sm font-semibold text-bg disabled:opacity-60">
-                Gửi yêu cầu
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
