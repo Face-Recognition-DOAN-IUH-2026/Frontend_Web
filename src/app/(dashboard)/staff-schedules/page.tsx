@@ -57,6 +57,11 @@ function normalizeTime(time?: string) {
   return (time || "").slice(0, 5);
 }
 
+function displayZoneName(zone: LibraryZone) {
+  const compact = zone.zoneName.match(/^(Tang|Tầng)\s*(\d+)/i);
+  return compact ? `Tang ${compact[2]}` : zone.zoneName;
+}
+
 function initials(name?: string | null, email?: string) {
   const source = name || email || "S";
   return source
@@ -261,8 +266,8 @@ export default function StaffSchedulesPage() {
       const createdZones = zones.length
         ? zones
         : await Promise.all([
-            api.createScheduleZone({ floor: 1, zoneName: "Tang 1 - Quay muon tra" }),
-            api.createScheduleZone({ floor: 2, zoneName: "Tang 2 - Kho sach" }),
+            api.createScheduleZone({ floor: 1, zoneName: "Tang 1" }),
+            api.createScheduleZone({ floor: 2, zoneName: "Tang 2" }),
           ]);
       const createdShifts = shifts.length
         ? shifts
@@ -282,16 +287,13 @@ export default function StaffSchedulesPage() {
   };
 
   const createZone = async () => {
-    if (!zoneForm.zoneName.trim()) {
-      setError("Vui long nhap ten khu vuc/tang");
-      return;
-    }
+    const floor = Number(zoneForm.floor) || 1;
     setSaving(true);
     setError(null);
     try {
       await api.createScheduleZone({
-        floor: Number(zoneForm.floor) || 1,
-        zoneName: zoneForm.zoneName.trim(),
+        floor,
+        zoneName: zoneForm.zoneName.trim() || `Tang ${floor}`,
       });
       setZoneForm((value) => ({ ...value, zoneName: "" }));
       await loadData();
@@ -474,11 +476,11 @@ export default function StaffSchedulesPage() {
                         />
                       </label>
                       <label className="text-caption text-text-2">
-                        Khu vuc
+                        Ten hien thi
                         <input
                           value={zoneForm.zoneName}
                           onChange={(event) => setZoneForm((value) => ({ ...value, zoneName: event.target.value }))}
-                          placeholder="VD: Tang 3 - Phong doc"
+                          placeholder="VD: Tang 3"
                           className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-2 text-text"
                         />
                       </label>
@@ -565,7 +567,7 @@ export default function StaffSchedulesPage() {
                       <div className="rounded-md border border-border bg-bg/60 p-3">
                         <div className="flex items-center gap-2 text-text">
                           <MapPin size={16} className="text-primary" />
-                          <span className="font-semibold">{zone.zoneName}</span>
+                          <span className="font-semibold">{displayZoneName(zone)}</span>
                         </div>
                         <p className="mt-1 text-caption text-text-3">Tang {zone.floor}</p>
                       </div>
