@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { LogIn, LogOut, ShieldCheck } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api-client';
 import CameraFeed from '@/components/gate/CameraFeed';
 import MssvInput from '@/components/gate/MssvInput';
 import GateButton from '@/components/gate/GateButton';
 import ResultCard from '@/components/gate/ResultCard';
-import PulseAnimation from '@/components/gate/PulseAnimation';
-import type { CameraEvent, KioskResult, PatronLookupResult } from '@/lib/types';
+import type { AccessLogPublic, CameraEvent, KioskResult, PatronLookupResult } from '@/lib/types';
 
 interface TodayCounts { entries: number; exits: number; no_match: number; spoof: number; }
 
@@ -28,6 +28,37 @@ interface Toast {
 
 let toastId = 0;
 
+const HISTORY_LIMIT = 8;
+
+function formatGateTime(value?: string) {
+  if (!value) return '--:--';
+  return new Date(value).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function formatConfidence(value?: number | null) {
+  if (typeof value !== 'number') return null;
+  return `${Math.round(value * 100)}%`;
+}
+
+function buildLogFromEvent(event: CameraEvent): AccessLogPublic {
+  return {
+    id: `${event.camera_id}-${event.patron_id || event.student_code || 'unknown'}-${Date.now()}`,
+    patron_id: event.patron_id || null,
+    patron_name: event.full_name || null,
+    student_code: event.student_code || null,
+    access_type: event.access_type === 'exit' ? 'exit' : 'entry',
+    verify_method: 'face',
+    confidence: event.score ?? null,
+    camera_id: event.camera_id,
+    access_time: new Date().toISOString(),
+    status: event.status,
+  };
+}
+
 export default function GatePage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -40,6 +71,7 @@ export default function GatePage() {
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
   const [todayCounts, setTodayCounts] = useState<TodayCounts>(() => {
     if (typeof window !== 'undefined') {
       const cached = localStorage.getItem('gate_today_counts');
@@ -57,6 +89,10 @@ export default function GatePage() {
     const id = ++toastId;
     setToasts((prev) => [{ ...t, id }, ...prev.slice(0, 4)]);
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 6000);
+  }, []);
+
+  const addRecentLog = useCallback((log: AccessLogPublic) => {
+    setRecentLogs((prev) => [log, ...prev].slice(0, HISTORY_LIMIT * 2));
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -216,6 +252,12 @@ export default function GatePage() {
   }, []);
 
   useEffect(() => {
+    api.getRecentLogs()
+      .then((res) => setRecentLogs(res.items.slice(0, HISTORY_LIMIT * 2)))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('gate_today_counts', JSON.stringify(todayCounts));
   }, [todayCounts]);
 
@@ -236,6 +278,7 @@ export default function GatePage() {
       }
       if (event.status === 'granted') {
         const type = event.access_type === 'entry' ? 'entry' : 'exit';
+        addRecentLog(buildLogFromEvent(event));
         addToast({
           type,
           message: `${event.full_name} — ${type === 'entry' ? 'Vào' : 'Ra'} thư viện`,
@@ -251,13 +294,92 @@ export default function GatePage() {
       }
     });
     return cleanup;
-  }, [addToast]);
+  }, [addRecentLog, addToast]);
 
   const getResultStatus = () => {
     if (!result) return 'processing';
     if (result.success) return 'success';
     if (result.message?.includes('đăng ký tại quầy')) return 'unregistered';
     return 'error';
+  };
+
+  const entryLogs = recentLogs.filter((log) => log.access_type === 'entry').slice(0, HISTORY_LIMIT);
+  const exitLogs = recentLogs.filter((log) => log.access_type === 'exit').slice(0, HISTORY_LIMIT);
+
+  const renderHistoryColumn = (
+    title: string,
+    subtitle: string,
+    logs: AccessLogPublic[],
+    type: 'entry' | 'exit',
+  ) => {
+    const Icon = type === 'entry' ? LogIn : LogOut;
+    const toneClasses = type === 'entry'
+      ? {
+          header: 'bg-emerald-500/10',
+          icon: 'bg-emerald-500/15 text-emerald-300',
+          count: 'text-emerald-300',
+          confidence: 'bg-emerald-500/15 text-emerald-300',
+        }
+      : {
+          header: 'bg-orange-500/10',
+          icon: 'bg-orange-500/15 text-orange-300',
+          count: 'text-orange-300',
+          confidence: 'bg-orange-500/15 text-orange-300',
+        };
+
+    return (
+      <div className="bg-slate-800/70 rounded-2xl border border-slate-700 overflow-hidden">
+        <div className={`px-4 py-3 border-b border-slate-700 ${toneClasses.header}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${toneClasses.icon}`}>
+                <Icon size={20} />
+              </div>
+              <div>
+                <h2 className="text-white font-semibold">{title}</h2>
+                <p className="text-xs text-slate-400">{subtitle}</p>
+              </div>
+            </div>
+            <span className={`text-2xl font-bold tabular-nums ${toneClasses.count}`}>{logs.length}</span>
+          </div>
+        </div>
+
+        <div className="divide-y divide-slate-700/70">
+          {logs.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-slate-400">
+              Chưa có lượt {type === 'entry' ? 'vào' : 'ra'} gần đây
+            </div>
+          ) : (
+            logs.map((log) => {
+              const confidence = formatConfidence(log.confidence);
+              return (
+                <div key={log.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">
+                        {log.patron_name || 'Không rõ tên'}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                        <span className="font-mono">{log.student_code || '---'}</span>
+                        <span>{formatGateTime(log.access_time)}</span>
+                        <span className="font-mono">{log.camera_id || '-'}</span>
+                      </div>
+                    </div>
+                    {confidence ? (
+                      <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${toneClasses.confidence}`}>
+                        {confidence}
+                      </span>
+                    ) : (
+                      <ShieldCheck className="shrink-0 text-slate-500" size={17} />
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -400,6 +522,11 @@ export default function GatePage() {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {renderHistoryColumn('Lịch sử vào', 'Các lượt vừa qua cổng vào', entryLogs, 'entry')}
+          {renderHistoryColumn('Lịch sử ra', 'Các lượt vừa qua cổng ra', exitLogs, 'exit')}
         </div>
 
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
