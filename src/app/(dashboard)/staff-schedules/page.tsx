@@ -614,7 +614,7 @@ export default function StaffSchedulesPage() {
                     <div>
                       <p className="font-semibold text-text">{item.workDate} - {item.shift?.name || item.shiftId}</p>
                       <p className="mt-1 text-body-sm text-text-3">
-                        {normalizeTime(item.shift?.startTime)}-{normalizeTime(item.shift?.endTime)} tai {item.zone?.zoneName || item.zoneId}
+                        {normalizeTime(item.shift?.startTime)}-{normalizeTime(item.shift?.endTime)} tai {item.zone ? displayZoneName(item.zone) : item.zoneId}
                       </p>
                     </div>
                     <span className="rounded-full bg-primary/15 px-2 py-1 text-caption font-semibold text-primary">{item.status}</span>
