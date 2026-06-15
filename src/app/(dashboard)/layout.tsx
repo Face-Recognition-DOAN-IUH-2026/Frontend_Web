@@ -20,6 +20,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   "/identify": { title: "Nhận diện", subtitle: "Tìm kiếm độc giả qua khuôn mặt" },
   "/liveness": { title: "Kiểm tra sống", subtitle: "Xác minh khuôn mặt thật" },
   "/dashboard/admin": { title: "Quản trị hệ thống", subtitle: "Quản lý người dùng và phân quyền" },
+  "/staff-schedules": { title: "Lich truc", subtitle: "Dieu phoi ca truc theo tuan, tang va khu vuc" },
 };
 
 function Breadcrumb({ pathname }: { pathname: string }) {

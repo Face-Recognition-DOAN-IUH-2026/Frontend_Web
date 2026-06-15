@@ -28,6 +28,12 @@ import type {
   StaffActiveBorrowersResponse,
   StaffPatronActiveBorrowsResponse,
   StaffReturnRequest,
+  LibraryZone,
+  ScheduleAssignmentList,
+  ScheduleStaff,
+  StaffAvailabilityRequest,
+  StaffScheduleAssignment,
+  StaffShift,
 } from "./types";
 
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
@@ -657,6 +663,78 @@ class ApiClient {
     if (bookId) params.book_id = bookId;
     if (availableOnly) params.available_only = true;
     const response = await this.client.get<BookCopyData[]>("/api/borrow/barcodes", { params: params });
+    return response.data;
+  }
+
+  // === Staff schedules ===
+  async getScheduleStaffOptions(): Promise<ScheduleStaff[]> {
+    const response = await this.client.get<ScheduleStaff[]>("/api/schedules/staff-options");
+    return response.data;
+  }
+
+  async getScheduleZones(): Promise<LibraryZone[]> {
+    const response = await this.client.get<LibraryZone[]>("/api/schedules/zones");
+    return response.data;
+  }
+
+  async createScheduleZone(data: Partial<LibraryZone>): Promise<LibraryZone> {
+    const response = await this.client.post<LibraryZone>("/api/schedules/zones", data);
+    return response.data;
+  }
+
+  async getScheduleShifts(): Promise<StaffShift[]> {
+    const response = await this.client.get<StaffShift[]>("/api/schedules/shifts");
+    return response.data;
+  }
+
+  async createScheduleShift(data: Partial<StaffShift>): Promise<StaffShift> {
+    const response = await this.client.post<StaffShift>("/api/schedules/shifts", data);
+    return response.data;
+  }
+
+  async getScheduleAssignments(params?: { from?: string; to?: string; staffId?: string; zoneId?: string; status?: string }): Promise<ScheduleAssignmentList> {
+    const query: any = {};
+    if (params?.from) query.from = params.from;
+    if (params?.to) query.to = params.to;
+    if (params?.staffId) query.staff_id = params.staffId;
+    if (params?.zoneId) query.zone_id = params.zoneId;
+    if (params?.status) query.status = params.status;
+    const response = await this.client.get<ScheduleAssignmentList>("/api/schedules/assignments", { params: query });
+    return response.data;
+  }
+
+  async createScheduleAssignment(data: { staffId: string; shiftId: string; zoneId: string; workDate: string; note?: string | null }): Promise<StaffScheduleAssignment> {
+    const response = await this.client.post<StaffScheduleAssignment>("/api/schedules/assignments", data);
+    return response.data;
+  }
+
+  async moveScheduleAssignment(id: string, data: Partial<StaffScheduleAssignment>): Promise<StaffScheduleAssignment> {
+    const response = await this.client.post<StaffScheduleAssignment>(`/api/schedules/assignments/${id}/move`, data);
+    return response.data;
+  }
+
+  async getMySchedules(params?: { from?: string; to?: string }): Promise<ScheduleAssignmentList> {
+    const response = await this.client.get<ScheduleAssignmentList>("/api/schedules/me", { params });
+    return response.data;
+  }
+
+  async confirmScheduleAssignment(id: string): Promise<StaffScheduleAssignment> {
+    const response = await this.client.post<StaffScheduleAssignment>(`/api/schedules/assignments/${id}/confirm`);
+    return response.data;
+  }
+
+  async checkInScheduleAssignment(id: string): Promise<any> {
+    const response = await this.client.post(`/api/schedules/assignments/${id}/check-in`, { method: "web" });
+    return response.data;
+  }
+
+  async checkOutScheduleAssignment(id: string): Promise<any> {
+    const response = await this.client.post(`/api/schedules/assignments/${id}/check-out`);
+    return response.data;
+  }
+
+  async createMyAvailability(data: { dateFrom: string; dateTo: string; reason?: string | null }): Promise<StaffAvailabilityRequest> {
+    const response = await this.client.post<StaffAvailabilityRequest>("/api/schedules/me/availability", data);
     return response.data;
   }
 }
