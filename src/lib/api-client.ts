@@ -35,6 +35,10 @@ import type {
   StaffAvailabilityRequest,
   StaffScheduleAssignment,
   StaffShift,
+  AiCommandCenterSummary,
+  AiInsight,
+  AiInsightList,
+  AiChatResponse,
 } from "./types";
 
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
@@ -52,7 +56,7 @@ function normalizeAccessLog(log: any): AccessLogPublic {
     confidence: log?.confidence ?? null,
     camera_id: log?.camera_id || log?.cameraId || "",
     access_time: log?.access_time || log?.accessTime || log?.created_at || log?.createdAt || "",
-    status: log?.status || "",
+    status: log?.status === "granted" ? "success" : (log?.status || ""),
   };
 }
 
@@ -537,8 +541,18 @@ class ApiClient {
   }
 
   async getStats(): Promise<StatsResponse> {
-    const response = await this.client.get<StatsResponse>("/api/access/stats");
-    return response.data;
+    const [accessRes, patronRes] = await Promise.all([
+      this.client.get<any>("/api/access/stats").catch(() => null),
+      this.client.get<any>("/api/patrons/stats").catch(() => null),
+    ]);
+    const access = accessRes?.data || {};
+    const patron = patronRes?.data || {};
+    return {
+      total_patrons: patron.totalPatrons ?? patron.total_patrons ?? 0,
+      active_patrons: patron.activePatrons ?? patron.active_patrons ?? access.active_inside ?? access.activeInside ?? 0,
+      today_entries: access.today_entries ?? access.todayEntries ?? 0,
+      today_exits: access.today_exits ?? access.todayExits ?? 0,
+    };
   }
 
   async enrollPatronFace(
@@ -683,6 +697,16 @@ class ApiClient {
 
   async staffReturnBorrowRecord(recordId: string): Promise<ReturnResponse> {
     const response = await this.client.post<ReturnResponse>(`/api/borrow/staff-return/record/${recordId}`);
+    return response.data;
+  }
+
+  async getBorrowStats(): Promise<{ total: number; active: number; overdue: number }> {
+    const response = await this.client.get("/api/borrow/staff/stats");
+    return response.data;
+  }
+
+  async getAllActiveBorrows(): Promise<BorrowRecord[]> {
+    const response = await this.client.get<BorrowRecord[]>("/api/borrow/staff/active");
     return response.data;
   }
 
@@ -858,6 +882,31 @@ class ApiClient {
 
   async createMyAvailability(data: { dateFrom: string; dateTo: string; reason?: string | null }): Promise<StaffAvailabilityRequest> {
     const response = await this.client.post<StaffAvailabilityRequest>("/api/schedules/me/availability", data);
+    return response.data;
+  }
+
+  async getAiCommandCenterSummary(): Promise<AiCommandCenterSummary> {
+    const response = await this.client.get<AiCommandCenterSummary>("/api/ai/command-center/summary");
+    return response.data;
+  }
+
+  async refreshAiCommandCenter(): Promise<AiCommandCenterSummary> {
+    const response = await this.client.post<AiCommandCenterSummary>("/api/ai/command-center/refresh");
+    return response.data;
+  }
+
+  async getAiInsights(params?: { status?: string; category?: string; severity?: string }): Promise<AiInsightList> {
+    const response = await this.client.get<AiInsightList>("/api/ai/insights", { params });
+    return response.data;
+  }
+
+  async dismissAiInsight(id: string): Promise<AiInsight> {
+    const response = await this.client.post<AiInsight>(`/api/ai/insights/${id}/dismiss`);
+    return response.data;
+  }
+
+  async askAiCommandCenter(question: string): Promise<AiChatResponse> {
+    const response = await this.client.post<AiChatResponse>("/api/ai/chat", { question });
     return response.data;
   }
 }
