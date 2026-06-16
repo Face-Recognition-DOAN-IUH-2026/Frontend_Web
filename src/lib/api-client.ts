@@ -678,8 +678,8 @@ class ApiClient {
     return response.data;
   }
 
-  async staffReturnBook(barcode: string): Promise<ReturnResponse> {
-    const response = await this.client.post<ReturnResponse>("/api/borrow/staff-return", { barcode } as StaffReturnRequest);
+  async staffReturnBook(barcode: string, note?: string | null): Promise<ReturnResponse> {
+    const response = await this.client.post<ReturnResponse>("/api/borrow/staff-return", { barcode, note } as StaffReturnRequest);
     return response.data;
   }
 
@@ -695,8 +695,8 @@ class ApiClient {
     return response.data;
   }
 
-  async staffReturnBorrowRecord(recordId: string): Promise<ReturnResponse> {
-    const response = await this.client.post<ReturnResponse>(`/api/borrow/staff-return/record/${recordId}`);
+  async staffReturnBorrowRecord(recordId: string, note?: string | null): Promise<ReturnResponse> {
+    const response = await this.client.post<ReturnResponse>(`/api/borrow/staff-return/record/${recordId}`, { note });
     return response.data;
   }
 
@@ -783,6 +783,16 @@ class ApiClient {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  }
+
+  async lookupBookByIsbn(isbn: string): Promise<BookWithStats> {
+    const response = await this.client.get<BookWithStats>(`/api/borrow/book/${encodeURIComponent(isbn)}`);
+    return response.data;
+  }
+
+  async batchImportByIsbn(items: { isbn: string; quantity: number }[]): Promise<BookImportResponse> {
+    const response = await this.client.post<BookImportResponse>("/api/borrow/isbn-import/batch", { items });
+    return response.data;
   }
 
   async updateBookQuantity(bookId: string, quantity: number): Promise<BookWithStats> {

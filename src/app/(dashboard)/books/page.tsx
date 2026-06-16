@@ -39,10 +39,12 @@ import EyeIcon from "@mui/icons-material/VisibilityOutlined";
 import FileIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import IsbnScannerDialog from "@/components/IsbnScannerDialog";
 import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
 
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
@@ -111,6 +113,7 @@ export default function BooksPage() {
   const [savingQuantity, setSavingQuantity] = useState(false);
   const [quantityError, setQuantityError] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
+  const [isbnScannerOpen, setIsbnScannerOpen] = useState(false);
 
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
 
@@ -232,6 +235,20 @@ export default function BooksPage() {
     }
   };
 
+  const handleIsbnImportComplete = (results: BookImportResultRow[]) => {
+    setIsbnScannerOpen(false);
+    setSearchQuery("");
+    setPage(0);
+    loadBooks();
+    const importedCount = results.filter((r) => r.status === "imported" || r.status === "updated").length;
+    const errorCount = results.filter((r) => r.status === "error").length;
+    if (errorCount === 0) {
+      showNotice("success", `Đã nhập ${importedCount} đầu sách từ ISBN`);
+    } else {
+      showNotice("warning", `${importedCount} thành công, ${errorCount} lỗi`);
+    }
+  };
+
   const openQuantityDialog = (book: BookWithStats) => {
     setSelectedBook(book);
     setEditQuantity(book.total_copies);
@@ -277,6 +294,7 @@ export default function BooksPage() {
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
             <Button variant="contained" startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Nhập Excel</Button>
+            <Button variant="contained" color="secondary" startIcon={<QrCodeScannerIcon />} onClick={() => setIsbnScannerOpen(true)}>Quét ISBN</Button>
             <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => { setPage(0); setSearchQuery(""); loadBooks(); }}>Tải lại</Button>
             <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.downloadBookTemplate()}>Tải mẫu</Button>
             <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.exportBooks()}>Xuất Excel</Button>
@@ -499,6 +517,12 @@ export default function BooksPage() {
       <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
         {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
       </Snackbar>
+
+      <IsbnScannerDialog
+        open={isbnScannerOpen}
+        onClose={() => setIsbnScannerOpen(false)}
+        onImportComplete={handleIsbnImportComplete}
+      />
     </Stack>
   );
 }

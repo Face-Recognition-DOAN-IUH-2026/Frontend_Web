@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -16,10 +16,13 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
+  IconButton,
   InputAdornment,
   List,
   ListItemButton,
+  MenuItem,
   Paper,
+  Select,
   Snackbar,
   Stack,
   Table,
@@ -35,7 +38,11 @@ import {
 } from "@mui/material";
 import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
 import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
@@ -72,6 +79,12 @@ function dueChip(record: BorrowRecord) {
   return <Chip size="small" color="success" label="Đúng hạn" />;
 }
 
+interface ScannedReturnItem {
+  isbn: string;
+  record: BorrowRecord;
+  condition: string;
+}
+
 export default function ReturnPage() {
   const [borrowers, setBorrowers] = useState<StaffActiveBorrowerSummary[]>([]);
   const [selectedStudentCode, setSelectedStudentCode] = useState<string | null>(null);
@@ -82,8 +95,19 @@ export default function ReturnPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [returningId, setReturningId] = useState<string | null>(null);
   const [confirmRecord, setConfirmRecord] = useState<BorrowRecord | null>(null);
+  const [condition, setCondition] = useState("");
   const [error, setError] = useState("");
-  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error"; message: string } | null>(null);
+  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const readerRef = useRef<any>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [scannedReturns, setScannedReturns] = useState<ScannedReturnItem[]>([]);
+  const [batchReturning, setBatchReturning] = useState(false);
+  const [scanToast, setScanToast] = useState("");
 
   const loadBorrowers = useCallback(async () => {
     setLoadingBorrowers(true);
@@ -123,6 +147,7 @@ export default function ReturnPage() {
   useEffect(() => {
     if (selectedStudentCode) loadPatronDetail(selectedStudentCode);
     else setDetail(null);
+    setScannedReturns([]);
   }, [selectedStudentCode, loadPatronDetail]);
 
   const filteredBorrowers = useMemo(() => {
@@ -154,8 +179,9 @@ export default function ReturnPage() {
     setReturningId(confirmRecord.id);
     setError("");
     try {
-      await api.staffReturnBorrowRecord(confirmRecord.id);
+      await api.staffReturnBorrowRecord(confirmRecord.id, condition || null);
       setSnackbar({ severity: "success", message: "Trả sách thành công" });
+      setCondition("");
       setConfirmRecord(null);
       await loadBorrowers();
       if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
@@ -165,6 +191,133 @@ export default function ReturnPage() {
       setReturningId(null);
     }
   };
+
+  const handleBatchReturn = async () => {
+    if (!scannedReturns.length) return;
+    setBatchReturning(true);
+    let ok = 0;
+    let fail = 0;
+    for (const item of scannedReturns) {
+      try {
+        await api.staffReturnBorrowRecord(item.record.id, item.condition || null);
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    setBatchReturning(false);
+    setScannerOpen(false);
+    setScannedReturns([]);
+    setSnackbar({
+      severity: fail > 0 ? "warning" : "success",
+      message: `Trả ${ok} sách thành công${fail > 0 ? `, ${fail} thất bại` : ""}`,
+    });
+    await loadBorrowers();
+    if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
+  };
+
+  const updateCondition = (isbn: string, value: string) => {
+    setScannedReturns((prev) => prev.map((item) =>
+      item.isbn === isbn ? { ...item, condition: value } : item
+    ));
+  };
+
+  const removeScanned = (isbn: string) => {
+    setScannedReturns((prev) => prev.filter((item) => item.isbn !== isbn));
+  };
+
+  const stopCamera = useCallback(() => {
+    if (readerRef.current) {
+      try { readerRef.current.reset(); } catch {}
+      readerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraReady(false);
+  }, []);
+
+  const handleScanned = useCallback((isbn: string) => {
+    const normalized = isbn.replace(/-/g, "");
+    let toast = "";
+    setScannedReturns((prev) => {
+      if (prev.some((item) => item.isbn === normalized)) {
+        toast = `Sách ${normalized} đã có trong danh sách`;
+        return prev;
+      }
+      const match = detail?.records.find((r) => {
+        const recordIsbn = (r.book?.isbn || "").replace(/-/g, "");
+        return recordIsbn === normalized;
+      });
+      if (match) {
+        toast = `Đã thêm: ${match.book?.title || normalized}`;
+        return [...prev, { isbn: normalized, record: match, condition: "" }];
+      }
+      toast = `Không tìm thấy sách đang mượn: ${normalized}`;
+      return prev;
+    });
+    setScanToast(toast);
+  }, [detail]);
+
+  useEffect(() => {
+    if (!scannerOpen) {
+      stopCamera();
+      setCameraError("");
+      setCameraReady(false);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        setCameraError("");
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        if (!active) return;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => { setCameraReady(true); };
+        }
+      } catch (err: any) {
+        if (!active) return;
+        if (err.name === "NotAllowedError") setCameraError("Không có quyền truy cập camera.");
+        else if (err.name === "NotFoundError") setCameraError("Không tìm thấy camera trên thiết bị.");
+        else setCameraError("Không thể khởi động camera.");
+      }
+    })();
+    return () => { active = false; };
+  }, [scannerOpen, stopCamera]);
+
+  useEffect(() => {
+    if (!cameraReady || !videoRef.current || !scannerOpen) return;
+    let active = true;
+    (async () => {
+      try {
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        if (!active) return;
+        const reader = new BrowserMultiFormatReader();
+        readerRef.current = reader;
+        reader.decodeFromVideoElement(videoRef.current!, (result, err) => {
+          if (!active) return;
+          if (result) {
+            const code = result.getText();
+            if (/^\d{10,13}$/.test(code.replace(/-/g, ""))) {
+              handleScanned(code);
+            }
+          }
+        });
+      } catch {}
+    })();
+    return () => { active = false; };
+  }, [cameraReady, scannerOpen, handleScanned]);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
 
   return (
     <Stack spacing={3}>
@@ -273,12 +426,24 @@ export default function ReturnPage() {
         </Paper>
 
         <Paper variant="outlined" sx={{ minHeight: 620, p: 2 }}>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="h6">Chi tiết trả sách</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {selectedBorrower ? `${borrowerName(selectedBorrower)} - ${selectedBorrower.patron.student_code}` : "Chọn một độc giả ở danh sách bên trái"}
-            </Typography>
-          </Box>
+          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
+            <Box>
+              <Typography variant="h6">Chi tiết trả sách</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {selectedBorrower ? `${borrowerName(selectedBorrower)} - ${selectedBorrower.patron.student_code}` : "Chọn một độc giả ở danh sách bên trái"}
+              </Typography>
+            </Box>
+            {selectedStudentCode && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<QrCodeScannerIcon />}
+                onClick={() => setScannerOpen(true)}
+              >
+                Quét ISBN
+              </Button>
+            )}
+          </Stack>
 
           {!selectedStudentCode ? (
             <Alert severity="info">Chọn một độc giả đang mượn để xem sách và xác nhận trả.</Alert>
@@ -340,16 +505,175 @@ export default function ReturnPage() {
         </Paper>
       </Box>
 
-      <Dialog open={!!confirmRecord} onClose={() => setConfirmRecord(null)}>
-        <DialogTitle>Xác nhận trả sách</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Trả sách "{confirmRecord?.book?.title || confirmRecord?.book_id}" cho độc giả {detail?.patron.full_name || detail?.patron.student_code}?
-          </DialogContentText>
+      <Dialog open={scannerOpen} onClose={batchReturning ? undefined : () => setScannerOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <QrCodeScannerIcon color="primary" />
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>Quét ISBN trả sách</Typography>
+            </Stack>
+            {!batchReturning && (
+              <IconButton size="small" onClick={() => setScannerOpen(false)}><CloseIcon fontSize="small" /></IconButton>
+            )}
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                position: "relative",
+                overflow: "hidden",
+                bgcolor: "black",
+                width: { md: "45%" },
+                aspectRatio: { xs: "16/9", md: "4/3" },
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {cameraError ? (
+                <Stack spacing={1} sx={{ alignItems: "center", color: "grey.300", p: 3, textAlign: "center" }}>
+                  <CameraAltIcon sx={{ fontSize: 42 }} />
+                  <Typography variant="body2">{cameraError}</Typography>
+                </Stack>
+              ) : (
+                <>
+                  <Box
+                    component="video"
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    sx={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  />
+                  {!cameraReady && (
+                    <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+                      <CircularProgress size={26} color="inherit" />
+                      <Typography variant="body2">Đang kết nối camera...</Typography>
+                    </Stack>
+                  )}
+                </>
+              )}
+            </Paper>
+
+            <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto" }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <QrCodeScannerIcon color="primary" sx={{ fontSize: 20 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
+                  {scannedReturns.length > 0 ? `Đã quét (${scannedReturns.length} cuốn)` : "Sách đã quét"}
+                </Typography>
+              </Stack>
+
+              {scannedReturns.length === 0 ? (
+                <Alert severity="info" sx={{ flex: 1, display: "flex", alignItems: "center" }}>
+                  Đưa mã vạch ISBN vào camera. Sách sẽ xuất hiện tại đây.
+                </Alert>
+              ) : (
+                scannedReturns.map((item) => (
+                  <Paper key={item.isbn} variant="outlined" sx={{ p: 1.5 }}>
+                    <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                      {item.record.book?.cover_url ? (
+                        <Box
+                          component="img"
+                          src={item.record.book.cover_url}
+                          alt={item.record.book.title}
+                          sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
+                        />
+                      ) : (
+                        <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
+                          <BookIcon />
+                        </Avatar>
+                      )}
+                      <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>
+                          {item.record.book?.title || item.record.book_id}
+                        </Typography>
+                        {item.record.book?.author && (
+                          <Typography variant="caption" color="text.secondary" noWrap>
+                            {item.record.book.author}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>
+                          {item.isbn}
+                        </Typography>
+                        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                          {dueChip(item.record)}
+                          <Typography variant="caption" color="text.secondary">
+                            Mượn: {formatDate(item.record.borrow_at)}
+                          </Typography>
+                        </Stack>
+                        <Select
+                          value={item.condition}
+                          onChange={(e) => updateCondition(item.isbn, e.target.value)}
+                          displayEmpty
+                          fullWidth
+                          size="small"
+                          sx={{ mt: 0.5 }}
+                        >
+                          <MenuItem value="">Tình trạng (tuỳ chọn)</MenuItem>
+                          <MenuItem value="Còn mới">Còn mới</MenuItem>
+                          <MenuItem value="Bình thường">Bình thường</MenuItem>
+                          <MenuItem value="Sách cũ">Sách cũ</MenuItem>
+                          <MenuItem value="Rách bìa">Rách bìa</MenuItem>
+                          <MenuItem value="Rách trang">Rách trang</MenuItem>
+                          <MenuItem value="Thiếu trang">Thiếu trang</MenuItem>
+                          <MenuItem value="Ẩm mốc">Ẩm mốc</MenuItem>
+                          <MenuItem value="Viết/bôi bẩn">Viết/bôi bẩn</MenuItem>
+                          <MenuItem value="Hư hỏng nặng">Hư hỏng nặng</MenuItem>
+                        </Select>
+                      </Stack>
+                      <IconButton size="small" color="error" onClick={() => removeScanned(item.isbn)} sx={{ mt: 0.5 }}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  </Paper>
+                ))
+              )}
+            </Stack>
+          </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmRecord(null)}>Hủy</Button>
-          <Button variant="contained" onClick={handleReturnRecord} disabled={!!returningId}>
+          <Button onClick={() => setScannerOpen(false)} disabled={batchReturning}>Đóng</Button>
+          <Button
+            variant="contained"
+            disabled={batchReturning || scannedReturns.length === 0}
+            onClick={handleBatchReturn}
+          >
+            {batchReturning ? "Đang trả sách..." : `Xác nhận trả (${scannedReturns.length} cuốn)`}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!confirmRecord} onClose={() => { setConfirmRecord(null); setCondition(""); }}>
+        <DialogTitle>Xác nhận trả sách</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Trả sách "{confirmRecord?.book?.title || confirmRecord?.book_id}" cho độc giả {detail?.patron.full_name || detail?.patron.student_code}?
+          </DialogContentText>
+          <Select
+            value={condition}
+            onChange={(e) => setCondition(e.target.value)}
+            displayEmpty
+            fullWidth
+            size="small"
+          >
+            <MenuItem value="">Tình trạng sách (tuỳ chọn)</MenuItem>
+            <MenuItem value="Còn mới">Còn mới</MenuItem>
+            <MenuItem value="Bình thường">Bình thường</MenuItem>
+            <MenuItem value="Sách cũ">Sách cũ</MenuItem>
+            <MenuItem value="Rách bìa">Rách bìa</MenuItem>
+            <MenuItem value="Rách trang">Rách trang</MenuItem>
+            <MenuItem value="Thiếu trang">Thiếu trang</MenuItem>
+            <MenuItem value="Ẩm mốc">Ẩm mốc</MenuItem>
+            <MenuItem value="Viết/bôi bẩn">Viết/bôi bẩn</MenuItem>
+            <MenuItem value="Hư hỏng nặng">Hư hỏng nặng</MenuItem>
+          </Select>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setConfirmRecord(null); setCondition(""); }}>Hủy</Button>
+          <Button variant="contained" onClick={handleReturnRecord} disabled={!!returningId || !condition}>
             {returningId ? "Đang trả..." : "Xác nhận trả"}
           </Button>
         </DialogActions>
@@ -358,6 +682,14 @@ export default function ReturnPage() {
       <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)}>
         {snackbar ? <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>{snackbar.message}</Alert> : undefined}
       </Snackbar>
+
+      <Snackbar
+        open={!!scanToast}
+        autoHideDuration={2000}
+        onClose={() => setScanToast("")}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        message={scanToast}
+      />
     </Stack>
   );
 }

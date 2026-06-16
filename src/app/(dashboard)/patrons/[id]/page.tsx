@@ -372,6 +372,7 @@ export default function PatronDetailPage() {
                   <TableCell>Ngày mượn</TableCell>
                   <TableCell>Hạn trả</TableCell>
                   <TableCell>Ngày trả</TableCell>
+                  <TableCell>Tình trạng</TableCell>
                   <TableCell>Trạng thái</TableCell>
                 </TableRow>
               </TableHead>
@@ -391,6 +392,13 @@ export default function PatronDetailPage() {
                         {formatDate(record.due_at)}
                       </TableCell>
                       <TableCell>{formatDate(record.return_at)}</TableCell>
+                      <TableCell>
+                        {record.status === "returned" && record.note ? (
+                          <Chip size="small" variant="outlined" label={record.note} sx={{ fontSize: 11 }} />
+                        ) : (
+                          <Typography variant="body2" color="text.disabled">-</Typography>
+                        )}
+                      </TableCell>
                       <TableCell><Chip size="small" color={status.color} label={status.label} /></TableCell>
                     </TableRow>
                   );
