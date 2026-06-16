@@ -470,7 +470,7 @@ export default function PatronDetailPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Chip size="small" color={log.status === "success" ? "success" : "error"} label={log.status === "success" ? "Thành công" : "Thất bại"} />
+                          <Chip size="small" color={["success", "granted"].includes(log.status) ? "success" : "error"} label={["success", "granted"].includes(log.status) ? "Thành công" : "Thất bại"} />
                         </TableCell>
                       </TableRow>
                     );

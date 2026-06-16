@@ -246,7 +246,7 @@ export default function StatsPage() {
             <Typography variant="body2" color="text.secondary">Theo dõi ra/vào, hiện diện và mượn trả trong ngày</Typography>
           </Box>
           <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap" }}>
-            <Chip variant="outlined" label={`Tổng độc giả: ${stats.total_patrons.toLocaleString("vi-VN")}`} />
+            <Chip variant="outlined" label={`Tổng độc giả: ${(stats.total_patrons ?? 0).toLocaleString("vi-VN")}`} />
             <Chip color={realtimeColor as any} icon={<RadioIcon />} label={realtimeLabel} />
           </Stack>
         </Stack>
