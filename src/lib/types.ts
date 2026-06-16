@@ -170,6 +170,7 @@ export interface BorrowRecord {
   return_at: string | null;
   shelf_location: string | null;
   status: string;
+  note?: string | null;
   book?: BookInfo | null;
 }
 
@@ -213,6 +214,7 @@ export interface ReturnResponse {
   status: string;
   message: string;
   record: BorrowRecord | null;
+  note?: string | null;
 }
 
 export interface BookCopy {
@@ -235,6 +237,7 @@ export interface BookInfo {
 
 export interface StaffReturnRequest {
   barcode: string;
+  note?: string | null;
 }
 
 // === Access Log ===
@@ -452,4 +455,48 @@ export interface StaffAvailabilityRequest {
 export interface ScheduleAssignmentList {
   items: StaffScheduleAssignment[];
   total: number;
+}
+
+// === AI Command Center ===
+export type AiInsightCategory = "access" | "borrow" | "schedule" | "inventory" | "risk";
+export type AiInsightSeverity = "info" | "warning" | "critical";
+export type AiInsightStatus = "open" | "dismissed" | "resolved";
+
+export interface AiInsight {
+  id: string;
+  category: AiInsightCategory;
+  severity: AiInsightSeverity;
+  title: string;
+  summary: string;
+  evidence: Array<{ label: string; value: string | number }>;
+  recommended_actions: string[];
+  status: AiInsightStatus;
+  generated_at: string;
+}
+
+export interface AiCommandCenterSummary {
+  generated_at: string;
+  model: string;
+  headline: string;
+  operational_score: number;
+  insights: AiInsight[];
+  snapshot: {
+    active_patrons: number;
+    today_entries: number;
+    today_exits: number;
+    active_borrows: number;
+    overdue_borrows: number;
+    scheduled_staff_today: number;
+  };
+}
+
+export interface AiInsightList {
+  items: AiInsight[];
+  total: number;
+}
+
+export interface AiChatResponse {
+  answer: string;
+  model: string;
+  generated_at: string;
 }

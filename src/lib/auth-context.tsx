@@ -30,6 +30,12 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function assertWebRole(role: string) {
+  if (role !== "admin" && role !== "staff") {
+    throw new Error("Web quản trị chỉ dành cho admin hoặc staff. Độc giả vui lòng đăng nhập trên ứng dụng mobile.");
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -85,7 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: (payload?.sub as string) || "",
       email,
       role: ((payload?.roles as string[])?.[0]) || "user",
+      full_name: (payload?.full_name as string) || null,
     };
+    assertWebRole(userData.role);
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
 
@@ -103,8 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const payload = decodeJwtPayload(accessToken);
     const userId = (payload?.sub as string) || "";
     const userRole = role || ((payload?.roles as string[])?.[0]) || "user";
+    assertWebRole(userRole);
 
-    const userData: AuthUser = { id: userId, email, role: userRole };
+    const userData: AuthUser = { id: userId, email, role: userRole, full_name: (payload?.full_name as string) || null };
     localStorage.setItem("user", JSON.stringify(userData));
     setAccessToken(accessToken);
     setUser(userData);

@@ -18,6 +18,7 @@ import {
   useTheme,
 } from "@mui/material";
 import BarChartIcon from "@mui/icons-material/BarChartOutlined";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import BookReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
 import CalendarIcon from "@mui/icons-material/CalendarMonthOutlined";
@@ -61,6 +62,7 @@ const aiItems = [
 ];
 
 const adminItems = [
+  { href: "/ai-command-center", label: "AI Command Center", icon: AutoAwesomeIcon },
   { href: "/dashboard/admin", label: "Quản trị", icon: ShieldIcon },
   { href: "/stats", label: "Thống kê", icon: BarChartIcon },
 ];
