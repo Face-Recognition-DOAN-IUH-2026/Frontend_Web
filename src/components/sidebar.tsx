@@ -20,6 +20,7 @@ import {
 import BarChartIcon from "@mui/icons-material/BarChartOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import BookPlusIcon from "@mui/icons-material/BookmarkAddOutlined";
 import BookReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
 import CalendarIcon from "@mui/icons-material/CalendarMonthOutlined";
 import DashboardIcon from "@mui/icons-material/DashboardOutlined";
@@ -46,6 +47,7 @@ const libraryItems = [
 ];
 
 const circulationItems = [
+  { href: "/borrow", label: "Mượn sách", icon: BookPlusIcon },
   { href: "/return", label: "Trả sách", icon: BookReturnIcon },
   { href: "/books", label: "Kho sách", icon: LibraryIcon },
 ];
