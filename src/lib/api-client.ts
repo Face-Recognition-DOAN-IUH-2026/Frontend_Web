@@ -700,6 +700,16 @@ class ApiClient {
     return response.data;
   }
 
+  async getBorrowStats(): Promise<{ total: number; active: number; overdue: number }> {
+    const response = await this.client.get("/api/borrow/staff/stats");
+    return response.data;
+  }
+
+  async getAllActiveBorrows(): Promise<BorrowRecord[]> {
+    const response = await this.client.get<BorrowRecord[]>("/api/borrow/staff/active");
+    return response.data;
+  }
+
   async getBorrowHistory(params?: { patronId?: string; statusFilter?: string }): Promise<BorrowRecord[]> {
     const query: any = {};
     if (params?.statusFilter) query.status_filter = params.statusFilter;

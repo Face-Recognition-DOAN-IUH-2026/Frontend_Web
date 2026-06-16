@@ -42,10 +42,6 @@ function toDateStr(d: Date) {
   return d.toISOString().split("T")[0];
 }
 
-function isBorrowActive(record: BorrowRecord) {
-  return record.status === "borrowed" || record.status === "borrowing";
-}
-
 function isPhysicalAccessLog(log: AccessLogPublic) {
   return ["entry_gate", "exit_gate", "kiosk"].includes(log.camera_id);
 }
@@ -125,7 +121,8 @@ export default function StatsPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [todayLogs, setTodayLogs] = useState<AccessLogPublic[]>([]);
   const [activePatrons, setActivePatrons] = useState<ActivePatron[]>([]);
-  const [borrows, setBorrows] = useState<BorrowRecord[]>([]);
+  const [activeBorrows, setActiveBorrows] = useState<BorrowRecord[]>([]);
+  const [borrowStats, setBorrowStats] = useState<{ total: number; active: number; overdue: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [realtimeState, setRealtimeState] = useState<RealtimeState>("connecting");
 
@@ -142,16 +139,18 @@ export default function StatsPage() {
     (async () => {
       try {
         const today = toDateStr(new Date());
-        const [s, logs, active, allBorrows] = await Promise.all([
+        const [s, logs, active, bStats, allActive] = await Promise.all([
           api.getStats(),
           api.getAccessLogs({ dateFrom: today, limit: 200 }),
           api.getActivePatrons(),
-          api.getBorrowHistory(),
+          api.getBorrowStats(),
+          api.getAllActiveBorrows(),
         ]);
         setStats(s);
         setTodayLogs(logs.items.filter(isPhysicalAccessLog));
         setActivePatrons(active.items);
-        setBorrows(allBorrows || []);
+        setBorrowStats(bStats);
+        setActiveBorrows(allActive || []);
       } catch (err) {
         console.error("Failed to load stats:", err);
       } finally {
@@ -200,20 +199,9 @@ export default function StatsPage() {
 
   const hasHourlyData = hourlyData.some((item) => item.total > 0);
 
-  const borrowStats = useMemo(() => {
-    const active = borrows.filter(isBorrowActive);
-    const overdue = active.filter((b) => new Date(b.due_at) < new Date());
-    return {
-      total: borrows.length,
-      active: active.length,
-      overdue: overdue.length,
-    };
-  }, [borrows]);
-
-  const recentBorrows = useMemo(() => [...borrows]
-    .filter(isBorrowActive)
+  const recentBorrows = useMemo(() => [...activeBorrows]
     .sort((a, b) => new Date(b.borrow_at).getTime() - new Date(a.borrow_at).getTime())
-    .slice(0, 12), [borrows]);
+    .slice(0, 12), [activeBorrows]);
 
   if (loading) {
     return (
@@ -385,17 +373,17 @@ export default function StatsPage() {
       </Paper>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "repeat(3, 1fr)" }, gap: 2 }}>
-        <MetricCard label="Tổng lượt mượn" value={borrowStats.total} icon={BookIcon} color={theme.palette.primary.main} description="Tất cả phiếu mượn" />
-        <MetricCard label="Đang mượn" value={borrowStats.active} icon={BookIcon} color={theme.palette.success.main} description="Chưa trả" />
-        <MetricCard label="Quá hạn" value={borrowStats.overdue} icon={AlertIcon} color={theme.palette.error.main} description="Cần xử lý" />
+        <MetricCard label="Tổng lượt mượn" value={borrowStats?.total ?? "—"} icon={BookIcon} color={theme.palette.primary.main} description="Tất cả phiếu mượn" />
+        <MetricCard label="Đang mượn" value={borrowStats?.active ?? "—"} icon={BookIcon} color={theme.palette.success.main} description="Chưa trả" />
+        <MetricCard label="Quá hạn" value={borrowStats?.overdue ?? "—"} icon={AlertIcon} color={theme.palette.error.main} description="Cần xử lý" />
       </Box>
 
       <Paper variant="outlined">
         <Box sx={{ p: 2 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <BookIcon color="primary" />
-            <Typography variant="h6">Sách đang mượn ({borrowStats.active})</Typography>
-            {borrowStats.overdue > 0 ? <Chip size="small" color="error" label={`${borrowStats.overdue} quá hạn`} /> : null}
+            <Typography variant="h6">Sách đang mượn ({borrowStats?.active ?? 0})</Typography>
+            {(borrowStats?.overdue ?? 0) > 0 ? <Chip size="small" color="error" label={`${borrowStats?.overdue ?? 0} quá hạn`} /> : null}
           </Stack>
         </Box>
         <Divider />
