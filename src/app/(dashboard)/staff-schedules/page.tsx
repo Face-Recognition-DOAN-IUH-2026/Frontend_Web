@@ -29,8 +29,12 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   TextField,
   Toolbar,
@@ -57,6 +61,18 @@ type ConfirmState =
   | { type: "zone"; zone: LibraryZone; title: string; message: string }
   | { type: "shift"; shift: StaffShift; title: string; message: string }
   | null;
+
+type AssignDialogState = {
+  open: boolean;
+  staffId: string;
+  workDate: string;
+  zoneId: string;
+  shiftId: string;
+  shiftName: string;
+  timeRange: string;
+  zoneName: string;
+  existingAssignments: StaffScheduleAssignment[];
+} | null;
 
 function toDateInput(date: Date) {
   const year = date.getFullYear();
@@ -231,59 +247,72 @@ function AssignmentCard({ item, onDelete }: { item: StaffScheduleAssignment; onD
   );
 }
 
-function DropCell({
-  id,
-  assignments,
-  minStaff,
-  onDelete,
-}: {
+interface DropCellProps {
   id: string;
   assignments: StaffScheduleAssignment[];
   minStaff: number;
   onDelete: (item: StaffScheduleAssignment) => void;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+  disabled?: boolean;
+  onCellClick?: (workDate: string, zoneId: string, shiftId: string, shiftName: string, timeRange: string, zoneName: string) => void;
+  shiftName?: string;
+  timeRange?: string;
+  zoneName?: string;
+}
+const DropCell = ({ id, assignments, minStaff, onDelete, disabled, onCellClick, shiftName, timeRange, zoneName }: DropCellProps) => {
+  const { setNodeRef, isOver } = useDroppable({ id, disabled });
   const understaffed = assignments.length < minStaff;
   const theme = useTheme();
+
+  const handleClick = () => {
+    if (disabled || !onCellClick) return;
+    const parts = id.split(":");
+    if (parts.length < 4 || parts[0] !== "cell") return;
+    const [, workDate, zoneId, shiftId] = parts;
+    onCellClick(workDate, zoneId, shiftId, shiftName || "", timeRange || "", zoneName || "");
+  };
 
   return (
     <Box
       ref={setNodeRef}
+      onClick={handleClick}
       sx={{
         minHeight: 156,
         border: 2,
         borderStyle: "dashed",
-        borderColor: isOver ? "primary.main" : understaffed ? "warning.main" : "divider",
-        bgcolor: isOver
-          ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.22 : 0.12)
-          : understaffed
-            ? alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.16 : 0.1)
-            : alpha(theme.palette.background.default, theme.palette.mode === "dark" ? 0.72 : 0.88),
-        color: "text.primary",
+        borderColor: disabled ? "text.disabled" : isOver ? "primary.main" : understaffed ? "warning.main" : "divider",
+        bgcolor: disabled
+          ? alpha(theme.palette.action.disabledBackground, theme.palette.mode === "dark" ? 0.24 : 0.16)
+          : isOver
+            ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.22 : 0.12)
+            : understaffed
+              ? alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.16 : 0.1)
+              : alpha(theme.palette.background.default, theme.palette.mode === "dark" ? 0.72 : 0.88),
+        color: disabled ? "text.disabled" : "text.primary",
         borderRadius: 1,
         p: 1.25,
         transition: "background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease",
-        boxShadow: isOver ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}` : "none",
+        boxShadow: isOver && !disabled ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}` : "none",
+        cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
       <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 1 }}>
         <Typography
           variant="caption"
-          color={understaffed && !isOver ? "warning.main" : "text.secondary"}
+          color={disabled ? "text.disabled" : understaffed && !isOver ? "warning.main" : "text.secondary"}
           noWrap
           sx={{ fontWeight: 800, minWidth: 92, flexShrink: 0 }}
         >
-          {assignments.length}/{minStaff} nhân viên
+          {disabled ? "Đã qua" : `${assignments.length}/${minStaff} nhân viên`}
         </Typography>
-        {understaffed ? <Chip size="small" color="warning" label="Thiếu" sx={{ height: 20, flexShrink: 0, minWidth: 58 }} /> : null}
+        {understaffed && !disabled ? <Chip size="small" color="warning" label="Thiếu" sx={{ height: 20, flexShrink: 0, minWidth: 58 }} /> : null}
       </Stack>
       {assignments.length ? (
         <Stack spacing={1}>
           {assignments.map((item) => <AssignmentCard key={item.id} item={item} onDelete={onDelete} />)}
         </Stack>
       ) : (
-        <Box sx={{ minHeight: 104, display: "grid", placeItems: "center", textAlign: "center", color: "text.secondary", borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.06 : 0.04) }}>
-          <Typography variant="body2" sx={{ fontWeight: 800 }}>Thả nhân viên vào đây</Typography>
+        <Box sx={{ minHeight: 104, display: "grid", placeItems: "center", textAlign: "center", color: disabled ? "text.disabled" : "text.secondary", borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.06 : 0.04) }}>
+          <Typography variant="body2" sx={{ fontWeight: 800 }}>{disabled ? "Không thể chỉnh sửa" : "Thả nhân viên vào đây"}</Typography>
         </Box>
       )}
     </Box>
@@ -329,6 +358,7 @@ export default function StaffSchedulesPage() {
   const [shiftForm, setShiftForm] = useState({ name: "", startTime: "08:00", endTime: "12:00", minStaff: "1" });
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [assignDialog, setAssignDialog] = useState<AssignDialogState>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -486,6 +516,26 @@ export default function StaffSchedulesPage() {
       if (confirm.type === "zone") await api.deleteScheduleZone(confirm.zone.id);
       if (confirm.type === "shift") await api.deleteScheduleShift(confirm.shift.id);
       setConfirm(null);
+      await loadData();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runAssign = async () => {
+    if (!assignDialog || !assignDialog.staffId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.createScheduleAssignment({
+        staffId: assignDialog.staffId,
+        shiftId: assignDialog.shiftId,
+        zoneId: assignDialog.zoneId,
+        workDate: assignDialog.workDate,
+      });
+      setAssignDialog(null);
       await loadData();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -726,6 +776,7 @@ export default function StaffSchedulesPage() {
                           <Stack key={`${zone.id}-${day.toISOString()}`} spacing={1}>
                             {shifts.map((shift) => {
                               const date = toDateInput(day);
+                              const isPast = date < toDateInput(new Date());
                               return (
                                 <Paper
                                   key={`${date}-${zone.id}-${shift.id}`}
@@ -744,6 +795,23 @@ export default function StaffSchedulesPage() {
                                     id={`cell:${date}:${zone.id}:${shift.id}`}
                                     assignments={assignmentsForCell(date, zone.id, shift.id)}
                                     minStaff={shift.minStaff || 1}
+                                    disabled={isPast}
+                                    shiftName={shift.name}
+                                    timeRange={`${normalizeTime(shift.startTime)}-${normalizeTime(shift.endTime)}`}
+                                    zoneName={displayZoneName(zone)}
+                                    onCellClick={(workDate, zoneId, shiftId, shiftName, timeRange, zoneName) => {
+                                      setAssignDialog({
+                                        open: true,
+                                        staffId: "",
+                                        workDate,
+                                        zoneId,
+                                        shiftId,
+                                        shiftName,
+                                        timeRange,
+                                        zoneName,
+                                        existingAssignments: assignmentsForCell(workDate, zoneId, shiftId),
+                                      });
+                                    }}
                                     onDelete={(item) => setConfirm({
                                       type: "assignment",
                                       id: item.id,
@@ -803,6 +871,107 @@ export default function StaffSchedulesPage() {
         <DialogActions>
           <Button onClick={() => setConfirm(null)}>Hủy</Button>
           <Button color="error" variant="contained" onClick={runConfirm} disabled={saving}>Xóa</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!assignDialog}
+        onClose={() => !saving && setAssignDialog(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Phân ca trực</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ pt: 0.5 }}>
+            <Paper variant="outlined" sx={{ p: 1.75 }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
+                <MapIcon fontSize="small" color="primary" />
+                <Typography variant="body2" sx={{ fontWeight: 900 }}>{assignDialog?.shiftName}</Typography>
+              </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ pl: 3.5 }}>
+                {assignDialog?.timeRange} &bull; {assignDialog?.zoneName} &bull; {assignDialog?.workDate}
+              </Typography>
+            </Paper>
+
+            {assignDialog && assignDialog.existingAssignments.length > 0 && (
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", display: "block", mb: 1 }}>
+                  Đã phân ({assignDialog.existingAssignments.length})
+                </Typography>
+                <Stack spacing={1}>
+                  {assignDialog.existingAssignments.map((item) => (
+                    <Paper key={item.id} variant="outlined" sx={{ p: 1.25, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.main", color: "primary.contrastText", fontSize: 12, fontWeight: 900 }}>
+                          {initials(item.staff?.fullName, item.staff?.email)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{item.staff?.fullName || item.staff?.email}</Typography>
+                          <Typography variant="caption" color="text.secondary">{item.staff?.email}</Typography>
+                        </Box>
+                      </Stack>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          setAssignDialog(null);
+                          setConfirm({
+                            type: "assignment",
+                            id: item.id,
+                            title: "Xóa lịch trực đã phân?",
+                            message: `${item.staff?.fullName || item.staff?.email || "Nhân viên"} sẽ được gỡ khỏi ca ${assignDialog.shiftName} ngày ${assignDialog.workDate}.`,
+                          });
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Paper>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Chọn nhân viên</InputLabel>
+              <Select
+                value={assignDialog?.staffId ?? ""}
+                label="Chọn nhân viên"
+                onChange={(e) => {
+                  const staffId = e.target.value;
+                  if (staffId) {
+                    setAssignDialog((prev) => prev ? { ...prev, staffId } : null);
+                  }
+                }}
+              >
+                {staff
+                  .filter((s) => s.role === "admin" || s.role === "staff")
+                  .filter((s) => !assignDialog?.existingAssignments.some((a) => a.staffId === s.id))
+                  .map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                        <Avatar sx={{ width: 30, height: 30, bgcolor: "primary.main", color: "primary.contrastText", fontSize: 11, fontWeight: 900 }}>
+                          {initials(s.fullName, s.email)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{s.fullName || s.email}</Typography>
+                          <Typography variant="caption" color="text.secondary">{s.email}</Typography>
+                        </Box>
+                      </Stack>
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignDialog(null)} disabled={saving}>Hủy</Button>
+          <Button
+            variant="contained"
+            onClick={runAssign}
+            disabled={saving || !assignDialog?.staffId}
+          >
+            Phân
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

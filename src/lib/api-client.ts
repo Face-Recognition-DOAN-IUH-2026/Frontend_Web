@@ -29,6 +29,8 @@ import type {
   StaffActiveBorrowersResponse,
   StaffPatronActiveBorrowsResponse,
   StaffReturnRequest,
+  CreateBorrowSlipRequest,
+  CreateBorrowSlipResponse,
   LibraryZone,
   ScheduleAssignmentList,
   ScheduleStaff,
@@ -797,6 +799,11 @@ class ApiClient {
 
   async updateBookQuantity(bookId: string, quantity: number): Promise<BookWithStats> {
     const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}/quantity`, { quantity });
+    return response.data;
+  }
+
+  async createBorrowSlip(data: CreateBorrowSlipRequest): Promise<CreateBorrowSlipResponse> {
+    const response = await this.client.post<CreateBorrowSlipResponse>("/api/borrow/staff/slip/create", data);
     return response.data;
   }
 
