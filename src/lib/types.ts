@@ -249,8 +249,18 @@ export interface BookInfo {
   id: string;
   isbn: string;
   title: string;
+  subtitle: string | null;
   author: string | null;
   cover_url: string | null;
+  publisher: string | null;
+  published_date: string | null;
+  description: string | null;
+  page_count: number | null;
+  categories: string | null;
+  average_rating: number | null;
+  language: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
   shelf_location: string | null;
   copies: BookCopy[];
 }
@@ -331,12 +341,24 @@ export interface BookWithStats {
   id: string;
   isbn: string;
   title: string;
+  subtitle: string | null;
   author: string | null;
   cover_url: string | null;
+  publisher: string | null;
+  published_date: string | null;
+  description: string | null;
+  page_count: number | null;
+  categories: string | null;
+  average_rating: number | null;
+  language: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
   shelf_location: string | null;
+  is_available: boolean;
   total_copies: number;
   available_copies: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface BooksListResponse {
@@ -358,8 +380,18 @@ export interface BookImportPreviewRow {
   isbn: string;
   quantity: number;
   title: string | null;
+  subtitle: string | null;
   author: string | null;
+  publisher: string | null;
+  published_date: string | null;
+  page_count: number | null;
+  categories: string | null;
   cover_url: string | null;
+  description: string | null;
+  average_rating: number | null;
+  language: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
   barcodes: string[];
   status: string;
   message: string | null;

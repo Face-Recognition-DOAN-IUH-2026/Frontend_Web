@@ -758,6 +758,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getBookById(bookId: string): Promise<BookWithStats> {
+    const response = await this.client.get<BookWithStats>(`/api/borrow/books/${bookId}`);
+    return response.data;
+  }
+
   async searchBooks(q: string): Promise<BookWithStats[]> {
     const response = await this.client.get<BookWithStats[]>("/api/borrow/books/search", { params: { q } });
     return response.data;
@@ -778,6 +783,22 @@ class ApiClient {
     const response = await this.client.post<BookImportResponse>("/api/borrow/books/import", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
+    return response.data;
+  }
+
+  async importBooksFiltered(rows: Array<{
+    isbn: string;
+    quantity: number;
+    title: string | null;
+    subtitle: string | null;
+    author: string | null;
+    publisher: string | null;
+    published_date: string | null;
+    page_count: number | null;
+    categories: string | null;
+    cover_url: string | null;
+  }>): Promise<BookImportResponse> {
+    const response = await this.client.post<BookImportResponse>("/api/borrow/books/import/filtered", { rows });
     return response.data;
   }
 
@@ -817,6 +838,11 @@ class ApiClient {
 
   async updateBookQuantity(bookId: string, quantity: number): Promise<BookWithStats> {
     const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}/quantity`, { quantity });
+    return response.data;
+  }
+
+  async bulkDeleteBooks(bookIds: string[]): Promise<{ deleted: number; errors: string[]; success: boolean }> {
+    const response = await this.client.post<{ deleted: number; errors: string[]; success: boolean }>("/api/borrow/books/delete", { book_ids: bookIds });
     return response.data;
   }
 

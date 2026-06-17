@@ -80,6 +80,7 @@ src/app/globals.css
 src/app/layout.tsx
 src/app/login/page.tsx
 src/app/page.tsx
+src/app/register/page.tsx
 src/components/BorrowScannerDialog.tsx
 src/components/camera-capture.tsx
 src/components/frequency-chart.tsx
@@ -92,6 +93,7 @@ src/components/IsbnScannerDialog.tsx
 src/components/job-poll.tsx
 src/components/MultiAngleCapture.tsx
 src/components/sidebar.tsx
+src/components/StudentCardScanner.tsx
 src/components/ui/Badge.tsx
 src/components/ui/Button.tsx
 src/components/ui/Card.tsx
@@ -2314,6 +2316,790 @@ export default function IsbnScannerDialog({
 }
 </file>
 
+<file path="src/components/StudentCardScanner.tsx">
+"use client";
+
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Box, Paper, Typography, Button, Stack, CircularProgress,
+  Alert, Divider, Fade, alpha, LinearProgress, Chip,
+} from "@mui/material";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import ReplayIcon from "@mui/icons-material/Replay";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
+import Webcam from "react-webcam";
+import { createWorker } from "tesseract.js";
+
+export interface ScannedCardData {
+  studentCode: string;
+  fullName: string;
+  className: string | null;
+  dateOfBirth: string | null;
+  course: string | null;
+  permanentAddress: string | null;
+  faculty: string | null;
+  rawText: string;
+}
+
+interface StudentCardScannerProps {
+  onScanned: (data: ScannedCardData) => void;
+  onError?: (error: string) => void;
+  onSkip?: () => void;
+}
+
+type Phase = "detecting" | "processing" | "confirm";
+
+const MAX_DETECT_ATTEMPTS = 10;
+const DETECT_INTERVAL_MS = 4000;
+
+const SURNAMES = [
+  "nguyễn", "trần", "lê", "phạm", "huỳnh", "hoàng", "phan",
+  "vũ", "võ", "đặng", "bùi", "đỗ", "hồ", "ngô", "dương", "lý",
+  "cao", "đinh", "tạ", "châu", "mai", "tô", "hà", "vương",
+];
+
+const HEADER_KEYWORDS = [
+  "bộ công thương", "trường đại học công nghiệp", "thẻ sinh viên",
+  "trường đại học", "đại học công nghiệp", "thành phố hồ chí minh",
+  "student card", "student id", "the sinh vien", "cong thuong",
+  "sinh viên", "ngày sinh", "khóa học", "hktt",
+  "hộ khẩu", "khoa", "lớp", "ngành", "msv", "mssv",
+];
+
+function preprocessForOcr(imageData: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const w = Math.min(img.width, 1920);
+      const scale = w / img.width;
+      canvas.width = w;
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(imageData); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageDataObj.data;
+      const weights = [0.299, 0.587, 0.114];
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        sum += weights[0] * data[i] + weights[1] * data[i + 1] + weights[2] * data[i + 2];
+      }
+      const avgBrightness = sum / (data.length / 4);
+      const factor = avgBrightness > 180 ? 1.3 : avgBrightness < 80 ? 1.5 : 1.1;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = weights[0] * data[i] + weights[1] * data[i + 1] + weights[2] * data[i + 2];
+        const enhanced = Math.min(255, Math.max(0, Math.round((gray - 128) * factor + 128)));
+        data[i] = enhanced;
+        data[i + 1] = enhanced;
+        data[i + 2] = enhanced;
+      }
+      ctx.putImageData(imageDataObj, 0, 0);
+      resolve(canvas.toDataURL("image/jpeg", 0.95));
+    };
+    img.onerror = () => resolve(imageData);
+    img.src = imageData;
+  });
+}
+
+function parseCardText(text: string): Partial<ScannedCardData> {
+  const result: Partial<ScannedCardData> = { rawText: text };
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\t/g, " ");
+  const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  const studentCodeRegex = /(?:MSSV|M[aã]\s*SV|M[aã]\s*S[oố]\s*SV|Student\s*Code|M[aã]\s*s[oố]\s*sinh\s*vi[eê]n|MSV|M\.S\.V)[:\s]*(\S{4,})/i;
+  const fullNameRegex = /(?:H[oọ]\s*v[aà]\s*t[eê]n|Full\s*Name|H[oọ]\s*t[eê]n|H[oọ]\s*V[AÀ]\s*T[EÊ]N|HỌ\s*TÊN|HỌ\s*VÀ\s*TÊN)[:\s]*([A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+(?:\s+[A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+)+)/i;
+  const classNameRegex = /(?:L[oớ]p|Class|LỚP)[:\s]*(\S+)/i;
+  const dobRegex = /(?:NS|Ng[aà]y\s*sinh|DOB|Birth|Ng[aà]y\s*th[aá]ng\s*n[aǎ]m\s*sinh|NGÀY\s*SINH|Sinh)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
+  const courseRegex = /(?:Kh[oó]a\s*h[oọô]c|Course|Kh[oó]a|KHÓA)[:\s]*(.+)/i;
+  const addressRegex = /(?:HKTT|H[oộ]\s*kh[aẩ]u|Đ[iịa]\s*ch[ỉi]|Address|H[oộ]\s*kh[aẩ]u\s*th[öo]ng\s*tr[uú]):\s*(.+)/i;
+  const facultyRegex = /(?:Khoa|Faculty|Department|KHOA)[:\s]*(.+)/i;
+
+  for (const line of lines) {
+    if (!result.studentCode) {
+      const m = line.match(studentCodeRegex);
+      if (m) result.studentCode = m[1].replace(/[^A-Za-z0-9]/g, "");
+    }
+    if (!result.fullName) {
+      const m = line.match(fullNameRegex);
+      if (m) result.fullName = m[1].trim();
+    }
+    if (!result.className) {
+      const m = line.match(classNameRegex);
+      if (m) result.className = m[1].trim();
+    }
+    if (!result.dateOfBirth) {
+      const m = line.match(dobRegex);
+      if (m) result.dateOfBirth = m[1].trim();
+    }
+    if (!result.course) {
+      const m = line.match(courseRegex);
+      if (m) result.course = m[1].trim();
+    }
+    if (!result.permanentAddress) {
+      const m = line.match(addressRegex);
+      if (m) result.permanentAddress = m[1].trim();
+    }
+    if (!result.faculty) {
+      const m = line.match(facultyRegex);
+      if (m) result.faculty = m[1].trim();
+    }
+  }
+
+  if (!result.studentCode) {
+    const strictMatch = normalized.match(/\b(\d{8})\b/);
+    if (strictMatch) {
+      result.studentCode = strictMatch[1];
+    } else {
+      const looseMatch = normalized.match(/\b(\d{7,13})\b/);
+      if (looseMatch) result.studentCode = looseMatch[1];
+    }
+  }
+
+  if (!result.fullName) {
+    const candidateLines = lines.filter((line) => {
+      const lower = line.toLowerCase();
+      if (HEADER_KEYWORDS.some((k) => lower.includes(k))) return false;
+      if (/^\d+$/.test(line.trim())) return false;
+      if (line.trim().length < 5) return false;
+      if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(line.trim())) return false;
+      return true;
+    });
+
+    const nameBySurname = candidateLines.find((l) => {
+      const lower = l.toLowerCase().trim();
+      return SURNAMES.some(
+        (s) => lower.startsWith(s) || lower.startsWith(`${s} `)
+      );
+    });
+    if (nameBySurname) {
+      result.fullName = nameBySurname.replace(/^[\d:\s]+/, "").trim();
+    }
+
+    if (!result.fullName) {
+      const nameByCase = candidateLines.find((l) => {
+        const words = l.trim().split(/\s+/);
+        if (words.length < 2 || words.length > 6) return false;
+        if (!/^[A-ZÀ-ỸĂÂĐÊÔƠƯ]/.test(l.trim())) return false;
+        if (/^[A-Z0-9]{4,}$/.test(words[0])) return false;
+        return true;
+      });
+      if (nameByCase) {
+        result.fullName = nameByCase.replace(/^[\d:\s]+/, "").trim();
+      }
+    }
+
+    if (!result.fullName) {
+      const allCapsName = candidateLines.find((l) => {
+        const words = l.trim().split(/\s+/);
+        if (words.length < 2 || words.length > 6) return false;
+        if (!/^[A-ZÀ-ỸĂÂĐÊÔƠƯ\s]+$/.test(l.trim())) return false;
+        if (!/[À-ỸĂÂĐÊÔƠƯ]/.test(l)) return false;
+        return true;
+      });
+      if (allCapsName) result.fullName = allCapsName.trim();
+    }
+  }
+
+  if (!result.course) {
+    const yearMatch = normalized.match(/\b(20\d{2}\s*[-–]\s*20\d{2})\b/);
+    if (yearMatch) result.course = yearMatch[1];
+  }
+
+  if (!result.course) {
+    const khoaMatch = normalized.match(/Kh[oó]a\s+(\d{4}(?:\s*[-–]\s*\d{4})?)/i);
+    if (khoaMatch) result.course = khoaMatch[1];
+  }
+
+  if (!result.className) {
+    const classMatch = normalized.match(/\b(DH[A-Z]{2,}\d{2,}[A-Z]?)\b/i);
+    if (classMatch) result.className = classMatch[1].toUpperCase();
+  }
+
+  return result;
+}
+
+function phaseLabel(phase: Phase): string {
+  switch (phase) {
+    case "detecting": return "Đang phát hiện thẻ...";
+    case "processing": return "Đang nhận dạng...";
+    case "confirm": return "Đọc thẻ thành công";
+  }
+}
+
+function phaseColor(phase: Phase): "info" | "primary" | "success" {
+  switch (phase) {
+    case "detecting": return "info";
+    case "processing": return "primary";
+    case "confirm": return "success";
+  }
+}
+
+export default function StudentCardScanner({ onScanned, onError, onSkip }: StudentCardScannerProps) {
+  const webcamRef = useRef<Webcam>(null);
+  const [phase, setPhase] = useState<Phase>("detecting");
+  const [ocrResult, setOcrResult] = useState<Partial<ScannedCardData> | null>(null);
+  const [error, setError] = useState("");
+  const [cameraReady, setCameraReady] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [detectAttempts, setDetectAttempts] = useState(0);
+  const workerRef = useRef<Tesseract.Worker | null>(null);
+  const isMounted = useRef(true);
+  const phaseRef = useRef(phase);
+  const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setOcrProgress(0);
+      const worker = await createWorker("vie+eng", 1, {
+        logger: (m) => {
+          if (m.status === "recognizing text" && isMounted.current) {
+            setOcrProgress(m.progress || 0);
+          }
+        },
+      });
+      if (!cancelled) workerRef.current = worker;
+      else worker.terminate();
+    })();
+    return () => {
+      cancelled = true;
+      workerRef.current?.terminate();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    };
+  }, []);
+
+  const runOcr = useCallback(async (imageData: string): Promise<Partial<ScannedCardData> | null> => {
+    if (!workerRef.current) return null;
+    try {
+      setOcrProgress(0);
+      setOcrLoading(true);
+      const processed = await preprocessForOcr(imageData);
+      const { data } = await workerRef.current.recognize(processed);
+      setOcrLoading(false);
+      if (!data?.text) return null;
+      console.log("[OCR] Raw text:", data.text);
+      return parseCardText(data.text);
+    } catch (err: any) {
+      setOcrLoading(false);
+      onError?.("Lỗi OCR: " + (err.message || ""));
+      return null;
+    }
+  }, [onError]);
+
+  const checkImageHasContent = useCallback((dataUrl: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const w = Math.min(img.width, 320);
+        const h = Math.round((w / img.width) * img.height);
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(true); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
+        let sum = 0;
+        let min = 255;
+        let max = 0;
+        for (let i = 0; i < data.length; i += 16) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          sum += gray;
+          if (gray < min) min = gray;
+          if (gray > max) max = gray;
+        }
+        const pixels = data.length / 16;
+        const avg = sum / pixels;
+        const contrast = max - min;
+        resolve(contrast > 30 && avg > 20 && avg < 240);
+      };
+      img.onerror = () => resolve(true);
+      img.src = dataUrl;
+    });
+  }, []);
+
+  const attemptAutoDetect = useCallback(async () => {
+    if (!isMounted.current || phaseRef.current !== "detecting") return;
+    if (!webcamRef.current) {
+      if (isMounted.current && phaseRef.current === "detecting") {
+        detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+      }
+      return;
+    }
+    try {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        if (isMounted.current && phaseRef.current === "detecting") {
+          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+        }
+        return;
+      }
+
+      setDetectAttempts((prev) => {
+        const next = prev + 1;
+        if (next >= MAX_DETECT_ATTEMPTS && isMounted.current) {
+          setError("Không thể phát hiện thẻ sau nhiều lần thử. Hãy chụp thủ công hoặc tải ảnh.");
+        }
+        return next;
+      });
+
+      const hasContent = await checkImageHasContent(imageSrc);
+      if (!hasContent) {
+        if (isMounted.current && phaseRef.current === "detecting") {
+          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+        }
+        return;
+      }
+
+      setPhase("processing");
+      const parsed = await runOcr(imageSrc);
+
+      if (!isMounted.current) return;
+
+      if (parsed && parsed.studentCode && parsed.fullName) {
+        setOcrResult(parsed);
+        setPhase("confirm");
+        return;
+      }
+
+      setPhase("detecting");
+    } catch (err: any) {
+      if (isMounted.current) {
+        setPhase("detecting");
+      }
+    }
+    if (isMounted.current && phaseRef.current === "detecting") {
+      detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+    }
+  }, [runOcr, checkImageHasContent]);
+
+  const startDetection = useCallback(() => {
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    setDetectAttempts(0);
+    detectTimerRef.current = setTimeout(attemptAutoDetect, 1000);
+  }, [attemptAutoDetect]);
+
+  useEffect(() => {
+    if (cameraReady && phase === "detecting") {
+      startDetection();
+    }
+    return () => {
+      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    };
+  }, [cameraReady, phase, startDetection]);
+
+  const handleManualCapture = useCallback(async () => {
+    if (!webcamRef.current) return;
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    setPhase("processing");
+    setError("");
+    try {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        setError("Không thể chụp ảnh từ camera");
+        setPhase("detecting");
+        startDetection();
+        return;
+      }
+      setPhase("processing");
+      const parsed = await runOcr(imageSrc);
+      if (parsed && isMounted.current) {
+        if (parsed.studentCode && parsed.fullName) {
+          setOcrResult(parsed);
+          setPhase("confirm");
+        } else {
+          setError("Không thể đọc thông tin từ thẻ. Hãy đảm bảo thẻ rõ nét và đủ ánh sáng.");
+          setPhase("detecting");
+          startDetection();
+        }
+      }
+    } catch {
+      setPhase("detecting");
+      startDetection();
+    }
+  }, [runOcr, startDetection]);
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    setPhase("processing");
+    setError("");
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      const parsed = await runOcr(dataUrl);
+      if (parsed && isMounted.current) {
+        if (parsed.studentCode && parsed.fullName) {
+          setOcrResult(parsed);
+          setPhase("confirm");
+        } else {
+          setError("Không thể đọc thông tin từ ảnh này");
+          setPhase("detecting");
+          startDetection();
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  }, [runOcr, startDetection]);
+
+  const handleConfirm = () => {
+    if (ocrResult) {
+      onScanned(ocrResult as ScannedCardData);
+    }
+  };
+
+  const handleRetake = () => {
+    setOcrResult(null);
+    setError("");
+    setPhase("detecting");
+    startDetection();
+  };
+
+  const videoConstraints: MediaStreamConstraints["video"] = {
+    facingMode: "environment",
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+  };
+
+  return (
+    <Stack spacing={0}>
+      {phase === "confirm" && ocrResult ? (
+        <Fade in>
+          <Box>
+            {/* ── CONFIRM STATE: full-width info panel ── */}
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Stack spacing={2}>
+                <Stack direction="row" sx={{ alignItems: "center" }} spacing={1}>
+                  <CheckCircleIcon color="success" />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    Thông tin từ thẻ sinh viên
+                  </Typography>
+                </Stack>
+                <Divider />
+                <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
+                <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
+                {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
+                {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
+                {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
+                {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
+                {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
+                {ocrResult.rawText && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ cursor: "pointer", userSelect: "none" }}
+                      onClick={(e) => {
+                        const el = (e.currentTarget as HTMLElement).nextElementSibling;
+                        if (el) (el as HTMLElement).style.display = el?.getAttribute("data-open") === "1" ? "none" : "block";
+                        e.currentTarget.setAttribute("data-open", e.currentTarget.getAttribute("data-open") === "1" ? "0" : "1");
+                      }}
+                    >
+                      ▸ Raw OCR text (debug)
+                    </Typography>
+                    <Box data-open="0" sx={{ display: "none", mt: 1, p: 1.5, bgcolor: "grey.900", borderRadius: 1, maxHeight: 120, overflow: "auto" }}>
+                      <Typography variant="caption" sx={{ fontFamily: "monospace", whiteSpace: "pre-wrap", color: "grey.300", fontSize: "0.7rem" }}>
+                        {ocrResult.rawText}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                <Stack direction="row" spacing={2} sx={{ pt: 1 }}>
+                  <Button variant="contained" onClick={handleConfirm} fullWidth>
+                    Xác nhận
+                  </Button>
+                  <Button variant="outlined" startIcon={<ReplayIcon />} onClick={handleRetake} fullWidth>
+                    Chụp lại
+                  </Button>
+                </Stack>
+                {onSkip && (
+                  <Button color="inherit" variant="text" onClick={onSkip} fullWidth size="small">
+                    Nhập thủ công
+                  </Button>
+                )}
+              </Stack>
+            </Paper>
+          </Box>
+        </Fade>
+      ) : (
+        /* ── SCANNING STATE: side-by-side layout ── */
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            gap: 0,
+            minHeight: { md: 420 },
+          }}
+        >
+          {/* ── LEFT: Camera panel ── */}
+          <Box
+            sx={{
+              flex: { md: "0 0 55%" },
+              position: "relative",
+              bgcolor: "common.black",
+              borderRadius: { xs: "12px 12px 0 0", md: "12px 0 0 12px" },
+              overflow: "hidden",
+              minHeight: { xs: 280, md: 420 },
+            }}
+          >
+            <Webcam
+              ref={webcamRef}
+              audio={false}
+              screenshotFormat="image/jpeg"
+              screenshotQuality={0.9}
+              videoConstraints={videoConstraints}
+              onUserMedia={() => setCameraReady(true)}
+              onUserMediaError={() => setError("Không thể truy cập camera")}
+              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+            />
+
+            {/* Card frame overlay */}
+            <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <Box sx={{ width: "70%", aspectRatio: "1.6 / 1", position: "relative" }}>
+                {/* Corner brackets */}
+                {(["top-left", "top-right", "bottom-left", "bottom-right"] as const).map((corner) => {
+                  const isTop = corner.includes("top");
+                  const isLeft = corner.includes("left");
+                  return (
+                    <Box
+                      key={corner}
+                      sx={{
+                        position: "absolute",
+                        width: 28,
+                        height: 28,
+                        [isTop ? "top" : "bottom"]: -2,
+                        [isLeft ? "left" : "right"]: -2,
+                        borderColor: "common.white",
+                        borderStyle: "solid",
+                        borderWidth: 0,
+                        [`border${isTop ? "Top" : "Bottom"}Width`]: 3,
+                        [`border${isLeft ? "Left" : "Right"}Width`]: 3,
+                        borderRadius: isTop && isLeft ? "12px 0 0 0"
+                          : isTop && !isLeft ? "0 12px 0 0"
+                          : !isTop && isLeft ? "0 0 0 12px"
+                          : "0 0 12px 0",
+                        opacity: 0.9,
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
+
+            {/* Status badge overlay */}
+            {phase !== "confirm" && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: 16,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  bgcolor: "rgba(13, 17, 23, 0.85)",
+                  px: 2,
+                  py: 1,
+                  borderRadius: 20,
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                {phase === "detecting" && <RadioButtonUncheckedIcon sx={{ fontSize: 18, color: "#7A8CA8", animation: "pulse-amber 2s ease-in-out infinite" }} />}
+                {phase === "processing" && <HourglassBottomIcon sx={{ fontSize: 18, color: "#D4A853", animation: "pulse-amber 1s ease-in-out infinite" }} />}
+                <Typography variant="body2" sx={{ fontWeight: 600, color: "common.white", whiteSpace: "nowrap" }}>
+                  {phase === "processing"
+                    ? `Đang nhận dạng... ${detectAttempts > 0 ? `(${detectAttempts}/${MAX_DETECT_ATTEMPTS})` : ""}`
+                    : phaseLabel(phase)}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Not-ready overlay */}
+            {!cameraReady && (
+              <Box
+                sx={{
+                  position: "absolute", inset: 0,
+                  bgcolor: "rgba(0,0,0,0.6)",
+                  color: "common.white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexDirection: "column", gap: 1,
+                }}
+              >
+                <CircularProgress size={28} color="inherit" />
+                <Typography variant="body2">Đang kết nối camera...</Typography>
+              </Box>
+            )}
+
+            {/* Processing overlay */}
+            {phase === "processing" && ocrLoading && (
+              <Box
+                sx={{
+                  position: "absolute", inset: 0,
+                  bgcolor: "rgba(0,0,0,0.7)",
+                  color: "common.white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexDirection: "column", gap: 1,
+                }}
+              >
+                <CircularProgress size={28} color="inherit" />
+                <Typography variant="body2">Đang nhận dạng chữ viết...</Typography>
+                <Box sx={{ width: 160 }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.max(ocrProgress * 100, 5)}
+                    sx={{ borderRadius: 1, height: 4 }}
+                  />
+                  <Typography variant="caption" sx={{ mt: 0.5, display: "block", textAlign: "center" }}>
+                    {Math.round(ocrProgress * 100)}%
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          {/* ── RIGHT: Info panel ── */}
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              bgcolor: "background.paper",
+              borderRadius: { xs: "0 0 12px 12px", md: "0 12px 12px 0" },
+              borderLeft: { md: "1px solid" },
+              borderTop: { xs: "1px solid", md: "none" },
+              borderColor: "divider",
+              overflow: "hidden",
+            }}
+          >
+            {/* Panel header */}
+            <Box sx={{ px: 2.5, py: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.3 }}>
+                Thông tin quét được
+              </Typography>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                <Chip
+                  label={phaseLabel(phase)}
+                  color={phaseColor(phase)}
+                  size="small"
+                  icon={
+                    phase === "detecting" ? <RadioButtonUncheckedIcon sx={{ fontSize: 14 }} /> :
+                    phase === "processing" ? <HourglassBottomIcon sx={{ fontSize: 14 }} /> :
+                    <CheckCircleIcon sx={{ fontSize: 14 }} />
+                  }
+                  variant="outlined"
+                  sx={{ fontWeight: 600, height: 24 }}
+                />
+              </Stack>
+            </Box>
+
+            {/* Fields area */}
+            <Box sx={{ flex: 1, px: 2.5, py: 2, overflow: "auto" }}>
+              {ocrResult ? (
+                <Stack spacing={1.5}>
+                  <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
+                  <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
+                  {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
+                  {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
+                  {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
+                  {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
+                  {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
+                </Stack>
+              ) : (
+                <Stack spacing={1.5}>
+                  {[
+                    { label: "MSSV", placeholder: "Đang chờ..." },
+                    { label: "Họ tên", placeholder: "Đang chờ..." },
+                    { label: "Lớp", placeholder: "—" },
+                    { label: "Khóa học", placeholder: "—" },
+                    { label: "HKTT", placeholder: "—" },
+                  ].map((field) => (
+                    <Stack key={field.label} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 72, flexShrink: 0, fontSize: "0.8rem" }}>
+                        {field.label}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: "text.disabled", fontStyle: "italic", fontSize: "0.8rem" }}>
+                        {field.placeholder}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+
+            {/* Error */}
+            {error && (
+              <Box sx={{ px: 2.5, pb: 1 }}>
+                <Alert severity="warning" sx={{ fontSize: "0.8rem" }}>{error}</Alert>
+              </Box>
+            )}
+
+            {/* Actions */}
+            <Box sx={{ px: 2.5, py: 2, borderTop: "1px solid", borderColor: "divider" }}>
+              <Stack spacing={1}>
+                <Button
+                  variant="contained"
+                  startIcon={<CameraAltIcon />}
+                  onClick={handleManualCapture}
+                  disabled={!cameraReady || phase === "processing"}
+                  fullWidth
+                >
+                  Chụp thẻ
+                </Button>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<UploadFileIcon />}
+                  disabled={phase === "processing"}
+                  fullWidth
+                >
+                  Tải ảnh
+                  <input type="file" accept="image/*" onChange={handleFileUpload} hidden />
+                </Button>
+                {onSkip && (
+                  <Button color="inherit" variant="text" onClick={onSkip} fullWidth size="small">
+                    Nhập thủ công
+                  </Button>
+                )}
+              </Stack>
+            </Box>
+          </Box>
+        </Box>
+      )}
+    </Stack>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 72, flexShrink: 0, fontSize: "0.8rem" }}>
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: "0.85rem", wordBreak: "break-word" }}>
+        {value || "—"}
+      </Typography>
+    </Stack>
+  );
+}
+</file>
+
 <file path="src/components/ui/Badge.tsx">
 import { HTMLAttributes, forwardRef } from "react";
 
@@ -4060,6 +4846,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -4067,6 +4854,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Fade,
   IconButton,
   InputAdornment,
   Paper,
@@ -4086,10 +4874,12 @@ import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import DownloadIcon from "@mui/icons-material/DownloadOutlined";
 import EyeIcon from "@mui/icons-material/VisibilityOutlined";
 import FileIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
+import LockIcon from "@mui/icons-material/LockOutlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -4166,6 +4956,11 @@ export default function BooksPage() {
   const [quantityError, setQuantityError] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [isbnScannerOpen, setIsbnScannerOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const deleteConfirmed = deleteInput.trim().normalize('NFC').toUpperCase() === 'XÓA';
 
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
 
@@ -4307,6 +5102,44 @@ export default function BooksPage() {
     setQuantityError("");
   };
 
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (prev.size === displayBooks.length) return new Set();
+      return new Set(displayBooks.map((b) => b.id));
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      const result = await api.bulkDeleteBooks(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setDeleteConfirmOpen(false);
+      setDeleteInput("");
+      setPage(0);
+      await loadBooks();
+      if (result.errors.length === 0) {
+        showNotice("success", `Đã xóa ${result.deleted} cuốn sách`);
+      } else {
+        showNotice("warning", `Xóa ${result.deleted} thành công, ${result.errors.length} lỗi: ${result.errors.join("; ")}`);
+      }
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Xóa thất bại");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const stats = {
     totalBooks: total,
     totalCopies: books.reduce((sum, book) => sum + book.total_copies, 0),
@@ -4390,6 +5223,7 @@ export default function BooksPage() {
                       <TableCell>ISBN</TableCell>
                       <TableCell>Tên sách</TableCell>
                       <TableCell>Tác giả</TableCell>
+                      <TableCell>NXB</TableCell>
                       <TableCell>Số lượng</TableCell>
                       <TableCell>Mã vạch mẫu</TableCell>
                       <TableCell>Trạng thái</TableCell>
@@ -4401,6 +5235,7 @@ export default function BooksPage() {
                         <TableCell sx={{ fontFamily: "monospace" }}>{row.isbn || "-"}</TableCell>
                         <TableCell>{row.title || "-"}</TableCell>
                         <TableCell>{row.author || "-"}</TableCell>
+                        <TableCell>{row.publisher || "-"}</TableCell>
                         <TableCell>{row.quantity}</TableCell>
                         <TableCell sx={{ fontFamily: "monospace" }}>{row.barcodes[0] || "-"}</TableCell>
                         <TableCell><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
@@ -4471,9 +5306,18 @@ export default function BooksPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    size="small"
+                    checked={displayBooks.length > 0 && selectedIds.size === displayBooks.length}
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < displayBooks.length}
+                    onChange={handleToggleSelectAll}
+                  />
+                </TableCell>
                 <TableCell>ISBN</TableCell>
                 <TableCell>Tiêu đề</TableCell>
                 <TableCell>Tác giả</TableCell>
+                <TableCell>NXB</TableCell>
                 <TableCell align="center">Tổng</TableCell>
                 <TableCell align="center">Sẵn sàng</TableCell>
                 <TableCell align="center">Mượn</TableCell>
@@ -4482,16 +5326,37 @@ export default function BooksPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
                 </TableRow>
               ) : displayBooks.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">{searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}</Typography>
                   </TableCell>
                 </TableRow>
-              ) : displayBooks.map((book) => (
-                <TableRow key={book.id} hover sx={{ cursor: "pointer" }} onClick={() => openQuantityDialog(book)}>
+              ) : displayBooks.map((book) => {
+                const isSelected = selectedIds.has(book.id);
+                const hasBorrowed = book.total_copies - book.available_copies > 0;
+                return (
+                <TableRow
+                  key={book.id}
+                  hover
+                  selected={isSelected}
+                  sx={{
+                    cursor: "pointer",
+                    borderLeft: isSelected ? "3px solid" : "3px solid transparent",
+                    borderColor: "warning.main",
+                    bgcolor: isSelected ? "rgba(255, 183, 77, 0.08)" : undefined,
+                  }}
+                  onClick={() => openQuantityDialog(book)}
+                >
+                  <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      size="small"
+                      checked={isSelected}
+                      onChange={() => handleToggleSelect(book.id)}
+                    />
+                  </TableCell>
                   <TableCell sx={{ fontFamily: "monospace", color: "primary.main" }}>{book.isbn}</TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
@@ -4504,11 +5369,13 @@ export default function BooksPage() {
                     </Stack>
                   </TableCell>
                   <TableCell>{book.author || "-"}</TableCell>
+                  <TableCell>{book.publisher || "-"}</TableCell>
                   <TableCell align="center">{book.total_copies}</TableCell>
                   <TableCell align="center"><Chip size="small" color={book.available_copies > 0 ? "success" : "error"} label={book.available_copies} /></TableCell>
                   <TableCell align="center">{book.total_copies - book.available_copies}</TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -4547,6 +5414,21 @@ export default function BooksPage() {
                 <Alert severity="success">Sẵn sàng: {selectedBook.available_copies}</Alert>
                 <Alert severity="warning">Đang mượn: {selectedBook.total_copies - selectedBook.available_copies}</Alert>
               </Box>
+              {(selectedBook.publisher || selectedBook.published_date || selectedBook.categories || selectedBook.page_count) && (
+                <Box sx={{ p: 1.5, bgcolor: "grey.900", borderRadius: 1 }}>
+                  {selectedBook.publisher && <Typography variant="body2"><strong>NXB:</strong> {selectedBook.publisher}</Typography>}
+                  {selectedBook.published_date && <Typography variant="body2"><strong>Năm XB:</strong> {selectedBook.published_date}</Typography>}
+                  {selectedBook.categories && <Typography variant="body2"><strong>Thể loại:</strong> {selectedBook.categories}</Typography>}
+                  {selectedBook.page_count && <Typography variant="body2"><strong>Số trang:</strong> {selectedBook.page_count}</Typography>}
+                  {selectedBook.average_rating && <Typography variant="body2"><strong>Đánh giá:</strong> {selectedBook.average_rating}/5</Typography>}
+                  {selectedBook.language && <Typography variant="body2"><strong>Ngôn ngữ:</strong> {selectedBook.language}</Typography>}
+                </Box>
+              )}
+              {selectedBook.description && (
+                <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {selectedBook.description}
+                </Typography>
+              )}
               <TextField
                 label="Số lượng mới"
                 type="number"
@@ -4575,6 +5457,111 @@ export default function BooksPage() {
         onClose={() => setIsbnScannerOpen(false)}
         onImportComplete={handleIsbnImportComplete}
       />
+
+      <Fade in={selectedIds.size > 0}>
+        <Paper
+          elevation={8}
+          sx={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1300,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            px: 3,
+            py: 1.5,
+            borderRadius: 3,
+            background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+            border: "1px solid",
+            borderColor: "warning.main",
+            boxShadow: "0 8px 32px rgba(255, 183, 77, 0.2)",
+          }}
+        >
+          <Chip
+            label={`${selectedIds.size} đã chọn`}
+            color="warning"
+            size="small"
+            sx={{ fontWeight: 700 }}
+          />
+          <Button
+            size="small"
+            variant="text"
+            color="inherit"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Bỏ chọn
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => {
+              setDeleteInput("");
+              setDeleteConfirmOpen(true);
+            }}
+          >
+            Xóa
+          </Button>
+        </Paper>
+      </Fade>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AlertIcon sx={{ color: "warning.main" }} />
+          Xóa {selectedIds.size} cuốn sách?
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Sách sẽ bị xóa vĩnh viễn cùng tất cả bản sao:
+            </Typography>
+            <Box sx={{ maxHeight: 200, overflow: "auto", p: 1, bgcolor: "grey.900", borderRadius: 1 }}>
+              {displayBooks.filter((b) => selectedIds.has(b.id)).map((book) => (
+                <Stack key={book.id} direction="row" spacing={1} sx={{ py: 0.5, alignItems: "center" }}>
+                  {book.total_copies - book.available_copies > 0 && <LockIcon fontSize="small" sx={{ color: "error.main" }} />}
+                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary", minWidth: 120 }}>
+                    {book.isbn}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
+                    {book.title}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {book.total_copies} bản
+                  </Typography>
+                </Stack>
+              ))}
+            </Box>
+            {displayBooks.filter((b) => selectedIds.has(b.id) && b.total_copies - b.available_copies > 0).length > 0 && (
+              <Alert severity="error">
+                Một số sách đang được mượn và sẽ không thể xóa. Hệ thống sẽ bỏ qua chúng.
+              </Alert>
+            )}
+            <TextField
+              label='Nhập "XÓA" để xác nhận'
+              value={deleteInput}
+              onChange={(e) => setDeleteInput(e.target.value)}
+              fullWidth
+              size="small"
+              autoFocus
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }}>Hủy</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={!deleteConfirmed || deleting}
+            onClick={handleBulkDelete}
+            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+          >
+            {deleting ? "Đang xóa..." : "Xóa vĩnh viễn"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }
@@ -6717,340 +7704,6 @@ playwright-report/
 next-env.d.ts
 </file>
 
-<file path="src/app/(dashboard)/active/page.tsx">
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
-  Grid,
-  InputAdornment,
-  LinearProgress,
-  Paper,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-  useTheme,
-} from "@mui/material";
-import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
-import DoorFrontOutlinedIcon from "@mui/icons-material/DoorFrontOutlined";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
-import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
-import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
-import api from "@/lib/api-client";
-import type { ActivePatron } from "@/lib/types";
-
-const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);
-
-const CAMERA_LABELS: Record<string, string> = {
-  entry_gate: "Cổng vào",
-  exit_gate: "Cổng ra",
-  kiosk: "Kiosk",
-};
-
-function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatDuration(value: string) {
-  const diffMs = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(0, Math.floor(diffMs / 60000));
-  if (minutes < 1) return "Vừa vào";
-  if (minutes < 60) return `${minutes} phút`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} giờ ${rest} phút` : `${hours} giờ`;
-}
-
-function initials(name?: string) {
-  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
-}
-
-function normalizeQuery(value: string) {
-  return value.trim().toLowerCase();
-}
-
-export default function ActivePage() {
-  const theme = useTheme();
-  const [patrons, setPatrons] = useState<ActivePatron[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-
-  const load = async () => {
-    try {
-      setError(null);
-      const data = await api.getActivePatrons();
-      const allowed = data.items
-        .filter((patron) => ACTIVE_CAMERA_IDS.has(patron.camera_id))
-        .sort((a, b) => new Date(b.entered_at).getTime() - new Date(a.entered_at).getTime());
-      setPatrons(allowed);
-      setLastUpdate(new Date());
-    } catch {
-      setError("Không thể tải danh sách độc giả đang trong thư viện.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const filteredPatrons = useMemo(() => {
-    const q = normalizeQuery(search);
-    if (!q) return patrons;
-    return patrons.filter((patron) => (
-      patron.full_name.toLowerCase().includes(q)
-      || patron.student_code.toLowerCase().includes(q)
-    ));
-  }, [patrons, search]);
-
-  const cameraCounts = useMemo(() => (
-    patrons.reduce<Record<string, number>>((acc, patron) => {
-      acc[patron.camera_id] = (acc[patron.camera_id] || 0) + 1;
-      return acc;
-    }, {})
-  ), [patrons]);
-
-  return (
-    <Stack spacing={3}>
-      <Paper
-        variant="outlined"
-        sx={{
-          overflow: "hidden",
-          background: `linear-gradient(135deg, ${theme.palette.success.dark}33, ${theme.palette.background.paper} 55%)`,
-        }}
-      >
-        <Grid container>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <Box sx={{ p: 3, height: "100%", borderRight: { md: `1px solid ${theme.palette.divider}` } }}>
-              <Stack spacing={2.5} sx={{ height: "100%", justifyContent: "space-between" }}>
-                <Avatar sx={{ bgcolor: "success.main", color: "success.contrastText", width: 52, height: 52 }}>
-                  <GroupsOutlinedIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="overline" color="success.main" sx={{ fontWeight: 800 }}>
-                    Đang trong thư viện
-                  </Typography>
-                  <Typography variant="h2" sx={{ mt: 0.5, fontWeight: 900, letterSpacing: 0 }}>
-                    {patrons.length}
-                  </Typography>
-                  <Typography color="text.secondary">
-                    Chỉ tính lượt hợp lệ từ cổng vào, cổng ra và kiosk.
-                  </Typography>
-                </Box>
-              </Stack>
-            </Box>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 8 }}>
-            <Stack spacing={2.5} sx={{ p: 3 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ justifyContent: "space-between" }}>
-                <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 850 }}>
-                    Hiện diện trong thư viện
-                  </Typography>
-                  <Typography color="text.secondary">
-                    Theo dõi nhanh độc giả đang ở trong thư viện theo dữ liệu camera/kiosk.
-                  </Typography>
-                </Box>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-                  <Chip color={error ? "error" : "success"} label={error ? "Lỗi cập nhật" : "Đang cập nhật"} />
-                  <Tooltip title="Làm mới danh sách">
-                    <span>
-                      <Button
-                        variant="outlined"
-                        startIcon={<RefreshOutlinedIcon />}
-                        onClick={load}
-                        disabled={loading}
-                      >
-                        Làm mới
-                      </Button>
-                    </span>
-                  </Tooltip>
-                </Stack>
-              </Stack>
-
-              {error && <Alert severity="error">{error}</Alert>}
-
-              <Grid container spacing={1.5}>
-                {Object.entries(CAMERA_LABELS).map(([cameraId, label]) => (
-                  <Grid key={cameraId} size={{ xs: 12, sm: 4 }}>
-                    <Card variant="outlined" sx={{ height: "100%" }}>
-                      <CardContent>
-                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                          <Avatar sx={{ bgcolor: "action.hover", color: "text.secondary" }}>
-                            <ShieldOutlinedIcon fontSize="small" />
-                          </Avatar>
-                          <Box>
-                            <Typography color="text.secondary" variant="body2">
-                              {label}
-                            </Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 850 }}>
-                              {cameraCounts[cameraId] || 0}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-
-              <Typography variant="caption" color="text.secondary">
-                Cập nhật lần cuối: {lastUpdate.toLocaleTimeString("vi-VN")}
-              </Typography>
-            </Stack>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={2}
-          sx={{ alignItems: { md: "center" }, justifyContent: "space-between", mb: 2.5 }}
-        >
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 850 }}>
-              Độc giả đang có mặt
-            </Typography>
-            <Typography color="text.secondary" variant="body2">
-              {filteredPatrons.length} kết quả hiển thị
-            </Typography>
-          </Box>
-          <TextField
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Tìm theo tên hoặc MSSV..."
-            size="small"
-            sx={{ width: { xs: "100%", md: 360 } }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchOutlinedIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-        </Stack>
-
-        {loading && patrons.length === 0 ? (
-          <Stack spacing={2} sx={{ minHeight: 280, alignItems: "center", justifyContent: "center" }}>
-            <CircularProgress size={32} />
-            <Typography color="text.secondary">Đang tải danh sách...</Typography>
-          </Stack>
-        ) : patrons.length === 0 ? (
-          <Alert icon={<DoorFrontOutlinedIcon />} severity="info">
-            Chưa có độc giả trong thư viện. Danh sách sẽ tự cập nhật khi có lượt vào hợp lệ.
-          </Alert>
-        ) : filteredPatrons.length === 0 ? (
-          <Alert icon={<SearchOutlinedIcon />} severity="warning">
-            Không tìm thấy độc giả phù hợp với từ khóa hiện tại.
-          </Alert>
-        ) : (
-          <Grid container spacing={1.5}>
-            {filteredPatrons.map((patron) => {
-              const percent = patron.confidence == null ? null : Math.round(patron.confidence * 100);
-              return (
-                <Grid key={patron.id} size={{ xs: 12, xl: 6 }}>
-                  <Card variant="outlined" sx={{ height: "100%" }}>
-                    <CardContent>
-                      <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start" }}>
-                        <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 800 }}>
-                          {initials(patron.full_name)}
-                        </Avatar>
-                        <Box sx={{ minWidth: 0, flex: 1 }}>
-                          <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={1}
-                            sx={{ justifyContent: "space-between", alignItems: { sm: "flex-start" } }}
-                          >
-                            <Box sx={{ minWidth: 0 }}>
-                              <Typography noWrap sx={{ fontWeight: 800 }}>
-                                {patron.full_name || "Chưa có tên"}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-                                {patron.student_code}
-                              </Typography>
-                            </Box>
-                            <Chip color="success" label="Đang ở trong" size="small" />
-                          </Stack>
-
-                          <Grid container spacing={1.5} sx={{ mt: 2 }}>
-                            <Grid size={{ xs: 12, sm: 4 }}>
-                              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                                <AccessTimeOutlinedIcon color="disabled" fontSize="small" />
-                                <Typography variant="body2">{formatTime(patron.entered_at)}</Typography>
-                              </Stack>
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 4 }}>
-                              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                                <LocationOnOutlinedIcon color="disabled" fontSize="small" />
-                                <Typography variant="body2">
-                                  {CAMERA_LABELS[patron.camera_id] || patron.camera_id}
-                                </Typography>
-                              </Stack>
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 4 }}>
-                              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                                <VerifiedUserOutlinedIcon color="disabled" fontSize="small" />
-                                <Typography variant="body2">{formatDuration(patron.entered_at)}</Typography>
-                              </Stack>
-                            </Grid>
-                          </Grid>
-
-                          {percent != null && (
-                            <Stack direction="row" spacing={1.5} sx={{ mt: 2, alignItems: "center" }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={percent}
-                                color={percent >= 80 ? "success" : percent >= 60 ? "warning" : "error"}
-                                sx={{ flex: 1, height: 7, borderRadius: 99 }}
-                              />
-                              <Typography variant="caption" color="text.secondary" sx={{ minWidth: 38, textAlign: "right" }}>
-                                {percent}%
-                              </Typography>
-                            </Stack>
-                          )}
-                        </Box>
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              );
-            })}
-          </Grid>
-        )}
-      </Paper>
-    </Stack>
-  );
-}
-</file>
-
 <file path="src/app/(dashboard)/dashboard/admin/page.tsx">
 "use client";
 
@@ -8556,6 +9209,899 @@ export default function ReturnPage() {
 }
 </file>
 
+<file path="src/app/register/page.tsx">
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  Alert, Box, Button, Card, CardContent, Checkbox, CircularProgress,
+  FormControlLabel, Paper, Stack, Step, StepLabel, Stepper,
+  TextField, Typography, alpha,
+} from "@mui/material";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import api, { getErrorMessage } from "@/lib/api-client";
+import StudentCardScanner, { type ScannedCardData } from "@/components/StudentCardScanner";
+import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
+
+const steps = ["Quét thẻ", "Xác nhận thông tin", "Đăng ký", "Khuôn mặt"];
+
+type RegisterPhase = "scan" | "confirm" | "form" | "face" | "face-enrolling" | "done";
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [phase, setPhase] = useState<RegisterPhase>("scan");
+  const [activeStep, setActiveStep] = useState(0);
+  const [scannedData, setScannedData] = useState<ScannedCardData | null>(null);
+  const [error, setError] = useState("");
+  const [registering, setRegistering] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [studentCode, setStudentCode] = useState("");
+  const [className, setClassName] = useState("");
+  const [course, setCourse] = useState("");
+  const [permanentAddress, setPermanentAddress] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [faculty, setFaculty] = useState("");
+
+  const [consent, setConsent] = useState(false);
+  const [faceResult, setFaceResult] = useState<any>(null);
+  const [faceLoading, setFaceLoading] = useState(false);
+  const [faceError, setFaceError] = useState("");
+
+  const [registrationTokens, setRegistrationTokens] = useState<{
+    access_token: string; refresh_token?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
+
+  const handleScanned = async (data: ScannedCardData) => {
+    setError("");
+    if (!data.studentCode) return;
+    try {
+      const existing = await api.lookupPatron(data.studentCode);
+      if (existing.exists) {
+        setError("MSSV này đã được đăng ký trong hệ thống. Vui lòng đăng nhập hoặc liên hệ thư viện để được hỗ trợ.");
+        return;
+      }
+    } catch {
+      setError("Không thể kiểm tra thông tin MSSV. Vui lòng thử lại.");
+      return;
+    }
+    setScannedData(data);
+    setFullName(data.fullName || "");
+    setStudentCode(data.studentCode || "");
+    setClassName(data.className || "");
+    setCourse(data.course || "");
+    setPermanentAddress(data.permanentAddress || "");
+    setDateOfBirth(data.dateOfBirth || "");
+    setFaculty(data.faculty || "");
+    setActiveStep(1);
+    setPhase("confirm");
+  };
+
+  const handleConfirmNext = () => {
+    setActiveStep(2);
+    setPhase("form");
+  };
+
+  const handleFormSubmit = async () => {
+    if (!email || !password || !fullName || !studentCode) {
+      setError("Vui lòng điền đầy đủ Email, Mật khẩu, Họ tên và MSSV");
+      return;
+    }
+    setError("");
+    setRegistering(true);
+    try {
+      const res = await api.patronRegister({
+        full_name: fullName,
+        student_code: studentCode,
+        email,
+        password,
+        class_name: className || undefined,
+        course: course || undefined,
+        permanent_address: permanentAddress || undefined,
+        date_of_birth: dateOfBirth || undefined,
+        faculty: faculty || undefined,
+      });
+      localStorage.setItem("access_token", res.access_token);
+      if (res.refresh_token) localStorage.setItem("refresh_token", res.refresh_token);
+      setRegistrationTokens({ access_token: res.access_token, refresh_token: res.refresh_token });
+      setRegistering(false);
+      setActiveStep(3);
+      setPhase("face");
+    } catch (err: any) {
+      setRegistering(false);
+      setError(getErrorMessage(err) || "Đăng ký thất bại");
+    }
+  };
+
+  const handleFilesReady = async (files: Record<CaptureAngle, File>) => {
+    setFaceError("");
+    setFaceLoading(true);
+    setFaceResult(null);
+    try {
+      const data = await api.enrollBatch(files, consent);
+      setPhase("face-enrolling");
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          const statusData = await api.getTaskStatus(data.job_id);
+          if (statusData.status === "SUCCESS") {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            if (statusData.result?.status === "error") {
+              setFaceError(statusData.result.error || "Đăng ký khuôn mặt thất bại");
+            }
+            setFaceResult(statusData.result);
+            setFaceLoading(false);
+            setPhase("done");
+          } else if (statusData.status === "FAILURE") {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            setFaceError(statusData.result?.error || "Đăng ký khuôn mặt thất bại");
+            setFaceResult(statusData.result);
+            setFaceLoading(false);
+            setPhase("done");
+          }
+        } catch {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          setFaceError("Không thể lấy trạng thái tác vụ");
+          setFaceLoading(false);
+          setPhase("done");
+        }
+      }, 2000);
+    } catch (err: any) {
+      setFaceError(getErrorMessage(err) || "Đăng ký khuôn mặt thất bại");
+      setFaceLoading(false);
+      setPhase("face");
+    }
+  };
+
+  const handleSkipFace = () => {
+    setPhase("done");
+  };
+
+  const handleReset = () => {
+    setPhase("scan");
+    setActiveStep(0);
+    setScannedData(null);
+    setError("");
+    setFaceResult(null);
+    setFaceError("");
+    setConsent(false);
+    setRegistrationTokens(null);
+    setEmail("");
+    setPassword("");
+    setFullName("");
+    setStudentCode("");
+    setClassName("");
+    setCourse("");
+    setPermanentAddress("");
+    setDateOfBirth("");
+    setFaculty("");
+  };
+
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        bgcolor: "background.default",
+        p: 2,
+      }}
+    >
+      <Card sx={{ maxWidth: 560, width: "100%" }}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Stack spacing={3}>
+            <Typography variant="h5" sx={{ fontWeight: 700, textAlign: "center" }}>
+              Đăng ký thẻ thư viện
+            </Typography>
+
+            {phase !== "done" && (
+              <Stepper activeStep={activeStep} alternativeLabel>
+                {steps.map((label) => (
+                  <Step key={label}>
+                    <StepLabel>{label}</StepLabel>
+                  </Step>
+                ))}
+              </Stepper>
+            )}
+
+            {error && <Alert severity="error">{error}</Alert>}
+
+            {phase === "scan" && (
+              <StudentCardScanner
+                onScanned={handleScanned}
+                onError={(msg) => setError(msg)}
+              />
+            )}
+
+            {phase === "confirm" && scannedData && (
+              <Stack spacing={2}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Thông tin từ thẻ sinh viên
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: alpha("#000", 0.02) }}>
+                  <Stack spacing={1}>
+                    <ConfirmRow label="MSSV" value={scannedData.studentCode} />
+                    <ConfirmRow label="Họ tên" value={scannedData.fullName} />
+                    {scannedData.className && <ConfirmRow label="Lớp" value={scannedData.className} />}
+                    {scannedData.dateOfBirth && <ConfirmRow label="Ngày sinh" value={scannedData.dateOfBirth} />}
+                    {scannedData.course && <ConfirmRow label="Khóa học" value={scannedData.course} />}
+                    {scannedData.permanentAddress && <ConfirmRow label="HKTT" value={scannedData.permanentAddress} />}
+                    {scannedData.faculty && <ConfirmRow label="Khoa" value={scannedData.faculty} />}
+                  </Stack>
+                </Paper>
+                <Typography variant="caption" color="text.secondary">
+                  Bạn có thể chỉnh sửa thông tin ở bước tiếp theo
+                </Typography>
+                <Stack direction="row" spacing={2}>
+                  <Button variant="contained" onClick={handleConfirmNext} fullWidth>
+                    Tiếp theo
+                  </Button>
+                  <Button variant="outlined" onClick={() => { setPhase("scan"); setActiveStep(0); }} fullWidth>
+                    Quét lại
+                  </Button>
+                </Stack>
+              </Stack>
+            )}
+
+            {phase === "form" && (
+              <Stack spacing={2}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Thông tin tài khoản
+                </Typography>
+                <TextField
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  fullWidth
+                  size="small"
+                />
+                <TextField
+                  label="Mật khẩu"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  fullWidth
+                  size="small"
+                />
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1 }}>
+                  Thông tin cá nhân
+                </Typography>
+                <TextField
+                  label="Họ tên"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  fullWidth
+                  size="small"
+                />
+                <TextField
+                  label="MSSV"
+                  value={studentCode}
+                  onChange={(e) => setStudentCode(e.target.value)}
+                  required
+                  fullWidth
+                  size="small"
+                />
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    label="Lớp"
+                    value={className}
+                    onChange={(e) => setClassName(e.target.value)}
+                    fullWidth
+                    size="small"
+                  />
+                  <TextField
+                    label="Ngày sinh"
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    placeholder="DD/MM/YYYY"
+                    fullWidth
+                    size="small"
+                  />
+                </Stack>
+                <TextField
+                  label="Khóa học"
+                  value={course}
+                  onChange={(e) => setCourse(e.target.value)}
+                  fullWidth
+                  size="small"
+                />
+                <TextField
+                  label="HKTT"
+                  value={permanentAddress}
+                  onChange={(e) => setPermanentAddress(e.target.value)}
+                  fullWidth
+                  size="small"
+                  multiline
+                  rows={2}
+                />
+                <TextField
+                  label="Khoa"
+                  value={faculty}
+                  onChange={(e) => setFaculty(e.target.value)}
+                  fullWidth
+                  size="small"
+                />
+                {scannedData && (
+                  <Alert severity="info" sx={{ fontSize: "0.8rem" }}>
+                    Đã điền thông tin từ thẻ sinh viên
+                  </Alert>
+                )}
+                <Stack direction="row" spacing={2} sx={{ pt: 1 }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleFormSubmit}
+                    disabled={registering}
+                    fullWidth
+                  >
+                    {registering ? <CircularProgress size={20} /> : "Đăng ký"}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => { setPhase("scan"); setActiveStep(0); }}
+                    fullWidth
+                  >
+                    Quay lại
+                  </Button>
+                </Stack>
+              </Stack>
+            )}
+
+            {phase === "face" && (
+              <Stack spacing={2}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Đăng ký khuôn mặt (tùy chọn)
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Đăng ký khuôn mặt giúp bạn ra vào thư viện nhanh chóng mà không cần thẻ.
+                  Bạn có thể bỏ qua bước này và làm sau.
+                </Typography>
+                <MultiAngleCapture
+                  consent={consent}
+                  setConsent={setConsent}
+                  onFilesReady={handleFilesReady}
+                />
+                <Button color="inherit" variant="text" onClick={handleSkipFace} fullWidth>
+                  Bỏ qua bước này
+                </Button>
+              </Stack>
+            )}
+
+            {phase === "face-enrolling" && (
+              <Stack spacing={2} sx={{ alignItems: "center", py: 4 }}>
+                <CircularProgress size={48} />
+                <Typography>Đang xử lý đăng ký khuôn mặt...</Typography>
+              </Stack>
+            )}
+
+            {phase === "done" && (
+              <Stack spacing={2} sx={{ alignItems: "center", py: 3 }}>
+                {faceLoading ? (
+                  <>
+                    <CircularProgress size={48} />
+                    <Typography>Đang xử lý...</Typography>
+                  </>
+                ) : faceError ? (
+                  <Alert severity="warning" sx={{ width: "100%" }}>
+                    {faceError}
+                  </Alert>
+                ) : faceResult ? (
+                  <Alert severity="success" sx={{ width: "100%" }}>
+                    Đăng ký khuôn mặt thành công!
+                  </Alert>
+                ) : (
+                  <Alert severity="info" sx={{ width: "100%" }}>
+                    Bạn có thể đăng ký khuôn mặt sau trong phần quản lý tài khoản.
+                  </Alert>
+                )}
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Đăng ký thành công!
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+                  Tài khoản thư viện của bạn đã được tạo. Vui lòng đăng nhập để sử dụng.
+                </Typography>
+                <Button variant="contained" onClick={() => router.push("/login")} fullWidth>
+                  Đăng nhập
+                </Button>
+                <Button variant="text" onClick={handleReset} fullWidth>
+                  Đăng ký tài khoản khác
+                </Button>
+              </Stack>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+}
+
+function ConfirmRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <Stack direction="row" spacing={1}>
+      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 90, flexShrink: 0 }}>
+        {label}:
+      </Typography>
+      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+        {value ?? ""}
+      </Typography>
+    </Stack>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/active/page.tsx">
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Grid,
+  InputAdornment,
+  Paper,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
+import DoorFrontOutlinedIcon from "@mui/icons-material/DoorFrontOutlined";
+import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
+import api from "@/lib/api-client";
+import type { ActivePatron } from "@/lib/types";
+
+const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);
+
+const CAMERA_CONFIG: Record<string, { label: string; icon: React.ElementType }> = {
+  entry_gate: { label: "Cổng vào", icon: DoorFrontOutlinedIcon },
+  exit_gate: { label: "Cổng ra", icon: ExitToAppOutlinedIcon },
+  kiosk: { label: "Kiosk", icon: TerminalOutlinedIcon },
+};
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getDuration(value: string) {
+  const diffMs = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(0, Math.floor(diffMs / 60000));
+  if (minutes < 1) return { text: "Vừa vào", level: 0 as const };
+  if (minutes < 60) return { text: `${minutes} phút`, level: 1 as const };
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours < 2) return { text: rest ? `${hours} giờ ${rest} phút` : `${hours} giờ`, level: 2 as const };
+  return { text: rest ? `${hours} giờ ${rest} phút` : `${hours} giờ`, level: 3 as const };
+}
+
+const DURATION_ACCENT: Record<number, string> = {
+  0: "#4A8C5C",
+  1: "#4A8C5C",
+  2: "#C49A3C",
+  3: "#B85C4A",
+};
+
+function initials(name?: string) {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+}
+
+function normalizeQuery(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export default function ActivePage() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const [patrons, setPatrons] = useState<ActivePatron[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  const load = async () => {
+    try {
+      setError(null);
+      const data = await api.getActivePatrons();
+      const allowed = data.items
+        .filter((p) => ACTIVE_CAMERA_IDS.has(p.camera_id))
+        .sort((a, b) => new Date(b.entered_at).getTime() - new Date(a.entered_at).getTime());
+      setPatrons(allowed);
+      setLastUpdate(new Date());
+    } catch {
+      setError("Không thể tải danh sách độc giả.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const q = normalizeQuery(search);
+  const filtered = useMemo(() => {
+    if (!q) return patrons;
+    return patrons.filter((p) =>
+      p.full_name.toLowerCase().includes(q) || p.student_code.toLowerCase().includes(q)
+    );
+  }, [patrons, search]);
+
+  const cameraCounts = useMemo(() =>
+    patrons.reduce<Record<string, number>>((acc, p) => {
+      acc[p.camera_id] = (acc[p.camera_id] || 0) + 1;
+      return acc;
+    }, {}),
+    [patrons]
+  );
+
+  return (
+    <Stack spacing={3}>
+      {/* Header — hero count + camera breakdown */}
+      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
+        <Box sx={{ p: { xs: 2.5, sm: 3 } }}>
+          <Grid container spacing={3} sx={{ alignItems: "flex-end" }}>
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Stack spacing={1}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 700,
+                    letterSpacing: 1.5,
+                    textTransform: "uppercase",
+                    color: "text.secondary",
+                  }}
+                >
+                  Hiện tại
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
+                  <Typography
+                    variant="h2"
+                    sx={{
+                      fontWeight: 900,
+                      letterSpacing: { xs: -1, sm: -2 },
+                      lineHeight: 1,
+                      fontSize: { xs: "3rem", sm: "3.75rem" },
+                    }}
+                  >
+                    {patrons.length}
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 500, color: "text.secondary" }}>
+                    độc giả
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 360 }}>
+                  Danh sách độc giả đang ở trong thư viện, cập nhật từ hệ thống cổng và kiosk.
+                </Typography>
+              </Stack>
+            </Grid>
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap" }}>
+                  {Object.entries(CAMERA_CONFIG).map(([id, cfg]) => {
+                    const Icon = cfg.icon;
+                    return (
+                      <Paper
+                        key={id}
+                        variant="outlined"
+                        sx={{
+                          flex: { xs: "1 1 100%", sm: "1 1 0" },
+                          minWidth: 0,
+                          p: 1.5,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1.5,
+                          borderRadius: 2,
+                          background: "transparent",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 1.5,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+                            color: "text.secondary",
+                          }}
+                        >
+                          <Icon fontSize="small" />
+                        </Box>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: "block" }}>
+                            {cfg.label}
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                            {cameraCounts[id] || 0}
+                          </Typography>
+                        </Box>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}
+                >
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <Box
+                      sx={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        bgcolor: error ? "error.main" : "success.main",
+                      }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {error ? "Lỗi cập nhật" : `Cập nhật: ${lastUpdate.toLocaleTimeString("vi-VN")}`}
+                    </Typography>
+                  </Stack>
+                  <Button size="small" variant="outlined" startIcon={<RefreshOutlinedIcon />} onClick={load} disabled={loading}>
+                    Làm mới
+                  </Button>
+                </Stack>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Box>
+      </Paper>
+
+      {/* Patron list */}
+      <Paper variant="outlined" sx={{ borderRadius: 3 }}>
+        <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+          {/* Search bar */}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", mb: 2.5 }}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Độc giả
+              </Typography>
+              <Typography color="text.secondary" variant="body2">
+                {filtered.length} kết quả
+              </Typography>
+            </Box>
+            <TextField
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm theo tên hoặc MSSV..."
+              size="small"
+              sx={{ width: { xs: "100%", sm: 320 } }}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchOutlinedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+          </Stack>
+
+          {/* Content states */}
+          {loading && patrons.length === 0 ? (
+            <Stack sx={{ minHeight: 300, alignItems: "center", justifyContent: "center", gap: 2 }}>
+              <CircularProgress size={28} />
+              <Typography variant="body2" color="text.secondary">
+                Đang tải...
+              </Typography>
+            </Stack>
+          ) : patrons.length === 0 ? (
+            <Stack
+              sx={{
+                minHeight: 300,
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 1.5,
+                py: 6,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  bgcolor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)",
+                  color: "text.disabled",
+                  mb: 1,
+                }}
+              >
+                <MenuBookOutlinedIcon sx={{ fontSize: 32 }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: "text.secondary" }}>
+                Thư viện đang yên tĩnh
+              </Typography>
+              <Typography variant="body2" color="text.disabled" sx={{ textAlign: "center", maxWidth: 360 }}>
+                Chưa có độc giả nào trong thư viện. Danh sách sẽ tự động cập nhật khi có lượt vào hợp lệ.
+              </Typography>
+            </Stack>
+          ) : filtered.length === 0 ? (
+            <Stack
+              sx={{
+                minHeight: 200,
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 1.5,
+                py: 4,
+              }}
+            >
+              <SearchOutlinedIcon sx={{ fontSize: 36, color: "text.disabled" }} />
+              <Typography variant="body1" color="text.secondary">
+                Không tìm thấy độc giả &ldquo;{search}&rdquo;
+              </Typography>
+            </Stack>
+          ) : (
+            <Grid container spacing={1.5}>
+              {filtered.map((patron) => {
+                const dur = getDuration(patron.entered_at);
+                const accent = DURATION_ACCENT[dur.level];
+                const percent = patron.confidence == null ? null : Math.round(patron.confidence * 100);
+                return (
+                  <Grid key={patron.id} size={{ xs: 12, xl: 6 }}>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        borderRadius: 2,
+                        overflow: "hidden",
+                        position: "relative",
+                        transition: "box-shadow 0.15s",
+                        "&:hover": {
+                          boxShadow: theme.shadows[2],
+                        },
+                      }}
+                    >
+                      {/* Duration accent bar — like a book spine */}
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 3,
+                          bgcolor: accent,
+                          opacity: 0.7,
+                        }}
+                      />
+
+                      <Box sx={{ pl: 2.5, pr: 2, py: 1.5 }}>
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                          <Avatar
+                            sx={{
+                              width: 36,
+                              height: 36,
+                              fontSize: 13,
+                              fontWeight: 700,
+                              bgcolor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                              color: "text.primary",
+                            }}
+                          >
+                            {initials(patron.full_name)}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              sx={{ justifyContent: "space-between", alignItems: "flex-start" }}
+                            >
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography noWrap sx={{ fontWeight: 700, fontSize: 14 }}>
+                                  {patron.full_name || "Chưa có tên"}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ fontFamily: "monospace", fontSize: 12 }}
+                                >
+                                  {patron.student_code}
+                                </Typography>
+                              </Box>
+                              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
+                                {percent != null && (
+                                  <Tooltip title={`Độ chính xác: ${percent}%`}>
+                                    <Box
+                                      sx={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: "50%",
+                                        bgcolor:
+                                          percent >= 80 ? "success.main" : percent >= 60 ? "warning.main" : "error.main",
+                                      }}
+                                    />
+                                  </Tooltip>
+                                )}
+                                <Box
+                                  sx={{
+                                    px: 1,
+                                    py: 0.25,
+                                    borderRadius: 0.75,
+                                    bgcolor:
+                                      dur.level <= 1
+                                        ? isDark ? "rgba(74,140,92,0.15)" : "rgba(74,140,92,0.1)"
+                                        : dur.level === 2
+                                          ? isDark ? "rgba(196,154,60,0.15)" : "rgba(196,154,60,0.1)"
+                                          : isDark ? "rgba(184,92,74,0.15)" : "rgba(184,92,74,0.1)",
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ fontWeight: 700, fontSize: 11, color: accent, whiteSpace: "nowrap" }}
+                                  >
+                                    {dur.text}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                            </Stack>
+
+                            <Stack direction="row" spacing={2} sx={{ mt: 1, flexWrap: "wrap", rowGap: 0.5 }}>
+                              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                                <AccessTimeOutlinedIcon sx={{ fontSize: 13, color: "text.disabled" }} />
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12 }}>
+                                  {formatTime(patron.entered_at)}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                                <LocationOnOutlinedIcon sx={{ fontSize: 13, color: "text.disabled" }} />
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12 }}>
+                                  {CAMERA_CONFIG[patron.camera_id]?.label || patron.camera_id}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
+        </Box>
+      </Paper>
+    </Stack>
+  );
+}
+</file>
+
 <file path="src/app/(dashboard)/identify/page.tsx">
 "use client";
 
@@ -9315,6 +10861,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
+  alpha,
   Avatar,
   Box,
   Button,
@@ -9324,25 +10871,21 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Drawer,
   IconButton,
   InputAdornment,
   MenuItem,
   Paper,
   Snackbar,
   Stack,
-  Step,
-  StepLabel,
-  Stepper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -9350,13 +10893,15 @@ import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import UpdateIcon from "@mui/icons-material/UpdateOutlined";
-import UsersIcon from "@mui/icons-material/GroupsOutlined";
+import PersonIcon from "@mui/icons-material/PersonOutlined";
+import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { CaptureAngle } from "@/components/MultiAngleCapture";
 import MultiAngleCapture from "@/components/MultiAngleCapture";
+import StudentCardScanner, { type ScannedCardData } from "@/components/StudentCardScanner";
 import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 
-type StepValue = 1 | 2 | 3;
+type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face";
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 const defaultIssueDate = new Date().toISOString().split("T")[0];
@@ -9371,30 +10916,53 @@ function emptyCreateForm(): PatronCreate {
     class_name: "",
     issue_date: defaultIssueDate,
     membership_expiry: defaultExpiryStr,
+    course: "",
+    permanent_address: "",
   };
 }
 
-function formatStatus(status: string) {
+function statusLabel(status: string) {
   if (status === "active") return "Hoạt động";
   if (status === "inactive") return "Tạm khóa";
   if (status === "expired") return "Hết hạn";
   return status;
 }
 
+function statusColor(status: string) {
+  if (status === "active") return "success" as const;
+  if (status === "inactive") return "warning" as const;
+  if (status === "expired") return "error" as const;
+  return "default" as const;
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+}
+
 export default function PatronsPage() {
   const router = useRouter();
   const [patrons, setPatrons] = useState<PatronPublic[]>([]);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FilterValue>("all");
   const [loading, setLoading] = useState(false);
+
   const [showCreate, setShowCreate] = useState(false);
-  const [createStep, setCreateStep] = useState<StepValue>(1);
+  const [createScan, setCreateScan] = useState(true);
   const [createForm, setCreateForm] = useState<PatronCreate>(emptyCreateForm());
   const [createError, setCreateError] = useState("");
-  const [enrollFiles, setEnrollFiles] = useState<Record<CaptureAngle, File> | null>(null);
+  const [scannedFromCard, setScannedFromCard] = useState(false);
+  const [createStep, setCreateStep] = useState<"scan" | "form" | "face" | "done">("scan");
   const [submitting, setSubmitting] = useState(false);
+
   const [editTarget, setEditTarget] = useState<PatronPublic | null>(null);
   const [editForm, setEditForm] = useState<PatronUpdate>({});
+  const [editSaving, setEditSaving] = useState(false);
+
   const [deleteTarget, setDeleteTarget] = useState<PatronPublic | null>(null);
+
   const [notice, setNotice] = useState<Notice>(null);
 
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
@@ -9410,43 +10978,70 @@ export default function PatronsPage() {
     }
   }, [query]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    let list = patrons;
+    if (filter === "active") list = list.filter((p) => p.status === "active");
+    else if (filter === "inactive") list = list.filter((p) => p.status === "inactive");
+    else if (filter === "expired") list = list.filter((p) => p.status === "expired");
+    else if (filter === "has_face") list = list.filter((p) => p.has_face);
+    else if (filter === "no_face") list = list.filter((p) => !p.has_face);
+    return list;
+  }, [patrons, filter]);
+
+  const handleCardScanned = (data: ScannedCardData) => {
+    setCreateForm((prev) => ({
+      ...prev,
+      full_name: data.fullName || prev.full_name,
+      student_code: data.studentCode || prev.student_code,
+      class_name: data.className || prev.class_name,
+      course: data.course || prev.course,
+      permanent_address: data.permanentAddress || prev.permanent_address,
+    }));
+    setScannedFromCard(true);
+    setCreateStep("form");
+  };
 
   const closeCreate = () => {
     setShowCreate(false);
-    setCreateStep(1);
+    setCreateScan(true);
+    setCreateStep("scan");
     setCreateForm(emptyCreateForm());
     setCreateError("");
-    setEnrollFiles(null);
+    setScannedFromCard(false);
+    setSubmitting(false);
   };
 
-  const handleCreateStep1 = () => {
-    if (!createForm.full_name.trim()) {
-      setCreateError("Vui lòng nhập họ tên");
-      return;
-    }
-    if (!createForm.student_code.trim()) {
-      setCreateError("Vui lòng nhập MSSV");
-      return;
-    }
+  const handleFormNext = () => {
+    if (!createForm.full_name.trim()) { setCreateError("Vui lòng nhập họ tên"); return; }
+    if (!createForm.student_code.trim()) { setCreateError("Vui lòng nhập MSSV"); return; }
     setCreateError("");
-    setCreateStep(2);
+    setCreateStep("face");
   };
 
-  const handleFilesReady = (files: Record<CaptureAngle, File>) => {
-    setEnrollFiles(files);
-    setCreateStep(3);
+  const handleSkipFace = async () => {
+    setSubmitting(true);
+    setCreateError("");
+    try {
+      await api.createPatron(createForm);
+      closeCreate();
+      await load();
+      showNotice("success", "Đã tạo độc giả mới");
+    } catch (err: any) {
+      if (err?.response?.status === 409) setCreateError("MSSV hoặc mã thẻ đã tồn tại");
+      else setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSubmit = async () => {
-    if (!enrollFiles) return;
+  const handleFaceReady = async (files: Record<CaptureAngle, File>) => {
     setSubmitting(true);
     setCreateError("");
     try {
       const newPatron = await api.createPatron(createForm);
-      await api.enrollPatronFaceBatch(newPatron.id, enrollFiles);
+      await api.enrollPatronFaceBatch(newPatron.id, files);
       closeCreate();
       await load();
       showNotice("success", "Đã tạo độc giả và đăng ký khuôn mặt");
@@ -9462,16 +11057,20 @@ export default function PatronsPage() {
     setEditTarget(patron);
     setEditForm({
       full_name: patron.full_name,
+      class_name: patron.class_name || undefined,
       identity_number: patron.identity_number || undefined,
       email: patron.email || undefined,
       phone: patron.phone || undefined,
       membership_expiry: patron.membership_expiry,
       status: patron.status,
+      course: patron.course || undefined,
+      permanent_address: patron.permanent_address || undefined,
     });
   };
 
   const handleEdit = async () => {
     if (!editTarget) return;
+    setEditSaving(true);
     try {
       await api.updatePatron(editTarget.id, editForm);
       setEditTarget(null);
@@ -9480,6 +11079,8 @@ export default function PatronsPage() {
       showNotice("success", "Đã cập nhật độc giả");
     } catch (err) {
       showNotice("error", getErrorMessage(err) || "Cập nhật thất bại");
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -9489,7 +11090,7 @@ export default function PatronsPage() {
     try {
       await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
       await load();
-      showNotice("success", "Đã gia hạn thẻ thêm 1 năm");
+      showNotice("success", `Đã gia hạn thẻ ${patron.full_name} thêm 1 năm`);
     } catch (err) {
       showNotice("error", getErrorMessage(err) || "Gia hạn thất bại");
     }
@@ -9499,32 +11100,39 @@ export default function PatronsPage() {
     if (!deleteTarget) return;
     const target = deleteTarget;
     setDeleteTarget(null);
-    setPatrons((prev) => prev.filter((patron) => patron.id !== target.id));
+    setPatrons((prev) => prev.filter((p) => p.id !== target.id));
     try {
       await api.deletePatron(target.id);
-      showNotice("success", "Đã xóa độc giả");
+      showNotice("success", `Đã xóa độc giả ${target.full_name}`);
     } catch (err: any) {
       if (err?.response?.status === 404) showNotice("info", "Độc giả đã bị xóa trước đó");
-      else {
-        showNotice("error", getErrorMessage(err) || "Xóa thất bại");
-        await load();
-      }
+      else { showNotice("error", getErrorMessage(err) || "Xóa thất bại"); await load(); }
     }
   };
 
-  const cardNumber = useMemo(
-    () => createForm.student_code ? `THV-${createForm.student_code}` : "THV-XXXXXXXX",
-    [createForm.student_code],
-  );
-
   return (
-    <Stack spacing={3}>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}>
+    <Stack spacing={2.5}>
+      {/* Header */}
+      <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}
+        sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>Độc giả</Typography>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load} size="small">
+            Tải lại
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCreateScan(true); setShowCreate(true); }}>
+            Thêm độc giả
+          </Button>
+        </Stack>
+      </Stack>
+
+      {/* Search + Filters */}
+      <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Stack spacing={1.5}>
           <TextField
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => event.key === "Enter" && load()}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && load()}
             placeholder="Tìm theo tên, MSSV, mã thẻ..."
             size="small"
             fullWidth
@@ -9534,166 +11142,250 @@ export default function PatronsPage() {
               },
             }}
           />
-          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load}>Tìm</Button>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreate(true)}>Thêm độc giả</Button>
-          </Stack>
+          <ToggleButtonGroup
+            value={filter}
+            exclusive
+            onChange={(_, val) => val && setFilter(val)}
+            size="small"
+            sx={{ flexWrap: "wrap", gap: 0.5, "& .MuiToggleButton-root": { px: 1.5, py: 0.4, borderRadius: "20px!important", border: "1px solid", borderColor: "divider", textTransform: "none", fontWeight: 600, fontSize: "0.8rem" } }}
+          >
+            <ToggleButton value="all">Tất cả</ToggleButton>
+            <ToggleButton value="active">
+              <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "success.main", mr: 0.6, flexShrink: 0 }} />
+              Hoạt động
+            </ToggleButton>
+            <ToggleButton value="inactive">Tạm khóa</ToggleButton>
+            <ToggleButton value="expired">Hết hạn</ToggleButton>
+            <ToggleButton value="has_face">
+              <FaceIcon sx={{ fontSize: 14, mr: 0.4 }} />
+              Có khuôn mặt
+            </ToggleButton>
+            <ToggleButton value="no_face">Chưa có khuôn mặt</ToggleButton>
+          </ToggleButtonGroup>
         </Stack>
       </Paper>
 
-      <Paper variant="outlined">
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Họ tên</TableCell>
-                <TableCell>MSSV</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>SĐT</TableCell>
-                <TableCell>Hạn thẻ</TableCell>
-                <TableCell>Trạng thái</TableCell>
-                <TableCell>Khuôn mặt</TableCell>
-                <TableCell align="right">Hành động</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading && patrons.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
-                </TableRow>
-              ) : patrons.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
-                    <Typography color="text.secondary">Không có độc giả nào</Typography>
-                  </TableCell>
-                </TableRow>
-              ) : patrons.map((patron) => (
-                <TableRow key={patron.id} hover sx={{ cursor: "pointer" }} onClick={() => router.push(`/patrons/${patron.id}`)}>
-                  <TableCell>
-                    <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-                      <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 900 }}>
-                        {patron.full_name?.charAt(0).toUpperCase() || "?"}
-                      </Avatar>
-                      <Typography variant="body2" sx={{ fontWeight: 900 }}>{patron.full_name}</Typography>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ fontFamily: "monospace" }}>{patron.student_code}</TableCell>
-                  <TableCell>{patron.email || "-"}</TableCell>
-                  <TableCell>{patron.phone || "-"}</TableCell>
-                  <TableCell>{patron.membership_expiry}</TableCell>
-                  <TableCell>
-                    <Chip size="small" color={patron.status === "active" ? "success" : "error"} label={formatStatus(patron.status)} />
-                  </TableCell>
-                  <TableCell>
-                    <Chip size="small" color={patron.has_face ? "success" : "default"} icon={<FaceIcon />} label={patron.has_face ? "Đã đăng ký" : "Chưa có"} />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={0.75} sx={{ justifyContent: "flex-end" }} onClick={(event) => event.stopPropagation()}>
-                      <IconButton size="small" title="Sửa" onClick={() => openEdit(patron)}><EditIcon fontSize="small" /></IconButton>
-                      <IconButton size="small" color="success" title="Gia hạn" onClick={() => handleRenew(patron)}><UpdateIcon fontSize="small" /></IconButton>
-                      <IconButton size="small" color="error" title="Xóa" onClick={() => setDeleteTarget(patron)}><DeleteIcon fontSize="small" /></IconButton>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-
-      <Dialog open={showCreate} onClose={closeCreate} fullWidth maxWidth="md">
-        <DialogTitle>
-          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-            <Typography variant="h6">Thêm độc giả mới</Typography>
-            <IconButton onClick={closeCreate}><CloseIcon /></IconButton>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          <Stepper activeStep={createStep - 1} sx={{ mb: 3 }}>
-            <Step><StepLabel>Thông tin</StepLabel></Step>
-            <Step><StepLabel>Khuôn mặt</StepLabel></Step>
-            <Step><StepLabel>Xác nhận</StepLabel></Step>
-          </Stepper>
-
-          {createError ? <Alert severity="error" sx={{ mb: 2 }}>{createError}</Alert> : null}
-
-          {createStep === 1 ? (
-            <Stack spacing={2}>
-              <TextField label="Họ tên" value={createForm.full_name} onChange={(event) => { setCreateForm({ ...createForm, full_name: event.target.value }); setCreateError(""); }} required fullWidth />
-              <TextField label="MSSV" value={createForm.student_code} onChange={(event) => { setCreateForm({ ...createForm, student_code: event.target.value }); setCreateError(""); }} required fullWidth />
-              <TextField label="Lớp" value={createForm.class_name || ""} onChange={(event) => setCreateForm({ ...createForm, class_name: event.target.value })} fullWidth />
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
-                <TextField label="Ngày cấp thẻ" type="date" value={createForm.issue_date} onChange={(event) => setCreateForm({ ...createForm, issue_date: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
-                <TextField label="Hạn thẻ" type="date" value={createForm.membership_expiry} onChange={(event) => setCreateForm({ ...createForm, membership_expiry: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
-              </Box>
-            </Stack>
-          ) : null}
-
-          {createStep === 2 ? (
-            <Stack spacing={2}>
-              <Alert severity="info">Chụp khuôn mặt từ 4 góc để đăng ký nhận diện tại cổng.</Alert>
-              <MultiAngleCapture consent={true} onFilesReady={handleFilesReady} />
-            </Stack>
-          ) : null}
-
-          {createStep === 3 && enrollFiles ? (
-            <Stack spacing={2}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 2 }}>
-                  <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText" }}><UsersIcon /></Avatar>
-                  <Box>
-                    <Typography sx={{ fontWeight: 900 }}>{createForm.full_name}</Typography>
-                    <Typography variant="caption" color="primary" sx={{ fontFamily: "monospace" }}>{cardNumber}</Typography>
-                  </Box>
+      {/* Card Grid */}
+      {loading && filtered.length === 0 ? (
+        <Stack sx={{ alignItems: "center", py: 8 }}><CircularProgress /></Stack>
+      ) : filtered.length === 0 ? (
+        <Paper variant="outlined" sx={{ p: 5, textAlign: "center" }}>
+          <PersonIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
+          <Typography color="text.secondary">Không tìm thấy độc giả nào</Typography>
+          <Button variant="outlined" size="small" sx={{ mt: 1.5 }} onClick={() => { setQuery(""); setFilter("all"); }}>
+            Xóa bộ lọc
+          </Button>
+        </Paper>
+      ) : (
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "1fr 1fr 1fr" }, gap: 2 }}>
+          {filtered.map((patron) => (
+            <Paper
+              key={patron.id}
+              variant="outlined"
+              sx={{
+                p: 2,
+                cursor: "pointer",
+                transition: "box-shadow .15s, border-color .15s",
+                "&:hover": { borderColor: "primary.main", boxShadow: (t) => `0 0 0 1px ${alpha(t.palette.primary.main, 0.3)}` },
+              }}
+              onClick={() => router.push(`/patrons/${patron.id}`)}
+            >
+              <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
+                    <Avatar sx={{ width: 40, height: 40, bgcolor: "primary.main", fontWeight: 700, fontSize: 15 }}>
+                      {initials(patron.full_name)}
+                    </Avatar>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{patron.full_name}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+                        {patron.student_code}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Chip size="small" color={statusColor(patron.status)} label={statusLabel(patron.status)} sx={{ fontWeight: 700, fontSize: 11, height: 22 }} />
                 </Stack>
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
-                  <Typography variant="body2">MSSV: <strong>{createForm.student_code}</strong></Typography>
-                  <Typography variant="body2">Lớp: <strong>{createForm.class_name || "-"}</strong></Typography>
-                  <Typography variant="body2">Cấp: <strong>{createForm.issue_date}</strong></Typography>
-                  <Typography variant="body2">Hạn: <strong>{createForm.membership_expiry}</strong></Typography>
+
+                <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
+                  {patron.course && (
+                    <Typography variant="caption" color="text.secondary">
+                      <SchoolIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: "text-top" }} />
+                      {patron.course}
+                    </Typography>
+                  )}
+                  <Typography variant="caption" color={patron.has_face ? "success.main" : "text.disabled"}>
+                    <FaceIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: "text-top" }} />
+                    {patron.has_face ? "Đã có khuôn mặt" : "Chưa có"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Hạn: {patron.membership_expiry}
+                  </Typography>
+                </Stack>
+
+                <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
+                  <IconButton size="small" title="Sửa" onClick={() => openEdit(patron)} sx={{ color: "text.secondary" }}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton size="small" title="Gia hạn" onClick={() => handleRenew(patron)} sx={{ color: "success.main" }}>
+                    <UpdateIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton size="small" title="Chi tiết" onClick={() => router.push(`/patrons/${patron.id}`)} sx={{ color: "text.secondary" }}>
+                    <ChevronRightIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </Stack>
+            </Paper>
+          ))}
+        </Box>
+      )}
+
+      {/* ─── CREATE DIALOG (full-screen scan-first) ─── */}
+      <Dialog open={showCreate} onClose={closeCreate} fullWidth maxWidth={createStep === "scan" ? "lg" : "sm"}>
+        {createStep === "scan" ? (
+          <>
+            <DialogTitle sx={{ pb: 0 }}>
+              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>Quét thẻ sinh viên</Typography>
+                <IconButton onClick={closeCreate}><CloseIcon /></IconButton>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Đặt thẻ sinh viên vào khung hình để tự động nhận dạng thông tin
+              </Typography>
+            </DialogTitle>
+            <DialogContent sx={{ display: "flex", flexDirection: "column", pb: 2 }}>
+              <StudentCardScanner
+                onScanned={handleCardScanned}
+                onError={(msg) => setCreateError(msg)}
+                onSkip={() => { setCreateScan(false); setCreateStep("form"); }}
+              />
+              {createError && <Alert severity="error" sx={{ mt: 2 }}>{createError}</Alert>}
+            </DialogContent>
+          </>
+        ) : createStep === "form" ? (
+          <>
+            <DialogTitle>
+              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>Thông tin độc giả</Typography>
+                <IconButton onClick={closeCreate}><CloseIcon /></IconButton>
+              </Stack>
+            </DialogTitle>
+            <DialogContent>
+              <Stack spacing={2} sx={{ mt: 1 }}>
+                {scannedFromCard && (
+                  <Alert severity="info" sx={{ fontSize: "0.8rem" }}>Đã điền thông tin từ thẻ sinh viên</Alert>
+                )}
+                {createScan && (
+                  <Button variant="outlined" startIcon={<CameraAltIcon />} onClick={() => setCreateStep("scan")} fullWidth size="small">
+                    Quét lại thẻ
+                  </Button>
+                )}
+                <TextField label="Họ tên" value={createForm.full_name} onChange={(e) => { setCreateForm({ ...createForm, full_name: e.target.value }); setCreateError(""); }} required fullWidth />
+                <TextField label="MSSV" value={createForm.student_code} onChange={(e) => { setCreateForm({ ...createForm, student_code: e.target.value }); setCreateError(""); }} required fullWidth />
+                <TextField label="Lớp" value={createForm.class_name || ""} onChange={(e) => setCreateForm({ ...createForm, class_name: e.target.value })} fullWidth />
+                <TextField label="Khóa học" value={createForm.course || ""} onChange={(e) => setCreateForm({ ...createForm, course: e.target.value })} fullWidth />
+                <TextField label="HKTT" value={createForm.permanent_address || ""} onChange={(e) => setCreateForm({ ...createForm, permanent_address: e.target.value })} fullWidth multiline rows={2} />
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
+                  <TextField label="Ngày cấp thẻ" type="date" value={createForm.issue_date} onChange={(e) => setCreateForm({ ...createForm, issue_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+                  <TextField label="Hạn thẻ" type="date" value={createForm.membership_expiry} onChange={(e) => setCreateForm({ ...createForm, membership_expiry: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
                 </Box>
-              </Paper>
-            </Stack>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          {createStep > 1 ? <Button onClick={() => setCreateStep((value) => (value - 1) as StepValue)}>Quay lại</Button> : <Button onClick={closeCreate}>Hủy</Button>}
-          {createStep === 1 ? <Button variant="contained" onClick={handleCreateStep1}>Tiếp tục</Button> : null}
-          {createStep === 3 ? <Button variant="contained" onClick={handleSubmit} disabled={submitting}>{submitting ? "Đang tạo..." : "Tạo độc giả"}</Button> : null}
-        </DialogActions>
+                {createError && <Alert severity="error">{createError}</Alert>}
+              </Stack>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button onClick={closeCreate} color="inherit">Hủy</Button>
+              <Button variant="outlined" onClick={handleSkipFace} disabled={submitting}>
+                {submitting ? <CircularProgress size={18} /> : "Tạo (bỏ qua khuôn mặt)"}
+              </Button>
+              <Button variant="contained" onClick={handleFormNext}>
+                Tiếp tục → Đăng ký khuôn mặt
+              </Button>
+            </DialogActions>
+          </>
+        ) : (
+          <>
+            <DialogTitle>
+              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>Đăng ký khuôn mặt</Typography>
+                <IconButton onClick={closeCreate}><CloseIcon /></IconButton>
+              </Stack>
+            </DialogTitle>
+            <DialogContent>
+              <Stack spacing={2}>
+                <Alert severity="info">Chụp khuôn mặt từ 4 góc để nhận diện tại cổng.</Alert>
+                <MultiAngleCapture consent={true} onFilesReady={handleFaceReady} />
+                {createError && <Alert severity="error">{createError}</Alert>}
+              </Stack>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button onClick={() => setCreateStep("form")} color="inherit">Quay lại</Button>
+              <Button variant="contained" onClick={handleSkipFace} disabled={submitting}>
+                {submitting ? <CircularProgress size={18} /> : "Bỏ qua + Tạo"}
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
 
-      <Dialog open={!!editTarget} onClose={() => setEditTarget(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Sửa độc giả</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Họ tên" value={editForm.full_name || ""} onChange={(event) => setEditForm({ ...editForm, full_name: event.target.value })} fullWidth />
-            <TextField label="CMND/CCCD" value={editForm.identity_number || ""} onChange={(event) => setEditForm({ ...editForm, identity_number: event.target.value })} fullWidth />
-            <TextField label="Email" value={editForm.email || ""} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} fullWidth />
-            <TextField label="SĐT" value={editForm.phone || ""} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} fullWidth />
-            <TextField label="Hạn thẻ" type="date" value={editForm.membership_expiry || ""} onChange={(event) => setEditForm({ ...editForm, membership_expiry: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
-            <TextField label="Trạng thái" value={editForm.status || "active"} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} select fullWidth>
-              <MenuItem value="active">Hoạt động</MenuItem>
-              <MenuItem value="inactive">Tạm khóa</MenuItem>
-              <MenuItem value="expired">Hết hạn</MenuItem>
-            </TextField>
+      {/* ─── EDIT DRAWER (slide panel) ─── */}
+      <Drawer
+        anchor="right"
+        open={!!editTarget}
+        onClose={() => { if (!editSaving) setEditTarget(null); }}
+        slotProps={{ backdrop: { invisible: true } }}
+      >
+        <Box sx={{ width: { xs: "100vw", sm: 440 }, display: "flex", flexDirection: "column", height: "100%" }}>
+          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", px: 2.5, py: 2, borderBottom: 1, borderColor: "divider" }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Sửa độc giả</Typography>
+            <IconButton onClick={() => setEditTarget(null)}><CloseIcon /></IconButton>
           </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditTarget(null)}>Hủy</Button>
-          <Button variant="contained" onClick={handleEdit}>Lưu</Button>
-        </DialogActions>
-      </Dialog>
 
+          {editTarget && (
+            <Stack spacing={2.5} sx={{ flex: 1, overflow: "auto", px: 2.5, py: 2.5 }}>
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                <Avatar sx={{ width: 48, height: 48, bgcolor: "primary.main", fontWeight: 700 }}>
+                  {initials(editTarget.full_name)}
+                </Avatar>
+                <Box>
+                  <Typography sx={{ fontWeight: 700 }}>{editTarget.full_name}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+                    {editTarget.student_code}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <TextField label="Họ tên" value={editForm.full_name || ""} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} fullWidth />
+              <TextField label="Lớp" value={editForm.class_name || ""} onChange={(e) => setEditForm({ ...editForm, class_name: e.target.value })} fullWidth />
+              <TextField label="Khóa học" value={editForm.course || ""} onChange={(e) => setEditForm({ ...editForm, course: e.target.value })} fullWidth />
+              <TextField label="HKTT" value={editForm.permanent_address || ""} onChange={(e) => setEditForm({ ...editForm, permanent_address: e.target.value })} fullWidth multiline rows={2} />
+              <TextField label="CMND/CCCD" value={editForm.identity_number || ""} onChange={(e) => setEditForm({ ...editForm, identity_number: e.target.value })} fullWidth />
+              <TextField label="Email" value={editForm.email || ""} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} fullWidth />
+              <TextField label="SĐT" value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} fullWidth />
+              <TextField label="Hạn thẻ" type="date" value={editForm.membership_expiry || ""} onChange={(e) => setEditForm({ ...editForm, membership_expiry: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+              <TextField select label="Trạng thái" value={editForm.status || "active"} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} fullWidth>
+                <MenuItem value="active">Hoạt động</MenuItem>
+                <MenuItem value="inactive">Tạm khóa</MenuItem>
+                <MenuItem value="expired">Hết hạn</MenuItem>
+              </TextField>
+            </Stack>
+          )}
+
+          <Stack direction="row" spacing={1.5} sx={{ px: 2.5, py: 2, borderTop: 1, borderColor: "divider" }}>
+            <Button fullWidth variant="outlined" onClick={() => setEditTarget(null)} disabled={editSaving}>Hủy</Button>
+            <Button fullWidth variant="contained" onClick={handleEdit} disabled={editSaving}>
+              {editSaving ? <CircularProgress size={20} /> : "Lưu thay đổi"}
+            </Button>
+          </Stack>
+        </Box>
+      </Drawer>
+
+      {/* ─── DELETE CONFIRM ─── */}
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
         <DialogTitle>Xóa độc giả?</DialogTitle>
         <DialogContent>
-          <Typography>
-            Xóa độc giả {deleteTarget?.full_name || deleteTarget?.student_code}? Thao tác này không thể hoàn tác từ giao diện.
-          </Typography>
+          <Typography>Xóa <strong>{deleteTarget?.full_name}</strong>? Thao tác này không thể hoàn tác từ giao diện.</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Hủy</Button>
+          <Button onClick={() => setDeleteTarget(null)} color="inherit">Hủy</Button>
           <Button color="error" variant="contained" onClick={handleDelete}>Xóa</Button>
         </DialogActions>
       </Dialog>
@@ -9879,55 +11571,6 @@ export function useAuth() {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "face-recognition-frontend",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbo",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test:e2e": "playwright test"
-  },
-  "dependencies": {
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^9.1.1",
-    "@mui/material": "^9.1.1",
-    "@zxing/browser": "^0.2.0",
-    "@zxing/library": "^0.22.0",
-    "axios": "^1.7.7",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.454.0",
-    "next": "^16.2.9",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-hook-form": "^7.53.2",
-    "react-is": "^19.2.7",
-    "react-webcam": "^7.2.0",
-    "recharts": "^3.8.1",
-    "tailwind-merge": "^2.5.4",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@hookform/resolvers": "^3.9.1",
-    "@playwright/test": "^1.60.0",
-    "@types/node": "^22.9.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3"
-  }
 }
 </file>
 
@@ -10703,6 +12346,56 @@ export default function Sidebar() {
 }
 </file>
 
+<file path="package.json">
+{
+  "name": "face-recognition-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.1.1",
+    "@mui/material": "^9.1.1",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
+    "axios": "^1.7.7",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
+    "next": "^16.2.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-form": "^7.53.2",
+    "react-is": "^19.2.7",
+    "react-webcam": "^7.2.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^2.5.4",
+    "tesseract.js": "^7.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
+  }
+}
+</file>
+
 <file path="src/app/(dashboard)/patrons/[id]/page.tsx">
 "use client";
 
@@ -10859,6 +12552,7 @@ export default function PatronDetailPage() {
       phone: patron.phone || undefined,
       membership_expiry: patron.membership_expiry,
       status: patron.status,
+      course: patron.course || undefined,
     });
     setShowEdit(true);
   };
@@ -11043,10 +12737,12 @@ export default function PatronDetailPage() {
             ["Họ tên", patron.full_name],
             ["MSSV", patron.student_code],
             ["Lớp", patron.class_name || "-"],
+            ["Khóa học", patron.course || "-"],
             ["Mã thẻ", patron.card_number],
             ["CCCD/CMND", patron.identity_number || "-"],
             ["Email", patron.email || "-"],
             ["Số điện thoại", patron.phone || "-"],
+            ["HKTT", patron.permanent_address || "-"],
             ["Ngày cấp thẻ", formatDate(patron.issue_date)],
             ["Ngày tạo", formatDateTime(patron.created_at)],
           ].map(([label, value]) => (
@@ -11215,6 +12911,7 @@ export default function PatronDetailPage() {
             <TextField label="CCCD/CMND" value={editForm.identity_number || ""} onChange={(event) => setEditForm({ ...editForm, identity_number: event.target.value })} fullWidth />
             <TextField label="Email" value={editForm.email || ""} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} fullWidth />
             <TextField label="Số điện thoại" value={editForm.phone || ""} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} fullWidth />
+            <TextField label="Khóa học" value={editForm.course || ""} onChange={(event) => setEditForm({ ...editForm, course: event.target.value })} fullWidth />
             <TextField
               label="Hạn thẻ"
               type="date"
@@ -12547,6 +14244,20 @@ export interface RegisterRequest {
   password: string;
   full_name?: string;
   role?: string;
+  course?: string;
+  permanent_address?: string;
+}
+
+export interface PatronRegisterRequest {
+  full_name: string;
+  student_code: string;
+  email: string;
+  password: string;
+  class_name?: string;
+  course?: string;
+  permanent_address?: string;
+  date_of_birth?: string;
+  faculty?: string;
 }
 
 // User-service returns user info along with tokens
@@ -12670,6 +14381,8 @@ export interface PatronPublic {
   created_at: string;
   updated_at: string;
   has_face: boolean;
+  course: string | null;
+  permanent_address: string | null;
 }
 
 export interface PatronCreate {
@@ -12678,6 +14391,8 @@ export interface PatronCreate {
   class_name?: string;
   membership_expiry: string;
   issue_date?: string;
+  course?: string;
+  permanent_address?: string;
 }
 
 export interface PatronUpdate {
@@ -12688,6 +14403,8 @@ export interface PatronUpdate {
   phone?: string;
   membership_expiry?: string;
   status?: string;
+  course?: string;
+  permanent_address?: string;
 }
 
 export interface PatronLookupResult {
@@ -12767,8 +14484,18 @@ export interface BookInfo {
   id: string;
   isbn: string;
   title: string;
+  subtitle: string | null;
   author: string | null;
   cover_url: string | null;
+  publisher: string | null;
+  published_date: string | null;
+  description: string | null;
+  page_count: number | null;
+  categories: string | null;
+  average_rating: number | null;
+  language: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
   shelf_location: string | null;
   copies: BookCopy[];
 }
@@ -12849,8 +14576,18 @@ export interface BookWithStats {
   id: string;
   isbn: string;
   title: string;
+  subtitle: string | null;
   author: string | null;
   cover_url: string | null;
+  publisher: string | null;
+  published_date: string | null;
+  description: string | null;
+  page_count: number | null;
+  categories: string | null;
+  average_rating: number | null;
+  language: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
   shelf_location: string | null;
   total_copies: number;
   available_copies: number;
@@ -12876,7 +14613,12 @@ export interface BookImportPreviewRow {
   isbn: string;
   quantity: number;
   title: string | null;
+  subtitle: string | null;
   author: string | null;
+  publisher: string | null;
+  published_date: string | null;
+  page_count: number | null;
+  categories: string | null;
   cover_url: string | null;
   barcodes: string[];
   status: string;
@@ -13088,6 +14830,7 @@ import type {
   PatronCreate,
   PatronLookupResult,
   PatronPublic,
+  PatronRegisterRequest,
   PatronUpdate,
   AccessFrequencyResponse,
   RegisterRequest,
@@ -13198,13 +14941,18 @@ export function getErrorMessage(err: any): string {
     const detail = err.response.data.detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail)) {
-      return detail.map((d: any) => 
+      return detail.map((d: any) =>
         typeof d === "string" ? d : `${d.loc?.join(".")}: ${d.msg}`
       ).join("; ");
     }
     if (typeof detail === "object") {
       return detail.msg || detail.message || JSON.stringify(detail);
     }
+  }
+  if (err.response?.data?.error) {
+    const errorVal = err.response.data.error;
+    if (typeof errorVal === "string") return errorVal;
+    if (typeof errorVal === "object") return errorVal.msg || errorVal.message || JSON.stringify(errorVal);
   }
   return err.message || err.msg || String(err);
 }
@@ -13242,8 +14990,15 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
+        const url = error.config?.url || '';
+        const status = error.response?.status;
+        const data = error.response?.data;
+        if (status && status >= 400) {
+          const msg = typeof data === 'object' ? (data as any).detail || (data as any).error || '' : '';
+          console.warn(`[API] ${error.config?.method?.toUpperCase()} ${url} ${status}${msg ? `: ${msg}` : ''}`);
+        }
         const originalRequest = error.config;
-        if (error.response?.status === 401 && originalRequest) {
+        if (status === 401 && originalRequest) {
           if (isAuthEndpoint(originalRequest.url)) {
             return Promise.reject(error);
           }
@@ -13480,6 +15235,11 @@ class ApiClient {
 
   async createPatron(data: PatronCreate): Promise<PatronPublic> {
     const response = await this.client.post<PatronPublic>("/api/patrons", data);
+    return response.data;
+  }
+
+  async patronRegister(data: PatronRegisterRequest): Promise<{ user: UserPublic; access_token: string; refresh_token?: string }> {
+    const response = await this.client.post("/api/patrons/register", data);
     return response.data;
   }
 
@@ -13872,6 +15632,11 @@ class ApiClient {
 
   async updateBookQuantity(bookId: string, quantity: number): Promise<BookWithStats> {
     const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}/quantity`, { quantity });
+    return response.data;
+  }
+
+  async bulkDeleteBooks(bookIds: string[]): Promise<{ deleted: number; errors: string[]; success: boolean }> {
+    const response = await this.client.delete<{ deleted: number; errors: string[]; success: boolean }>("/api/borrow/books", { data: { book_ids: bookIds } });
     return response.data;
   }
 

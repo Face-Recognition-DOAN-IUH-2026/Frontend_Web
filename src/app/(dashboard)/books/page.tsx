@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   Avatar,
@@ -8,6 +9,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -15,6 +17,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Fade,
   IconButton,
   InputAdornment,
   Paper,
@@ -34,10 +37,12 @@ import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import DownloadIcon from "@mui/icons-material/DownloadOutlined";
 import EyeIcon from "@mui/icons-material/VisibilityOutlined";
 import FileIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
+import LockIcon from "@mui/icons-material/LockOutlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -92,6 +97,7 @@ function MetricCard({ label, value, description, icon: Icon, color }: any) {
 
 export default function BooksPage() {
   const theme = useTheme();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [books, setBooks] = useState<BookWithStats[]>([]);
   const [total, setTotal] = useState(0);
@@ -102,6 +108,8 @@ export default function BooksPage() {
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<BookImportPreviewRow[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [selectedPreviewIndices, setSelectedPreviewIndices] = useState<Set<number>>(new Set());
+  const [deletePreviewOpen, setDeletePreviewOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState<BookImportResultRow[] | null>(null);
   const [showResults, setShowResults] = useState(false);
@@ -114,6 +122,11 @@ export default function BooksPage() {
   const [quantityError, setQuantityError] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [isbnScannerOpen, setIsbnScannerOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const deleteConfirmed = deleteInput.trim().normalize('NFC').toUpperCase() === 'XÓA';
 
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
 
@@ -178,7 +191,28 @@ export default function BooksPage() {
     setImporting(true);
     setShowResults(false);
     try {
-      const result = await api.importBooks(previewFile);
+      let result;
+      if (previewData && previewData.length > 0) {
+        result = await api.importBooksFiltered(previewData.map((row) => ({
+          isbn: row.isbn,
+          quantity: row.quantity,
+          title: row.title,
+          subtitle: row.subtitle ?? null,
+          author: row.author ?? null,
+          publisher: row.publisher ?? null,
+          published_date: row.published_date ?? null,
+          page_count: row.page_count ?? null,
+          categories: row.categories ?? null,
+          cover_url: row.cover_url ?? null,
+          description: (row as any).description ?? null,
+          average_rating: (row as any).average_rating ?? null,
+          language: (row as any).language ?? null,
+          isbn10: (row as any).isbn10 ?? null,
+          isbn13: (row as any).isbn13 ?? null,
+        })));
+      } else {
+        result = await api.importBooks(previewFile);
+      }
       setImportResults(result.results);
       setShowResults(true);
       setPreviewData(null);
@@ -255,6 +289,44 @@ export default function BooksPage() {
     setQuantityError("");
   };
 
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (prev.size === displayBooks.length) return new Set();
+      return new Set(displayBooks.map((b) => b.id));
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      const result = await api.bulkDeleteBooks(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setDeleteConfirmOpen(false);
+      setDeleteInput("");
+      setPage(0);
+      await loadBooks();
+      if (result.errors.length === 0) {
+        showNotice("success", `Đã xóa ${result.deleted} cuốn sách`);
+      } else {
+        showNotice("warning", `Xóa ${result.deleted} thành công, ${result.errors.length} lỗi: ${result.errors.join("; ")}`);
+      }
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Xóa thất bại");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const stats = {
     totalBooks: total,
     totalCopies: books.reduce((sum, book) => sum + book.total_copies, 0),
@@ -321,44 +393,133 @@ export default function BooksPage() {
                 <Typography variant="body2" color="text.secondary">Kiểm tra dữ liệu trước khi nhập kho</Typography>
               </Box>
             </Stack>
-            <Button variant="text" color="inherit" onClick={() => { setPreviewFile(null); setPreviewData(null); }}>Hủy</Button>
+            <Button variant="text" color="inherit" onClick={() => { setPreviewFile(null); setPreviewData(null); setSelectedPreviewIndices(new Set()); }}>Hủy</Button>
           </Stack>
           {previewLoading ? (
             <Box sx={{ py: 5, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
           ) : previewData?.length ? (
             <Stack spacing={2}>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
                 <Chip color="success" label={`${previewData.filter((row) => row.status !== "invalid").length} hàng hợp lệ`} />
                 <Chip color="error" label={`${previewData.filter((row) => row.status === "invalid").length} hàng lỗi`} />
+                {selectedPreviewIndices.size > 0 && (
+                  <Chip
+                    color="warning"
+                    label={`${selectedPreviewIndices.size} đã chọn`}
+                    onDelete={() => setSelectedPreviewIndices(new Set())}
+                    deleteIcon={<CloseIcon />}
+                    sx={{ ml: 1 }}
+                  />
+                )}
+                {selectedPreviewIndices.size > 0 && (
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    startIcon={<DeleteIcon />}
+                    onClick={() => setDeletePreviewOpen(true)}
+                    sx={{ ml: 1 }}
+                  >
+                    Xóa {selectedPreviewIndices.size} dòng
+                  </Button>
+                )}
               </Stack>
               <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
-                    <TableRow>
+                    <TableRow sx={{ "& > th": { bgcolor: theme.palette.mode === "dark" ? "#1a1a1a" : "#f5f5f5" } }}>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          indeterminate={selectedPreviewIndices.size > 0 && selectedPreviewIndices.size < (previewData?.filter(r => r.status !== "invalid").length ?? 0)}
+                          checked={!!previewData?.length && selectedPreviewIndices.size === previewData.filter(r => r.status !== "invalid").length}
+                          onChange={(_, checked) => {
+                            if (checked) {
+                              setSelectedPreviewIndices(new Set(previewData!.map((_, i) => i).filter(i => previewData![i].status !== "invalid")));
+                            } else {
+                              setSelectedPreviewIndices(new Set());
+                            }
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>ISBN</TableCell>
                       <TableCell>Tên sách</TableCell>
                       <TableCell>Tác giả</TableCell>
+                      <TableCell>NXB</TableCell>
                       <TableCell>Số lượng</TableCell>
                       <TableCell>Mã vạch mẫu</TableCell>
                       <TableCell>Trạng thái</TableCell>
+                      <TableCell align="center">Xóa</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {previewData.slice(0, 50).map((row, index) => (
-                      <TableRow key={`${row.isbn}-${index}`} selected={row.status === "invalid"}>
-                        <TableCell sx={{ fontFamily: "monospace" }}>{row.isbn || "-"}</TableCell>
-                        <TableCell>{row.title || "-"}</TableCell>
-                        <TableCell>{row.author || "-"}</TableCell>
-                        <TableCell>{row.quantity}</TableCell>
-                        <TableCell sx={{ fontFamily: "monospace" }}>{row.barcodes[0] || "-"}</TableCell>
-                        <TableCell><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
+                    {previewData!.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={10} align="center" sx={{ py: 3, color: "text.secondary" }}>
+                          Không có dòng nào
+                        </TableCell>
                       </TableRow>
-                    ))}
+                    ) : previewData!.slice(0, 50).map((row, index) => {
+                      const isSelected = selectedPreviewIndices.has(index);
+                      const isInvalid = row.status === "invalid";
+                      return (
+                        <TableRow
+                          key={`${row.isbn}-${index}`}
+                          selected={isInvalid || isSelected}
+                          sx={{
+                            "&:hover .preview-delete-btn": { opacity: 1 },
+                            "& > td": { py: 0.5 },
+                            cursor: isInvalid ? "default" : "pointer",
+                          }}
+                        >
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              size="small"
+                              checked={isSelected}
+                              disabled={isInvalid}
+                              onChange={(_, checked) => {
+                                const newSet = new Set(selectedPreviewIndices);
+                                if (checked) newSet.add(index);
+                                else newSet.delete(index);
+                                setSelectedPreviewIndices(newSet);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: "monospace", py: 0.5 }}>{row.isbn || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}>{row.title || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}>{row.author || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}>{row.publisher || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}>{row.quantity}</TableCell>
+                          <TableCell sx={{ fontFamily: "monospace", py: 0.5 }}>{row.barcodes[0] || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
+                          <TableCell align="center" sx={{ py: 0.5 }}>
+                            <IconButton
+                              className="preview-delete-btn"
+                              size="small"
+                              sx={{ opacity: 0, transition: "opacity 0.15s" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewData(previewData!.filter((_, i) => i !== index));
+                                setSelectedPreviewIndices(prev => {
+                                  const next = new Set<number>();
+                                  prev.forEach(v => { if (v < index) next.add(v); else if (v > index) next.add(v - 1); });
+                                  return next;
+                                });
+                                showNotice("info", "Đã xóa dòng");
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" color="error" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>
               <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
-                <Button variant="outlined" onClick={() => { setPreviewFile(null); setPreviewData(null); }}>Hủy</Button>
+                <Button variant="outlined" onClick={() => { setPreviewFile(null); setPreviewData(null); setSelectedPreviewIndices(new Set()); }}>Hủy</Button>
                 <Button variant="contained" startIcon={<CheckIcon />} onClick={handleImport} disabled={importing}>
                   {importing ? "Đang nhập..." : "Xác nhận nhập kho"}
                 </Button>
@@ -419,9 +580,18 @@ export default function BooksPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    size="small"
+                    checked={displayBooks.length > 0 && selectedIds.size === displayBooks.length}
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < displayBooks.length}
+                    onChange={handleToggleSelectAll}
+                  />
+                </TableCell>
                 <TableCell>ISBN</TableCell>
                 <TableCell>Tiêu đề</TableCell>
                 <TableCell>Tác giả</TableCell>
+                <TableCell>NXB</TableCell>
                 <TableCell align="center">Tổng</TableCell>
                 <TableCell align="center">Sẵn sàng</TableCell>
                 <TableCell align="center">Mượn</TableCell>
@@ -430,16 +600,37 @@ export default function BooksPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
                 </TableRow>
               ) : displayBooks.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                     <Typography color="text.secondary">{searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}</Typography>
                   </TableCell>
                 </TableRow>
-              ) : displayBooks.map((book) => (
-                <TableRow key={book.id} hover sx={{ cursor: "pointer" }} onClick={() => openQuantityDialog(book)}>
+              ) : displayBooks.map((book) => {
+                const isSelected = selectedIds.has(book.id);
+                const hasBorrowed = book.total_copies - book.available_copies > 0;
+                return (
+                <TableRow
+                  key={book.id}
+                  hover
+                  selected={isSelected}
+                  sx={{
+                    cursor: "pointer",
+                    borderLeft: isSelected ? "3px solid" : "3px solid transparent",
+                    borderColor: "warning.main",
+                    bgcolor: isSelected ? "rgba(255, 183, 77, 0.08)" : undefined,
+                  }}
+                  onClick={() => router.push(`/books/${book.id}`)}
+                >
+                  <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      size="small"
+                      checked={isSelected}
+                      onChange={() => handleToggleSelect(book.id)}
+                    />
+                  </TableCell>
                   <TableCell sx={{ fontFamily: "monospace", color: "primary.main" }}>{book.isbn}</TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
@@ -452,11 +643,13 @@ export default function BooksPage() {
                     </Stack>
                   </TableCell>
                   <TableCell>{book.author || "-"}</TableCell>
+                  <TableCell>{book.publisher || "-"}</TableCell>
                   <TableCell align="center">{book.total_copies}</TableCell>
                   <TableCell align="center"><Chip size="small" color={book.available_copies > 0 ? "success" : "error"} label={book.available_copies} /></TableCell>
                   <TableCell align="center">{book.total_copies - book.available_copies}</TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -495,6 +688,21 @@ export default function BooksPage() {
                 <Alert severity="success">Sẵn sàng: {selectedBook.available_copies}</Alert>
                 <Alert severity="warning">Đang mượn: {selectedBook.total_copies - selectedBook.available_copies}</Alert>
               </Box>
+              {(selectedBook.publisher || selectedBook.published_date || selectedBook.categories || selectedBook.page_count) && (
+                <Box sx={{ p: 1.5, bgcolor: "grey.900", borderRadius: 1 }}>
+                  {selectedBook.publisher && <Typography variant="body2"><strong>NXB:</strong> {selectedBook.publisher}</Typography>}
+                  {selectedBook.published_date && <Typography variant="body2"><strong>Năm XB:</strong> {selectedBook.published_date}</Typography>}
+                  {selectedBook.categories && <Typography variant="body2"><strong>Thể loại:</strong> {selectedBook.categories}</Typography>}
+                  {selectedBook.page_count && <Typography variant="body2"><strong>Số trang:</strong> {selectedBook.page_count}</Typography>}
+                  {selectedBook.average_rating && <Typography variant="body2"><strong>Đánh giá:</strong> {selectedBook.average_rating}/5</Typography>}
+                  {selectedBook.language && <Typography variant="body2"><strong>Ngôn ngữ:</strong> {selectedBook.language}</Typography>}
+                </Box>
+              )}
+              {selectedBook.description && (
+                <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {selectedBook.description}
+                </Typography>
+              )}
               <TextField
                 label="Số lượng mới"
                 type="number"
@@ -523,6 +731,161 @@ export default function BooksPage() {
         onClose={() => setIsbnScannerOpen(false)}
         onImportComplete={handleIsbnImportComplete}
       />
+
+      <Fade in={selectedIds.size > 0}>
+        <Paper
+          elevation={8}
+          sx={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1300,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            px: 3,
+            py: 1.5,
+            borderRadius: 3,
+            background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+            border: "1px solid",
+            borderColor: "warning.main",
+            boxShadow: "0 8px 32px rgba(255, 183, 77, 0.2)",
+          }}
+        >
+          <Chip
+            label={`${selectedIds.size} đã chọn`}
+            color="warning"
+            size="small"
+            sx={{ fontWeight: 700 }}
+          />
+          <Button
+            size="small"
+            variant="text"
+            color="inherit"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Bỏ chọn
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => {
+              setDeleteInput("");
+              setDeleteConfirmOpen(true);
+            }}
+          >
+            Xóa
+          </Button>
+        </Paper>
+      </Fade>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AlertIcon sx={{ color: "warning.main" }} />
+          Xóa {selectedIds.size} cuốn sách?
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Sách sẽ bị xóa vĩnh viễn cùng tất cả bản sao:
+            </Typography>
+            <Box sx={{ maxHeight: 200, overflow: "auto", p: 1, bgcolor: "grey.900", borderRadius: 1 }}>
+              {displayBooks.filter((b) => selectedIds.has(b.id)).map((book) => (
+                <Stack key={book.id} direction="row" spacing={1} sx={{ py: 0.5, alignItems: "center" }}>
+                  {book.total_copies - book.available_copies > 0 && <LockIcon fontSize="small" sx={{ color: "error.main" }} />}
+                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary", minWidth: 120 }}>
+                    {book.isbn}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
+                    {book.title}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {book.total_copies} bản
+                  </Typography>
+                </Stack>
+              ))}
+            </Box>
+            {displayBooks.filter((b) => selectedIds.has(b.id) && b.total_copies - b.available_copies > 0).length > 0 && (
+              <Alert severity="error">
+                Một số sách đang được mượn và sẽ không thể xóa. Hệ thống sẽ bỏ qua chúng.
+              </Alert>
+            )}
+            <TextField
+              label='Nhập "XÓA" để xác nhận'
+              value={deleteInput}
+              onChange={(e) => setDeleteInput(e.target.value)}
+              fullWidth
+              size="small"
+              autoFocus
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }}>Hủy</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={!deleteConfirmed || deleting}
+            onClick={handleBulkDelete}
+            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+          >
+            {deleting ? "Đang xóa..." : "Xóa vĩnh viễn"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deletePreviewOpen} onClose={() => setDeletePreviewOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AlertIcon sx={{ color: "warning.main" }} />
+          Xóa {selectedPreviewIndices.size} dòng khỏi danh sách?
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Các dòng sau sẽ bị xóa khỏi danh sách trước khi nhập:
+            </Typography>
+            <Box sx={{ maxHeight: 200, overflow: "auto", p: 1, bgcolor: "grey.900", borderRadius: 1 }}>
+              {previewData?.filter((_, i) => selectedPreviewIndices.has(i)).slice(0, 10).map((row, idx) => (
+                <Stack key={idx} direction="row" spacing={1} sx={{ py: 0.5, alignItems: "center" }}>
+                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary", minWidth: 130 }}>
+                    {row.isbn}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
+                    {row.title || "Không có tên"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    SL: {row.quantity}
+                  </Typography>
+                </Stack>
+              ))}
+              {selectedPreviewIndices.size > 10 && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, textAlign: "center" }}>
+                  ... và {selectedPreviewIndices.size - 10} dòng khác
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletePreviewOpen(false)}>Hủy</Button>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => {
+              setPreviewData(previewData!.filter((_, i) => !selectedPreviewIndices.has(i)));
+              setSelectedPreviewIndices(new Set());
+              setDeletePreviewOpen(false);
+              showNotice("info", `Đã xóa ${selectedPreviewIndices.size} dòng`);
+            }}
+          >
+            Xóa {selectedPreviewIndices.size} dòng
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

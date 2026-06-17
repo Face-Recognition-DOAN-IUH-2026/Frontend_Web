@@ -3,12 +3,14 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Box, Paper, Typography, Button, Stack, CircularProgress,
-  Alert, Divider, Fade, alpha, LinearProgress,
+  Alert, Divider, Fade, alpha, LinearProgress, Chip,
 } from "@mui/material";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import ReplayIcon from "@mui/icons-material/Replay";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
 import Webcam from "react-webcam";
 import { createWorker } from "tesseract.js";
 
@@ -29,6 +31,11 @@ interface StudentCardScannerProps {
   onSkip?: () => void;
 }
 
+type Phase = "detecting" | "processing" | "confirm";
+
+const MAX_DETECT_ATTEMPTS = 10;
+const DETECT_INTERVAL_MS = 4000;
+
 const SURNAMES = [
   "nguyễn", "trần", "lê", "phạm", "huỳnh", "hoàng", "phan",
   "vũ", "võ", "đặng", "bùi", "đỗ", "hồ", "ngô", "dương", "lý",
@@ -43,46 +50,53 @@ const HEADER_KEYWORDS = [
   "hộ khẩu", "khoa", "lớp", "ngành", "msv", "mssv",
 ];
 
-function preprocessImage(imageData: string): Promise<string> {
-  return new Promise((resolve, reject) => {
+function preprocessForOcr(imageData: string): Promise<string> {
+  return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
+      const w = Math.min(img.width, 1920);
+      const scale = w / img.width;
+      canvas.width = w;
+      canvas.height = Math.round(img.height * scale);
       const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        resolve(imageData);
-        return;
-      }
-      ctx.drawImage(img, 0, 0);
+      if (!ctx) { resolve(imageData); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageDataObj.data;
+      const weights = [0.299, 0.587, 0.114];
+      let sum = 0;
       for (let i = 0; i < data.length; i += 4) {
-        const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
-        const val = brightness > 120 ? 255 : 0;
-        data[i] = val;
-        data[i + 1] = val;
-        data[i + 2] = val;
+        sum += weights[0] * data[i] + weights[1] * data[i + 1] + weights[2] * data[i + 2];
+      }
+      const avgBrightness = sum / (data.length / 4);
+      const factor = avgBrightness > 180 ? 1.3 : avgBrightness < 80 ? 1.5 : 1.1;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = weights[0] * data[i] + weights[1] * data[i + 1] + weights[2] * data[i + 2];
+        const enhanced = Math.min(255, Math.max(0, Math.round((gray - 128) * factor + 128)));
+        data[i] = enhanced;
+        data[i + 1] = enhanced;
+        data[i + 2] = enhanced;
       }
       ctx.putImageData(imageDataObj, 0, 0);
       resolve(canvas.toDataURL("image/jpeg", 0.95));
     };
-    img.onerror = () => reject(new Error("Không thể đọc ảnh"));
+    img.onerror = () => resolve(imageData);
     img.src = imageData;
   });
 }
 
 function parseCardText(text: string): Partial<ScannedCardData> {
   const result: Partial<ScannedCardData> = { rawText: text };
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\t/g, " ");
+  const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
 
-  const studentCodeRegex = /(?:MSSV|Mã SV|Mã Số SV|Student Code|Mã số sinh viên|MSV)[:\s]*(\S{4,})/i;
-  const fullNameRegex = /(?:Họ[\s]*và[\s]*tên|Full Name|Họ tên|HỌ TÊN|HỌ VÀ TÊN)[:\s]*([A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+(?:\s+[A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+)+)/i;
-  const classNameRegex = /(?:Lớp|Class|LỚP)[:\s]*(\S+)/i;
-  const dobRegex = /(?:Ngày sinh|DOB|Birth|Ngày tháng năm sinh|NGÀY SINH|Sinh)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
-  const courseRegex = /(?:Khóa[\s]*h[oọô]c|Course|Khóa|KHÓA)[:\s]*(.+)/i;
-  const addressRegex = /(?:HKTT|Hộ khẩu|Địa chỉ|Address|Hộ khẩu thường trú)[:\s]*(.+)/i;
+  const studentCodeRegex = /(?:MSSV|M[aã]\s*SV|M[aã]\s*S[oố]\s*SV|Student\s*Code|M[aã]\s*s[oố]\s*sinh\s*vi[eê]n|MSV|M\.S\.V)[:\s]*(\S{4,})/i;
+  const fullNameRegex = /(?:H[oọ]\s*v[aà]\s*t[eê]n|Full\s*Name|H[oọ]\s*t[eê]n|H[oọ]\s*V[AÀ]\s*T[EÊ]N|HỌ\s*TÊN|HỌ\s*VÀ\s*TÊN)[:\s]*([A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+(?:\s+[A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+)+)/i;
+  const classNameRegex = /(?:L[oớ]p|Class|LỚP)[:\s]*(\S+)/i;
+  const dobRegex = /(?:NS|Ng[aà]y\s*sinh|DOB|Birth|Ng[aà]y\s*th[aá]ng\s*n[aǎ]m\s*sinh|NGÀY\s*SINH|Sinh)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
+  const courseRegex = /(?:Kh[oó]a\s*h[oọô]c|Course|Kh[oó]a|KHÓA)[:\s]*(.+)/i;
+  const addressRegex = /(?:HKTT|H[oộ]\s*kh[aẩ]u|Đ[iịa]\s*ch[ỉi]|Address|H[oộ]\s*kh[aẩ]u\s*th[öo]ng\s*tr[uú]):\s*(.+)/i;
   const facultyRegex = /(?:Khoa|Faculty|Department|KHOA)[:\s]*(.+)/i;
 
   for (const line of lines) {
@@ -117,11 +131,11 @@ function parseCardText(text: string): Partial<ScannedCardData> {
   }
 
   if (!result.studentCode) {
-    const strictMatch = text.match(/\b(\d{8})\b/);
+    const strictMatch = normalized.match(/\b(\d{8})\b/);
     if (strictMatch) {
       result.studentCode = strictMatch[1];
     } else {
-      const looseMatch = text.match(/\b(\d{7,13})\b/);
+      const looseMatch = normalized.match(/\b(\d{7,13})\b/);
       if (looseMatch) result.studentCode = looseMatch[1];
     }
   }
@@ -133,7 +147,6 @@ function parseCardText(text: string): Partial<ScannedCardData> {
       if (/^\d+$/.test(line.trim())) return false;
       if (line.trim().length < 5) return false;
       if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(line.trim())) return false;
-      if (line.length < 8) return false;
       return true;
     });
 
@@ -172,23 +185,62 @@ function parseCardText(text: string): Partial<ScannedCardData> {
     }
   }
 
+  if (!result.course) {
+    const yearMatch = normalized.match(/\b(20\d{2}\s*[-–]\s*20\d{2})\b/);
+    if (yearMatch) result.course = yearMatch[1];
+  }
+
+  if (!result.course) {
+    const khoaMatch = normalized.match(/Kh[oó]a\s+(\d{4}(?:\s*[-–]\s*\d{4})?)/i);
+    if (khoaMatch) result.course = khoaMatch[1];
+  }
+
   if (!result.className) {
-    const classMatch = text.match(/\b(DH[A-Z]{2,}\d{2,}[A-Z]?)\b/i);
+    const classMatch = normalized.match(/\b(DH[A-Z]{2,}\d{2,}[A-Z]?)\b/i);
     if (classMatch) result.className = classMatch[1].toUpperCase();
   }
 
   return result;
 }
 
+function phaseLabel(phase: Phase): string {
+  switch (phase) {
+    case "detecting": return "Đang phát hiện thẻ...";
+    case "processing": return "Đang nhận dạng...";
+    case "confirm": return "Đọc thẻ thành công";
+  }
+}
+
+function phaseColor(phase: Phase): "info" | "primary" | "success" {
+  switch (phase) {
+    case "detecting": return "info";
+    case "processing": return "primary";
+    case "confirm": return "success";
+  }
+}
+
 export default function StudentCardScanner({ onScanned, onError, onSkip }: StudentCardScannerProps) {
   const webcamRef = useRef<Webcam>(null);
-  const [phase, setPhase] = useState<"idle" | "processing" | "confirm">("idle");
+  const [phase, setPhase] = useState<Phase>("detecting");
   const [ocrResult, setOcrResult] = useState<Partial<ScannedCardData> | null>(null);
   const [error, setError] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [detectAttempts, setDetectAttempts] = useState(0);
   const workerRef = useRef<Tesseract.Worker | null>(null);
+  const isMounted = useRef(true);
+  const phaseRef = useRef(phase);
+  const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -196,7 +248,7 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
       setOcrProgress(0);
       const worker = await createWorker("vie+eng", 1, {
         logger: (m) => {
-          if (m.status === "recognizing text") {
+          if (m.status === "recognizing text" && isMounted.current) {
             setOcrProgress(m.progress || 0);
           }
         },
@@ -210,15 +262,22 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    };
+  }, []);
+
   const runOcr = useCallback(async (imageData: string): Promise<Partial<ScannedCardData> | null> => {
     if (!workerRef.current) return null;
     try {
       setOcrProgress(0);
       setOcrLoading(true);
-      const processed = await preprocessImage(imageData);
+      const processed = await preprocessForOcr(imageData);
       const { data } = await workerRef.current.recognize(processed);
       setOcrLoading(false);
       if (!data?.text) return null;
+      console.log("[OCR] Raw text:", data.text);
       return parseCardText(data.text);
     } catch (err: any) {
       setOcrLoading(false);
@@ -227,43 +286,162 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
     }
   }, [onError]);
 
-  const captureAndOcr = useCallback(async () => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (!imageSrc) {
-      setError("Không thể chụp ảnh từ camera");
+  const checkImageHasContent = useCallback((dataUrl: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const w = Math.min(img.width, 320);
+        const h = Math.round((w / img.width) * img.height);
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(true); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
+        let sum = 0;
+        let min = 255;
+        let max = 0;
+        for (let i = 0; i < data.length; i += 16) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          sum += gray;
+          if (gray < min) min = gray;
+          if (gray > max) max = gray;
+        }
+        const pixels = data.length / 16;
+        const avg = sum / pixels;
+        const contrast = max - min;
+        resolve(contrast > 30 && avg > 20 && avg < 240);
+      };
+      img.onerror = () => resolve(true);
+      img.src = dataUrl;
+    });
+  }, []);
+
+  const attemptAutoDetect = useCallback(async () => {
+    if (!isMounted.current || phaseRef.current !== "detecting") return;
+    if (!webcamRef.current) {
+      if (isMounted.current && phaseRef.current === "detecting") {
+        detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+      }
       return;
     }
+    try {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        if (isMounted.current && phaseRef.current === "detecting") {
+          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+        }
+        return;
+      }
+
+      setDetectAttempts((prev) => {
+        const next = prev + 1;
+        if (next >= MAX_DETECT_ATTEMPTS && isMounted.current) {
+          setError("Không thể phát hiện thẻ sau nhiều lần thử. Hãy chụp thủ công hoặc tải ảnh.");
+        }
+        return next;
+      });
+
+      const hasContent = await checkImageHasContent(imageSrc);
+      if (!hasContent) {
+        if (isMounted.current && phaseRef.current === "detecting") {
+          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+        }
+        return;
+      }
+
+      setPhase("processing");
+      const parsed = await runOcr(imageSrc);
+
+      if (!isMounted.current) return;
+
+      if (parsed && parsed.studentCode && parsed.fullName) {
+        setOcrResult(parsed);
+        setPhase("confirm");
+        return;
+      }
+
+      setPhase("detecting");
+    } catch (err: any) {
+      if (isMounted.current) {
+        setPhase("detecting");
+      }
+    }
+    if (isMounted.current && phaseRef.current === "detecting") {
+      detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+    }
+  }, [runOcr, checkImageHasContent]);
+
+  const startDetection = useCallback(() => {
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    setDetectAttempts(0);
+    detectTimerRef.current = setTimeout(attemptAutoDetect, 1000);
+  }, [attemptAutoDetect]);
+
+  useEffect(() => {
+    if (cameraReady && phase === "detecting") {
+      startDetection();
+    }
+    return () => {
+      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    };
+  }, [cameraReady, phase, startDetection]);
+
+  const handleManualCapture = useCallback(async () => {
+    if (!webcamRef.current) return;
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
     setPhase("processing");
     setError("");
-    const parsed = await runOcr(imageSrc);
-    if (parsed && parsed.studentCode && parsed.fullName) {
-      setOcrResult(parsed);
-      setPhase("confirm");
-    } else {
-      setError("Không thể đọc thông tin từ thẻ. Hãy đảm bảo thẻ rõ nét và đủ ánh sáng.");
-      setPhase("idle");
+    try {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        setError("Không thể chụp ảnh từ camera");
+        setPhase("detecting");
+        startDetection();
+        return;
+      }
+      setPhase("processing");
+      const parsed = await runOcr(imageSrc);
+      if (parsed && isMounted.current) {
+        if (parsed.studentCode && parsed.fullName) {
+          setOcrResult(parsed);
+          setPhase("confirm");
+        } else {
+          setError("Không thể đọc thông tin từ thẻ. Hãy đảm bảo thẻ rõ nét và đủ ánh sáng.");
+          setPhase("detecting");
+          startDetection();
+        }
+      }
+    } catch {
+      setPhase("detecting");
+      startDetection();
     }
-  }, [runOcr]);
+  }, [runOcr, startDetection]);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
     setPhase("processing");
     setError("");
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataUrl = ev.target?.result as string;
       const parsed = await runOcr(dataUrl);
-      if (parsed && parsed.studentCode && parsed.fullName) {
-        setOcrResult(parsed);
-        setPhase("confirm");
-      } else {
-        setError("Không thể đọc thông tin từ ảnh này");
-        setPhase("idle");
+      if (parsed && isMounted.current) {
+        if (parsed.studentCode && parsed.fullName) {
+          setOcrResult(parsed);
+          setPhase("confirm");
+        } else {
+          setError("Không thể đọc thông tin từ ảnh này");
+          setPhase("detecting");
+          startDetection();
+        }
       }
     };
     reader.readAsDataURL(file);
-  }, [runOcr]);
+  }, [runOcr, startDetection]);
 
   const handleConfirm = () => {
     if (ocrResult) {
@@ -274,58 +452,92 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
   const handleRetake = () => {
     setOcrResult(null);
     setError("");
-    setPhase("idle");
+    setPhase("detecting");
+    startDetection();
   };
 
   const videoConstraints: MediaStreamConstraints["video"] = {
     facingMode: "environment",
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
   };
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={0}>
       {phase === "confirm" && ocrResult ? (
         <Fade in>
-          <Paper variant="outlined" sx={{ p: 3 }}>
-            <Stack spacing={2}>
-              <Stack direction="row" sx={{ alignItems: "center" }} spacing={1}>
-                <CheckCircleIcon color="success" />
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  Thông tin từ thẻ sinh viên
-                </Typography>
+          <Box>
+            {/* ── CONFIRM STATE: full-width info panel ── */}
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Stack spacing={2}>
+                <Stack direction="row" sx={{ alignItems: "center" }} spacing={1}>
+                  <CheckCircleIcon color="success" />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    Thông tin từ thẻ sinh viên
+                  </Typography>
+                </Stack>
+                <Divider />
+                <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
+                <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
+                {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
+                {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
+                {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
+                {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
+                {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
+                {ocrResult.rawText && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ cursor: "pointer", userSelect: "none" }}
+                      onClick={(e) => {
+                        const el = (e.currentTarget as HTMLElement).nextElementSibling;
+                        if (el) (el as HTMLElement).style.display = el?.getAttribute("data-open") === "1" ? "none" : "block";
+                        e.currentTarget.setAttribute("data-open", e.currentTarget.getAttribute("data-open") === "1" ? "0" : "1");
+                      }}
+                    >
+                      ▸ Raw OCR text (debug)
+                    </Typography>
+                    <Box data-open="0" sx={{ display: "none", mt: 1, p: 1.5, bgcolor: "grey.900", borderRadius: 1, maxHeight: 120, overflow: "auto" }}>
+                      <Typography variant="caption" sx={{ fontFamily: "monospace", whiteSpace: "pre-wrap", color: "grey.300", fontSize: "0.7rem" }}>
+                        {ocrResult.rawText}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                <Stack direction="row" spacing={2} sx={{ pt: 1 }}>
+                  <Button variant="contained" onClick={handleConfirm} fullWidth>
+                    Xác nhận
+                  </Button>
+                  <Button variant="outlined" startIcon={<ReplayIcon />} onClick={handleRetake} fullWidth>
+                    Chụp lại
+                  </Button>
+                </Stack>
+                {onSkip && (
+                  <Button color="inherit" variant="text" onClick={onSkip} fullWidth size="small">
+                    Nhập thủ công
+                  </Button>
+                )}
               </Stack>
-              <Divider />
-              <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
-              <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
-              {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
-              {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
-              {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
-              {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
-              {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
-              <Stack direction="row" spacing={2} sx={{ pt: 1 }}>
-                <Button variant="contained" onClick={handleConfirm} fullWidth>
-                  Xác nhận
-                </Button>
-                <Button variant="outlined" startIcon={<ReplayIcon />} onClick={handleRetake} fullWidth>
-                  Chụp lại
-                </Button>
-              </Stack>
-            </Stack>
-          </Paper>
+            </Paper>
+          </Box>
         </Fade>
       ) : (
-        <>
-          <Paper
-            variant="outlined"
+        /* ── SCANNING STATE: side-by-side layout ── */
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            gap: 0,
+            minHeight: { md: 420 },
+          }}
+        >
+          {/* ── LEFT: Camera panel ── */}
+          <Box
             sx={{
+              flex: { md: "0 0 55%" },
               position: "relative",
+              bgcolor: "common.black",
+              borderRadius: { xs: "12px 12px 0 0", md: "12px 0 0 12px" },
               overflow: "hidden",
-              bgcolor: "black",
-              aspectRatio: "4 / 3",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              minHeight: { xs: 280, md: 420 },
             }}
           >
             <Webcam
@@ -336,87 +548,220 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
               videoConstraints={videoConstraints}
               onUserMedia={() => setCameraReady(true)}
               onUserMediaError={() => setError("Không thể truy cập camera")}
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
             />
-            <Box
-              sx={{
-                position: "absolute",
-                inset: "12%",
-                border: "2px dashed",
-                borderColor: alpha("#fff", 0.5),
-                borderRadius: 2,
-                pointerEvents: "none",
-              }}
-            />
-            {!cameraReady && (
-              <Stack
+
+            {/* Card frame overlay */}
+            <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <Box sx={{ width: "70%", aspectRatio: "1.6 / 1", position: "relative" }}>
+                {/* Corner brackets */}
+                {(["top-left", "top-right", "bottom-left", "bottom-right"] as const).map((corner) => {
+                  const isTop = corner.includes("top");
+                  const isLeft = corner.includes("left");
+                  return (
+                    <Box
+                      key={corner}
+                      sx={{
+                        position: "absolute",
+                        width: 28,
+                        height: 28,
+                        [isTop ? "top" : "bottom"]: -2,
+                        [isLeft ? "left" : "right"]: -2,
+                        borderColor: "common.white",
+                        borderStyle: "solid",
+                        borderWidth: 0,
+                        [`border${isTop ? "Top" : "Bottom"}Width`]: 3,
+                        [`border${isLeft ? "Left" : "Right"}Width`]: 3,
+                        borderRadius: isTop && isLeft ? "12px 0 0 0"
+                          : isTop && !isLeft ? "0 12px 0 0"
+                          : !isTop && isLeft ? "0 0 0 12px"
+                          : "0 0 12px 0",
+                        opacity: 0.9,
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
+
+            {/* Status badge overlay */}
+            {phase !== "confirm" && (
+              <Box
                 sx={{
-                  position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,0.6)",
-                  color: "common.white", alignItems: "center", justifyContent: "center",
+                  position: "absolute",
+                  top: 16,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  bgcolor: "rgba(13, 17, 23, 0.85)",
+                  px: 2,
+                  py: 1,
+                  borderRadius: 20,
+                  backdropFilter: "blur(4px)",
                 }}
-                spacing={1}
+              >
+                {phase === "detecting" && <RadioButtonUncheckedIcon sx={{ fontSize: 18, color: "#7A8CA8", animation: "pulse-amber 2s ease-in-out infinite" }} />}
+                {phase === "processing" && <HourglassBottomIcon sx={{ fontSize: 18, color: "#D4A853", animation: "pulse-amber 1s ease-in-out infinite" }} />}
+                <Typography variant="body2" sx={{ fontWeight: 600, color: "common.white", whiteSpace: "nowrap" }}>
+                  {phase === "processing"
+                    ? `Đang nhận dạng... ${detectAttempts > 0 ? `(${detectAttempts}/${MAX_DETECT_ATTEMPTS})` : ""}`
+                    : phaseLabel(phase)}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Not-ready overlay */}
+            {!cameraReady && (
+              <Box
+                sx={{
+                  position: "absolute", inset: 0,
+                  bgcolor: "rgba(0,0,0,0.6)",
+                  color: "common.white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexDirection: "column", gap: 1,
+                }}
               >
                 <CircularProgress size={28} color="inherit" />
                 <Typography variant="body2">Đang kết nối camera...</Typography>
-              </Stack>
+              </Box>
             )}
-            {(phase === "processing" || ocrLoading) && (
-              <Stack
+
+            {/* Processing overlay */}
+            {phase === "processing" && ocrLoading && (
+              <Box
                 sx={{
-                  position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,0.7)",
-                  color: "common.white", alignItems: "center", justifyContent: "center",
+                  position: "absolute", inset: 0,
+                  bgcolor: "rgba(0,0,0,0.7)",
+                  color: "common.white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexDirection: "column", gap: 1,
                 }}
-                spacing={1}
               >
                 <CircularProgress size={28} color="inherit" />
-                <Typography variant="body2">
-                  {ocrLoading ? "Đang nhận dạng chữ viết..." : "Đang xử lý ảnh..."}
-                </Typography>
-                {ocrLoading && (
-                  <Box sx={{ width: 160 }}>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.max(ocrProgress * 100, 5)}
-                      sx={{ borderRadius: 1, height: 4 }}
-                    />
-                    <Typography variant="caption" sx={{ mt: 0.5, display: "block", textAlign: "center" }}>
-                      {Math.round(ocrProgress * 100)}%
-                    </Typography>
-                  </Box>
+                <Typography variant="body2">Đang nhận dạng chữ viết...</Typography>
+                <Box sx={{ width: 160 }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.max(ocrProgress * 100, 5)}
+                    sx={{ borderRadius: 1, height: 4 }}
+                  />
+                  <Typography variant="caption" sx={{ mt: 0.5, display: "block", textAlign: "center" }}>
+                    {Math.round(ocrProgress * 100)}%
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          {/* ── RIGHT: Info panel ── */}
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              bgcolor: "background.paper",
+              borderRadius: { xs: "0 0 12px 12px", md: "0 12px 12px 0" },
+              borderLeft: { md: "1px solid" },
+              borderTop: { xs: "1px solid", md: "none" },
+              borderColor: "divider",
+              overflow: "hidden",
+            }}
+          >
+            {/* Panel header */}
+            <Box sx={{ px: 2.5, py: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.3 }}>
+                Thông tin quét được
+              </Typography>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                <Chip
+                  label={phaseLabel(phase)}
+                  color={phaseColor(phase)}
+                  size="small"
+                  icon={
+                    phase === "detecting" ? <RadioButtonUncheckedIcon sx={{ fontSize: 14 }} /> :
+                    phase === "processing" ? <HourglassBottomIcon sx={{ fontSize: 14 }} /> :
+                    <CheckCircleIcon sx={{ fontSize: 14 }} />
+                  }
+                  variant="outlined"
+                  sx={{ fontWeight: 600, height: 24 }}
+                />
+              </Stack>
+            </Box>
+
+            {/* Fields area */}
+            <Box sx={{ flex: 1, px: 2.5, py: 2, overflow: "auto" }}>
+              {ocrResult ? (
+                <Stack spacing={1.5}>
+                  <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
+                  <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
+                  {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
+                  {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
+                  {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
+                  {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
+                  {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
+                </Stack>
+              ) : (
+                <Stack spacing={1.5}>
+                  {[
+                    { label: "MSSV", placeholder: "Đang chờ..." },
+                    { label: "Họ tên", placeholder: "Đang chờ..." },
+                    { label: "Lớp", placeholder: "—" },
+                    { label: "Khóa học", placeholder: "—" },
+                    { label: "HKTT", placeholder: "—" },
+                  ].map((field) => (
+                    <Stack key={field.label} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 72, flexShrink: 0, fontSize: "0.8rem" }}>
+                        {field.label}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: "text.disabled", fontStyle: "italic", fontSize: "0.8rem" }}>
+                        {field.placeholder}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+
+            {/* Error */}
+            {error && (
+              <Box sx={{ px: 2.5, pb: 1 }}>
+                <Alert severity="warning" sx={{ fontSize: "0.8rem" }}>{error}</Alert>
+              </Box>
+            )}
+
+            {/* Actions */}
+            <Box sx={{ px: 2.5, py: 2, borderTop: "1px solid", borderColor: "divider" }}>
+              <Stack spacing={1}>
+                <Button
+                  variant="contained"
+                  startIcon={<CameraAltIcon />}
+                  onClick={handleManualCapture}
+                  disabled={!cameraReady || phase === "processing"}
+                  fullWidth
+                >
+                  Chụp thẻ
+                </Button>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<UploadFileIcon />}
+                  disabled={phase === "processing"}
+                  fullWidth
+                >
+                  Tải ảnh
+                  <input type="file" accept="image/*" onChange={handleFileUpload} hidden />
+                </Button>
+                {onSkip && (
+                  <Button color="inherit" variant="text" onClick={onSkip} fullWidth size="small">
+                    Nhập thủ công
+                  </Button>
                 )}
               </Stack>
-            )}
-          </Paper>
-
-          {error && <Alert severity="warning">{error}</Alert>}
-
-          <Stack direction="row" spacing={2}>
-            <Button
-              variant="contained"
-              startIcon={<CameraAltIcon />}
-              onClick={captureAndOcr}
-              disabled={!cameraReady || phase === "processing"}
-              fullWidth
-            >
-              Chụp thẻ
-            </Button>
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<UploadFileIcon />}
-              disabled={phase === "processing"}
-            >
-              Tải ảnh
-              <input type="file" accept="image/*" onChange={handleFileUpload} hidden />
-            </Button>
-          </Stack>
-
-          {onSkip && (
-            <Button color="inherit" variant="text" onClick={onSkip} fullWidth>
-              Bỏ qua quét thẻ
-            </Button>
-          )}
-        </>
+            </Box>
+          </Box>
+        </Box>
       )}
     </Stack>
   );
@@ -424,12 +769,12 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <Stack direction="row" spacing={1}>
-      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 100, flexShrink: 0 }}>
-        {label}:
+    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 72, flexShrink: 0, fontSize: "0.8rem" }}>
+        {label}
       </Typography>
-      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-        {value}
+      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: "0.85rem", wordBreak: "break-word" }}>
+        {value || "—"}
       </Typography>
     </Stack>
   );

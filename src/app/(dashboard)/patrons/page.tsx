@@ -383,7 +383,7 @@ export default function PatronsPage() {
       )}
 
       {/* ─── CREATE DIALOG (full-screen scan-first) ─── */}
-      <Dialog open={showCreate} onClose={closeCreate} fullWidth maxWidth={createStep === "scan" ? "md" : "sm"} fullScreen={createStep === "scan"}>
+      <Dialog open={showCreate} onClose={closeCreate} fullWidth maxWidth={createStep === "scan" ? "lg" : "sm"}>
         {createStep === "scan" ? (
           <>
             <DialogTitle sx={{ pb: 0 }}>
