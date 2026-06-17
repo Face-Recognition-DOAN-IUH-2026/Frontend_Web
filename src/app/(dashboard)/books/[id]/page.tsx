@@ -1,0 +1,452 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Breadcrumbs,
+  Button,
+  Card,
+  CardContent,
+  CardMedia,
+  Chip,
+  CircularProgress,
+  Collapse,
+  Divider,
+  Fab,
+  Grid,
+  IconButton,
+  Link,
+  Paper,
+  Skeleton,
+  Stack,
+  Tooltip,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import CalendarTodayIcon from "@mui/icons-material/CalendarTodayOutlined";
+import CategoryIcon from "@mui/icons-material/CategoryOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import DescriptionIcon from "@mui/icons-material/DescriptionOutlined";
+import EditIcon from "@mui/icons-material/EditOutlined";
+import ExpandIcon from "@mui/icons-material/ExpandMoreOutlined";
+import GridViewIcon from "@mui/icons-material/GridViewOutlined";
+import LanguageIcon from "@mui/icons-material/LanguageOutlined";
+import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
+import MenuBookIcon from "@mui/icons-material/MenuBookOutlined";
+import StarIcon from "@mui/icons-material/StarOutlined";
+import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
+import api from "@/lib/api-client";
+import type { BookWithStats } from "@/lib/types";
+
+function StatCard({ label, value, color, icon }: { label: string; value: number; color: "info" | "success" | "warning"; icon: React.ReactNode }) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        flex: 1,
+        p: 1.5,
+        textAlign: "center",
+        borderColor: `${color}.main`,
+        borderRadius: 2,
+        background: color === "info" ? "rgba(2,136,209,0.08)" : color === "success" ? "rgba(46,125,50,0.08)" : "rgba(245,124,0,0.08)",
+      }}
+    >
+      <Box sx={{ color: `${color}.main`, mb: 0.5 }}>{icon}</Box>
+      <Typography variant="h5" sx={{ fontWeight: 900, color: `${color}.main` }}>
+        {value}
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+        {label}
+      </Typography>
+    </Paper>
+  );
+}
+
+function MetaItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <Box sx={{ py: 1.5, px: 0 }}>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+        <Box sx={{ color: "text.secondary", mt: 0.3 }}>{icon}</Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+            {label}
+          </Typography>
+          <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: "break-word" }}>
+            {value}
+          </Typography>
+        </Box>
+      </Stack>
+      <Divider sx={{ mt: 1.5 }} />
+    </Box>
+  );
+}
+
+export default function BookDetailPage() {
+  const theme = useTheme();
+  const params = useParams();
+  const router = useRouter();
+  const bookId = params.id as string;
+
+  const [book, setBook] = useState<BookWithStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [descExpanded, setDescExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!bookId) return;
+    setLoading(true);
+    setError(null);
+    api.getBookById(bookId).then(setBook).catch((err) => setError(getErrorMessage(err))).finally(() => setLoading(false));
+  }, [bookId]);
+
+  if (loading) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
+        <Skeleton variant="text" width={180} height={28} sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card variant="outlined" sx={{ borderRadius: 3 }}>
+              <Skeleton variant="rounded" height={340} sx={{ borderRadius: "12px 12px 0 0" }} />
+              <CardContent>
+                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} variant="rounded" width={80} height={60} />
+                  ))}
+                </Stack>
+                <Stack spacing={1}>
+                  {[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="text" width="80%" />)}
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Stack spacing={2}>
+              <Skeleton variant="text" height={56} width="70%" />
+              <Skeleton variant="text" height={32} width="40%" />
+              <Stack direction="row" spacing={1}>
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} variant="rounded" width={90} height={32} />)}
+              </Stack>
+              <Skeleton variant="rounded" height={120} />
+              <Skeleton variant="rounded" height={80} />
+            </Stack>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  }
+
+  if (error || !book) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => router.back()} sx={{ mb: 2 }}>
+          Quay lại
+        </Button>
+        <Alert severity="error">{error || "Không tìm thấy sách"}</Alert>
+      </Box>
+    );
+  }
+
+  const borrowed = book.total_copies - book.available_copies;
+  const isLongDescription = book.description && book.description.length > 300;
+
+  return (
+    <Box sx={{ bgcolor: "background.default", minHeight: "100vh", py: 3 }}>
+      <Box sx={{ maxWidth: 1200, mx: "auto", px: 3 }}>
+        <Breadcrumbs sx={{ mb: 3 }}>
+          <Link
+            component="button"
+            underline="hover"
+            color="inherit"
+            onClick={() => router.push("/books")}
+            sx={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 0.5 }}
+          >
+            <MenuBookIcon fontSize="small" /> Sách
+          </Link>
+          <Typography color="text.primary" sx={{ fontWeight: 500 }}>
+            Chi tiết
+          </Typography>
+        </Breadcrumbs>
+
+        <Grid container spacing={3}>
+          {/* Left Column - Cover & Metadata */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+                overflow: "hidden",
+                position: { md: "sticky" },
+                top: 80,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+              }}
+            >
+              {/* Cover Image */}
+              <Box
+                sx={{
+                  position: "relative",
+                  height: 340,
+                  background: `linear-gradient(135deg, ${theme.palette.grey[900]} 0%, ${theme.palette.grey[800]} 100%)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                {book.cover_url ? (
+                  <Box
+                    component="img"
+                    src={book.cover_url}
+                    alt={book.title}
+                    sx={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                      transition: "transform 0.3s ease",
+                      "&:hover": { transform: "scale(1.02)" },
+                    }}
+                  />
+                ) : (
+                  <Avatar sx={{ width: 140, height: 140, bgcolor: "grey.700" }}>
+                    <BookIcon sx={{ fontSize: 72 }} />
+                  </Avatar>
+                )}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 12,
+                    left: 12,
+                    bgcolor: book.is_available ? "success.main" : "error.main",
+                    color: "white",
+                    px: 1.5,
+                    py: 0.5,
+                    borderRadius: 5,
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {book.is_available ? "Còn hàng" : "Hết hàng"}
+                </Box>
+              </Box>
+
+              <CardContent sx={{ p: 2.5 }}>
+                {/* Stats Row */}
+                <Stack direction="row" spacing={1} sx={{ mb: 2.5 }}>
+                  <StatCard label="Tổng" value={book.total_copies} color="info" icon={<GridViewIcon fontSize="small" />} />
+                  <StatCard label="Sẵn sàng" value={book.available_copies} color="success" icon={<VerifiedIcon fontSize="small" />} />
+                  <StatCard label="Đang mượn" value={borrowed} color="warning" icon={<BookIcon fontSize="small" />} />
+                </Stack>
+
+                <Divider sx={{ mb: 1.5 }} />
+
+                {/* Metadata */}
+                <Box>
+                  <MetaItem
+                    icon={<GridViewIcon fontSize="small" />}
+                    label="ISBN-13"
+                    value={book.isbn13 || book.isbn}
+                  />
+                  {book.isbn10 && (
+                    <MetaItem icon={<GridViewIcon fontSize="small" />} label="ISBN-10" value={book.isbn10} />
+                  )}
+                  {book.shelf_location && (
+                    <MetaItem icon={<LocationOnIcon fontSize="small" />} label="Vị trí" value={book.shelf_location} />
+                  )}
+                  {book.language && (
+                    <MetaItem icon={<LanguageIcon fontSize="small" />} label="Ngôn ngữ" value={book.language} />
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Right Column - Details */}
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Stack spacing={3}>
+              {/* Header */}
+              <Box>
+                <Typography
+                  variant="h3"
+                  gutterBottom
+                  sx={{ fontWeight: 900, lineHeight: 1.2, fontSize: { xs: "1.75rem", md: "2.25rem" } }}
+                >
+                  {book.title}
+                </Typography>
+                {book.subtitle && (
+                  <Typography variant="h6" color="text.secondary" sx={{ fontStyle: "italic", mb: 1.5 }}>
+                    {book.subtitle}
+                  </Typography>
+                )}
+                {book.author && (
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <Typography variant="body1" color="text.secondary">
+                      Tác giả:
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {book.author}
+                    </Typography>
+                  </Stack>
+                )}
+              </Box>
+
+              {/* Info Chips */}
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+                {book.publisher && (
+                  <Chip icon={<MenuBookIcon sx={{ fontSize: 16 }} />} label={book.publisher} size="small" variant="outlined" />
+                )}
+                {book.published_date && (
+                  <Chip
+                    icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />}
+                    label={book.published_date}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+                {book.page_count && (
+                  <Chip
+                    icon={<DescriptionIcon sx={{ fontSize: 16 }} />}
+                    label={`${book.page_count} trang`}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+                {book.average_rating && (
+                  <Chip
+                    icon={<StarIcon sx={{ fontSize: 16 }} />}
+                    label={`${book.average_rating}/5`}
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                  />
+                )}
+                {book.categories && (
+                  <Chip
+                    icon={<CategoryIcon sx={{ fontSize: 16 }} />}
+                    label={book.categories}
+                    size="small"
+                    variant="outlined"
+                    sx={{ bgcolor: "primary.main", color: "primary.contrastText", borderColor: "primary.main" }}
+                  />
+                )}
+              </Stack>
+
+              <Divider />
+
+              {/* Description */}
+              {book.description && (
+                <Box>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1.5 }}>
+                    <DescriptionIcon color="action" />
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                      Mô tả
+                    </Typography>
+                  </Stack>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 2.5,
+                      bgcolor: "grey.900",
+                      borderRadius: 2,
+                      position: "relative",
+                      maxHeight: descExpanded ? "none" : 200,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+                      {book.description}
+                    </Typography>
+                    {isLongDescription && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: 60,
+                          background: descExpanded ? "transparent" : "linear-gradient(transparent, #1a1a1a)",
+                          display: "flex",
+                          alignItems: "flex-end",
+                          justifyContent: "center",
+                          pb: 1,
+                        }}
+                      >
+                        <Button
+                          size="small"
+                          onClick={() => setDescExpanded(!descExpanded)}
+                          endIcon={descExpanded ? <CloseIcon /> : <ExpandIcon />}
+                          sx={{ color: "text.secondary" }}
+                        >
+                          {descExpanded ? "Thu gọn" : "Xem thêm"}
+                        </Button>
+                      </Box>
+                    )}
+                  </Paper>
+                </Box>
+              )}
+
+              {/* Dates */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  gap: 2,
+                }}
+              >
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Ngày tạo
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {book.created_at ? new Date(book.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "long", year: "numeric" }) : "-"}
+                  </Typography>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Ngày cập nhật
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {book.updated_at ? new Date(book.updated_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "long", year: "numeric" }) : "-"}
+                  </Typography>
+                </Paper>
+              </Box>
+
+              {/* Action Buttons */}
+              <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={<BookIcon />}
+                  onClick={() => router.push(`/borrow?barcode=${book.isbn}`)}
+                  sx={{ flex: 1, py: 1.5, fontWeight: 700 }}
+                >
+                  Mượn sách
+                </Button>
+                <Tooltip title="Chỉnh sửa số lượng">
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    startIcon={<EditIcon />}
+                    onClick={() => router.push("/books")}
+                    sx={{ py: 1.5 }}
+                  >
+                    Sửa
+                  </Button>
+                </Tooltip>
+              </Stack>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
+  );
+}
+
+function getErrorMessage(err: any): string {
+  if (err?.response?.data?.message) return err.response.data.message;
+  if (err?.message) return err.message;
+  return "Đã xảy ra lỗi";
+}
