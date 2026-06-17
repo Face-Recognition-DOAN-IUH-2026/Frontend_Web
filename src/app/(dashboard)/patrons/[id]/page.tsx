@@ -153,6 +153,7 @@ export default function PatronDetailPage() {
       phone: patron.phone || undefined,
       membership_expiry: patron.membership_expiry,
       status: patron.status,
+      course: patron.course || undefined,
     });
     setShowEdit(true);
   };
@@ -337,10 +338,12 @@ export default function PatronDetailPage() {
             ["Họ tên", patron.full_name],
             ["MSSV", patron.student_code],
             ["Lớp", patron.class_name || "-"],
+            ["Khóa học", patron.course || "-"],
             ["Mã thẻ", patron.card_number],
             ["CCCD/CMND", patron.identity_number || "-"],
             ["Email", patron.email || "-"],
             ["Số điện thoại", patron.phone || "-"],
+            ["HKTT", patron.permanent_address || "-"],
             ["Ngày cấp thẻ", formatDate(patron.issue_date)],
             ["Ngày tạo", formatDateTime(patron.created_at)],
           ].map(([label, value]) => (
@@ -509,6 +512,7 @@ export default function PatronDetailPage() {
             <TextField label="CCCD/CMND" value={editForm.identity_number || ""} onChange={(event) => setEditForm({ ...editForm, identity_number: event.target.value })} fullWidth />
             <TextField label="Email" value={editForm.email || ""} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} fullWidth />
             <TextField label="Số điện thoại" value={editForm.phone || ""} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} fullWidth />
+            <TextField label="Khóa học" value={editForm.course || ""} onChange={(event) => setEditForm({ ...editForm, course: event.target.value })} fullWidth />
             <TextField
               label="Hạn thẻ"
               type="date"

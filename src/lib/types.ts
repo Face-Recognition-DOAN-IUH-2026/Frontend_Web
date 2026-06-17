@@ -9,6 +9,20 @@ export interface RegisterRequest {
   password: string;
   full_name?: string;
   role?: string;
+  course?: string;
+  permanent_address?: string;
+}
+
+export interface PatronRegisterRequest {
+  full_name: string;
+  student_code: string;
+  email: string;
+  password: string;
+  class_name?: string;
+  course?: string;
+  permanent_address?: string;
+  date_of_birth?: string;
+  faculty?: string;
 }
 
 // User-service returns user info along with tokens
@@ -132,6 +146,8 @@ export interface PatronPublic {
   created_at: string;
   updated_at: string;
   has_face: boolean;
+  course: string | null;
+  permanent_address: string | null;
 }
 
 export interface PatronCreate {
@@ -140,6 +156,8 @@ export interface PatronCreate {
   class_name?: string;
   membership_expiry: string;
   issue_date?: string;
+  course?: string;
+  permanent_address?: string;
 }
 
 export interface PatronUpdate {
@@ -150,6 +168,8 @@ export interface PatronUpdate {
   phone?: string;
   membership_expiry?: string;
   status?: string;
+  course?: string;
+  permanent_address?: string;
 }
 
 export interface PatronLookupResult {
