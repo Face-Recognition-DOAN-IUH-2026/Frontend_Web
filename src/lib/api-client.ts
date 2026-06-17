@@ -15,6 +15,7 @@ import type {
   PatronCreate,
   PatronLookupResult,
   PatronPublic,
+  PatronRegisterRequest,
   PatronUpdate,
   AccessFrequencyResponse,
   RegisterRequest,
@@ -125,13 +126,18 @@ export function getErrorMessage(err: any): string {
     const detail = err.response.data.detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail)) {
-      return detail.map((d: any) => 
+      return detail.map((d: any) =>
         typeof d === "string" ? d : `${d.loc?.join(".")}: ${d.msg}`
       ).join("; ");
     }
     if (typeof detail === "object") {
       return detail.msg || detail.message || JSON.stringify(detail);
     }
+  }
+  if (err.response?.data?.error) {
+    const errorVal = err.response.data.error;
+    if (typeof errorVal === "string") return errorVal;
+    if (typeof errorVal === "object") return errorVal.msg || errorVal.message || JSON.stringify(errorVal);
   }
   return err.message || err.msg || String(err);
 }
@@ -169,8 +175,15 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
+        const url = error.config?.url || '';
+        const status = error.response?.status;
+        const data = error.response?.data;
+        if (status && status >= 400) {
+          const msg = typeof data === 'object' ? (data as any).detail || (data as any).error || '' : '';
+          console.warn(`[API] ${error.config?.method?.toUpperCase()} ${url} ${status}${msg ? `: ${msg}` : ''}`);
+        }
         const originalRequest = error.config;
-        if (error.response?.status === 401 && originalRequest) {
+        if (status === 401 && originalRequest) {
           if (isAuthEndpoint(originalRequest.url)) {
             return Promise.reject(error);
           }
@@ -407,6 +420,11 @@ class ApiClient {
 
   async createPatron(data: PatronCreate): Promise<PatronPublic> {
     const response = await this.client.post<PatronPublic>("/api/patrons", data);
+    return response.data;
+  }
+
+  async patronRegister(data: PatronRegisterRequest): Promise<{ user: UserPublic; access_token: string; refresh_token?: string }> {
+    const response = await this.client.post("/api/patrons/register", data);
     return response.data;
   }
 

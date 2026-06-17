@@ -112,578 +112,6 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/app/(dashboard)/borrow/page.tsx">
-"use client";
-
-import { useCallback, useState } from "react";
-import {
-  Alert,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  InputAdornment,
-  Snackbar,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import ErrorIcon from "@mui/icons-material/ErrorOutlineOutlined";
-import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import SearchIcon from "@mui/icons-material/Search";
-import WarningIcon from "@mui/icons-material/WarningAmberOutlined";
-import BorrowScannerDialog from "@/components/BorrowScannerDialog";
-import api, { getErrorMessage } from "@/lib/api-client";
-
-const MAX_BORROW_BOOKS = 3;
-
-export default function BorrowPage() {
-  const [patronCode, setPatronCode] = useState("");
-  const [patronId, setPatronId] = useState<string | null>(null);
-  const [patronName, setPatronName] = useState("");
-  const [activeCount, setActiveCount] = useState(0);
-  const [overdueCount, setOverdueCount] = useState(0);
-  const [isLookingUp, setIsLookingUp] = useState(false);
-  const [error, setError] = useState("");
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
-
-  const remaining = MAX_BORROW_BOOKS - activeCount;
-  const canBorrow = remaining > 0 && overdueCount === 0;
-
-  const lookupPatron = useCallback(async (silent = false) => {
-    if (!patronCode.trim()) return;
-    setIsLookingUp(true);
-    setError("");
-    try {
-      const data = await api.getActiveBorrowsByStudentCode(patronCode.trim());
-      setPatronId(data.patron.id);
-      setPatronName(data.patron.full_name || data.patron.student_code);
-      setActiveCount(data.total);
-      setOverdueCount(data.overdue_count);
-      if (!silent) {
-        if (data.overdue_count > 0) {
-          setSnackbar({ severity: "warning", message: `Độc giả có ${data.overdue_count} cuốn sách quá hạn!` });
-        } else {
-          setSnackbar({ severity: "success", message: `Đã chọn độc giả: ${data.patron.full_name || data.patron.student_code}` });
-        }
-      }
-    } catch (err: any) {
-      if (!silent) {
-        const status = err?.response?.status || err?.status;
-        if (status === 403) {
-          setError("Thẻ độc giả đã bị khóa/hết hạn. Vui lòng liên hệ thư viện.");
-        } else {
-          setError(getErrorMessage(err) || "Không tìm thấy độc giả");
-        }
-      }
-      setPatronId(null);
-      setPatronName("");
-      setActiveCount(0);
-      setOverdueCount(0);
-    } finally {
-      setIsLookingUp(false);
-    }
-  }, [patronCode]);
-
-  const handleScanSuccess = useCallback((message: string) => {
-    setSnackbar({ severity: "success", message });
-    if (patronCode.trim()) {
-      lookupPatron(true);
-    }
-  }, [patronCode, lookupPatron]);
-
-  return (
-    <Stack spacing={3}>
-      <Typography variant="h5" sx={{ fontWeight: 900 }}>Tạo phiếu mượn sách</Typography>
-
-      {error ? <Alert severity="error" onClose={() => setError("")}>{error}</Alert> : null}
-
-      <Card variant="outlined">
-        <CardContent>
-          <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1 }}>Độc giả</Typography>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-            <TextField
-              value={patronCode}
-              onChange={(e) => setPatronCode(e.target.value)}
-              placeholder="Nhập MSSV..."
-              size="small"
-              sx={{ minWidth: 260 }}
-              slotProps={{
-                input: {
-                  startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
-                },
-              }}
-            />
-            <Button variant="contained" onClick={() => lookupPatron()} disabled={isLookingUp || !patronCode.trim()}>
-              {isLookingUp ? "Đang tra..." : "Tra cứu"}
-            </Button>
-            {patronId && (
-              <Chip color="success" label={patronName || patronId} onDelete={() => {
-                setPatronId(null);
-                setPatronName("");
-                setActiveCount(0);
-                setOverdueCount(0);
-              }} />
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
-
-      {patronId && (
-        <Card variant="outlined" sx={overdueCount > 0 ? { borderLeft: 4, borderLeftColor: "error.main" } : {}}>
-          <CardContent>
-            <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.5 }}>Tình trạng mượn sách</Typography>
-            <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-              <Chip
-                icon={remaining > 0 ? <CheckCircleIcon /> : <ErrorIcon />}
-                color={remaining > 0 ? "success" : "error"}
-                label={`Đã mượn: ${activeCount}/${MAX_BORROW_BOOKS}`}
-              />
-              {overdueCount > 0 && (
-                <Chip
-                  icon={<WarningIcon />}
-                  color="error"
-                  label={`Quá hạn: ${overdueCount} cuốn`}
-                />
-              )}
-              <Typography variant="body2" color={remaining > 0 ? "text.secondary" : "error"}>
-                {remaining > 0
-                  ? `Có thể mượn thêm ${remaining} cuốn`
-                  : "Đã đạt giới hạn mượn sách"}
-              </Typography>
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
-
-      {patronId && (
-        <Button
-          variant="contained"
-          size="large"
-          startIcon={<QrCodeScannerIcon />}
-          disabled={!canBorrow}
-          onClick={() => setScannerOpen(true)}
-          sx={{ alignSelf: "flex-start" }}
-        >
-          {canBorrow ? "Quét ISBN" : overdueCount > 0 ? "Cần trả sách quá hạn trước" : "Đã đạt giới hạn mượn"}
-        </Button>
-      )}
-
-      <BorrowScannerDialog
-        open={scannerOpen}
-        patronId={patronId || ""}
-        maxItems={remaining > 0 ? remaining : undefined}
-        onClose={() => setScannerOpen(false)}
-        onSuccess={handleScanSuccess}
-      />
-
-      <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)}>
-        {snackbar ? <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>{snackbar.message}</Alert> : undefined}
-      </Snackbar>
-    </Stack>
-  );
-}
-</file>
-
-<file path="src/components/BorrowScannerDialog.tsx">
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Paper,
-  Snackbar,
-  Stack,
-  Typography,
-} from "@mui/material";
-import BookIcon from "@mui/icons-material/MenuBookOutlined";
-import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
-import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import CloseIcon from "@mui/icons-material/Close";
-import DeleteIcon from "@mui/icons-material/DeleteOutlined";
-import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import api, { getErrorMessage } from "@/lib/api-client";
-import type { BookWithStats } from "@/lib/types";
-
-interface ScannedBorrowItem {
-  isbn: string;
-  lookup: BookWithStats | null;
-  loading: boolean;
-}
-
-export default function BorrowScannerDialog({
-  open,
-  patronId,
-  maxItems,
-  onClose,
-  onSuccess,
-}: {
-  open: boolean;
-  patronId: string;
-  maxItems?: number;
-  onClose: () => void;
-  onSuccess: (message: string) => void;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const readerRef = useRef<any>(null);
-  const lastScannedRef = useRef<string | null>(null);
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState("");
-  const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
-  const [scanToast, setScanToast] = useState("");
-
-  const stopCamera = useCallback(() => {
-    if (readerRef.current) {
-      try { readerRef.current.reset(); } catch {}
-      readerRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setCameraReady(false);
-  }, []);
-
-  const lookupIsbn = useCallback(async (isbn: string) => {
-    setScanned((prev) => prev.map((item) =>
-      item.isbn === isbn ? { ...item, loading: true } : item
-    ));
-    try {
-      const book = await api.lookupBookByIsbn(isbn);
-      setScanned((prev) => prev.map((item) =>
-        item.isbn === isbn ? { ...item, lookup: book, loading: false } : item
-      ));
-    } catch {
-      setScanned((prev) => prev.filter((item) => item.isbn !== isbn));
-      setScanToast(`Không tìm thấy sách: ${isbn}`);
-    }
-  }, []);
-
-  const addScanned = useCallback((isbn: string) => {
-    if (!/^\d{10,13}$/.test(isbn.replace(/-/g, ""))) return;
-    const normalized = isbn.replace(/-/g, "");
-    lastScannedRef.current = normalized;
-    setScanToast(normalized);
-    setScanned((prev) => {
-      if (prev.some((item) => item.isbn === normalized)) {
-        setScanToast(`Sách ${normalized} đã có trong danh sách`);
-        return prev;
-      }
-      if (maxItems !== undefined && prev.length >= maxItems) {
-        setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
-        return prev;
-      }
-      return [...prev, { isbn: normalized, lookup: null, loading: true }];
-    });
-    lookupIsbn(normalized);
-  }, [lookupIsbn, maxItems]);
-
-  useEffect(() => {
-    if (!open) {
-      stopCamera();
-      setScanned([]);
-      setCameraError("");
-      setCreateError("");
-      setScanToast("");
-      lastScannedRef.current = null;
-      return;
-    }
-    let active = true;
-    (async () => {
-      try {
-        setCameraError("");
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
-        if (!active) return;
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
-        });
-        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => { setCameraReady(true); };
-        }
-      } catch (err: any) {
-        if (!active) return;
-        if (err.name === "NotAllowedError") setCameraError("Không có quyền truy cập camera. Hãy cấp quyền camera cho trình duyệt.");
-        else if (err.name === "NotFoundError") setCameraError("Không tìm thấy camera trên thiết bị.");
-        else setCameraError("Không thể khởi động camera.");
-      }
-    })();
-    return () => { active = false; };
-  }, [open, stopCamera]);
-
-  useEffect(() => {
-    if (!cameraReady || !videoRef.current || !open) return;
-    let active = true;
-    (async () => {
-      try {
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
-        if (!active) return;
-        const reader = new BrowserMultiFormatReader();
-        readerRef.current = reader;
-        reader.decodeFromVideoElement(videoRef.current!, (result, err) => {
-          if (!active) return;
-          if (result) {
-            const code = result.getText();
-            if (/^\d{10,13}$/.test(code.replace(/-/g, ""))) {
-              addScanned(code);
-            }
-          }
-        });
-      } catch {}
-    })();
-    return () => { active = false; };
-  }, [cameraReady, open, addScanned]);
-
-  useEffect(() => () => stopCamera(), [stopCamera]);
-
-  const removeItem = (isbn: string) => {
-    setScanned((prev) => prev.filter((item) => item.isbn !== isbn));
-  };
-
-  const handleCreateSlip = async () => {
-    const valid = scanned.filter((item) => item.lookup);
-    if (!valid.length || !patronId) return;
-    setCreating(true);
-    setCreateError("");
-    try {
-      const items = valid.map((item) => ({ barcode: item.isbn, isbn: item.isbn }));
-      const result = await api.createBorrowSlip({ patron_id: patronId, items });
-      if (result.status === "success") {
-        stopCamera();
-        setScanned([]);
-        onSuccess(result.message);
-        onClose();
-      }
-    } catch (err) {
-      const detail = getErrorMessage(err);
-      const removedIsbns: string[] = [];
-      const toastMsg = detail;
-      setScanned((prev) => {
-        const matchTitle = detail.match(/^Sach "(.+)" da duoc doc gia nay muon$/);
-        if (matchTitle) {
-          const title = matchTitle[1];
-          const filtered = prev.filter((item) => {
-            if (item.lookup?.title === title) {
-              removedIsbns.push(item.isbn);
-              return false;
-            }
-            return true;
-          });
-          return filtered;
-        }
-        const matchBarcode = detail.match(/^(?:Ma vach|Ban sao) ([^\s]+) (?:da duoc quet trong phieu muon nay|dang duoc muon)$/);
-        if (matchBarcode) {
-          const barcode = matchBarcode[1];
-          const filtered = prev.filter((item) => {
-            if (item.isbn === barcode) {
-              removedIsbns.push(item.isbn);
-              return false;
-            }
-            return true;
-          });
-          return filtered;
-        }
-        const matchUnavailable = detail.match(/^Sach "(.+)" da het ban co the muon$/);
-        if (matchUnavailable) {
-          const title = matchUnavailable[1];
-          const filtered = prev.filter((item) => {
-            if (item.lookup?.title === title) {
-              removedIsbns.push(item.isbn);
-              return false;
-            }
-            return true;
-          });
-          return filtered;
-        }
-        return prev;
-      });
-      if (removedIsbns.length > 0) {
-        setScanToast(toastMsg);
-      } else {
-        setCreateError(detail);
-      }
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const validCount = scanned.filter((item) => item.lookup).length;
-
-  return (
-    <>
-      <Dialog open={open} onClose={creating ? undefined : onClose} fullWidth maxWidth="xl">
-        <DialogTitle>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <QrCodeScannerIcon color="primary" />
-              <Typography variant="h6" sx={{ fontWeight: 900 }}>Quét ISBN sách</Typography>
-            </Stack>
-            {!creating && (
-              <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
-            )}
-          </Stack>
-        </DialogTitle>
-        <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                position: "relative",
-                overflow: "hidden",
-                bgcolor: "black",
-                width: { md: "50%" },
-                aspectRatio: { xs: "16/9", md: "4/3" },
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              {cameraError ? (
-                <Stack spacing={1} sx={{ alignItems: "center", color: "grey.300", p: 3 }}>
-                  <CameraAltIcon sx={{ fontSize: 42 }} />
-                  <Typography>{cameraError}</Typography>
-                </Stack>
-              ) : (
-                <>
-                  <Box
-                    component="video"
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    sx={{ width: "100%", height: "100%", objectFit: "contain" }}
-                  />
-                  {!cameraReady && (
-                    <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-                      <CircularProgress size={26} color="inherit" />
-                      <Typography variant="body2">Đang kết nối camera...</Typography>
-                    </Stack>
-                  )}
-                </>
-              )}
-            </Paper>
-
-            <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto" }}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                <QrCodeScannerIcon color="primary" sx={{ fontSize: 20 }} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
-                  {scanned.length > 0 ? `Đã quét (${scanned.length} cuốn)` : "Sách đã quét"}
-                </Typography>
-              </Stack>
-
-              {createError ? <Alert severity="error" onClose={() => setCreateError("")}>{createError}</Alert> : null}
-
-              {scanned.length === 0 ? (
-                <Alert severity="info" sx={{ flex: 1, display: "flex", alignItems: "center" }}>
-                  Đưa mã vạch ISBN vào camera. Sách sẽ xuất hiện tại đây.
-                </Alert>
-              ) : (
-                scanned.map((item) => {
-                  const isLastScanned = item.isbn === lastScannedRef.current;
-                  return (
-                    <Paper
-                      key={item.isbn}
-                      variant="outlined"
-                      sx={{
-                        p: 1.5,
-                        borderColor: isLastScanned ? "primary.main" : undefined,
-                        bgcolor: isLastScanned ? "action.hover" : undefined,
-                      }}
-                    >
-                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                        {item.lookup?.cover_url ? (
-                          <Box
-                            component="img"
-                            src={item.lookup.cover_url}
-                            alt={item.lookup.title}
-                            sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
-                          />
-                        ) : (
-                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
-                            <BookIcon />
-                          </Avatar>
-                        )}
-                        <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
-                          {item.loading ? (
-                            <Typography variant="body2" color="text.secondary">Đang tra cứu...</Typography>
-                          ) : item.lookup ? (
-                            <>
-                              <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>
-                                {item.lookup.title}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" noWrap>
-                                {item.lookup.author || "-"}
-                              </Typography>
-                              <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>
-                                {item.isbn}
-                              </Typography>
-                              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexWrap: "wrap", mt: 0.5 }}>
-                                <Chip size="small" variant="outlined" label={`Kho: ${item.lookup.total_copies}`} sx={{ height: 20, fontSize: 11 }} />
-                                <Chip size="small" variant="outlined" color="success" label={`Sẵn: ${item.lookup.available_copies}`} sx={{ height: 20, fontSize: 11 }} />
-                              </Stack>
-                            </>
-                          ) : null}
-                        </Stack>
-                        <IconButton size="small" color="error" onClick={() => removeItem(item.isbn)} sx={{ mt: 0.5 }}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Stack>
-                    </Paper>
-                  );
-                })
-              )}
-            </Stack>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose} disabled={creating}>Hủy</Button>
-          <Button
-            variant="contained"
-            disabled={creating || validCount === 0}
-            onClick={handleCreateSlip}
-          >
-            {creating ? "Đang tạo phiếu mượn..." : `Tạo phiếu mượn (${validCount} cuốn)`}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={!!scanToast}
-        autoHideDuration={2000}
-        onClose={() => setScanToast("")}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        message={
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <CheckCircleIcon sx={{ fontSize: 18 }} />
-            <span>{scanToast}</span>
-          </Stack>
-        }
-      />
-    </>
-  );
-}
-</file>
-
 <file path=".env.example">
 NEXT_PUBLIC_API_URL=http://localhost:80
 NEXT_PUBLIC_APP_NAME=Face Recognition Platform
@@ -1811,6 +1239,578 @@ export default function AiCommandCenterPage() {
         </>
       ) : null}
     </Stack>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/borrow/page.tsx">
+"use client";
+
+import { useCallback, useState } from "react";
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  InputAdornment,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import ErrorIcon from "@mui/icons-material/ErrorOutlineOutlined";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
+import SearchIcon from "@mui/icons-material/Search";
+import WarningIcon from "@mui/icons-material/WarningAmberOutlined";
+import BorrowScannerDialog from "@/components/BorrowScannerDialog";
+import api, { getErrorMessage } from "@/lib/api-client";
+
+const MAX_BORROW_BOOKS = 3;
+
+export default function BorrowPage() {
+  const [patronCode, setPatronCode] = useState("");
+  const [patronId, setPatronId] = useState<string | null>(null);
+  const [patronName, setPatronName] = useState("");
+  const [activeCount, setActiveCount] = useState(0);
+  const [overdueCount, setOverdueCount] = useState(0);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [error, setError] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
+
+  const remaining = MAX_BORROW_BOOKS - activeCount;
+  const canBorrow = remaining > 0 && overdueCount === 0;
+
+  const lookupPatron = useCallback(async (silent = false) => {
+    if (!patronCode.trim()) return;
+    setIsLookingUp(true);
+    setError("");
+    try {
+      const data = await api.getActiveBorrowsByStudentCode(patronCode.trim());
+      setPatronId(data.patron.id);
+      setPatronName(data.patron.full_name || data.patron.student_code);
+      setActiveCount(data.total);
+      setOverdueCount(data.overdue_count);
+      if (!silent) {
+        if (data.overdue_count > 0) {
+          setSnackbar({ severity: "warning", message: `Độc giả có ${data.overdue_count} cuốn sách quá hạn!` });
+        } else {
+          setSnackbar({ severity: "success", message: `Đã chọn độc giả: ${data.patron.full_name || data.patron.student_code}` });
+        }
+      }
+    } catch (err: any) {
+      if (!silent) {
+        const status = err?.response?.status || err?.status;
+        if (status === 403) {
+          setError("Thẻ độc giả đã bị khóa/hết hạn. Vui lòng liên hệ thư viện.");
+        } else {
+          setError(getErrorMessage(err) || "Không tìm thấy độc giả");
+        }
+      }
+      setPatronId(null);
+      setPatronName("");
+      setActiveCount(0);
+      setOverdueCount(0);
+    } finally {
+      setIsLookingUp(false);
+    }
+  }, [patronCode]);
+
+  const handleScanSuccess = useCallback((message: string) => {
+    setSnackbar({ severity: "success", message });
+    if (patronCode.trim()) {
+      lookupPatron(true);
+    }
+  }, [patronCode, lookupPatron]);
+
+  return (
+    <Stack spacing={3}>
+      <Typography variant="h5" sx={{ fontWeight: 900 }}>Tạo phiếu mượn sách</Typography>
+
+      {error ? <Alert severity="error" onClose={() => setError("")}>{error}</Alert> : null}
+
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1 }}>Độc giả</Typography>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <TextField
+              value={patronCode}
+              onChange={(e) => setPatronCode(e.target.value)}
+              placeholder="Nhập MSSV..."
+              size="small"
+              sx={{ minWidth: 260 }}
+              slotProps={{
+                input: {
+                  startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                },
+              }}
+            />
+            <Button variant="contained" onClick={() => lookupPatron()} disabled={isLookingUp || !patronCode.trim()}>
+              {isLookingUp ? "Đang tra..." : "Tra cứu"}
+            </Button>
+            {patronId && (
+              <Chip color="success" label={patronName || patronId} onDelete={() => {
+                setPatronId(null);
+                setPatronName("");
+                setActiveCount(0);
+                setOverdueCount(0);
+              }} />
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {patronId && (
+        <Card variant="outlined" sx={overdueCount > 0 ? { borderLeft: 4, borderLeftColor: "error.main" } : {}}>
+          <CardContent>
+            <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.5 }}>Tình trạng mượn sách</Typography>
+            <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+              <Chip
+                icon={remaining > 0 ? <CheckCircleIcon /> : <ErrorIcon />}
+                color={remaining > 0 ? "success" : "error"}
+                label={`Đã mượn: ${activeCount}/${MAX_BORROW_BOOKS}`}
+              />
+              {overdueCount > 0 && (
+                <Chip
+                  icon={<WarningIcon />}
+                  color="error"
+                  label={`Quá hạn: ${overdueCount} cuốn`}
+                />
+              )}
+              <Typography variant="body2" color={remaining > 0 ? "text.secondary" : "error"}>
+                {remaining > 0
+                  ? `Có thể mượn thêm ${remaining} cuốn`
+                  : "Đã đạt giới hạn mượn sách"}
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {patronId && (
+        <Button
+          variant="contained"
+          size="large"
+          startIcon={<QrCodeScannerIcon />}
+          disabled={!canBorrow}
+          onClick={() => setScannerOpen(true)}
+          sx={{ alignSelf: "flex-start" }}
+        >
+          {canBorrow ? "Quét ISBN" : overdueCount > 0 ? "Cần trả sách quá hạn trước" : "Đã đạt giới hạn mượn"}
+        </Button>
+      )}
+
+      <BorrowScannerDialog
+        open={scannerOpen}
+        patronId={patronId || ""}
+        maxItems={remaining > 0 ? remaining : undefined}
+        onClose={() => setScannerOpen(false)}
+        onSuccess={handleScanSuccess}
+      />
+
+      <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)}>
+        {snackbar ? <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>{snackbar.message}</Alert> : undefined}
+      </Snackbar>
+    </Stack>
+  );
+}
+</file>
+
+<file path="src/components/BorrowScannerDialog.tsx">
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Paper,
+  Snackbar,
+  Stack,
+  Typography,
+} from "@mui/material";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type { BookWithStats } from "@/lib/types";
+
+interface ScannedBorrowItem {
+  isbn: string;
+  lookup: BookWithStats | null;
+  loading: boolean;
+}
+
+export default function BorrowScannerDialog({
+  open,
+  patronId,
+  maxItems,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  patronId: string;
+  maxItems?: number;
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const readerRef = useRef<any>(null);
+  const lastScannedRef = useRef<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [scanToast, setScanToast] = useState("");
+
+  const stopCamera = useCallback(() => {
+    if (readerRef.current) {
+      try { readerRef.current.reset(); } catch {}
+      readerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraReady(false);
+  }, []);
+
+  const lookupIsbn = useCallback(async (isbn: string) => {
+    setScanned((prev) => prev.map((item) =>
+      item.isbn === isbn ? { ...item, loading: true } : item
+    ));
+    try {
+      const book = await api.lookupBookByIsbn(isbn);
+      setScanned((prev) => prev.map((item) =>
+        item.isbn === isbn ? { ...item, lookup: book, loading: false } : item
+      ));
+    } catch {
+      setScanned((prev) => prev.filter((item) => item.isbn !== isbn));
+      setScanToast(`Không tìm thấy sách: ${isbn}`);
+    }
+  }, []);
+
+  const addScanned = useCallback((isbn: string) => {
+    if (!/^\d{10,13}$/.test(isbn.replace(/-/g, ""))) return;
+    const normalized = isbn.replace(/-/g, "");
+    lastScannedRef.current = normalized;
+    setScanToast(normalized);
+    setScanned((prev) => {
+      if (prev.some((item) => item.isbn === normalized)) {
+        setScanToast(`Sách ${normalized} đã có trong danh sách`);
+        return prev;
+      }
+      if (maxItems !== undefined && prev.length >= maxItems) {
+        setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
+        return prev;
+      }
+      return [...prev, { isbn: normalized, lookup: null, loading: true }];
+    });
+    lookupIsbn(normalized);
+  }, [lookupIsbn, maxItems]);
+
+  useEffect(() => {
+    if (!open) {
+      stopCamera();
+      setScanned([]);
+      setCameraError("");
+      setCreateError("");
+      setScanToast("");
+      lastScannedRef.current = null;
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        setCameraError("");
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        if (!active) return;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => { setCameraReady(true); };
+        }
+      } catch (err: any) {
+        if (!active) return;
+        if (err.name === "NotAllowedError") setCameraError("Không có quyền truy cập camera. Hãy cấp quyền camera cho trình duyệt.");
+        else if (err.name === "NotFoundError") setCameraError("Không tìm thấy camera trên thiết bị.");
+        else setCameraError("Không thể khởi động camera.");
+      }
+    })();
+    return () => { active = false; };
+  }, [open, stopCamera]);
+
+  useEffect(() => {
+    if (!cameraReady || !videoRef.current || !open) return;
+    let active = true;
+    (async () => {
+      try {
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        if (!active) return;
+        const reader = new BrowserMultiFormatReader();
+        readerRef.current = reader;
+        reader.decodeFromVideoElement(videoRef.current!, (result, err) => {
+          if (!active) return;
+          if (result) {
+            const code = result.getText();
+            if (/^\d{10,13}$/.test(code.replace(/-/g, ""))) {
+              addScanned(code);
+            }
+          }
+        });
+      } catch {}
+    })();
+    return () => { active = false; };
+  }, [cameraReady, open, addScanned]);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
+
+  const removeItem = (isbn: string) => {
+    setScanned((prev) => prev.filter((item) => item.isbn !== isbn));
+  };
+
+  const handleCreateSlip = async () => {
+    const valid = scanned.filter((item) => item.lookup);
+    if (!valid.length || !patronId) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const items = valid.map((item) => ({ barcode: item.isbn, isbn: item.isbn }));
+      const result = await api.createBorrowSlip({ patron_id: patronId, items });
+      if (result.status === "success") {
+        stopCamera();
+        setScanned([]);
+        onSuccess(result.message);
+        onClose();
+      }
+    } catch (err) {
+      const detail = getErrorMessage(err);
+      const removedIsbns: string[] = [];
+      const toastMsg = detail;
+      setScanned((prev) => {
+        const matchTitle = detail.match(/^Sach "(.+)" da duoc doc gia nay muon$/);
+        if (matchTitle) {
+          const title = matchTitle[1];
+          const filtered = prev.filter((item) => {
+            if (item.lookup?.title === title) {
+              removedIsbns.push(item.isbn);
+              return false;
+            }
+            return true;
+          });
+          return filtered;
+        }
+        const matchBarcode = detail.match(/^(?:Ma vach|Ban sao) ([^\s]+) (?:da duoc quet trong phieu muon nay|dang duoc muon)$/);
+        if (matchBarcode) {
+          const barcode = matchBarcode[1];
+          const filtered = prev.filter((item) => {
+            if (item.isbn === barcode) {
+              removedIsbns.push(item.isbn);
+              return false;
+            }
+            return true;
+          });
+          return filtered;
+        }
+        const matchUnavailable = detail.match(/^Sach "(.+)" da het ban co the muon$/);
+        if (matchUnavailable) {
+          const title = matchUnavailable[1];
+          const filtered = prev.filter((item) => {
+            if (item.lookup?.title === title) {
+              removedIsbns.push(item.isbn);
+              return false;
+            }
+            return true;
+          });
+          return filtered;
+        }
+        return prev;
+      });
+      if (removedIsbns.length > 0) {
+        setScanToast(toastMsg);
+      } else {
+        setCreateError(detail);
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const validCount = scanned.filter((item) => item.lookup).length;
+
+  return (
+    <>
+      <Dialog open={open} onClose={creating ? undefined : onClose} fullWidth maxWidth="xl">
+        <DialogTitle>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <QrCodeScannerIcon color="primary" />
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>Quét ISBN sách</Typography>
+            </Stack>
+            {!creating && (
+              <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
+            )}
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                position: "relative",
+                overflow: "hidden",
+                bgcolor: "black",
+                width: { md: "50%" },
+                aspectRatio: { xs: "16/9", md: "4/3" },
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {cameraError ? (
+                <Stack spacing={1} sx={{ alignItems: "center", color: "grey.300", p: 3 }}>
+                  <CameraAltIcon sx={{ fontSize: 42 }} />
+                  <Typography>{cameraError}</Typography>
+                </Stack>
+              ) : (
+                <>
+                  <Box
+                    component="video"
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    sx={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  />
+                  {!cameraReady && (
+                    <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+                      <CircularProgress size={26} color="inherit" />
+                      <Typography variant="body2">Đang kết nối camera...</Typography>
+                    </Stack>
+                  )}
+                </>
+              )}
+            </Paper>
+
+            <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto" }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <QrCodeScannerIcon color="primary" sx={{ fontSize: 20 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
+                  {scanned.length > 0 ? `Đã quét (${scanned.length} cuốn)` : "Sách đã quét"}
+                </Typography>
+              </Stack>
+
+              {createError ? <Alert severity="error" onClose={() => setCreateError("")}>{createError}</Alert> : null}
+
+              {scanned.length === 0 ? (
+                <Alert severity="info" sx={{ flex: 1, display: "flex", alignItems: "center" }}>
+                  Đưa mã vạch ISBN vào camera. Sách sẽ xuất hiện tại đây.
+                </Alert>
+              ) : (
+                scanned.map((item) => {
+                  const isLastScanned = item.isbn === lastScannedRef.current;
+                  return (
+                    <Paper
+                      key={item.isbn}
+                      variant="outlined"
+                      sx={{
+                        p: 1.5,
+                        borderColor: isLastScanned ? "primary.main" : undefined,
+                        bgcolor: isLastScanned ? "action.hover" : undefined,
+                      }}
+                    >
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                        {item.lookup?.cover_url ? (
+                          <Box
+                            component="img"
+                            src={item.lookup.cover_url}
+                            alt={item.lookup.title}
+                            sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
+                          />
+                        ) : (
+                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
+                            <BookIcon />
+                          </Avatar>
+                        )}
+                        <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
+                          {item.loading ? (
+                            <Typography variant="body2" color="text.secondary">Đang tra cứu...</Typography>
+                          ) : item.lookup ? (
+                            <>
+                              <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>
+                                {item.lookup.title}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" noWrap>
+                                {item.lookup.author || "-"}
+                              </Typography>
+                              <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>
+                                {item.isbn}
+                              </Typography>
+                              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexWrap: "wrap", mt: 0.5 }}>
+                                <Chip size="small" variant="outlined" label={`Kho: ${item.lookup.total_copies}`} sx={{ height: 20, fontSize: 11 }} />
+                                <Chip size="small" variant="outlined" color="success" label={`Sẵn: ${item.lookup.available_copies}`} sx={{ height: 20, fontSize: 11 }} />
+                              </Stack>
+                            </>
+                          ) : null}
+                        </Stack>
+                        <IconButton size="small" color="error" onClick={() => removeItem(item.isbn)} sx={{ mt: 0.5 }}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </Paper>
+                  );
+                })
+              )}
+            </Stack>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose} disabled={creating}>Hủy</Button>
+          <Button
+            variant="contained"
+            disabled={creating || validCount === 0}
+            onClick={handleCreateSlip}
+          >
+            {creating ? "Đang tạo phiếu mượn..." : `Tạo phiếu mượn (${validCount} cuốn)`}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={!!scanToast}
+        autoHideDuration={2000}
+        onClose={() => setScanToast("")}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        message={
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <CheckCircleIcon sx={{ fontSize: 18 }} />
+            <span>{scanToast}</span>
+          </Stack>
+        }
+      />
+    </>
   );
 }
 </file>
@@ -9706,188 +9706,6 @@ export default function PatronsPage() {
 }
 </file>
 
-<file path="src/components/sidebar.tsx">
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import {
-  Avatar,
-  Box,
-  ButtonBase,
-  Divider,
-  Drawer,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Stack,
-  Typography,
-  useTheme,
-} from "@mui/material";
-import BarChartIcon from "@mui/icons-material/BarChartOutlined";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
-import BookIcon from "@mui/icons-material/MenuBookOutlined";
-import BookPlusIcon from "@mui/icons-material/BookmarkAddOutlined";
-import BookReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
-import CalendarIcon from "@mui/icons-material/CalendarMonthOutlined";
-import DashboardIcon from "@mui/icons-material/DashboardOutlined";
-import DoorIcon from "@mui/icons-material/DoorFrontOutlined";
-import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
-import HistoryIcon from "@mui/icons-material/HistoryOutlined";
-import LibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
-import LogoutIcon from "@mui/icons-material/LogoutOutlined";
-import SearchIcon from "@mui/icons-material/SearchOutlined";
-import ShieldIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
-import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
-import UsersIcon from "@mui/icons-material/GroupsOutlined";
-import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
-import { useAuth } from "@/lib/auth-context";
-
-const drawerWidth = 268;
-
-const libraryItems = [
-  { href: "/dashboard", label: "Tổng quan", icon: DashboardIcon },
-  { href: "/patrons", label: "Độc giả", icon: UsersIcon },
-  { href: "/active", label: "Đang hiện diện", icon: BookIcon },
-  { href: "/gate", label: "Cổng ra vào", icon: DoorIcon },
-  { href: "/history", label: "Lịch sử ra vào", icon: HistoryIcon },
-];
-
-const circulationItems = [
-  { href: "/borrow", label: "Mượn sách", icon: BookPlusIcon },
-  { href: "/return", label: "Trả sách", icon: BookReturnIcon },
-  { href: "/books", label: "Kho sách", icon: LibraryIcon },
-];
-
-const staffItems = [
-  { href: "/staff-schedules", label: "Lịch trực", icon: CalendarIcon },
-];
-
-const aiItems = [
-  { href: "/enroll", label: "Đăng ký khuôn mặt", icon: FaceIcon },
-  { href: "/verify", label: "Xác thực khuôn mặt", icon: UserCheckIcon },
-  { href: "/identify", label: "Nhận diện", icon: SearchIcon },
-  { href: "/liveness", label: "Kiểm tra sống", icon: VisibilityIcon },
-];
-
-const adminItems = [
-  { href: "/ai-command-center", label: "AI Command Center", icon: AutoAwesomeIcon },
-  { href: "/dashboard/admin", label: "Quản trị", icon: ShieldIcon },
-  { href: "/stats", label: "Thống kê", icon: BarChartIcon },
-];
-
-function NavSection({ title, items }: { title: string; items: Array<{ href: string; label: string; icon: any }> }) {
-  const pathname = usePathname();
-
-  return (
-    <Box>
-      <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, fontWeight: 800, letterSpacing: 0.5 }}>
-        {title}
-      </Typography>
-      <List dense disablePadding sx={{ mt: 0.75 }}>
-        {items.map((item) => {
-          const Icon = item.icon;
-          const selected = pathname === item.href;
-          return (
-            <ListItemButton
-              key={item.href}
-              component={Link}
-              href={item.href}
-              selected={selected}
-              sx={{
-                mb: 0.5,
-                borderRadius: 1,
-                color: selected ? "primary.main" : "text.secondary",
-                "&.Mui-selected": {
-                  bgcolor: "primary.main",
-                  color: "primary.contrastText",
-                  "& .MuiListItemIcon-root": { color: "primary.contrastText" },
-                },
-                "&.Mui-selected:hover": { bgcolor: "primary.dark" },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 38, color: selected ? "primary.contrastText" : "text.secondary" }}>
-                <Icon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Typography variant="body2" sx={{ fontWeight: selected ? 800 : 600 }}>
-                    {item.label}
-                  </Typography>
-                }
-              />
-            </ListItemButton>
-          );
-        })}
-      </List>
-    </Box>
-  );
-}
-
-export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const theme = useTheme();
-  const role = user?.role || "staff";
-  const isAdminOrStaff = role === "admin" || role === "staff";
-  const isAdmin = role === "admin";
-
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        "& .MuiDrawer-paper": {
-          width: drawerWidth,
-          boxSizing: "border-box",
-          bgcolor: "background.paper",
-          borderRight: `1px solid ${theme.palette.divider}`,
-        },
-      }}
-    >
-      <Stack sx={{ minHeight: "100%" }}>
-        <Box sx={{ p: 2.25 }}>
-          <ButtonBase component={Link} href="/dashboard" sx={{ width: "100%", justifyContent: "flex-start", borderRadius: 1 }}>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <Avatar sx={{ width: 42, height: 42, bgcolor: "primary.main", color: "primary.contrastText", borderRadius: 2 }}>
-                <LibraryIcon />
-              </Avatar>
-              <Box sx={{ minWidth: 0, textAlign: "left" }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900 }} noWrap>THƯ VIỆN IUH</Typography>
-                <Typography variant="caption" color="text.secondary">Hệ thống quản lý</Typography>
-              </Box>
-            </Stack>
-          </ButtonBase>
-        </Box>
-        <Divider />
-        <Stack spacing={2.25} sx={{ flex: 1, p: 1.5, overflowY: "auto" }}>
-          <NavSection title="Thư viện" items={libraryItems} />
-          {isAdminOrStaff ? <NavSection title="Mượn / Trả" items={circulationItems} /> : null}
-          {isAdminOrStaff ? <NavSection title="Nhân sự" items={staffItems} /> : null}
-          {isAdmin ? <NavSection title="Chẩn đoán AI" items={aiItems} /> : null}
-          {isAdmin ? <NavSection title="Quản trị" items={adminItems} /> : null}
-        </Stack>
-        <Divider />
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", p: 1.5 }}>
-          <Avatar sx={{ width: 38, height: 38, bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 900 }}>
-            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
-          </Avatar>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>{user?.full_name || user?.email?.split("@")[0] || "Người dùng"}</Typography>
-            <Typography variant="caption" color="text.secondary">{role === "admin" ? "Quản trị viên" : "Nhân viên"}</Typography>
-          </Box>
-          <IconButton onClick={logout} title="Đăng xuất" color="error" size="small">
-            <LogoutIcon fontSize="small" />
-          </IconButton>
-        </Stack>
-      </Stack>
-    </Drawer>
-  );
-}
-</file>
-
 <file path="src/lib/auth-context.tsx">
 "use client";
 
@@ -10699,6 +10517,188 @@ export default function StatsPage() {
         )}
       </Paper>
     </Stack>
+  );
+}
+</file>
+
+<file path="src/components/sidebar.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Avatar,
+  Box,
+  ButtonBase,
+  Divider,
+  Drawer,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Stack,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import BarChartIcon from "@mui/icons-material/BarChartOutlined";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import BookPlusIcon from "@mui/icons-material/BookmarkAddOutlined";
+import BookReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
+import CalendarIcon from "@mui/icons-material/CalendarMonthOutlined";
+import DashboardIcon from "@mui/icons-material/DashboardOutlined";
+import DoorIcon from "@mui/icons-material/DoorFrontOutlined";
+import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
+import HistoryIcon from "@mui/icons-material/HistoryOutlined";
+import LibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
+import LogoutIcon from "@mui/icons-material/LogoutOutlined";
+import SearchIcon from "@mui/icons-material/SearchOutlined";
+import ShieldIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
+import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
+import UsersIcon from "@mui/icons-material/GroupsOutlined";
+import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
+import { useAuth } from "@/lib/auth-context";
+
+const drawerWidth = 268;
+
+const libraryItems = [
+  { href: "/dashboard", label: "Tổng quan", icon: DashboardIcon },
+  { href: "/patrons", label: "Độc giả", icon: UsersIcon },
+  { href: "/active", label: "Đang hiện diện", icon: BookIcon },
+  { href: "/gate", label: "Cổng ra vào", icon: DoorIcon },
+  { href: "/history", label: "Lịch sử ra vào", icon: HistoryIcon },
+];
+
+const circulationItems = [
+  { href: "/borrow", label: "Mượn sách", icon: BookPlusIcon },
+  { href: "/return", label: "Trả sách", icon: BookReturnIcon },
+  { href: "/books", label: "Kho sách", icon: LibraryIcon },
+];
+
+const staffItems = [
+  { href: "/staff-schedules", label: "Lịch trực", icon: CalendarIcon },
+];
+
+const aiItems = [
+  { href: "/enroll", label: "Đăng ký khuôn mặt", icon: FaceIcon },
+  { href: "/verify", label: "Xác thực khuôn mặt", icon: UserCheckIcon },
+  { href: "/identify", label: "Nhận diện", icon: SearchIcon },
+  { href: "/liveness", label: "Kiểm tra sống", icon: VisibilityIcon },
+];
+
+const adminItems = [
+  { href: "/ai-command-center", label: "AI Command Center", icon: AutoAwesomeIcon },
+  { href: "/dashboard/admin", label: "Quản trị", icon: ShieldIcon },
+  { href: "/stats", label: "Thống kê", icon: BarChartIcon },
+];
+
+function NavSection({ title, items }: { title: string; items: Array<{ href: string; label: string; icon: any }> }) {
+  const pathname = usePathname();
+
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, fontWeight: 800, letterSpacing: 0.5 }}>
+        {title}
+      </Typography>
+      <List dense disablePadding sx={{ mt: 0.75 }}>
+        {items.map((item) => {
+          const Icon = item.icon;
+          const selected = pathname === item.href;
+          return (
+            <ListItemButton
+              key={item.href}
+              component={Link}
+              href={item.href}
+              selected={selected}
+              sx={{
+                mb: 0.5,
+                borderRadius: 1,
+                color: selected ? "primary.main" : "text.secondary",
+                "&.Mui-selected": {
+                  bgcolor: "primary.main",
+                  color: "primary.contrastText",
+                  "& .MuiListItemIcon-root": { color: "primary.contrastText" },
+                },
+                "&.Mui-selected:hover": { bgcolor: "primary.dark" },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 38, color: selected ? "primary.contrastText" : "text.secondary" }}>
+                <Icon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Typography variant="body2" sx={{ fontWeight: selected ? 800 : 600 }}>
+                    {item.label}
+                  </Typography>
+                }
+              />
+            </ListItemButton>
+          );
+        })}
+      </List>
+    </Box>
+  );
+}
+
+export default function Sidebar() {
+  const { user, logout } = useAuth();
+  const theme = useTheme();
+  const role = user?.role || "staff";
+  const isAdminOrStaff = role === "admin" || role === "staff";
+  const isAdmin = role === "admin";
+
+  return (
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: drawerWidth,
+        flexShrink: 0,
+        "& .MuiDrawer-paper": {
+          width: drawerWidth,
+          boxSizing: "border-box",
+          bgcolor: "background.paper",
+          borderRight: `1px solid ${theme.palette.divider}`,
+        },
+      }}
+    >
+      <Stack sx={{ minHeight: "100%" }}>
+        <Box sx={{ p: 2.25 }}>
+          <ButtonBase component={Link} href="/dashboard" sx={{ width: "100%", justifyContent: "flex-start", borderRadius: 1 }}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+              <Avatar sx={{ width: 42, height: 42, bgcolor: "primary.main", color: "primary.contrastText", borderRadius: 2 }}>
+                <LibraryIcon />
+              </Avatar>
+              <Box sx={{ minWidth: 0, textAlign: "left" }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 900 }} noWrap>THƯ VIỆN IUH</Typography>
+                <Typography variant="caption" color="text.secondary">Hệ thống quản lý</Typography>
+              </Box>
+            </Stack>
+          </ButtonBase>
+        </Box>
+        <Divider />
+        <Stack spacing={2.25} sx={{ flex: 1, p: 1.5, overflowY: "auto" }}>
+          <NavSection title="Thư viện" items={libraryItems} />
+          {isAdminOrStaff ? <NavSection title="Mượn / Trả" items={circulationItems} /> : null}
+          {isAdminOrStaff ? <NavSection title="Nhân sự" items={staffItems} /> : null}
+          {isAdmin ? <NavSection title="Chẩn đoán AI" items={aiItems} /> : null}
+          {isAdmin ? <NavSection title="Quản trị" items={adminItems} /> : null}
+        </Stack>
+        <Divider />
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", p: 1.5 }}>
+          <Avatar sx={{ width: 38, height: 38, bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 900 }}>
+            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
+          </Avatar>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>{user?.full_name || user?.email?.split("@")[0] || "Người dùng"}</Typography>
+            <Typography variant="caption" color="text.secondary">{role === "admin" ? "Quản trị viên" : "Nhân viên"}</Typography>
+          </Box>
+          <IconButton onClick={logout} title="Đăng xuất" color="error" size="small">
+            <LogoutIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      </Stack>
+    </Drawer>
   );
 }
 </file>
@@ -11585,8 +11585,12 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   TextField,
   Toolbar,
@@ -11613,6 +11617,18 @@ type ConfirmState =
   | { type: "zone"; zone: LibraryZone; title: string; message: string }
   | { type: "shift"; shift: StaffShift; title: string; message: string }
   | null;
+
+type AssignDialogState = {
+  open: boolean;
+  staffId: string;
+  workDate: string;
+  zoneId: string;
+  shiftId: string;
+  shiftName: string;
+  timeRange: string;
+  zoneName: string;
+  existingAssignments: StaffScheduleAssignment[];
+} | null;
 
 function toDateInput(date: Date) {
   const year = date.getFullYear();
@@ -11787,59 +11803,72 @@ function AssignmentCard({ item, onDelete }: { item: StaffScheduleAssignment; onD
   );
 }
 
-function DropCell({
-  id,
-  assignments,
-  minStaff,
-  onDelete,
-}: {
+interface DropCellProps {
   id: string;
   assignments: StaffScheduleAssignment[];
   minStaff: number;
   onDelete: (item: StaffScheduleAssignment) => void;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+  disabled?: boolean;
+  onCellClick?: (workDate: string, zoneId: string, shiftId: string, shiftName: string, timeRange: string, zoneName: string) => void;
+  shiftName?: string;
+  timeRange?: string;
+  zoneName?: string;
+}
+const DropCell = ({ id, assignments, minStaff, onDelete, disabled, onCellClick, shiftName, timeRange, zoneName }: DropCellProps) => {
+  const { setNodeRef, isOver } = useDroppable({ id, disabled });
   const understaffed = assignments.length < minStaff;
   const theme = useTheme();
+
+  const handleClick = () => {
+    if (disabled || !onCellClick) return;
+    const parts = id.split(":");
+    if (parts.length < 4 || parts[0] !== "cell") return;
+    const [, workDate, zoneId, shiftId] = parts;
+    onCellClick(workDate, zoneId, shiftId, shiftName || "", timeRange || "", zoneName || "");
+  };
 
   return (
     <Box
       ref={setNodeRef}
+      onClick={handleClick}
       sx={{
         minHeight: 156,
         border: 2,
         borderStyle: "dashed",
-        borderColor: isOver ? "primary.main" : understaffed ? "warning.main" : "divider",
-        bgcolor: isOver
-          ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.22 : 0.12)
-          : understaffed
-            ? alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.16 : 0.1)
-            : alpha(theme.palette.background.default, theme.palette.mode === "dark" ? 0.72 : 0.88),
-        color: "text.primary",
+        borderColor: disabled ? "text.disabled" : isOver ? "primary.main" : understaffed ? "warning.main" : "divider",
+        bgcolor: disabled
+          ? alpha(theme.palette.action.disabledBackground, theme.palette.mode === "dark" ? 0.24 : 0.16)
+          : isOver
+            ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.22 : 0.12)
+            : understaffed
+              ? alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.16 : 0.1)
+              : alpha(theme.palette.background.default, theme.palette.mode === "dark" ? 0.72 : 0.88),
+        color: disabled ? "text.disabled" : "text.primary",
         borderRadius: 1,
         p: 1.25,
         transition: "background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease",
-        boxShadow: isOver ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}` : "none",
+        boxShadow: isOver && !disabled ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}` : "none",
+        cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
       <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 1 }}>
         <Typography
           variant="caption"
-          color={understaffed && !isOver ? "warning.main" : "text.secondary"}
+          color={disabled ? "text.disabled" : understaffed && !isOver ? "warning.main" : "text.secondary"}
           noWrap
           sx={{ fontWeight: 800, minWidth: 92, flexShrink: 0 }}
         >
-          {assignments.length}/{minStaff} nhân viên
+          {disabled ? "Đã qua" : `${assignments.length}/${minStaff} nhân viên`}
         </Typography>
-        {understaffed ? <Chip size="small" color="warning" label="Thiếu" sx={{ height: 20, flexShrink: 0, minWidth: 58 }} /> : null}
+        {understaffed && !disabled ? <Chip size="small" color="warning" label="Thiếu" sx={{ height: 20, flexShrink: 0, minWidth: 58 }} /> : null}
       </Stack>
       {assignments.length ? (
         <Stack spacing={1}>
           {assignments.map((item) => <AssignmentCard key={item.id} item={item} onDelete={onDelete} />)}
         </Stack>
       ) : (
-        <Box sx={{ minHeight: 104, display: "grid", placeItems: "center", textAlign: "center", color: "text.secondary", borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.06 : 0.04) }}>
-          <Typography variant="body2" sx={{ fontWeight: 800 }}>Thả nhân viên vào đây</Typography>
+        <Box sx={{ minHeight: 104, display: "grid", placeItems: "center", textAlign: "center", color: disabled ? "text.disabled" : "text.secondary", borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.06 : 0.04) }}>
+          <Typography variant="body2" sx={{ fontWeight: 800 }}>{disabled ? "Không thể chỉnh sửa" : "Thả nhân viên vào đây"}</Typography>
         </Box>
       )}
     </Box>
@@ -11885,6 +11914,7 @@ export default function StaffSchedulesPage() {
   const [shiftForm, setShiftForm] = useState({ name: "", startTime: "08:00", endTime: "12:00", minStaff: "1" });
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [assignDialog, setAssignDialog] = useState<AssignDialogState>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -12042,6 +12072,26 @@ export default function StaffSchedulesPage() {
       if (confirm.type === "zone") await api.deleteScheduleZone(confirm.zone.id);
       if (confirm.type === "shift") await api.deleteScheduleShift(confirm.shift.id);
       setConfirm(null);
+      await loadData();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runAssign = async () => {
+    if (!assignDialog || !assignDialog.staffId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.createScheduleAssignment({
+        staffId: assignDialog.staffId,
+        shiftId: assignDialog.shiftId,
+        zoneId: assignDialog.zoneId,
+        workDate: assignDialog.workDate,
+      });
+      setAssignDialog(null);
       await loadData();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -12282,6 +12332,7 @@ export default function StaffSchedulesPage() {
                           <Stack key={`${zone.id}-${day.toISOString()}`} spacing={1}>
                             {shifts.map((shift) => {
                               const date = toDateInput(day);
+                              const isPast = date < toDateInput(new Date());
                               return (
                                 <Paper
                                   key={`${date}-${zone.id}-${shift.id}`}
@@ -12300,6 +12351,23 @@ export default function StaffSchedulesPage() {
                                     id={`cell:${date}:${zone.id}:${shift.id}`}
                                     assignments={assignmentsForCell(date, zone.id, shift.id)}
                                     minStaff={shift.minStaff || 1}
+                                    disabled={isPast}
+                                    shiftName={shift.name}
+                                    timeRange={`${normalizeTime(shift.startTime)}-${normalizeTime(shift.endTime)}`}
+                                    zoneName={displayZoneName(zone)}
+                                    onCellClick={(workDate, zoneId, shiftId, shiftName, timeRange, zoneName) => {
+                                      setAssignDialog({
+                                        open: true,
+                                        staffId: "",
+                                        workDate,
+                                        zoneId,
+                                        shiftId,
+                                        shiftName,
+                                        timeRange,
+                                        zoneName,
+                                        existingAssignments: assignmentsForCell(workDate, zoneId, shiftId),
+                                      });
+                                    }}
                                     onDelete={(item) => setConfirm({
                                       type: "assignment",
                                       id: item.id,
@@ -12359,6 +12427,107 @@ export default function StaffSchedulesPage() {
         <DialogActions>
           <Button onClick={() => setConfirm(null)}>Hủy</Button>
           <Button color="error" variant="contained" onClick={runConfirm} disabled={saving}>Xóa</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={!!assignDialog}
+        onClose={() => !saving && setAssignDialog(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Phân ca trực</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ pt: 0.5 }}>
+            <Paper variant="outlined" sx={{ p: 1.75 }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
+                <MapIcon fontSize="small" color="primary" />
+                <Typography variant="body2" sx={{ fontWeight: 900 }}>{assignDialog?.shiftName}</Typography>
+              </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ pl: 3.5 }}>
+                {assignDialog?.timeRange} &bull; {assignDialog?.zoneName} &bull; {assignDialog?.workDate}
+              </Typography>
+            </Paper>
+
+            {assignDialog && assignDialog.existingAssignments.length > 0 && (
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", display: "block", mb: 1 }}>
+                  Đã phân ({assignDialog.existingAssignments.length})
+                </Typography>
+                <Stack spacing={1}>
+                  {assignDialog.existingAssignments.map((item) => (
+                    <Paper key={item.id} variant="outlined" sx={{ p: 1.25, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.main", color: "primary.contrastText", fontSize: 12, fontWeight: 900 }}>
+                          {initials(item.staff?.fullName, item.staff?.email)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{item.staff?.fullName || item.staff?.email}</Typography>
+                          <Typography variant="caption" color="text.secondary">{item.staff?.email}</Typography>
+                        </Box>
+                      </Stack>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          setAssignDialog(null);
+                          setConfirm({
+                            type: "assignment",
+                            id: item.id,
+                            title: "Xóa lịch trực đã phân?",
+                            message: `${item.staff?.fullName || item.staff?.email || "Nhân viên"} sẽ được gỡ khỏi ca ${assignDialog.shiftName} ngày ${assignDialog.workDate}.`,
+                          });
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Paper>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Chọn nhân viên</InputLabel>
+              <Select
+                value={assignDialog?.staffId ?? ""}
+                label="Chọn nhân viên"
+                onChange={(e) => {
+                  const staffId = e.target.value;
+                  if (staffId) {
+                    setAssignDialog((prev) => prev ? { ...prev, staffId } : null);
+                  }
+                }}
+              >
+                {staff
+                  .filter((s) => s.role === "admin" || s.role === "staff")
+                  .filter((s) => !assignDialog?.existingAssignments.some((a) => a.staffId === s.id))
+                  .map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                        <Avatar sx={{ width: 30, height: 30, bgcolor: "primary.main", color: "primary.contrastText", fontSize: 11, fontWeight: 900 }}>
+                          {initials(s.fullName, s.email)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{s.fullName || s.email}</Typography>
+                          <Typography variant="caption" color="text.secondary">{s.email}</Typography>
+                        </Box>
+                      </Stack>
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignDialog(null)} disabled={saving}>Hủy</Button>
+          <Button
+            variant="contained"
+            onClick={runAssign}
+            disabled={saving || !assignDialog?.staffId}
+          >
+            Phân
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
