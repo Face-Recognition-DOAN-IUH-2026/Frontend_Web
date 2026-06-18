@@ -32,6 +32,9 @@ import type {
   StaffReturnRequest,
   CreateBorrowSlipRequest,
   CreateBorrowSlipResponse,
+  LookupBorrowSlipRequest,
+  LookupBorrowSlipResponse,
+  ConfirmBorrowSlipRequest,
   LibraryZone,
   ScheduleAssignmentList,
   ScheduleStaff,
@@ -848,6 +851,16 @@ class ApiClient {
 
   async createBorrowSlip(data: CreateBorrowSlipRequest): Promise<CreateBorrowSlipResponse> {
     const response = await this.client.post<CreateBorrowSlipResponse>("/api/borrow/staff/slip/create", data);
+    return response.data;
+  }
+
+  async lookupBorrowSlip(data: LookupBorrowSlipRequest): Promise<LookupBorrowSlipResponse> {
+    const response = await this.client.post<LookupBorrowSlipResponse>("/api/borrow/staff/slip/lookup", data);
+    return response.data;
+  }
+
+  async confirmBorrowSlip(data: ConfirmBorrowSlipRequest): Promise<CreateBorrowSlipResponse> {
+    const response = await this.client.post<CreateBorrowSlipResponse>("/api/borrow/staff/slip/confirm", data);
     return response.data;
   }
 

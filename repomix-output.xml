@@ -59,6 +59,7 @@ src/__tests__/books/BorrowFlow.test.tsx
 src/__tests__/components/JobPoll.test.tsx
 src/app/(dashboard)/active/page.tsx
 src/app/(dashboard)/ai-command-center/page.tsx
+src/app/(dashboard)/books/[id]/page.tsx
 src/app/(dashboard)/books/page.tsx
 src/app/(dashboard)/borrow/page.tsx
 src/app/(dashboard)/dashboard/admin/page.tsx
@@ -1245,6 +1246,461 @@ export default function AiCommandCenterPage() {
 }
 </file>
 
+<file path="src/app/(dashboard)/books/[id]/page.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Breadcrumbs,
+  Button,
+  Card,
+  CardContent,
+  CardMedia,
+  Chip,
+  CircularProgress,
+  Collapse,
+  Divider,
+  Fab,
+  Grid,
+  IconButton,
+  Link,
+  Paper,
+  Skeleton,
+  Stack,
+  Tooltip,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import CalendarTodayIcon from "@mui/icons-material/CalendarTodayOutlined";
+import CategoryIcon from "@mui/icons-material/CategoryOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import DescriptionIcon from "@mui/icons-material/DescriptionOutlined";
+import EditIcon from "@mui/icons-material/EditOutlined";
+import ExpandIcon from "@mui/icons-material/ExpandMoreOutlined";
+import GridViewIcon from "@mui/icons-material/GridViewOutlined";
+import LanguageIcon from "@mui/icons-material/LanguageOutlined";
+import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
+import MenuBookIcon from "@mui/icons-material/MenuBookOutlined";
+import StarIcon from "@mui/icons-material/StarOutlined";
+import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
+import api from "@/lib/api-client";
+import type { BookWithStats } from "@/lib/types";
+
+function StatCard({ label, value, color, icon }: { label: string; value: number; color: "info" | "success" | "warning"; icon: React.ReactNode }) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        flex: 1,
+        p: 1.5,
+        textAlign: "center",
+        borderColor: `${color}.main`,
+        borderRadius: 2,
+        background: color === "info" ? "rgba(2,136,209,0.08)" : color === "success" ? "rgba(46,125,50,0.08)" : "rgba(245,124,0,0.08)",
+      }}
+    >
+      <Box sx={{ color: `${color}.main`, mb: 0.5 }}>{icon}</Box>
+      <Typography variant="h5" sx={{ fontWeight: 900, color: `${color}.main` }}>
+        {value}
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+        {label}
+      </Typography>
+    </Paper>
+  );
+}
+
+function MetaItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <Box sx={{ py: 1.5, px: 0 }}>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+        <Box sx={{ color: "text.secondary", mt: 0.3 }}>{icon}</Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+            {label}
+          </Typography>
+          <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: "break-word" }}>
+            {value}
+          </Typography>
+        </Box>
+      </Stack>
+      <Divider sx={{ mt: 1.5 }} />
+    </Box>
+  );
+}
+
+export default function BookDetailPage() {
+  const theme = useTheme();
+  const params = useParams();
+  const router = useRouter();
+  const bookId = params.id as string;
+
+  const [book, setBook] = useState<BookWithStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [descExpanded, setDescExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!bookId) return;
+    setLoading(true);
+    setError(null);
+    api.getBookById(bookId).then(setBook).catch((err) => setError(getErrorMessage(err))).finally(() => setLoading(false));
+  }, [bookId]);
+
+  if (loading) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 1200, mx: "auto" }}>
+        <Skeleton variant="text" width={180} height={28} sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card variant="outlined" sx={{ borderRadius: 3 }}>
+              <Skeleton variant="rounded" height={340} sx={{ borderRadius: "12px 12px 0 0" }} />
+              <CardContent>
+                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} variant="rounded" width={80} height={60} />
+                  ))}
+                </Stack>
+                <Stack spacing={1}>
+                  {[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="text" width="80%" />)}
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Stack spacing={2}>
+              <Skeleton variant="text" height={56} width="70%" />
+              <Skeleton variant="text" height={32} width="40%" />
+              <Stack direction="row" spacing={1}>
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} variant="rounded" width={90} height={32} />)}
+              </Stack>
+              <Skeleton variant="rounded" height={120} />
+              <Skeleton variant="rounded" height={80} />
+            </Stack>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  }
+
+  if (error || !book) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => router.back()} sx={{ mb: 2 }}>
+          Quay lại
+        </Button>
+        <Alert severity="error">{error || "Không tìm thấy sách"}</Alert>
+      </Box>
+    );
+  }
+
+  const borrowed = book.total_copies - book.available_copies;
+  const isLongDescription = book.description && book.description.length > 300;
+
+  return (
+    <Box sx={{ bgcolor: "background.default", minHeight: "100vh", py: 3 }}>
+      <Box sx={{ maxWidth: 1200, mx: "auto", px: 3 }}>
+        <Breadcrumbs sx={{ mb: 3 }}>
+          <Link
+            component="button"
+            underline="hover"
+            color="inherit"
+            onClick={() => router.push("/books")}
+            sx={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 0.5 }}
+          >
+            <MenuBookIcon fontSize="small" /> Sách
+          </Link>
+          <Typography color="text.primary" sx={{ fontWeight: 500 }}>
+            Chi tiết
+          </Typography>
+        </Breadcrumbs>
+
+        <Grid container spacing={3}>
+          {/* Left Column - Cover & Metadata */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+                overflow: "hidden",
+                position: { md: "sticky" },
+                top: 80,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+              }}
+            >
+              {/* Cover Image */}
+              <Box
+                sx={{
+                  position: "relative",
+                  height: 340,
+                  background: `linear-gradient(135deg, ${theme.palette.grey[900]} 0%, ${theme.palette.grey[800]} 100%)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                {book.cover_url ? (
+                  <Box
+                    component="img"
+                    src={book.cover_url}
+                    alt={book.title}
+                    sx={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                      transition: "transform 0.3s ease",
+                      "&:hover": { transform: "scale(1.02)" },
+                    }}
+                  />
+                ) : (
+                  <Avatar sx={{ width: 140, height: 140, bgcolor: "grey.700" }}>
+                    <BookIcon sx={{ fontSize: 72 }} />
+                  </Avatar>
+                )}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 12,
+                    left: 12,
+                    bgcolor: book.is_available ? "success.main" : "error.main",
+                    color: "white",
+                    px: 1.5,
+                    py: 0.5,
+                    borderRadius: 5,
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {book.is_available ? "Còn hàng" : "Hết hàng"}
+                </Box>
+              </Box>
+
+              <CardContent sx={{ p: 2.5 }}>
+                {/* Stats Row */}
+                <Stack direction="row" spacing={1} sx={{ mb: 2.5 }}>
+                  <StatCard label="Tổng" value={book.total_copies} color="info" icon={<GridViewIcon fontSize="small" />} />
+                  <StatCard label="Sẵn sàng" value={book.available_copies} color="success" icon={<VerifiedIcon fontSize="small" />} />
+                  <StatCard label="Đang mượn" value={borrowed} color="warning" icon={<BookIcon fontSize="small" />} />
+                </Stack>
+
+                <Divider sx={{ mb: 1.5 }} />
+
+                {/* Metadata */}
+                <Box>
+                  <MetaItem
+                    icon={<GridViewIcon fontSize="small" />}
+                    label="ISBN-13"
+                    value={book.isbn13 || book.isbn}
+                  />
+                  {book.isbn10 && (
+                    <MetaItem icon={<GridViewIcon fontSize="small" />} label="ISBN-10" value={book.isbn10} />
+                  )}
+                  {book.shelf_location && (
+                    <MetaItem icon={<LocationOnIcon fontSize="small" />} label="Vị trí" value={book.shelf_location} />
+                  )}
+                  {book.language && (
+                    <MetaItem icon={<LanguageIcon fontSize="small" />} label="Ngôn ngữ" value={book.language} />
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Right Column - Details */}
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Stack spacing={3}>
+              {/* Header */}
+              <Box>
+                <Typography
+                  variant="h3"
+                  gutterBottom
+                  sx={{ fontWeight: 900, lineHeight: 1.2, fontSize: { xs: "1.75rem", md: "2.25rem" } }}
+                >
+                  {book.title}
+                </Typography>
+                {book.subtitle && (
+                  <Typography variant="h6" color="text.secondary" sx={{ fontStyle: "italic", mb: 1.5 }}>
+                    {book.subtitle}
+                  </Typography>
+                )}
+                {book.author && (
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <Typography variant="body1" color="text.secondary">
+                      Tác giả:
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {book.author}
+                    </Typography>
+                  </Stack>
+                )}
+              </Box>
+
+              {/* Info Chips */}
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+                {book.publisher && (
+                  <Chip icon={<MenuBookIcon sx={{ fontSize: 16 }} />} label={book.publisher} size="small" variant="outlined" />
+                )}
+                {book.published_date && (
+                  <Chip
+                    icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />}
+                    label={book.published_date}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+                {book.page_count && (
+                  <Chip
+                    icon={<DescriptionIcon sx={{ fontSize: 16 }} />}
+                    label={`${book.page_count} trang`}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
+                {book.average_rating && (
+                  <Chip
+                    icon={<StarIcon sx={{ fontSize: 16 }} />}
+                    label={`${book.average_rating}/5`}
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                  />
+                )}
+                {book.categories && (
+                  <Chip
+                    icon={<CategoryIcon sx={{ fontSize: 16 }} />}
+                    label={book.categories}
+                    size="small"
+                    variant="outlined"
+                    sx={{ bgcolor: "primary.main", color: "primary.contrastText", borderColor: "primary.main" }}
+                  />
+                )}
+              </Stack>
+
+              <Divider />
+
+              {/* Description */}
+              {book.description && (
+                <Box>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1.5 }}>
+                    <DescriptionIcon color="action" />
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                      Mô tả
+                    </Typography>
+                  </Stack>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 2.5,
+                      bgcolor: "grey.900",
+                      borderRadius: 2,
+                      position: "relative",
+                      maxHeight: descExpanded ? "none" : 200,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+                      {book.description}
+                    </Typography>
+                    {isLongDescription && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: 60,
+                          background: descExpanded ? "transparent" : "linear-gradient(transparent, #1a1a1a)",
+                          display: "flex",
+                          alignItems: "flex-end",
+                          justifyContent: "center",
+                          pb: 1,
+                        }}
+                      >
+                        <Button
+                          size="small"
+                          onClick={() => setDescExpanded(!descExpanded)}
+                          endIcon={descExpanded ? <CloseIcon /> : <ExpandIcon />}
+                          sx={{ color: "text.secondary" }}
+                        >
+                          {descExpanded ? "Thu gọn" : "Xem thêm"}
+                        </Button>
+                      </Box>
+                    )}
+                  </Paper>
+                </Box>
+              )}
+
+              {/* Dates */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  gap: 2,
+                }}
+              >
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Ngày tạo
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {book.created_at ? new Date(book.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "long", year: "numeric" }) : "-"}
+                  </Typography>
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Ngày cập nhật
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {book.updated_at ? new Date(book.updated_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "long", year: "numeric" }) : "-"}
+                  </Typography>
+                </Paper>
+              </Box>
+
+              {/* Action Buttons */}
+              <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={<BookIcon />}
+                  onClick={() => router.push(`/borrow?barcode=${book.isbn}`)}
+                  sx={{ flex: 1, py: 1.5, fontWeight: 700 }}
+                >
+                  Mượn sách
+                </Button>
+                <Tooltip title="Chỉnh sửa số lượng">
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    startIcon={<EditIcon />}
+                    onClick={() => router.push("/books")}
+                    sx={{ py: 1.5 }}
+                  >
+                    Sửa
+                  </Button>
+                </Tooltip>
+              </Stack>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
+  );
+}
+
+function getErrorMessage(err: any): string {
+  if (err?.response?.data?.message) return err.response.data.message;
+  if (err?.message) return err.message;
+  return "Đã xảy ra lỗi";
+}
+</file>
+
 <file path="src/app/(dashboard)/borrow/page.tsx">
 "use client";
 
@@ -2312,790 +2768,6 @@ export default function IsbnScannerDialog({
         }
       />
     </>
-  );
-}
-</file>
-
-<file path="src/components/StudentCardScanner.tsx">
-"use client";
-
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import {
-  Box, Paper, Typography, Button, Stack, CircularProgress,
-  Alert, Divider, Fade, alpha, LinearProgress, Chip,
-} from "@mui/material";
-import CameraAltIcon from "@mui/icons-material/CameraAlt";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
-import ReplayIcon from "@mui/icons-material/Replay";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
-import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
-import Webcam from "react-webcam";
-import { createWorker } from "tesseract.js";
-
-export interface ScannedCardData {
-  studentCode: string;
-  fullName: string;
-  className: string | null;
-  dateOfBirth: string | null;
-  course: string | null;
-  permanentAddress: string | null;
-  faculty: string | null;
-  rawText: string;
-}
-
-interface StudentCardScannerProps {
-  onScanned: (data: ScannedCardData) => void;
-  onError?: (error: string) => void;
-  onSkip?: () => void;
-}
-
-type Phase = "detecting" | "processing" | "confirm";
-
-const MAX_DETECT_ATTEMPTS = 10;
-const DETECT_INTERVAL_MS = 4000;
-
-const SURNAMES = [
-  "nguyễn", "trần", "lê", "phạm", "huỳnh", "hoàng", "phan",
-  "vũ", "võ", "đặng", "bùi", "đỗ", "hồ", "ngô", "dương", "lý",
-  "cao", "đinh", "tạ", "châu", "mai", "tô", "hà", "vương",
-];
-
-const HEADER_KEYWORDS = [
-  "bộ công thương", "trường đại học công nghiệp", "thẻ sinh viên",
-  "trường đại học", "đại học công nghiệp", "thành phố hồ chí minh",
-  "student card", "student id", "the sinh vien", "cong thuong",
-  "sinh viên", "ngày sinh", "khóa học", "hktt",
-  "hộ khẩu", "khoa", "lớp", "ngành", "msv", "mssv",
-];
-
-function preprocessForOcr(imageData: string): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const w = Math.min(img.width, 1920);
-      const scale = w / img.width;
-      canvas.width = w;
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { resolve(imageData); return; }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageDataObj.data;
-      const weights = [0.299, 0.587, 0.114];
-      let sum = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        sum += weights[0] * data[i] + weights[1] * data[i + 1] + weights[2] * data[i + 2];
-      }
-      const avgBrightness = sum / (data.length / 4);
-      const factor = avgBrightness > 180 ? 1.3 : avgBrightness < 80 ? 1.5 : 1.1;
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = weights[0] * data[i] + weights[1] * data[i + 1] + weights[2] * data[i + 2];
-        const enhanced = Math.min(255, Math.max(0, Math.round((gray - 128) * factor + 128)));
-        data[i] = enhanced;
-        data[i + 1] = enhanced;
-        data[i + 2] = enhanced;
-      }
-      ctx.putImageData(imageDataObj, 0, 0);
-      resolve(canvas.toDataURL("image/jpeg", 0.95));
-    };
-    img.onerror = () => resolve(imageData);
-    img.src = imageData;
-  });
-}
-
-function parseCardText(text: string): Partial<ScannedCardData> {
-  const result: Partial<ScannedCardData> = { rawText: text };
-  const normalized = text.replace(/\r\n/g, "\n").replace(/\t/g, " ");
-  const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
-
-  const studentCodeRegex = /(?:MSSV|M[aã]\s*SV|M[aã]\s*S[oố]\s*SV|Student\s*Code|M[aã]\s*s[oố]\s*sinh\s*vi[eê]n|MSV|M\.S\.V)[:\s]*(\S{4,})/i;
-  const fullNameRegex = /(?:H[oọ]\s*v[aà]\s*t[eê]n|Full\s*Name|H[oọ]\s*t[eê]n|H[oọ]\s*V[AÀ]\s*T[EÊ]N|HỌ\s*TÊN|HỌ\s*VÀ\s*TÊN)[:\s]*([A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+(?:\s+[A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+)+)/i;
-  const classNameRegex = /(?:L[oớ]p|Class|LỚP)[:\s]*(\S+)/i;
-  const dobRegex = /(?:NS|Ng[aà]y\s*sinh|DOB|Birth|Ng[aà]y\s*th[aá]ng\s*n[aǎ]m\s*sinh|NGÀY\s*SINH|Sinh)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
-  const courseRegex = /(?:Kh[oó]a\s*h[oọô]c|Course|Kh[oó]a|KHÓA)[:\s]*(.+)/i;
-  const addressRegex = /(?:HKTT|H[oộ]\s*kh[aẩ]u|Đ[iịa]\s*ch[ỉi]|Address|H[oộ]\s*kh[aẩ]u\s*th[öo]ng\s*tr[uú]):\s*(.+)/i;
-  const facultyRegex = /(?:Khoa|Faculty|Department|KHOA)[:\s]*(.+)/i;
-
-  for (const line of lines) {
-    if (!result.studentCode) {
-      const m = line.match(studentCodeRegex);
-      if (m) result.studentCode = m[1].replace(/[^A-Za-z0-9]/g, "");
-    }
-    if (!result.fullName) {
-      const m = line.match(fullNameRegex);
-      if (m) result.fullName = m[1].trim();
-    }
-    if (!result.className) {
-      const m = line.match(classNameRegex);
-      if (m) result.className = m[1].trim();
-    }
-    if (!result.dateOfBirth) {
-      const m = line.match(dobRegex);
-      if (m) result.dateOfBirth = m[1].trim();
-    }
-    if (!result.course) {
-      const m = line.match(courseRegex);
-      if (m) result.course = m[1].trim();
-    }
-    if (!result.permanentAddress) {
-      const m = line.match(addressRegex);
-      if (m) result.permanentAddress = m[1].trim();
-    }
-    if (!result.faculty) {
-      const m = line.match(facultyRegex);
-      if (m) result.faculty = m[1].trim();
-    }
-  }
-
-  if (!result.studentCode) {
-    const strictMatch = normalized.match(/\b(\d{8})\b/);
-    if (strictMatch) {
-      result.studentCode = strictMatch[1];
-    } else {
-      const looseMatch = normalized.match(/\b(\d{7,13})\b/);
-      if (looseMatch) result.studentCode = looseMatch[1];
-    }
-  }
-
-  if (!result.fullName) {
-    const candidateLines = lines.filter((line) => {
-      const lower = line.toLowerCase();
-      if (HEADER_KEYWORDS.some((k) => lower.includes(k))) return false;
-      if (/^\d+$/.test(line.trim())) return false;
-      if (line.trim().length < 5) return false;
-      if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(line.trim())) return false;
-      return true;
-    });
-
-    const nameBySurname = candidateLines.find((l) => {
-      const lower = l.toLowerCase().trim();
-      return SURNAMES.some(
-        (s) => lower.startsWith(s) || lower.startsWith(`${s} `)
-      );
-    });
-    if (nameBySurname) {
-      result.fullName = nameBySurname.replace(/^[\d:\s]+/, "").trim();
-    }
-
-    if (!result.fullName) {
-      const nameByCase = candidateLines.find((l) => {
-        const words = l.trim().split(/\s+/);
-        if (words.length < 2 || words.length > 6) return false;
-        if (!/^[A-ZÀ-ỸĂÂĐÊÔƠƯ]/.test(l.trim())) return false;
-        if (/^[A-Z0-9]{4,}$/.test(words[0])) return false;
-        return true;
-      });
-      if (nameByCase) {
-        result.fullName = nameByCase.replace(/^[\d:\s]+/, "").trim();
-      }
-    }
-
-    if (!result.fullName) {
-      const allCapsName = candidateLines.find((l) => {
-        const words = l.trim().split(/\s+/);
-        if (words.length < 2 || words.length > 6) return false;
-        if (!/^[A-ZÀ-ỸĂÂĐÊÔƠƯ\s]+$/.test(l.trim())) return false;
-        if (!/[À-ỸĂÂĐÊÔƠƯ]/.test(l)) return false;
-        return true;
-      });
-      if (allCapsName) result.fullName = allCapsName.trim();
-    }
-  }
-
-  if (!result.course) {
-    const yearMatch = normalized.match(/\b(20\d{2}\s*[-–]\s*20\d{2})\b/);
-    if (yearMatch) result.course = yearMatch[1];
-  }
-
-  if (!result.course) {
-    const khoaMatch = normalized.match(/Kh[oó]a\s+(\d{4}(?:\s*[-–]\s*\d{4})?)/i);
-    if (khoaMatch) result.course = khoaMatch[1];
-  }
-
-  if (!result.className) {
-    const classMatch = normalized.match(/\b(DH[A-Z]{2,}\d{2,}[A-Z]?)\b/i);
-    if (classMatch) result.className = classMatch[1].toUpperCase();
-  }
-
-  return result;
-}
-
-function phaseLabel(phase: Phase): string {
-  switch (phase) {
-    case "detecting": return "Đang phát hiện thẻ...";
-    case "processing": return "Đang nhận dạng...";
-    case "confirm": return "Đọc thẻ thành công";
-  }
-}
-
-function phaseColor(phase: Phase): "info" | "primary" | "success" {
-  switch (phase) {
-    case "detecting": return "info";
-    case "processing": return "primary";
-    case "confirm": return "success";
-  }
-}
-
-export default function StudentCardScanner({ onScanned, onError, onSkip }: StudentCardScannerProps) {
-  const webcamRef = useRef<Webcam>(null);
-  const [phase, setPhase] = useState<Phase>("detecting");
-  const [ocrResult, setOcrResult] = useState<Partial<ScannedCardData> | null>(null);
-  const [error, setError] = useState("");
-  const [cameraReady, setCameraReady] = useState(false);
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [detectAttempts, setDetectAttempts] = useState(0);
-  const workerRef = useRef<Tesseract.Worker | null>(null);
-  const isMounted = useRef(true);
-  const phaseRef = useRef(phase);
-  const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    phaseRef.current = phase;
-  }, [phase]);
-
-  useEffect(() => {
-    isMounted.current = true;
-    return () => { isMounted.current = false; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setOcrProgress(0);
-      const worker = await createWorker("vie+eng", 1, {
-        logger: (m) => {
-          if (m.status === "recognizing text" && isMounted.current) {
-            setOcrProgress(m.progress || 0);
-          }
-        },
-      });
-      if (!cancelled) workerRef.current = worker;
-      else worker.terminate();
-    })();
-    return () => {
-      cancelled = true;
-      workerRef.current?.terminate();
-    };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
-    };
-  }, []);
-
-  const runOcr = useCallback(async (imageData: string): Promise<Partial<ScannedCardData> | null> => {
-    if (!workerRef.current) return null;
-    try {
-      setOcrProgress(0);
-      setOcrLoading(true);
-      const processed = await preprocessForOcr(imageData);
-      const { data } = await workerRef.current.recognize(processed);
-      setOcrLoading(false);
-      if (!data?.text) return null;
-      console.log("[OCR] Raw text:", data.text);
-      return parseCardText(data.text);
-    } catch (err: any) {
-      setOcrLoading(false);
-      onError?.("Lỗi OCR: " + (err.message || ""));
-      return null;
-    }
-  }, [onError]);
-
-  const checkImageHasContent = useCallback((dataUrl: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const w = Math.min(img.width, 320);
-        const h = Math.round((w / img.width) * img.height);
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { resolve(true); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        const data = ctx.getImageData(0, 0, w, h).data;
-        let sum = 0;
-        let min = 255;
-        let max = 0;
-        for (let i = 0; i < data.length; i += 16) {
-          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          sum += gray;
-          if (gray < min) min = gray;
-          if (gray > max) max = gray;
-        }
-        const pixels = data.length / 16;
-        const avg = sum / pixels;
-        const contrast = max - min;
-        resolve(contrast > 30 && avg > 20 && avg < 240);
-      };
-      img.onerror = () => resolve(true);
-      img.src = dataUrl;
-    });
-  }, []);
-
-  const attemptAutoDetect = useCallback(async () => {
-    if (!isMounted.current || phaseRef.current !== "detecting") return;
-    if (!webcamRef.current) {
-      if (isMounted.current && phaseRef.current === "detecting") {
-        detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
-      }
-      return;
-    }
-    try {
-      const imageSrc = webcamRef.current.getScreenshot();
-      if (!imageSrc) {
-        if (isMounted.current && phaseRef.current === "detecting") {
-          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
-        }
-        return;
-      }
-
-      setDetectAttempts((prev) => {
-        const next = prev + 1;
-        if (next >= MAX_DETECT_ATTEMPTS && isMounted.current) {
-          setError("Không thể phát hiện thẻ sau nhiều lần thử. Hãy chụp thủ công hoặc tải ảnh.");
-        }
-        return next;
-      });
-
-      const hasContent = await checkImageHasContent(imageSrc);
-      if (!hasContent) {
-        if (isMounted.current && phaseRef.current === "detecting") {
-          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
-        }
-        return;
-      }
-
-      setPhase("processing");
-      const parsed = await runOcr(imageSrc);
-
-      if (!isMounted.current) return;
-
-      if (parsed && parsed.studentCode && parsed.fullName) {
-        setOcrResult(parsed);
-        setPhase("confirm");
-        return;
-      }
-
-      setPhase("detecting");
-    } catch (err: any) {
-      if (isMounted.current) {
-        setPhase("detecting");
-      }
-    }
-    if (isMounted.current && phaseRef.current === "detecting") {
-      detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
-    }
-  }, [runOcr, checkImageHasContent]);
-
-  const startDetection = useCallback(() => {
-    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
-    setDetectAttempts(0);
-    detectTimerRef.current = setTimeout(attemptAutoDetect, 1000);
-  }, [attemptAutoDetect]);
-
-  useEffect(() => {
-    if (cameraReady && phase === "detecting") {
-      startDetection();
-    }
-    return () => {
-      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
-    };
-  }, [cameraReady, phase, startDetection]);
-
-  const handleManualCapture = useCallback(async () => {
-    if (!webcamRef.current) return;
-    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
-    setPhase("processing");
-    setError("");
-    try {
-      const imageSrc = webcamRef.current.getScreenshot();
-      if (!imageSrc) {
-        setError("Không thể chụp ảnh từ camera");
-        setPhase("detecting");
-        startDetection();
-        return;
-      }
-      setPhase("processing");
-      const parsed = await runOcr(imageSrc);
-      if (parsed && isMounted.current) {
-        if (parsed.studentCode && parsed.fullName) {
-          setOcrResult(parsed);
-          setPhase("confirm");
-        } else {
-          setError("Không thể đọc thông tin từ thẻ. Hãy đảm bảo thẻ rõ nét và đủ ánh sáng.");
-          setPhase("detecting");
-          startDetection();
-        }
-      }
-    } catch {
-      setPhase("detecting");
-      startDetection();
-    }
-  }, [runOcr, startDetection]);
-
-  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
-    setPhase("processing");
-    setError("");
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataUrl = ev.target?.result as string;
-      const parsed = await runOcr(dataUrl);
-      if (parsed && isMounted.current) {
-        if (parsed.studentCode && parsed.fullName) {
-          setOcrResult(parsed);
-          setPhase("confirm");
-        } else {
-          setError("Không thể đọc thông tin từ ảnh này");
-          setPhase("detecting");
-          startDetection();
-        }
-      }
-    };
-    reader.readAsDataURL(file);
-  }, [runOcr, startDetection]);
-
-  const handleConfirm = () => {
-    if (ocrResult) {
-      onScanned(ocrResult as ScannedCardData);
-    }
-  };
-
-  const handleRetake = () => {
-    setOcrResult(null);
-    setError("");
-    setPhase("detecting");
-    startDetection();
-  };
-
-  const videoConstraints: MediaStreamConstraints["video"] = {
-    facingMode: "environment",
-    width: { ideal: 1920 },
-    height: { ideal: 1080 },
-  };
-
-  return (
-    <Stack spacing={0}>
-      {phase === "confirm" && ocrResult ? (
-        <Fade in>
-          <Box>
-            {/* ── CONFIRM STATE: full-width info panel ── */}
-            <Paper variant="outlined" sx={{ p: 3 }}>
-              <Stack spacing={2}>
-                <Stack direction="row" sx={{ alignItems: "center" }} spacing={1}>
-                  <CheckCircleIcon color="success" />
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                    Thông tin từ thẻ sinh viên
-                  </Typography>
-                </Stack>
-                <Divider />
-                <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
-                <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
-                {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
-                {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
-                {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
-                {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
-                {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
-                {ocrResult.rawText && (
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ cursor: "pointer", userSelect: "none" }}
-                      onClick={(e) => {
-                        const el = (e.currentTarget as HTMLElement).nextElementSibling;
-                        if (el) (el as HTMLElement).style.display = el?.getAttribute("data-open") === "1" ? "none" : "block";
-                        e.currentTarget.setAttribute("data-open", e.currentTarget.getAttribute("data-open") === "1" ? "0" : "1");
-                      }}
-                    >
-                      ▸ Raw OCR text (debug)
-                    </Typography>
-                    <Box data-open="0" sx={{ display: "none", mt: 1, p: 1.5, bgcolor: "grey.900", borderRadius: 1, maxHeight: 120, overflow: "auto" }}>
-                      <Typography variant="caption" sx={{ fontFamily: "monospace", whiteSpace: "pre-wrap", color: "grey.300", fontSize: "0.7rem" }}>
-                        {ocrResult.rawText}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-                <Stack direction="row" spacing={2} sx={{ pt: 1 }}>
-                  <Button variant="contained" onClick={handleConfirm} fullWidth>
-                    Xác nhận
-                  </Button>
-                  <Button variant="outlined" startIcon={<ReplayIcon />} onClick={handleRetake} fullWidth>
-                    Chụp lại
-                  </Button>
-                </Stack>
-                {onSkip && (
-                  <Button color="inherit" variant="text" onClick={onSkip} fullWidth size="small">
-                    Nhập thủ công
-                  </Button>
-                )}
-              </Stack>
-            </Paper>
-          </Box>
-        </Fade>
-      ) : (
-        /* ── SCANNING STATE: side-by-side layout ── */
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: { xs: "column", md: "row" },
-            gap: 0,
-            minHeight: { md: 420 },
-          }}
-        >
-          {/* ── LEFT: Camera panel ── */}
-          <Box
-            sx={{
-              flex: { md: "0 0 55%" },
-              position: "relative",
-              bgcolor: "common.black",
-              borderRadius: { xs: "12px 12px 0 0", md: "12px 0 0 12px" },
-              overflow: "hidden",
-              minHeight: { xs: 280, md: 420 },
-            }}
-          >
-            <Webcam
-              ref={webcamRef}
-              audio={false}
-              screenshotFormat="image/jpeg"
-              screenshotQuality={0.9}
-              videoConstraints={videoConstraints}
-              onUserMedia={() => setCameraReady(true)}
-              onUserMediaError={() => setError("Không thể truy cập camera")}
-              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-            />
-
-            {/* Card frame overlay */}
-            <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-              <Box sx={{ width: "70%", aspectRatio: "1.6 / 1", position: "relative" }}>
-                {/* Corner brackets */}
-                {(["top-left", "top-right", "bottom-left", "bottom-right"] as const).map((corner) => {
-                  const isTop = corner.includes("top");
-                  const isLeft = corner.includes("left");
-                  return (
-                    <Box
-                      key={corner}
-                      sx={{
-                        position: "absolute",
-                        width: 28,
-                        height: 28,
-                        [isTop ? "top" : "bottom"]: -2,
-                        [isLeft ? "left" : "right"]: -2,
-                        borderColor: "common.white",
-                        borderStyle: "solid",
-                        borderWidth: 0,
-                        [`border${isTop ? "Top" : "Bottom"}Width`]: 3,
-                        [`border${isLeft ? "Left" : "Right"}Width`]: 3,
-                        borderRadius: isTop && isLeft ? "12px 0 0 0"
-                          : isTop && !isLeft ? "0 12px 0 0"
-                          : !isTop && isLeft ? "0 0 0 12px"
-                          : "0 0 12px 0",
-                        opacity: 0.9,
-                      }}
-                    />
-                  );
-                })}
-              </Box>
-            </Box>
-
-            {/* Status badge overlay */}
-            {phase !== "confirm" && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: 16,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  bgcolor: "rgba(13, 17, 23, 0.85)",
-                  px: 2,
-                  py: 1,
-                  borderRadius: 20,
-                  backdropFilter: "blur(4px)",
-                }}
-              >
-                {phase === "detecting" && <RadioButtonUncheckedIcon sx={{ fontSize: 18, color: "#7A8CA8", animation: "pulse-amber 2s ease-in-out infinite" }} />}
-                {phase === "processing" && <HourglassBottomIcon sx={{ fontSize: 18, color: "#D4A853", animation: "pulse-amber 1s ease-in-out infinite" }} />}
-                <Typography variant="body2" sx={{ fontWeight: 600, color: "common.white", whiteSpace: "nowrap" }}>
-                  {phase === "processing"
-                    ? `Đang nhận dạng... ${detectAttempts > 0 ? `(${detectAttempts}/${MAX_DETECT_ATTEMPTS})` : ""}`
-                    : phaseLabel(phase)}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Not-ready overlay */}
-            {!cameraReady && (
-              <Box
-                sx={{
-                  position: "absolute", inset: 0,
-                  bgcolor: "rgba(0,0,0,0.6)",
-                  color: "common.white",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexDirection: "column", gap: 1,
-                }}
-              >
-                <CircularProgress size={28} color="inherit" />
-                <Typography variant="body2">Đang kết nối camera...</Typography>
-              </Box>
-            )}
-
-            {/* Processing overlay */}
-            {phase === "processing" && ocrLoading && (
-              <Box
-                sx={{
-                  position: "absolute", inset: 0,
-                  bgcolor: "rgba(0,0,0,0.7)",
-                  color: "common.white",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexDirection: "column", gap: 1,
-                }}
-              >
-                <CircularProgress size={28} color="inherit" />
-                <Typography variant="body2">Đang nhận dạng chữ viết...</Typography>
-                <Box sx={{ width: 160 }}>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.max(ocrProgress * 100, 5)}
-                    sx={{ borderRadius: 1, height: 4 }}
-                  />
-                  <Typography variant="caption" sx={{ mt: 0.5, display: "block", textAlign: "center" }}>
-                    {Math.round(ocrProgress * 100)}%
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-          </Box>
-
-          {/* ── RIGHT: Info panel ── */}
-          <Box
-            sx={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              bgcolor: "background.paper",
-              borderRadius: { xs: "0 0 12px 12px", md: "0 12px 12px 0" },
-              borderLeft: { md: "1px solid" },
-              borderTop: { xs: "1px solid", md: "none" },
-              borderColor: "divider",
-              overflow: "hidden",
-            }}
-          >
-            {/* Panel header */}
-            <Box sx={{ px: 2.5, py: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.3 }}>
-                Thông tin quét được
-              </Typography>
-              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-                <Chip
-                  label={phaseLabel(phase)}
-                  color={phaseColor(phase)}
-                  size="small"
-                  icon={
-                    phase === "detecting" ? <RadioButtonUncheckedIcon sx={{ fontSize: 14 }} /> :
-                    phase === "processing" ? <HourglassBottomIcon sx={{ fontSize: 14 }} /> :
-                    <CheckCircleIcon sx={{ fontSize: 14 }} />
-                  }
-                  variant="outlined"
-                  sx={{ fontWeight: 600, height: 24 }}
-                />
-              </Stack>
-            </Box>
-
-            {/* Fields area */}
-            <Box sx={{ flex: 1, px: 2.5, py: 2, overflow: "auto" }}>
-              {ocrResult ? (
-                <Stack spacing={1.5}>
-                  <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
-                  <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
-                  {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
-                  {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
-                  {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
-                  {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
-                  {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
-                </Stack>
-              ) : (
-                <Stack spacing={1.5}>
-                  {[
-                    { label: "MSSV", placeholder: "Đang chờ..." },
-                    { label: "Họ tên", placeholder: "Đang chờ..." },
-                    { label: "Lớp", placeholder: "—" },
-                    { label: "Khóa học", placeholder: "—" },
-                    { label: "HKTT", placeholder: "—" },
-                  ].map((field) => (
-                    <Stack key={field.label} direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 72, flexShrink: 0, fontSize: "0.8rem" }}>
-                        {field.label}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: "text.disabled", fontStyle: "italic", fontSize: "0.8rem" }}>
-                        {field.placeholder}
-                      </Typography>
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-            </Box>
-
-            {/* Error */}
-            {error && (
-              <Box sx={{ px: 2.5, pb: 1 }}>
-                <Alert severity="warning" sx={{ fontSize: "0.8rem" }}>{error}</Alert>
-              </Box>
-            )}
-
-            {/* Actions */}
-            <Box sx={{ px: 2.5, py: 2, borderTop: "1px solid", borderColor: "divider" }}>
-              <Stack spacing={1}>
-                <Button
-                  variant="contained"
-                  startIcon={<CameraAltIcon />}
-                  onClick={handleManualCapture}
-                  disabled={!cameraReady || phase === "processing"}
-                  fullWidth
-                >
-                  Chụp thẻ
-                </Button>
-                <Button
-                  variant="outlined"
-                  component="label"
-                  startIcon={<UploadFileIcon />}
-                  disabled={phase === "processing"}
-                  fullWidth
-                >
-                  Tải ảnh
-                  <input type="file" accept="image/*" onChange={handleFileUpload} hidden />
-                </Button>
-                {onSkip && (
-                  <Button color="inherit" variant="text" onClick={onSkip} fullWidth size="small">
-                    Nhập thủ công
-                  </Button>
-                )}
-              </Stack>
-            </Box>
-          </Box>
-        </Box>
-      )}
-    </Stack>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 72, flexShrink: 0, fontSize: "0.8rem" }}>
-        {label}
-      </Typography>
-      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: "0.85rem", wordBreak: "break-word" }}>
-        {value || "—"}
-      </Typography>
-    </Stack>
   );
 }
 </file>
@@ -4791,6 +4463,790 @@ export default function ResultCard({ status, patronInfo, message }: ResultCardPr
 }
 </file>
 
+<file path="src/components/StudentCardScanner.tsx">
+"use client";
+
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Box, Paper, Typography, Button, Stack, CircularProgress,
+  Alert, Divider, Fade, alpha, LinearProgress, Chip,
+} from "@mui/material";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import ReplayIcon from "@mui/icons-material/Replay";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
+import Webcam from "react-webcam";
+import { createWorker } from "tesseract.js";
+
+export interface ScannedCardData {
+  studentCode: string;
+  fullName: string;
+  className: string | null;
+  dateOfBirth: string | null;
+  course: string | null;
+  permanentAddress: string | null;
+  faculty: string | null;
+  rawText: string;
+}
+
+interface StudentCardScannerProps {
+  onScanned: (data: ScannedCardData) => void;
+  onError?: (error: string) => void;
+  onSkip?: () => void;
+}
+
+type Phase = "detecting" | "processing" | "confirm";
+
+const MAX_DETECT_ATTEMPTS = 10;
+const DETECT_INTERVAL_MS = 4000;
+
+const SURNAMES = [
+  "nguyễn", "trần", "lê", "phạm", "huỳnh", "hoàng", "phan",
+  "vũ", "võ", "đặng", "bùi", "đỗ", "hồ", "ngô", "dương", "lý",
+  "cao", "đinh", "tạ", "châu", "mai", "tô", "hà", "vương",
+];
+
+const HEADER_KEYWORDS = [
+  "bộ công thương", "trường đại học công nghiệp", "thẻ sinh viên",
+  "trường đại học", "đại học công nghiệp", "thành phố hồ chí minh",
+  "student card", "student id", "the sinh vien", "cong thuong",
+  "sinh viên", "ngày sinh", "khóa học", "hktt",
+  "hộ khẩu", "khoa", "lớp", "ngành", "msv", "mssv",
+];
+
+function preprocessForOcr(imageData: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const w = Math.min(img.width, 1920);
+      const scale = w / img.width;
+      canvas.width = w;
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(imageData); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageDataObj.data;
+      const weights = [0.299, 0.587, 0.114];
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        sum += weights[0] * data[i] + weights[1] * data[i + 1] + weights[2] * data[i + 2];
+      }
+      const avgBrightness = sum / (data.length / 4);
+      const factor = avgBrightness > 180 ? 1.3 : avgBrightness < 80 ? 1.5 : 1.1;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = weights[0] * data[i] + weights[1] * data[i + 1] + weights[2] * data[i + 2];
+        const enhanced = Math.min(255, Math.max(0, Math.round((gray - 128) * factor + 128)));
+        data[i] = enhanced;
+        data[i + 1] = enhanced;
+        data[i + 2] = enhanced;
+      }
+      ctx.putImageData(imageDataObj, 0, 0);
+      resolve(canvas.toDataURL("image/jpeg", 0.95));
+    };
+    img.onerror = () => resolve(imageData);
+    img.src = imageData;
+  });
+}
+
+function parseCardText(text: string): Partial<ScannedCardData> {
+  const result: Partial<ScannedCardData> = { rawText: text };
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\t/g, " ");
+  const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  const studentCodeRegex = /(?:MSSV|M[aã]\s*SV|M[aã]\s*S[oố]\s*SV|Student\s*Code|M[aã]\s*s[oố]\s*sinh\s*vi[eê]n|MSV|M\.S\.V)[:\s]*(\S{4,})/i;
+  const fullNameRegex = /(?:H[oọ]\s*v[aà]\s*t[eê]n|Full\s*Name|H[oọ]\s*t[eê]n|H[oọ]\s*V[AÀ]\s*T[EÊ]N|HỌ\s*TÊN|HỌ\s*VÀ\s*TÊN)[:\s]*([A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+(?:\s+[A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+)+)/i;
+  const classNameRegex = /(?:L[oớ]p|Class|LỚP)[:\s]*(\S+)/i;
+  const dobRegex = /(?:NS|Ng[aà]y\s*sinh|DOB|Birth|Ng[aà]y\s*th[aá]ng\s*n[aǎ]m\s*sinh|NGÀY\s*SINH|Sinh)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
+  const courseRegex = /(?:Kh[oó]a\s*h[oọô]c|Course|Kh[oó]a|KHÓA)[:\s]*(.+)/i;
+  const addressRegex = /(?:HKTT|H[oộ]\s*kh[aẩ]u|Đ[iịa]\s*ch[ỉi]|Address|H[oộ]\s*kh[aẩ]u\s*th[öo]ng\s*tr[uú]):\s*(.+)/i;
+  const facultyRegex = /(?:Khoa|Faculty|Department|KHOA)[:\s]*(.+)/i;
+
+  for (const line of lines) {
+    if (!result.studentCode) {
+      const m = line.match(studentCodeRegex);
+      if (m) result.studentCode = m[1].replace(/[^A-Za-z0-9]/g, "");
+    }
+    if (!result.fullName) {
+      const m = line.match(fullNameRegex);
+      if (m) result.fullName = m[1].trim();
+    }
+    if (!result.className) {
+      const m = line.match(classNameRegex);
+      if (m) result.className = m[1].trim();
+    }
+    if (!result.dateOfBirth) {
+      const m = line.match(dobRegex);
+      if (m) result.dateOfBirth = m[1].trim();
+    }
+    if (!result.course) {
+      const m = line.match(courseRegex);
+      if (m) result.course = m[1].trim();
+    }
+    if (!result.permanentAddress) {
+      const m = line.match(addressRegex);
+      if (m) result.permanentAddress = m[1].trim();
+    }
+    if (!result.faculty) {
+      const m = line.match(facultyRegex);
+      if (m) result.faculty = m[1].trim();
+    }
+  }
+
+  if (!result.studentCode) {
+    const strictMatch = normalized.match(/\b(\d{8})\b/);
+    if (strictMatch) {
+      result.studentCode = strictMatch[1];
+    } else {
+      const looseMatch = normalized.match(/\b(\d{7,13})\b/);
+      if (looseMatch) result.studentCode = looseMatch[1];
+    }
+  }
+
+  if (!result.fullName) {
+    const candidateLines = lines.filter((line) => {
+      const lower = line.toLowerCase();
+      if (HEADER_KEYWORDS.some((k) => lower.includes(k))) return false;
+      if (/^\d+$/.test(line.trim())) return false;
+      if (line.trim().length < 5) return false;
+      if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(line.trim())) return false;
+      return true;
+    });
+
+    const nameBySurname = candidateLines.find((l) => {
+      const lower = l.toLowerCase().trim();
+      return SURNAMES.some(
+        (s) => lower.startsWith(s) || lower.startsWith(`${s} `)
+      );
+    });
+    if (nameBySurname) {
+      result.fullName = nameBySurname.replace(/^[\d:\s]+/, "").trim();
+    }
+
+    if (!result.fullName) {
+      const nameByCase = candidateLines.find((l) => {
+        const words = l.trim().split(/\s+/);
+        if (words.length < 2 || words.length > 6) return false;
+        if (!/^[A-ZÀ-ỸĂÂĐÊÔƠƯ]/.test(l.trim())) return false;
+        if (/^[A-Z0-9]{4,}$/.test(words[0])) return false;
+        return true;
+      });
+      if (nameByCase) {
+        result.fullName = nameByCase.replace(/^[\d:\s]+/, "").trim();
+      }
+    }
+
+    if (!result.fullName) {
+      const allCapsName = candidateLines.find((l) => {
+        const words = l.trim().split(/\s+/);
+        if (words.length < 2 || words.length > 6) return false;
+        if (!/^[A-ZÀ-ỸĂÂĐÊÔƠƯ\s]+$/.test(l.trim())) return false;
+        if (!/[À-ỸĂÂĐÊÔƠƯ]/.test(l)) return false;
+        return true;
+      });
+      if (allCapsName) result.fullName = allCapsName.trim();
+    }
+  }
+
+  if (!result.course) {
+    const yearMatch = normalized.match(/\b(20\d{2}\s*[-–]\s*20\d{2})\b/);
+    if (yearMatch) result.course = yearMatch[1];
+  }
+
+  if (!result.course) {
+    const khoaMatch = normalized.match(/Kh[oó]a\s+(\d{4}(?:\s*[-–]\s*\d{4})?)/i);
+    if (khoaMatch) result.course = khoaMatch[1];
+  }
+
+  if (!result.className) {
+    const classMatch = normalized.match(/\b(DH[A-Z]{2,}\d{2,}[A-Z]?)\b/i);
+    if (classMatch) result.className = classMatch[1].toUpperCase();
+  }
+
+  return result;
+}
+
+function phaseLabel(phase: Phase): string {
+  switch (phase) {
+    case "detecting": return "Đang phát hiện thẻ...";
+    case "processing": return "Đang nhận dạng...";
+    case "confirm": return "Đọc thẻ thành công";
+  }
+}
+
+function phaseColor(phase: Phase): "info" | "primary" | "success" {
+  switch (phase) {
+    case "detecting": return "info";
+    case "processing": return "primary";
+    case "confirm": return "success";
+  }
+}
+
+export default function StudentCardScanner({ onScanned, onError, onSkip }: StudentCardScannerProps) {
+  const webcamRef = useRef<Webcam>(null);
+  const [phase, setPhase] = useState<Phase>("detecting");
+  const [ocrResult, setOcrResult] = useState<Partial<ScannedCardData> | null>(null);
+  const [error, setError] = useState("");
+  const [cameraReady, setCameraReady] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [detectAttempts, setDetectAttempts] = useState(0);
+  const workerRef = useRef<Tesseract.Worker | null>(null);
+  const isMounted = useRef(true);
+  const phaseRef = useRef(phase);
+  const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setOcrProgress(0);
+      const worker = await createWorker("vie+eng", 1, {
+        logger: (m) => {
+          if (m.status === "recognizing text" && isMounted.current) {
+            setOcrProgress(m.progress || 0);
+          }
+        },
+      });
+      if (!cancelled) workerRef.current = worker;
+      else worker.terminate();
+    })();
+    return () => {
+      cancelled = true;
+      workerRef.current?.terminate();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    };
+  }, []);
+
+  const runOcr = useCallback(async (imageData: string): Promise<Partial<ScannedCardData> | null> => {
+    if (!workerRef.current) return null;
+    try {
+      setOcrProgress(0);
+      setOcrLoading(true);
+      const processed = await preprocessForOcr(imageData);
+      const { data } = await workerRef.current.recognize(processed);
+      setOcrLoading(false);
+      if (!data?.text) return null;
+      console.log("[OCR] Raw text:", data.text);
+      return parseCardText(data.text);
+    } catch (err: any) {
+      setOcrLoading(false);
+      onError?.("Lỗi OCR: " + (err.message || ""));
+      return null;
+    }
+  }, [onError]);
+
+  const checkImageHasContent = useCallback((dataUrl: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const w = Math.min(img.width, 320);
+        const h = Math.round((w / img.width) * img.height);
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(true); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
+        let sum = 0;
+        let min = 255;
+        let max = 0;
+        for (let i = 0; i < data.length; i += 16) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          sum += gray;
+          if (gray < min) min = gray;
+          if (gray > max) max = gray;
+        }
+        const pixels = data.length / 16;
+        const avg = sum / pixels;
+        const contrast = max - min;
+        resolve(contrast > 30 && avg > 20 && avg < 240);
+      };
+      img.onerror = () => resolve(true);
+      img.src = dataUrl;
+    });
+  }, []);
+
+  const attemptAutoDetect = useCallback(async () => {
+    if (!isMounted.current || phaseRef.current !== "detecting") return;
+    if (!webcamRef.current) {
+      if (isMounted.current && phaseRef.current === "detecting") {
+        detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+      }
+      return;
+    }
+    try {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        if (isMounted.current && phaseRef.current === "detecting") {
+          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+        }
+        return;
+      }
+
+      setDetectAttempts((prev) => {
+        const next = prev + 1;
+        if (next >= MAX_DETECT_ATTEMPTS && isMounted.current) {
+          setError("Không thể phát hiện thẻ sau nhiều lần thử. Hãy chụp thủ công hoặc tải ảnh.");
+        }
+        return next;
+      });
+
+      const hasContent = await checkImageHasContent(imageSrc);
+      if (!hasContent) {
+        if (isMounted.current && phaseRef.current === "detecting") {
+          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+        }
+        return;
+      }
+
+      setPhase("processing");
+      const parsed = await runOcr(imageSrc);
+
+      if (!isMounted.current) return;
+
+      if (parsed && parsed.studentCode && parsed.fullName) {
+        setOcrResult(parsed);
+        setPhase("confirm");
+        return;
+      }
+
+      setPhase("detecting");
+    } catch (err: any) {
+      if (isMounted.current) {
+        setPhase("detecting");
+      }
+    }
+    if (isMounted.current && phaseRef.current === "detecting") {
+      detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+    }
+  }, [runOcr, checkImageHasContent]);
+
+  const startDetection = useCallback(() => {
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    setDetectAttempts(0);
+    detectTimerRef.current = setTimeout(attemptAutoDetect, 1000);
+  }, [attemptAutoDetect]);
+
+  useEffect(() => {
+    if (cameraReady && phase === "detecting") {
+      startDetection();
+    }
+    return () => {
+      if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    };
+  }, [cameraReady, phase, startDetection]);
+
+  const handleManualCapture = useCallback(async () => {
+    if (!webcamRef.current) return;
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    setPhase("processing");
+    setError("");
+    try {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        setError("Không thể chụp ảnh từ camera");
+        setPhase("detecting");
+        startDetection();
+        return;
+      }
+      setPhase("processing");
+      const parsed = await runOcr(imageSrc);
+      if (parsed && isMounted.current) {
+        if (parsed.studentCode && parsed.fullName) {
+          setOcrResult(parsed);
+          setPhase("confirm");
+        } else {
+          setError("Không thể đọc thông tin từ thẻ. Hãy đảm bảo thẻ rõ nét và đủ ánh sáng.");
+          setPhase("detecting");
+          startDetection();
+        }
+      }
+    } catch {
+      setPhase("detecting");
+      startDetection();
+    }
+  }, [runOcr, startDetection]);
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    setPhase("processing");
+    setError("");
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      const parsed = await runOcr(dataUrl);
+      if (parsed && isMounted.current) {
+        if (parsed.studentCode && parsed.fullName) {
+          setOcrResult(parsed);
+          setPhase("confirm");
+        } else {
+          setError("Không thể đọc thông tin từ ảnh này");
+          setPhase("detecting");
+          startDetection();
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  }, [runOcr, startDetection]);
+
+  const handleConfirm = () => {
+    if (ocrResult) {
+      onScanned(ocrResult as ScannedCardData);
+    }
+  };
+
+  const handleRetake = () => {
+    setOcrResult(null);
+    setError("");
+    setPhase("detecting");
+    startDetection();
+  };
+
+  const videoConstraints: MediaStreamConstraints["video"] = {
+    facingMode: "environment",
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+  };
+
+  return (
+    <Stack spacing={0}>
+      {phase === "confirm" && ocrResult ? (
+        <Fade in>
+          <Box>
+            {/* ── CONFIRM STATE: full-width info panel ── */}
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Stack spacing={2}>
+                <Stack direction="row" sx={{ alignItems: "center" }} spacing={1}>
+                  <CheckCircleIcon color="success" />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    Thông tin từ thẻ sinh viên
+                  </Typography>
+                </Stack>
+                <Divider />
+                <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
+                <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
+                {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
+                {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
+                {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
+                {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
+                {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
+                {ocrResult.rawText && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ cursor: "pointer", userSelect: "none" }}
+                      onClick={(e) => {
+                        const el = (e.currentTarget as HTMLElement).nextElementSibling;
+                        if (el) (el as HTMLElement).style.display = el?.getAttribute("data-open") === "1" ? "none" : "block";
+                        e.currentTarget.setAttribute("data-open", e.currentTarget.getAttribute("data-open") === "1" ? "0" : "1");
+                      }}
+                    >
+                      ▸ Raw OCR text (debug)
+                    </Typography>
+                    <Box data-open="0" sx={{ display: "none", mt: 1, p: 1.5, bgcolor: "grey.900", borderRadius: 1, maxHeight: 120, overflow: "auto" }}>
+                      <Typography variant="caption" sx={{ fontFamily: "monospace", whiteSpace: "pre-wrap", color: "grey.300", fontSize: "0.7rem" }}>
+                        {ocrResult.rawText}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                <Stack direction="row" spacing={2} sx={{ pt: 1 }}>
+                  <Button variant="contained" onClick={handleConfirm} fullWidth>
+                    Xác nhận
+                  </Button>
+                  <Button variant="outlined" startIcon={<ReplayIcon />} onClick={handleRetake} fullWidth>
+                    Chụp lại
+                  </Button>
+                </Stack>
+                {onSkip && (
+                  <Button color="inherit" variant="text" onClick={onSkip} fullWidth size="small">
+                    Nhập thủ công
+                  </Button>
+                )}
+              </Stack>
+            </Paper>
+          </Box>
+        </Fade>
+      ) : (
+        /* ── SCANNING STATE: side-by-side layout ── */
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            gap: 0,
+            minHeight: { md: 420 },
+          }}
+        >
+          {/* ── LEFT: Camera panel ── */}
+          <Box
+            sx={{
+              flex: { md: "0 0 55%" },
+              position: "relative",
+              bgcolor: "common.black",
+              borderRadius: { xs: "12px 12px 0 0", md: "12px 0 0 12px" },
+              overflow: "hidden",
+              minHeight: { xs: 280, md: 420 },
+            }}
+          >
+            <Webcam
+              ref={webcamRef}
+              audio={false}
+              screenshotFormat="image/jpeg"
+              screenshotQuality={0.9}
+              videoConstraints={videoConstraints}
+              onUserMedia={() => setCameraReady(true)}
+              onUserMediaError={() => setError("Không thể truy cập camera")}
+              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+            />
+
+            {/* Card frame overlay */}
+            <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <Box sx={{ width: "70%", aspectRatio: "1.6 / 1", position: "relative" }}>
+                {/* Corner brackets */}
+                {(["top-left", "top-right", "bottom-left", "bottom-right"] as const).map((corner) => {
+                  const isTop = corner.includes("top");
+                  const isLeft = corner.includes("left");
+                  return (
+                    <Box
+                      key={corner}
+                      sx={{
+                        position: "absolute",
+                        width: 28,
+                        height: 28,
+                        [isTop ? "top" : "bottom"]: -2,
+                        [isLeft ? "left" : "right"]: -2,
+                        borderColor: "common.white",
+                        borderStyle: "solid",
+                        borderWidth: 0,
+                        [`border${isTop ? "Top" : "Bottom"}Width`]: 3,
+                        [`border${isLeft ? "Left" : "Right"}Width`]: 3,
+                        borderRadius: isTop && isLeft ? "12px 0 0 0"
+                          : isTop && !isLeft ? "0 12px 0 0"
+                          : !isTop && isLeft ? "0 0 0 12px"
+                          : "0 0 12px 0",
+                        opacity: 0.9,
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
+
+            {/* Status badge overlay */}
+            {phase !== "confirm" && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: 16,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  bgcolor: "rgba(13, 17, 23, 0.85)",
+                  px: 2,
+                  py: 1,
+                  borderRadius: 20,
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                {phase === "detecting" && <RadioButtonUncheckedIcon sx={{ fontSize: 18, color: "#7A8CA8", animation: "pulse-amber 2s ease-in-out infinite" }} />}
+                {phase === "processing" && <HourglassBottomIcon sx={{ fontSize: 18, color: "#D4A853", animation: "pulse-amber 1s ease-in-out infinite" }} />}
+                <Typography variant="body2" sx={{ fontWeight: 600, color: "common.white", whiteSpace: "nowrap" }}>
+                  {phase === "processing"
+                    ? `Đang nhận dạng... ${detectAttempts > 0 ? `(${detectAttempts}/${MAX_DETECT_ATTEMPTS})` : ""}`
+                    : phaseLabel(phase)}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Not-ready overlay */}
+            {!cameraReady && (
+              <Box
+                sx={{
+                  position: "absolute", inset: 0,
+                  bgcolor: "rgba(0,0,0,0.6)",
+                  color: "common.white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexDirection: "column", gap: 1,
+                }}
+              >
+                <CircularProgress size={28} color="inherit" />
+                <Typography variant="body2">Đang kết nối camera...</Typography>
+              </Box>
+            )}
+
+            {/* Processing overlay */}
+            {phase === "processing" && ocrLoading && (
+              <Box
+                sx={{
+                  position: "absolute", inset: 0,
+                  bgcolor: "rgba(0,0,0,0.7)",
+                  color: "common.white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexDirection: "column", gap: 1,
+                }}
+              >
+                <CircularProgress size={28} color="inherit" />
+                <Typography variant="body2">Đang nhận dạng chữ viết...</Typography>
+                <Box sx={{ width: 160 }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.max(ocrProgress * 100, 5)}
+                    sx={{ borderRadius: 1, height: 4 }}
+                  />
+                  <Typography variant="caption" sx={{ mt: 0.5, display: "block", textAlign: "center" }}>
+                    {Math.round(ocrProgress * 100)}%
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          {/* ── RIGHT: Info panel ── */}
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              bgcolor: "background.paper",
+              borderRadius: { xs: "0 0 12px 12px", md: "0 12px 12px 0" },
+              borderLeft: { md: "1px solid" },
+              borderTop: { xs: "1px solid", md: "none" },
+              borderColor: "divider",
+              overflow: "hidden",
+            }}
+          >
+            {/* Panel header */}
+            <Box sx={{ px: 2.5, py: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.3 }}>
+                Thông tin quét được
+              </Typography>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                <Chip
+                  label={phaseLabel(phase)}
+                  color={phaseColor(phase)}
+                  size="small"
+                  icon={
+                    phase === "detecting" ? <RadioButtonUncheckedIcon sx={{ fontSize: 14 }} /> :
+                    phase === "processing" ? <HourglassBottomIcon sx={{ fontSize: 14 }} /> :
+                    <CheckCircleIcon sx={{ fontSize: 14 }} />
+                  }
+                  variant="outlined"
+                  sx={{ fontWeight: 600, height: 24 }}
+                />
+              </Stack>
+            </Box>
+
+            {/* Fields area */}
+            <Box sx={{ flex: 1, px: 2.5, py: 2, overflow: "auto" }}>
+              {ocrResult ? (
+                <Stack spacing={1.5}>
+                  <InfoRow label="MSSV" value={ocrResult.studentCode ?? ""} />
+                  <InfoRow label="Họ tên" value={ocrResult.fullName ?? ""} />
+                  {ocrResult.className != null && <InfoRow label="Lớp" value={ocrResult.className} />}
+                  {ocrResult.dateOfBirth != null && <InfoRow label="Ngày sinh" value={ocrResult.dateOfBirth} />}
+                  {ocrResult.course != null && <InfoRow label="Khóa học" value={ocrResult.course} />}
+                  {ocrResult.permanentAddress != null && <InfoRow label="HKTT" value={ocrResult.permanentAddress} />}
+                  {ocrResult.faculty != null && <InfoRow label="Khoa" value={ocrResult.faculty} />}
+                </Stack>
+              ) : (
+                <Stack spacing={1.5}>
+                  {[
+                    { label: "MSSV", placeholder: "Đang chờ..." },
+                    { label: "Họ tên", placeholder: "Đang chờ..." },
+                    { label: "Lớp", placeholder: "—" },
+                    { label: "Khóa học", placeholder: "—" },
+                    { label: "HKTT", placeholder: "—" },
+                  ].map((field) => (
+                    <Stack key={field.label} direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 72, flexShrink: 0, fontSize: "0.8rem" }}>
+                        {field.label}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: "text.disabled", fontStyle: "italic", fontSize: "0.8rem" }}>
+                        {field.placeholder}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+
+            {/* Error */}
+            {error && (
+              <Box sx={{ px: 2.5, pb: 1 }}>
+                <Alert severity="warning" sx={{ fontSize: "0.8rem" }}>{error}</Alert>
+              </Box>
+            )}
+
+            {/* Actions */}
+            <Box sx={{ px: 2.5, py: 2, borderTop: "1px solid", borderColor: "divider" }}>
+              <Stack spacing={1}>
+                <Button
+                  variant="contained"
+                  startIcon={<CameraAltIcon />}
+                  onClick={handleManualCapture}
+                  disabled={!cameraReady || phase === "processing"}
+                  fullWidth
+                >
+                  Chụp thẻ
+                </Button>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<UploadFileIcon />}
+                  disabled={phase === "processing"}
+                  fullWidth
+                >
+                  Tải ảnh
+                  <input type="file" accept="image/*" onChange={handleFileUpload} hidden />
+                </Button>
+                {onSkip && (
+                  <Button color="inherit" variant="text" onClick={onSkip} fullWidth size="small">
+                    Nhập thủ công
+                  </Button>
+                )}
+              </Stack>
+            </Box>
+          </Box>
+        </Box>
+      )}
+    </Stack>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 72, flexShrink: 0, fontSize: "0.8rem" }}>
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ fontWeight: 500, fontSize: "0.85rem", wordBreak: "break-word" }}>
+        {value || "—"}
+      </Typography>
+    </Stack>
+  );
+}
+</file>
+
 <file path="tsconfig.json">
 {
   "compilerOptions": {
@@ -4832,738 +5288,6 @@ export default function ResultCard({ status, patronInfo, message }: ResultCardPr
   "exclude": [
     "node_modules"
   ]
-}
-</file>
-
-<file path="src/app/(dashboard)/books/page.tsx">
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Checkbox,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  Fade,
-  IconButton,
-  InputAdornment,
-  Paper,
-  Snackbar,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Typography,
-  useTheme,
-} from "@mui/material";
-import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
-import BookIcon from "@mui/icons-material/MenuBookOutlined";
-import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
-import CloseIcon from "@mui/icons-material/Close";
-import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import DownloadIcon from "@mui/icons-material/DownloadOutlined";
-import EyeIcon from "@mui/icons-material/VisibilityOutlined";
-import FileIcon from "@mui/icons-material/InsertDriveFileOutlined";
-import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
-import LockIcon from "@mui/icons-material/LockOutlined";
-import PrintIcon from "@mui/icons-material/PrintOutlined";
-import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import SearchIcon from "@mui/icons-material/Search";
-import UploadIcon from "@mui/icons-material/UploadFileOutlined";
-import api, { getErrorMessage } from "@/lib/api-client";
-import IsbnScannerDialog from "@/components/IsbnScannerDialog";
-import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
-
-type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
-
-function statusColor(status: string): "success" | "info" | "warning" | "error" | "default" {
-  if (["new", "imported"].includes(status)) return "success";
-  if (["updated"].includes(status)) return "info";
-  if (["exists", "skipped"].includes(status)) return "default";
-  if (["warning"].includes(status)) return "warning";
-  return "error";
-}
-
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    exists: "Đã có",
-    new: "Mới",
-    warning: "Cảnh báo",
-    invalid: "Lỗi",
-    imported: "Thành công",
-    updated: "Cập nhật",
-    skipped: "Bỏ qua",
-    error: "Lỗi",
-  };
-  return labels[status] || status;
-}
-
-function MetricCard({ label, value, description, icon: Icon, color }: any) {
-  return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-          <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>{label}</Typography>
-            <Typography variant="h4" sx={{ fontWeight: 900 }}>{value}</Typography>
-            <Typography variant="caption" color="text.secondary">{description}</Typography>
-          </Box>
-          <Avatar sx={{ bgcolor: color, color: "primary.contrastText" }}>
-            <Icon />
-          </Avatar>
-        </Stack>
-      </CardContent>
-    </Card>
-  );
-}
-
-export default function BooksPage() {
-  const theme = useTheme();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [books, setBooks] = useState<BookWithStats[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<BookWithStats[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [previewFile, setPreviewFile] = useState<File | null>(null);
-  const [previewData, setPreviewData] = useState<BookImportPreviewRow[] | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importResults, setImportResults] = useState<BookImportResultRow[] | null>(null);
-  const [showResults, setShowResults] = useState(false);
-  const [recentlyPrinted, setRecentlyPrinted] = useState<string[]>([]);
-  const [page, setPage] = useState(0);
-  const limit = 30;
-  const [selectedBook, setSelectedBook] = useState<BookWithStats | null>(null);
-  const [editQuantity, setEditQuantity] = useState(0);
-  const [savingQuantity, setSavingQuantity] = useState(false);
-  const [quantityError, setQuantityError] = useState("");
-  const [notice, setNotice] = useState<Notice>(null);
-  const [isbnScannerOpen, setIsbnScannerOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteInput, setDeleteInput] = useState("");
-  const [deleting, setDeleting] = useState(false);
-  const deleteConfirmed = deleteInput.trim().normalize('NFC').toUpperCase() === 'XÓA';
-
-  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
-
-  const loadBooks = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.listBooks({ skip: page * limit, limit });
-      setBooks(data.items ?? []);
-      setTotal(data.total ?? 0);
-    } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Lỗi tải dữ liệu sách");
-      setBooks([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
-
-  useEffect(() => {
-    loadBooks();
-  }, [loadBooks]);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      try {
-        setSearchResults(await api.searchBooks(searchQuery));
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setPreviewFile(file);
-    setPreviewData(null);
-    setShowResults(false);
-    setPreviewLoading(true);
-    try {
-      const data = await api.getBarcodePreview(file);
-      setPreviewData(data.rows);
-      showNotice("info", `Đã đọc ${data.total_rows} dòng từ file Excel`);
-    } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Lỗi đọc file");
-    } finally {
-      setPreviewLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const handleImport = async () => {
-    if (!previewFile) return;
-    setImporting(true);
-    setShowResults(false);
-    try {
-      const result = await api.importBooks(previewFile);
-      setImportResults(result.results);
-      setShowResults(true);
-      setPreviewData(null);
-      setPreviewFile(null);
-      setSearchQuery("");
-      setPage(0);
-      await loadBooks();
-      showNotice(result.errors === 0 ? "success" : "warning", result.errors === 0
-        ? `Đã nhập ${result.imported} đầu sách`
-        : `${result.imported} nhập thành công, ${result.errors} lỗi`);
-    } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Lỗi nhập kho");
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const handleQuantitySave = async () => {
-    if (!selectedBook) return;
-    const borrowed = selectedBook.total_copies - selectedBook.available_copies;
-    if (editQuantity < borrowed) {
-      setQuantityError(`Tối thiểu ${borrowed} bản vì đang có ${borrowed} bản được mượn`);
-      return;
-    }
-    if (editQuantity < 1) {
-      setQuantityError("Số lượng phải lớn hơn 0");
-      return;
-    }
-    setSavingQuantity(true);
-    try {
-      const updated = await api.updateBookQuantity(selectedBook.id, editQuantity);
-      setBooks((prev) => prev.map((book) => book.id === updated.id ? updated : book));
-      setSearchResults((prev) => prev.map((book) => book.id === updated.id ? updated : book));
-      showNotice("success", `Đã cập nhật số lượng: ${updated.total_copies} bản`);
-      setSelectedBook(null);
-    } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Cập nhật thất bại");
-    } finally {
-      setSavingQuantity(false);
-    }
-  };
-
-  const handlePrintBarcodes = async (bookId?: string) => {
-    try {
-      const barcodes = await api.getBarcodes(bookId);
-      if (barcodes.length === 0) {
-        showNotice("info", "Không tìm thấy mã vạch để in");
-        return;
-      }
-      setRecentlyPrinted(barcodes.map((item) => item.barcode));
-      showNotice("success", `${barcodes.length} mã vạch sẵn sàng in`);
-    } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Không thể lấy mã vạch");
-    }
-  };
-
-  const handleIsbnImportComplete = (results: BookImportResultRow[]) => {
-    setIsbnScannerOpen(false);
-    setSearchQuery("");
-    setPage(0);
-    loadBooks();
-    const importedCount = results.filter((r) => r.status === "imported" || r.status === "updated").length;
-    const errorCount = results.filter((r) => r.status === "error").length;
-    if (errorCount === 0) {
-      showNotice("success", `Đã nhập ${importedCount} đầu sách từ ISBN`);
-    } else {
-      showNotice("warning", `${importedCount} thành công, ${errorCount} lỗi`);
-    }
-  };
-
-  const openQuantityDialog = (book: BookWithStats) => {
-    setSelectedBook(book);
-    setEditQuantity(book.total_copies);
-    setQuantityError("");
-  };
-
-  const handleToggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleToggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      if (prev.size === displayBooks.length) return new Set();
-      return new Set(displayBooks.map((b) => b.id));
-    });
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return;
-    setDeleting(true);
-    try {
-      const result = await api.bulkDeleteBooks(Array.from(selectedIds));
-      setSelectedIds(new Set());
-      setDeleteConfirmOpen(false);
-      setDeleteInput("");
-      setPage(0);
-      await loadBooks();
-      if (result.errors.length === 0) {
-        showNotice("success", `Đã xóa ${result.deleted} cuốn sách`);
-      } else {
-        showNotice("warning", `Xóa ${result.deleted} thành công, ${result.errors.length} lỗi: ${result.errors.join("; ")}`);
-      }
-    } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Xóa thất bại");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const stats = {
-    totalBooks: total,
-    totalCopies: books.reduce((sum, book) => sum + book.total_copies, 0),
-    availableCopies: books.reduce((sum, book) => sum + book.available_copies, 0),
-    borrowedCopies: books.reduce((sum, book) => sum + (book.total_copies - book.available_copies), 0),
-  };
-  const displayBooks = searchQuery.trim() ? searchResults : books;
-
-  return (
-    <Stack spacing={3}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
-        <MetricCard label="Tổng đầu sách" value={stats.totalBooks} icon={BookIcon} color={theme.palette.primary.main} description="Trong hệ thống" />
-        <MetricCard label="Tổng bản sao" value={stats.totalCopies} icon={InventoryIcon} color={theme.palette.info.main} description="Tất cả các bản" />
-        <MetricCard label="Sẵn sàng" value={stats.availableCopies} icon={CheckIcon} color={theme.palette.success.main} description="Có thể mượn" />
-        <MetricCard label="Đang được mượn" value={stats.borrowedCopies} icon={AlertIcon} color={theme.palette.warning.main} description="Đang lưu hành" />
-      </Box>
-
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ alignItems: { lg: "center" } }}>
-          <TextField
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Tìm kiếm sách theo ISBN, tên, tác giả..."
-            size="small"
-            fullWidth
-            slotProps={{
-              input: {
-                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
-                endAdornment: searchQuery ? (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setSearchQuery("")}>{searching ? <CircularProgress size={16} /> : <CloseIcon fontSize="small" />}</IconButton>
-                  </InputAdornment>
-                ) : undefined,
-              },
-            }}
-          />
-          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
-            <Button variant="contained" startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Nhập Excel</Button>
-            <Button variant="contained" color="secondary" startIcon={<QrCodeScannerIcon />} onClick={() => setIsbnScannerOpen(true)}>Quét ISBN</Button>
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => { setPage(0); setSearchQuery(""); loadBooks(); }}>Tải lại</Button>
-            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.downloadBookTemplate()}>Tải mẫu</Button>
-            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.exportBooks()}>Xuất Excel</Button>
-          </Stack>
-        </Stack>
-      </Paper>
-
-      {searchQuery.trim() ? (
-        <Alert
-          severity="info"
-          action={searchResults.length > 0 ? <Button color="inherit" size="small" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()}>In mã vạch</Button> : undefined}
-        >
-          Kết quả tìm kiếm: {searchResults.length} cuốn sách
-        </Alert>
-      ) : null}
-
-      {previewFile ? (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", gap: 1.5, mb: 2 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <FileIcon color="primary" />
-              <Box>
-                <Typography variant="h6">Xem trước: {previewFile.name}</Typography>
-                <Typography variant="body2" color="text.secondary">Kiểm tra dữ liệu trước khi nhập kho</Typography>
-              </Box>
-            </Stack>
-            <Button variant="text" color="inherit" onClick={() => { setPreviewFile(null); setPreviewData(null); }}>Hủy</Button>
-          </Stack>
-          {previewLoading ? (
-            <Box sx={{ py: 5, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
-          ) : previewData?.length ? (
-            <Stack spacing={2}>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                <Chip color="success" label={`${previewData.filter((row) => row.status !== "invalid").length} hàng hợp lệ`} />
-                <Chip color="error" label={`${previewData.filter((row) => row.status === "invalid").length} hàng lỗi`} />
-              </Stack>
-              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320 }}>
-                <Table size="small" stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>ISBN</TableCell>
-                      <TableCell>Tên sách</TableCell>
-                      <TableCell>Tác giả</TableCell>
-                      <TableCell>NXB</TableCell>
-                      <TableCell>Số lượng</TableCell>
-                      <TableCell>Mã vạch mẫu</TableCell>
-                      <TableCell>Trạng thái</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {previewData.slice(0, 50).map((row, index) => (
-                      <TableRow key={`${row.isbn}-${index}`} selected={row.status === "invalid"}>
-                        <TableCell sx={{ fontFamily: "monospace" }}>{row.isbn || "-"}</TableCell>
-                        <TableCell>{row.title || "-"}</TableCell>
-                        <TableCell>{row.author || "-"}</TableCell>
-                        <TableCell>{row.publisher || "-"}</TableCell>
-                        <TableCell>{row.quantity}</TableCell>
-                        <TableCell sx={{ fontFamily: "monospace" }}>{row.barcodes[0] || "-"}</TableCell>
-                        <TableCell><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
-                <Button variant="outlined" onClick={() => { setPreviewFile(null); setPreviewData(null); }}>Hủy</Button>
-                <Button variant="contained" startIcon={<CheckIcon />} onClick={handleImport} disabled={importing}>
-                  {importing ? "Đang nhập..." : "Xác nhận nhập kho"}
-                </Button>
-              </Stack>
-            </Stack>
-          ) : null}
-        </Paper>
-      ) : null}
-
-      {showResults && importResults ? (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="h6">Kết quả nhập kho</Typography>
-          <TableContainer component={Paper} variant="outlined" sx={{ mt: 2, maxHeight: 320 }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>ISBN</TableCell>
-                  <TableCell>Tên sách</TableCell>
-                  <TableCell>Số lượng</TableCell>
-                  <TableCell>Barcode mẫu</TableCell>
-                  <TableCell>Trạng thái</TableCell>
-                  <TableCell>Thông báo</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {importResults.map((row, index) => (
-                  <TableRow key={`${row.isbn}-${index}`} selected={row.status === "error" || row.status === "warning"}>
-                    <TableCell sx={{ fontFamily: "monospace" }}>{row.isbn || "-"}</TableCell>
-                    <TableCell>{row.title || "-"}</TableCell>
-                    <TableCell>{row.quantity}</TableCell>
-                    <TableCell sx={{ fontFamily: "monospace" }}>{row.barcodes[0] || "-"}</TableCell>
-                    <TableCell><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
-                    <TableCell>{row.message || "-"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          {importResults.some((row) => row.status === "imported" || row.status === "warning") ? (
-            <Button sx={{ mt: 2 }} variant="outlined" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()}>
-              In mã vạch vừa tạo
-            </Button>
-          ) : null}
-        </Paper>
-      ) : null}
-
-      {recentlyPrinted.length > 0 ? (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="h6">Mã vạch sẵn sàng in ({recentlyPrinted.length})</Typography>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", mt: 2 }}>
-            {recentlyPrinted.map((barcode) => <Chip key={barcode} label={barcode} sx={{ fontFamily: "monospace" }} />)}
-          </Stack>
-        </Paper>
-      ) : null}
-
-      <Paper variant="outlined">
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    size="small"
-                    checked={displayBooks.length > 0 && selectedIds.size === displayBooks.length}
-                    indeterminate={selectedIds.size > 0 && selectedIds.size < displayBooks.length}
-                    onChange={handleToggleSelectAll}
-                  />
-                </TableCell>
-                <TableCell>ISBN</TableCell>
-                <TableCell>Tiêu đề</TableCell>
-                <TableCell>Tác giả</TableCell>
-                <TableCell>NXB</TableCell>
-                <TableCell align="center">Tổng</TableCell>
-                <TableCell align="center">Sẵn sàng</TableCell>
-                <TableCell align="center">Mượn</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
-                </TableRow>
-              ) : displayBooks.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
-                    <Typography color="text.secondary">{searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}</Typography>
-                  </TableCell>
-                </TableRow>
-              ) : displayBooks.map((book) => {
-                const isSelected = selectedIds.has(book.id);
-                const hasBorrowed = book.total_copies - book.available_copies > 0;
-                return (
-                <TableRow
-                  key={book.id}
-                  hover
-                  selected={isSelected}
-                  sx={{
-                    cursor: "pointer",
-                    borderLeft: isSelected ? "3px solid" : "3px solid transparent",
-                    borderColor: "warning.main",
-                    bgcolor: isSelected ? "rgba(255, 183, 77, 0.08)" : undefined,
-                  }}
-                  onClick={() => openQuantityDialog(book)}
-                >
-                  <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      size="small"
-                      checked={isSelected}
-                      onChange={() => handleToggleSelect(book.id)}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ fontFamily: "monospace", color: "primary.main" }}>{book.isbn}</TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-                      {book.cover_url ? (
-                        <Box component="img" src={book.cover_url} alt={book.title} sx={{ width: 34, height: 44, objectFit: "cover", borderRadius: 1, border: 1, borderColor: "divider" }} />
-                      ) : (
-                        <Avatar variant="rounded" sx={{ width: 34, height: 44, bgcolor: "background.default" }}><BookIcon fontSize="small" /></Avatar>
-                      )}
-                      <Typography variant="body2" sx={{ fontWeight: 800 }}>{book.title}</Typography>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>{book.author || "-"}</TableCell>
-                  <TableCell>{book.publisher || "-"}</TableCell>
-                  <TableCell align="center">{book.total_copies}</TableCell>
-                  <TableCell align="center"><Chip size="small" color={book.available_copies > 0 ? "success" : "error"} label={book.available_copies} /></TableCell>
-                  <TableCell align="center">{book.total_copies - book.available_copies}</TableCell>
-                </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        {!searchQuery && total > limit ? (
-          <>
-            <Divider />
-            <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", p: 2 }}>
-              <Typography variant="caption" color="text.secondary">
-                Hiển thị {page * limit + 1}-{Math.min((page + 1) * limit, total)} / {total} đầu sách
-              </Typography>
-              <Stack direction="row" spacing={1}>
-                <Button size="small" variant="outlined" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Trước</Button>
-                <Button size="small" variant="outlined" disabled={(page + 1) * limit >= total} onClick={() => setPage((value) => value + 1)}>Sau</Button>
-              </Stack>
-            </Stack>
-          </>
-        ) : null}
-      </Paper>
-
-      <Dialog open={!!selectedBook} onClose={() => setSelectedBook(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Sửa số lượng sách</DialogTitle>
-        <DialogContent>
-          {selectedBook ? (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                {selectedBook.cover_url ? (
-                  <Box component="img" src={selectedBook.cover_url} alt={selectedBook.title} sx={{ width: 48, height: 64, objectFit: "cover", borderRadius: 1 }} />
-                ) : <Avatar variant="rounded"><BookIcon /></Avatar>}
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 900 }} noWrap>{selectedBook.title}</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>ISBN: {selectedBook.isbn}</Typography>
-                </Box>
-              </Stack>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
-                <Alert severity="info">Tổng: {selectedBook.total_copies}</Alert>
-                <Alert severity="success">Sẵn sàng: {selectedBook.available_copies}</Alert>
-                <Alert severity="warning">Đang mượn: {selectedBook.total_copies - selectedBook.available_copies}</Alert>
-              </Box>
-              {(selectedBook.publisher || selectedBook.published_date || selectedBook.categories || selectedBook.page_count) && (
-                <Box sx={{ p: 1.5, bgcolor: "grey.900", borderRadius: 1 }}>
-                  {selectedBook.publisher && <Typography variant="body2"><strong>NXB:</strong> {selectedBook.publisher}</Typography>}
-                  {selectedBook.published_date && <Typography variant="body2"><strong>Năm XB:</strong> {selectedBook.published_date}</Typography>}
-                  {selectedBook.categories && <Typography variant="body2"><strong>Thể loại:</strong> {selectedBook.categories}</Typography>}
-                  {selectedBook.page_count && <Typography variant="body2"><strong>Số trang:</strong> {selectedBook.page_count}</Typography>}
-                  {selectedBook.average_rating && <Typography variant="body2"><strong>Đánh giá:</strong> {selectedBook.average_rating}/5</Typography>}
-                  {selectedBook.language && <Typography variant="body2"><strong>Ngôn ngữ:</strong> {selectedBook.language}</Typography>}
-                </Box>
-              )}
-              {selectedBook.description && (
-                <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                  {selectedBook.description}
-                </Typography>
-              )}
-              <TextField
-                label="Số lượng mới"
-                type="number"
-                value={editQuantity}
-                onChange={(event) => { setEditQuantity(Number(event.target.value) || 0); setQuantityError(""); }}
-                error={!!quantityError}
-                helperText={quantityError || "Số lượng không được nhỏ hơn số bản đang mượn"}
-                fullWidth
-                slotProps={{ htmlInput: { min: 1 } }}
-              />
-            </Stack>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSelectedBook(null)}>Hủy</Button>
-          <Button variant="contained" onClick={handleQuantitySave} disabled={savingQuantity}>{savingQuantity ? "Đang lưu..." : "Lưu thay đổi"}</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
-        {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
-      </Snackbar>
-
-      <IsbnScannerDialog
-        open={isbnScannerOpen}
-        onClose={() => setIsbnScannerOpen(false)}
-        onImportComplete={handleIsbnImportComplete}
-      />
-
-      <Fade in={selectedIds.size > 0}>
-        <Paper
-          elevation={8}
-          sx={{
-            position: "fixed",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 1300,
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            px: 3,
-            py: 1.5,
-            borderRadius: 3,
-            background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
-            border: "1px solid",
-            borderColor: "warning.main",
-            boxShadow: "0 8px 32px rgba(255, 183, 77, 0.2)",
-          }}
-        >
-          <Chip
-            label={`${selectedIds.size} đã chọn`}
-            color="warning"
-            size="small"
-            sx={{ fontWeight: 700 }}
-          />
-          <Button
-            size="small"
-            variant="text"
-            color="inherit"
-            onClick={() => setSelectedIds(new Set())}
-          >
-            Bỏ chọn
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => {
-              setDeleteInput("");
-              setDeleteConfirmOpen(true);
-            }}
-          >
-            Xóa
-          </Button>
-        </Paper>
-      </Fade>
-
-      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <AlertIcon sx={{ color: "warning.main" }} />
-          Xóa {selectedIds.size} cuốn sách?
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Sách sẽ bị xóa vĩnh viễn cùng tất cả bản sao:
-            </Typography>
-            <Box sx={{ maxHeight: 200, overflow: "auto", p: 1, bgcolor: "grey.900", borderRadius: 1 }}>
-              {displayBooks.filter((b) => selectedIds.has(b.id)).map((book) => (
-                <Stack key={book.id} direction="row" spacing={1} sx={{ py: 0.5, alignItems: "center" }}>
-                  {book.total_copies - book.available_copies > 0 && <LockIcon fontSize="small" sx={{ color: "error.main" }} />}
-                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary", minWidth: 120 }}>
-                    {book.isbn}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
-                    {book.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {book.total_copies} bản
-                  </Typography>
-                </Stack>
-              ))}
-            </Box>
-            {displayBooks.filter((b) => selectedIds.has(b.id) && b.total_copies - b.available_copies > 0).length > 0 && (
-              <Alert severity="error">
-                Một số sách đang được mượn và sẽ không thể xóa. Hệ thống sẽ bỏ qua chúng.
-              </Alert>
-            )}
-            <TextField
-              label='Nhập "XÓA" để xác nhận'
-              value={deleteInput}
-              onChange={(e) => setDeleteInput(e.target.value)}
-              fullWidth
-              size="small"
-              autoFocus
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }}>Hủy</Button>
-          <Button
-            variant="contained"
-            color="error"
-            disabled={!deleteConfirmed || deleting}
-            onClick={handleBulkDelete}
-            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
-          >
-            {deleting ? "Đang xóa..." : "Xóa vĩnh viễn"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Stack>
-  );
 }
 </file>
 
@@ -6231,6 +5955,900 @@ const config: Config = {
 };
 
 export default config;
+</file>
+
+<file path="src/app/(dashboard)/books/page.tsx">
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Fade,
+  IconButton,
+  InputAdornment,
+  Paper,
+  Snackbar,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import DownloadIcon from "@mui/icons-material/DownloadOutlined";
+import EyeIcon from "@mui/icons-material/VisibilityOutlined";
+import FileIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
+import LockIcon from "@mui/icons-material/LockOutlined";
+import PrintIcon from "@mui/icons-material/PrintOutlined";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SearchIcon from "@mui/icons-material/Search";
+import UploadIcon from "@mui/icons-material/UploadFileOutlined";
+import api, { getErrorMessage } from "@/lib/api-client";
+import IsbnScannerDialog from "@/components/IsbnScannerDialog";
+import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
+
+type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
+
+function statusColor(status: string): "success" | "info" | "warning" | "error" | "default" {
+  if (["new", "imported"].includes(status)) return "success";
+  if (["updated"].includes(status)) return "info";
+  if (["exists", "skipped"].includes(status)) return "default";
+  if (["warning"].includes(status)) return "warning";
+  return "error";
+}
+
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    exists: "Đã có",
+    new: "Mới",
+    warning: "Cảnh báo",
+    invalid: "Lỗi",
+    imported: "Thành công",
+    updated: "Cập nhật",
+    skipped: "Bỏ qua",
+    error: "Lỗi",
+  };
+  return labels[status] || status;
+}
+
+function MetricCard({ label, value, description, icon: Icon, color }: any) {
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>{label}</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 900 }}>{value}</Typography>
+            <Typography variant="caption" color="text.secondary">{description}</Typography>
+          </Box>
+          <Avatar sx={{ bgcolor: color, color: "primary.contrastText" }}>
+            <Icon />
+          </Avatar>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function BooksPage() {
+  const theme = useTheme();
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [books, setBooks] = useState<BookWithStats[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<BookWithStats[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewData, setPreviewData] = useState<BookImportPreviewRow[] | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [selectedPreviewIndices, setSelectedPreviewIndices] = useState<Set<number>>(new Set());
+  const [deletePreviewOpen, setDeletePreviewOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState<BookImportResultRow[] | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const [recentlyPrinted, setRecentlyPrinted] = useState<string[]>([]);
+  const [page, setPage] = useState(0);
+  const limit = 30;
+  const [selectedBook, setSelectedBook] = useState<BookWithStats | null>(null);
+  const [editQuantity, setEditQuantity] = useState(0);
+  const [savingQuantity, setSavingQuantity] = useState(false);
+  const [quantityError, setQuantityError] = useState("");
+  const [notice, setNotice] = useState<Notice>(null);
+  const [isbnScannerOpen, setIsbnScannerOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const deleteConfirmed = deleteInput.trim().normalize('NFC').toUpperCase() === 'XÓA';
+
+  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
+
+  const loadBooks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.listBooks({ skip: page * limit, limit });
+      setBooks(data.items ?? []);
+      setTotal(data.total ?? 0);
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Lỗi tải dữ liệu sách");
+      setBooks([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [page]);
+
+  useEffect(() => {
+    loadBooks();
+  }, [loadBooks]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        setSearchResults(await api.searchBooks(searchQuery));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPreviewFile(file);
+    setPreviewData(null);
+    setShowResults(false);
+    setPreviewLoading(true);
+    try {
+      const data = await api.getBarcodePreview(file);
+      setPreviewData(data.rows);
+      showNotice("info", `Đã đọc ${data.total_rows} dòng từ file Excel`);
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Lỗi đọc file");
+    } finally {
+      setPreviewLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleImport = async () => {
+    if (!previewFile) return;
+    setImporting(true);
+    setShowResults(false);
+    try {
+      let result;
+      if (previewData && previewData.length > 0) {
+        result = await api.importBooksFiltered(previewData.map((row) => ({
+          isbn: row.isbn,
+          quantity: row.quantity,
+          title: row.title,
+          subtitle: row.subtitle ?? null,
+          author: row.author ?? null,
+          publisher: row.publisher ?? null,
+          published_date: row.published_date ?? null,
+          page_count: row.page_count ?? null,
+          categories: row.categories ?? null,
+          cover_url: row.cover_url ?? null,
+          description: (row as any).description ?? null,
+          average_rating: (row as any).average_rating ?? null,
+          language: (row as any).language ?? null,
+          isbn10: (row as any).isbn10 ?? null,
+          isbn13: (row as any).isbn13 ?? null,
+        })));
+      } else {
+        result = await api.importBooks(previewFile);
+      }
+      setImportResults(result.results);
+      setShowResults(true);
+      setPreviewData(null);
+      setPreviewFile(null);
+      setSearchQuery("");
+      setPage(0);
+      await loadBooks();
+      showNotice(result.errors === 0 ? "success" : "warning", result.errors === 0
+        ? `Đã nhập ${result.imported} đầu sách`
+        : `${result.imported} nhập thành công, ${result.errors} lỗi`);
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Lỗi nhập kho");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleQuantitySave = async () => {
+    if (!selectedBook) return;
+    const borrowed = selectedBook.total_copies - selectedBook.available_copies;
+    if (editQuantity < borrowed) {
+      setQuantityError(`Tối thiểu ${borrowed} bản vì đang có ${borrowed} bản được mượn`);
+      return;
+    }
+    if (editQuantity < 1) {
+      setQuantityError("Số lượng phải lớn hơn 0");
+      return;
+    }
+    setSavingQuantity(true);
+    try {
+      const updated = await api.updateBookQuantity(selectedBook.id, editQuantity);
+      setBooks((prev) => prev.map((book) => book.id === updated.id ? updated : book));
+      setSearchResults((prev) => prev.map((book) => book.id === updated.id ? updated : book));
+      showNotice("success", `Đã cập nhật số lượng: ${updated.total_copies} bản`);
+      setSelectedBook(null);
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Cập nhật thất bại");
+    } finally {
+      setSavingQuantity(false);
+    }
+  };
+
+  const handlePrintBarcodes = async (bookId?: string) => {
+    try {
+      const barcodes = await api.getBarcodes(bookId);
+      if (barcodes.length === 0) {
+        showNotice("info", "Không tìm thấy mã vạch để in");
+        return;
+      }
+      setRecentlyPrinted(barcodes.map((item) => item.barcode));
+      showNotice("success", `${barcodes.length} mã vạch sẵn sàng in`);
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Không thể lấy mã vạch");
+    }
+  };
+
+  const handleIsbnImportComplete = (results: BookImportResultRow[]) => {
+    setIsbnScannerOpen(false);
+    setSearchQuery("");
+    setPage(0);
+    loadBooks();
+    const importedCount = results.filter((r) => r.status === "imported" || r.status === "updated").length;
+    const errorCount = results.filter((r) => r.status === "error").length;
+    if (errorCount === 0) {
+      showNotice("success", `Đã nhập ${importedCount} đầu sách từ ISBN`);
+    } else {
+      showNotice("warning", `${importedCount} thành công, ${errorCount} lỗi`);
+    }
+  };
+
+  const openQuantityDialog = (book: BookWithStats) => {
+    setSelectedBook(book);
+    setEditQuantity(book.total_copies);
+    setQuantityError("");
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (prev.size === displayBooks.length) return new Set();
+      return new Set(displayBooks.map((b) => b.id));
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      const result = await api.bulkDeleteBooks(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setDeleteConfirmOpen(false);
+      setDeleteInput("");
+      setPage(0);
+      await loadBooks();
+      if (result.errors.length === 0) {
+        showNotice("success", `Đã xóa ${result.deleted} cuốn sách`);
+      } else {
+        showNotice("warning", `Xóa ${result.deleted} thành công, ${result.errors.length} lỗi: ${result.errors.join("; ")}`);
+      }
+    } catch (err) {
+      showNotice("error", getErrorMessage(err) || "Xóa thất bại");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const stats = {
+    totalBooks: total,
+    totalCopies: books.reduce((sum, book) => sum + book.total_copies, 0),
+    availableCopies: books.reduce((sum, book) => sum + book.available_copies, 0),
+    borrowedCopies: books.reduce((sum, book) => sum + (book.total_copies - book.available_copies), 0),
+  };
+  const displayBooks = searchQuery.trim() ? searchResults : books;
+
+  return (
+    <Stack spacing={3}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
+        <MetricCard label="Tổng đầu sách" value={stats.totalBooks} icon={BookIcon} color={theme.palette.primary.main} description="Trong hệ thống" />
+        <MetricCard label="Tổng bản sao" value={stats.totalCopies} icon={InventoryIcon} color={theme.palette.info.main} description="Tất cả các bản" />
+        <MetricCard label="Sẵn sàng" value={stats.availableCopies} icon={CheckIcon} color={theme.palette.success.main} description="Có thể mượn" />
+        <MetricCard label="Đang được mượn" value={stats.borrowedCopies} icon={AlertIcon} color={theme.palette.warning.main} description="Đang lưu hành" />
+      </Box>
+
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ alignItems: { lg: "center" } }}>
+          <TextField
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Tìm kiếm sách theo ISBN, tên, tác giả..."
+            size="small"
+            fullWidth
+            slotProps={{
+              input: {
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                endAdornment: searchQuery ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchQuery("")}>{searching ? <CircularProgress size={16} /> : <CloseIcon fontSize="small" />}</IconButton>
+                  </InputAdornment>
+                ) : undefined,
+              },
+            }}
+          />
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
+            <Button variant="contained" startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Nhập Excel</Button>
+            <Button variant="contained" color="secondary" startIcon={<QrCodeScannerIcon />} onClick={() => setIsbnScannerOpen(true)}>Quét ISBN</Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => { setPage(0); setSearchQuery(""); loadBooks(); }}>Tải lại</Button>
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.downloadBookTemplate()}>Tải mẫu</Button>
+            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.exportBooks()}>Xuất Excel</Button>
+          </Stack>
+        </Stack>
+      </Paper>
+
+      {searchQuery.trim() ? (
+        <Alert
+          severity="info"
+          action={searchResults.length > 0 ? <Button color="inherit" size="small" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()}>In mã vạch</Button> : undefined}
+        >
+          Kết quả tìm kiếm: {searchResults.length} cuốn sách
+        </Alert>
+      ) : null}
+
+      {previewFile ? (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", gap: 1.5, mb: 2 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <FileIcon color="primary" />
+              <Box>
+                <Typography variant="h6">Xem trước: {previewFile.name}</Typography>
+                <Typography variant="body2" color="text.secondary">Kiểm tra dữ liệu trước khi nhập kho</Typography>
+              </Box>
+            </Stack>
+            <Button variant="text" color="inherit" onClick={() => { setPreviewFile(null); setPreviewData(null); setSelectedPreviewIndices(new Set()); }}>Hủy</Button>
+          </Stack>
+          {previewLoading ? (
+            <Box sx={{ py: 5, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+          ) : previewData?.length ? (
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
+                <Chip color="success" label={`${previewData.filter((row) => row.status !== "invalid").length} hàng hợp lệ`} />
+                <Chip color="error" label={`${previewData.filter((row) => row.status === "invalid").length} hàng lỗi`} />
+                {selectedPreviewIndices.size > 0 && (
+                  <Chip
+                    color="warning"
+                    label={`${selectedPreviewIndices.size} đã chọn`}
+                    onDelete={() => setSelectedPreviewIndices(new Set())}
+                    deleteIcon={<CloseIcon />}
+                    sx={{ ml: 1 }}
+                  />
+                )}
+                {selectedPreviewIndices.size > 0 && (
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    startIcon={<DeleteIcon />}
+                    onClick={() => setDeletePreviewOpen(true)}
+                    sx={{ ml: 1 }}
+                  >
+                    Xóa {selectedPreviewIndices.size} dòng
+                  </Button>
+                )}
+              </Stack>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow sx={{ "& > th": { bgcolor: theme.palette.mode === "dark" ? "#1a1a1a" : "#f5f5f5" } }}>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          indeterminate={selectedPreviewIndices.size > 0 && selectedPreviewIndices.size < (previewData?.filter(r => r.status !== "invalid").length ?? 0)}
+                          checked={!!previewData?.length && selectedPreviewIndices.size === previewData.filter(r => r.status !== "invalid").length}
+                          onChange={(_, checked) => {
+                            if (checked) {
+                              setSelectedPreviewIndices(new Set(previewData!.map((_, i) => i).filter(i => previewData![i].status !== "invalid")));
+                            } else {
+                              setSelectedPreviewIndices(new Set());
+                            }
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>ISBN</TableCell>
+                      <TableCell>Tên sách</TableCell>
+                      <TableCell>Tác giả</TableCell>
+                      <TableCell>NXB</TableCell>
+                      <TableCell>Số lượng</TableCell>
+                      <TableCell>Mã vạch mẫu</TableCell>
+                      <TableCell>Trạng thái</TableCell>
+                      <TableCell align="center">Xóa</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {previewData!.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={10} align="center" sx={{ py: 3, color: "text.secondary" }}>
+                          Không có dòng nào
+                        </TableCell>
+                      </TableRow>
+                    ) : previewData!.slice(0, 50).map((row, index) => {
+                      const isSelected = selectedPreviewIndices.has(index);
+                      const isInvalid = row.status === "invalid";
+                      return (
+                        <TableRow
+                          key={`${row.isbn}-${index}`}
+                          selected={isInvalid || isSelected}
+                          sx={{
+                            "&:hover .preview-delete-btn": { opacity: 1 },
+                            "& > td": { py: 0.5 },
+                            cursor: isInvalid ? "default" : "pointer",
+                          }}
+                        >
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              size="small"
+                              checked={isSelected}
+                              disabled={isInvalid}
+                              onChange={(_, checked) => {
+                                const newSet = new Set(selectedPreviewIndices);
+                                if (checked) newSet.add(index);
+                                else newSet.delete(index);
+                                setSelectedPreviewIndices(newSet);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: "monospace", py: 0.5 }}>{row.isbn || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}>{row.title || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}>{row.author || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}>{row.publisher || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}>{row.quantity}</TableCell>
+                          <TableCell sx={{ fontFamily: "monospace", py: 0.5 }}>{row.barcodes[0] || "-"}</TableCell>
+                          <TableCell sx={{ py: 0.5 }}><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
+                          <TableCell align="center" sx={{ py: 0.5 }}>
+                            <IconButton
+                              className="preview-delete-btn"
+                              size="small"
+                              sx={{ opacity: 0, transition: "opacity 0.15s" }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewData(previewData!.filter((_, i) => i !== index));
+                                setSelectedPreviewIndices(prev => {
+                                  const next = new Set<number>();
+                                  prev.forEach(v => { if (v < index) next.add(v); else if (v > index) next.add(v - 1); });
+                                  return next;
+                                });
+                                showNotice("info", "Đã xóa dòng");
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" color="error" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+                <Button variant="outlined" onClick={() => { setPreviewFile(null); setPreviewData(null); setSelectedPreviewIndices(new Set()); }}>Hủy</Button>
+                <Button variant="contained" startIcon={<CheckIcon />} onClick={handleImport} disabled={importing}>
+                  {importing ? "Đang nhập..." : "Xác nhận nhập kho"}
+                </Button>
+              </Stack>
+            </Stack>
+          ) : null}
+        </Paper>
+      ) : null}
+
+      {showResults && importResults ? (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6">Kết quả nhập kho</Typography>
+          <TableContainer component={Paper} variant="outlined" sx={{ mt: 2, maxHeight: 320 }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ISBN</TableCell>
+                  <TableCell>Tên sách</TableCell>
+                  <TableCell>Số lượng</TableCell>
+                  <TableCell>Barcode mẫu</TableCell>
+                  <TableCell>Trạng thái</TableCell>
+                  <TableCell>Thông báo</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {importResults.map((row, index) => (
+                  <TableRow key={`${row.isbn}-${index}`} selected={row.status === "error" || row.status === "warning"}>
+                    <TableCell sx={{ fontFamily: "monospace" }}>{row.isbn || "-"}</TableCell>
+                    <TableCell>{row.title || "-"}</TableCell>
+                    <TableCell>{row.quantity}</TableCell>
+                    <TableCell sx={{ fontFamily: "monospace" }}>{row.barcodes[0] || "-"}</TableCell>
+                    <TableCell><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
+                    <TableCell>{row.message || "-"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {importResults.some((row) => row.status === "imported" || row.status === "warning") ? (
+            <Button sx={{ mt: 2 }} variant="outlined" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()}>
+              In mã vạch vừa tạo
+            </Button>
+          ) : null}
+        </Paper>
+      ) : null}
+
+      {recentlyPrinted.length > 0 ? (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6">Mã vạch sẵn sàng in ({recentlyPrinted.length})</Typography>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", mt: 2 }}>
+            {recentlyPrinted.map((barcode) => <Chip key={barcode} label={barcode} sx={{ fontFamily: "monospace" }} />)}
+          </Stack>
+        </Paper>
+      ) : null}
+
+      <Paper variant="outlined">
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    size="small"
+                    checked={displayBooks.length > 0 && selectedIds.size === displayBooks.length}
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < displayBooks.length}
+                    onChange={handleToggleSelectAll}
+                  />
+                </TableCell>
+                <TableCell>ISBN</TableCell>
+                <TableCell>Tiêu đề</TableCell>
+                <TableCell>Tác giả</TableCell>
+                <TableCell>NXB</TableCell>
+                <TableCell align="center">Tổng</TableCell>
+                <TableCell align="center">Sẵn sàng</TableCell>
+                <TableCell align="center">Mượn</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
+                </TableRow>
+              ) : displayBooks.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                    <Typography color="text.secondary">{searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : displayBooks.map((book) => {
+                const isSelected = selectedIds.has(book.id);
+                const hasBorrowed = book.total_copies - book.available_copies > 0;
+                return (
+                <TableRow
+                  key={book.id}
+                  hover
+                  selected={isSelected}
+                  sx={{
+                    cursor: "pointer",
+                    borderLeft: isSelected ? "3px solid" : "3px solid transparent",
+                    borderColor: "warning.main",
+                    bgcolor: isSelected ? "rgba(255, 183, 77, 0.08)" : undefined,
+                  }}
+                  onClick={() => router.push(`/books/${book.id}`)}
+                >
+                  <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      size="small"
+                      checked={isSelected}
+                      onChange={() => handleToggleSelect(book.id)}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontFamily: "monospace", color: "primary.main" }}>{book.isbn}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                      {book.cover_url ? (
+                        <Box component="img" src={book.cover_url} alt={book.title} sx={{ width: 34, height: 44, objectFit: "cover", borderRadius: 1, border: 1, borderColor: "divider" }} />
+                      ) : (
+                        <Avatar variant="rounded" sx={{ width: 34, height: 44, bgcolor: "background.default" }}><BookIcon fontSize="small" /></Avatar>
+                      )}
+                      <Typography variant="body2" sx={{ fontWeight: 800 }}>{book.title}</Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell>{book.author || "-"}</TableCell>
+                  <TableCell>{book.publisher || "-"}</TableCell>
+                  <TableCell align="center">{book.total_copies}</TableCell>
+                  <TableCell align="center"><Chip size="small" color={book.available_copies > 0 ? "success" : "error"} label={book.available_copies} /></TableCell>
+                  <TableCell align="center">{book.total_copies - book.available_copies}</TableCell>
+                </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {!searchQuery && total > limit ? (
+          <>
+            <Divider />
+            <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", p: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                Hiển thị {page * limit + 1}-{Math.min((page + 1) * limit, total)} / {total} đầu sách
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button size="small" variant="outlined" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Trước</Button>
+                <Button size="small" variant="outlined" disabled={(page + 1) * limit >= total} onClick={() => setPage((value) => value + 1)}>Sau</Button>
+              </Stack>
+            </Stack>
+          </>
+        ) : null}
+      </Paper>
+
+      <Dialog open={!!selectedBook} onClose={() => setSelectedBook(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Sửa số lượng sách</DialogTitle>
+        <DialogContent>
+          {selectedBook ? (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                {selectedBook.cover_url ? (
+                  <Box component="img" src={selectedBook.cover_url} alt={selectedBook.title} sx={{ width: 48, height: 64, objectFit: "cover", borderRadius: 1 }} />
+                ) : <Avatar variant="rounded"><BookIcon /></Avatar>}
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 900 }} noWrap>{selectedBook.title}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>ISBN: {selectedBook.isbn}</Typography>
+                </Box>
+              </Stack>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
+                <Alert severity="info">Tổng: {selectedBook.total_copies}</Alert>
+                <Alert severity="success">Sẵn sàng: {selectedBook.available_copies}</Alert>
+                <Alert severity="warning">Đang mượn: {selectedBook.total_copies - selectedBook.available_copies}</Alert>
+              </Box>
+              {(selectedBook.publisher || selectedBook.published_date || selectedBook.categories || selectedBook.page_count) && (
+                <Box sx={{ p: 1.5, bgcolor: "grey.900", borderRadius: 1 }}>
+                  {selectedBook.publisher && <Typography variant="body2"><strong>NXB:</strong> {selectedBook.publisher}</Typography>}
+                  {selectedBook.published_date && <Typography variant="body2"><strong>Năm XB:</strong> {selectedBook.published_date}</Typography>}
+                  {selectedBook.categories && <Typography variant="body2"><strong>Thể loại:</strong> {selectedBook.categories}</Typography>}
+                  {selectedBook.page_count && <Typography variant="body2"><strong>Số trang:</strong> {selectedBook.page_count}</Typography>}
+                  {selectedBook.average_rating && <Typography variant="body2"><strong>Đánh giá:</strong> {selectedBook.average_rating}/5</Typography>}
+                  {selectedBook.language && <Typography variant="body2"><strong>Ngôn ngữ:</strong> {selectedBook.language}</Typography>}
+                </Box>
+              )}
+              {selectedBook.description && (
+                <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {selectedBook.description}
+                </Typography>
+              )}
+              <TextField
+                label="Số lượng mới"
+                type="number"
+                value={editQuantity}
+                onChange={(event) => { setEditQuantity(Number(event.target.value) || 0); setQuantityError(""); }}
+                error={!!quantityError}
+                helperText={quantityError || "Số lượng không được nhỏ hơn số bản đang mượn"}
+                fullWidth
+                slotProps={{ htmlInput: { min: 1 } }}
+              />
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedBook(null)}>Hủy</Button>
+          <Button variant="contained" onClick={handleQuantitySave} disabled={savingQuantity}>{savingQuantity ? "Đang lưu..." : "Lưu thay đổi"}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
+        {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
+      </Snackbar>
+
+      <IsbnScannerDialog
+        open={isbnScannerOpen}
+        onClose={() => setIsbnScannerOpen(false)}
+        onImportComplete={handleIsbnImportComplete}
+      />
+
+      <Fade in={selectedIds.size > 0}>
+        <Paper
+          elevation={8}
+          sx={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1300,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            px: 3,
+            py: 1.5,
+            borderRadius: 3,
+            background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+            border: "1px solid",
+            borderColor: "warning.main",
+            boxShadow: "0 8px 32px rgba(255, 183, 77, 0.2)",
+          }}
+        >
+          <Chip
+            label={`${selectedIds.size} đã chọn`}
+            color="warning"
+            size="small"
+            sx={{ fontWeight: 700 }}
+          />
+          <Button
+            size="small"
+            variant="text"
+            color="inherit"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Bỏ chọn
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => {
+              setDeleteInput("");
+              setDeleteConfirmOpen(true);
+            }}
+          >
+            Xóa
+          </Button>
+        </Paper>
+      </Fade>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AlertIcon sx={{ color: "warning.main" }} />
+          Xóa {selectedIds.size} cuốn sách?
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Sách sẽ bị xóa vĩnh viễn cùng tất cả bản sao:
+            </Typography>
+            <Box sx={{ maxHeight: 200, overflow: "auto", p: 1, bgcolor: "grey.900", borderRadius: 1 }}>
+              {displayBooks.filter((b) => selectedIds.has(b.id)).map((book) => (
+                <Stack key={book.id} direction="row" spacing={1} sx={{ py: 0.5, alignItems: "center" }}>
+                  {book.total_copies - book.available_copies > 0 && <LockIcon fontSize="small" sx={{ color: "error.main" }} />}
+                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary", minWidth: 120 }}>
+                    {book.isbn}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
+                    {book.title}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {book.total_copies} bản
+                  </Typography>
+                </Stack>
+              ))}
+            </Box>
+            {displayBooks.filter((b) => selectedIds.has(b.id) && b.total_copies - b.available_copies > 0).length > 0 && (
+              <Alert severity="error">
+                Một số sách đang được mượn và sẽ không thể xóa. Hệ thống sẽ bỏ qua chúng.
+              </Alert>
+            )}
+            <TextField
+              label='Nhập "XÓA" để xác nhận'
+              value={deleteInput}
+              onChange={(e) => setDeleteInput(e.target.value)}
+              fullWidth
+              size="small"
+              autoFocus
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }}>Hủy</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={!deleteConfirmed || deleting}
+            onClick={handleBulkDelete}
+            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+          >
+            {deleting ? "Đang xóa..." : "Xóa vĩnh viễn"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deletePreviewOpen} onClose={() => setDeletePreviewOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AlertIcon sx={{ color: "warning.main" }} />
+          Xóa {selectedPreviewIndices.size} dòng khỏi danh sách?
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Các dòng sau sẽ bị xóa khỏi danh sách trước khi nhập:
+            </Typography>
+            <Box sx={{ maxHeight: 200, overflow: "auto", p: 1, bgcolor: "grey.900", borderRadius: 1 }}>
+              {previewData?.filter((_, i) => selectedPreviewIndices.has(i)).slice(0, 10).map((row, idx) => (
+                <Stack key={idx} direction="row" spacing={1} sx={{ py: 0.5, alignItems: "center" }}>
+                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary", minWidth: 130 }}>
+                    {row.isbn}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
+                    {row.title || "Không có tên"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    SL: {row.quantity}
+                  </Typography>
+                </Stack>
+              ))}
+              {selectedPreviewIndices.size > 10 && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, textAlign: "center" }}>
+                  ... và {selectedPreviewIndices.size - 10} dòng khác
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletePreviewOpen(false)}>Hủy</Button>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => {
+              setPreviewData(previewData!.filter((_, i) => !selectedPreviewIndices.has(i)));
+              setSelectedPreviewIndices(new Set());
+              setDeletePreviewOpen(false);
+              showNotice("info", `Đã xóa ${selectedPreviewIndices.size} dòng`);
+            }}
+          >
+            Xóa {selectedPreviewIndices.size} dòng
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Stack>
+  );
+}
 </file>
 
 <file path="src/app/(dashboard)/dashboard/page.tsx">
@@ -10854,6 +11472,339 @@ export default function LivenessPage() {
 }
 </file>
 
+<file path="src/lib/auth-context.tsx">
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
+import { useRouter } from "next/navigation";
+import api from "./api-client";
+import type { AuthContextType, AuthUser, LoginRequest } from "./types";
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function assertWebRole(role: string) {
+  if (role !== "admin" && role !== "staff") {
+    throw new Error("Web quản trị chỉ dành cho admin hoặc staff. Độc giả vui lòng đăng nhập trên ứng dụng mobile.");
+  }
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadUserFromStorage = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const storedToken = localStorage.getItem("access_token");
+    const storedUser = localStorage.getItem("user");
+
+    if (storedToken && storedUser) {
+      try {
+        setAccessToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadUserFromStorage();
+  }, [loadUserFromStorage]);
+
+  const setTokenCookie = (token: string) => {
+    document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=lax`;
+  };
+
+  const clearTokenCookie = () => {
+    document.cookie = "access_token=; path=/; max-age=0";
+  };
+
+  const login = async (email: string, password: string) => {
+    const data: LoginRequest = { email, password };
+    const response = await api.login(data);
+    if (!response.access_token) {
+      throw new Error("Backend did not return access_token");
+    }
+
+    localStorage.setItem("access_token", response.access_token);
+    setTokenCookie(response.access_token);
+    if (response.refresh_token) {
+      localStorage.setItem("refresh_token", response.refresh_token);
+    }
+    setAccessToken(response.access_token);
+
+    const payload = decodeJwtPayload(response.access_token);
+    const userData: AuthUser = {
+      id: (payload?.sub as string) || "",
+      email,
+      role: ((payload?.roles as string[])?.[0]) || "user",
+      full_name: (payload?.full_name as string) || null,
+    };
+    assertWebRole(userData.role);
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
+
+    router.push("/dashboard");
+  };
+
+  const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
+    localStorage.setItem("access_token", accessToken);
+    setTokenCookie(accessToken);
+    if (refreshToken) {
+      localStorage.setItem("refresh_token", refreshToken);
+    }
+
+    // Decode JWT to get user id and role if not provided
+    const payload = decodeJwtPayload(accessToken);
+    const userId = (payload?.sub as string) || "";
+    const userRole = role || ((payload?.roles as string[])?.[0]) || "user";
+    assertWebRole(userRole);
+
+    const userData: AuthUser = { id: userId, email, role: userRole, full_name: (payload?.full_name as string) || null };
+    localStorage.setItem("user", JSON.stringify(userData));
+    setAccessToken(accessToken);
+    setUser(userData);
+  };
+
+  const logout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
+    clearTokenCookie();
+    setUser(null);
+    setAccessToken(null);
+    router.push("/login");
+  };
+
+  const refreshAccessToken = async (): Promise<boolean> => {
+    try {
+      const refreshToken = localStorage.getItem("refresh_token");
+      if (!refreshToken) return false;
+
+      const { access_token } = await api.refreshAuthToken(refreshToken);
+      if (access_token) {
+        localStorage.setItem("access_token", access_token);
+        setTokenCookie(access_token);
+        setAccessToken(access_token);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        accessToken,
+        login,
+        setAuthFromToken,
+        logout,
+        refreshAccessToken,
+        isAuthenticated: !!user && !!accessToken,
+        isLoading,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
+</file>
+
+<file path="src/app/(dashboard)/enroll/page.tsx">
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Divider,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
+import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
+import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
+import api, { getErrorMessage } from "@/lib/api-client";
+import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
+
+export default function EnrollPage() {
+  const [consent, setConsent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState("");
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
+
+  const pollForResult = async (taskId: string) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const data = await api.getTaskStatus(taskId);
+        if (data.status === "SUCCESS") {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          const inner = data.result;
+          if (inner?.status === "error") setError(inner.error || "Đăng ký thất bại.");
+          setResult(inner);
+          setIsLoading(false);
+        } else if (data.status === "FAILURE") {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          setError(data.result?.error || "Đăng ký thất bại.");
+          setResult(data.result);
+          setIsLoading(false);
+        }
+      } catch {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        setError("Không thể lấy trạng thái tác vụ.");
+        setIsLoading(false);
+      }
+    }, 2000);
+  };
+
+  const handleFilesReady = async (files: Record<CaptureAngle, File>) => {
+    setError("");
+    setIsLoading(true);
+    setJobId(null);
+    setResult(null);
+    try {
+      const data = await api.enrollBatch(files, consent);
+      setJobId(data.job_id);
+      await pollForResult(data.job_id);
+    } catch (err: any) {
+      setError(getErrorMessage(err) || "Đăng ký nhiều góc thất bại.");
+      setIsLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setConsent(false);
+    setJobId(null);
+    setResult(null);
+    setError("");
+    setIsLoading(false);
+  };
+
+  const failedCount = result?.results?.filter((item: any) => item.status !== "success").length || 0;
+  const success = result && result.status !== "error";
+
+  return (
+    <Stack spacing={3} sx={{ maxWidth: 920, mx: "auto" }}>
+      <Paper variant="outlined" sx={{ p: 3 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+          <FaceRetouchingNaturalOutlinedIcon color="primary" />
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 850 }}>Đăng ký khuôn mặt</Typography>
+            <Typography color="text.secondary">Chụp đủ 4 góc để hệ thống tạo hồ sơ nhận diện ổn định hơn.</Typography>
+          </Box>
+        </Stack>
+      </Paper>
+
+      {error && <Alert icon={<ErrorOutlineOutlinedIcon />} severity="error">{error}</Alert>}
+
+      {result ? (
+        <Card variant="outlined">
+          <CardContent>
+            <Stack spacing={2.5}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                {success ? <CheckCircleOutlineOutlinedIcon color="success" sx={{ fontSize: 44 }} /> : <ErrorOutlineOutlinedIcon color="error" sx={{ fontSize: 44 }} />}
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 850 }}>
+                    {success ? "Đăng ký thành công" : "Đăng ký thất bại một phần"}
+                  </Typography>
+                  <Typography color="text.secondary">
+                    {success ? "Khuôn mặt đã được ghi nhận vào hệ thống." : `${failedCount} góc ảnh chưa đạt yêu cầu.`}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              {result.results && (
+                <>
+                  <Divider />
+                  <Stack spacing={1}>
+                    <Typography variant="overline" color="text.secondary">Kết quả từng góc</Typography>
+                    {result.results.map((item: any, index: number) => (
+                      <Stack key={`${item.angle}-${index}`} direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <Typography sx={{ textTransform: "capitalize" }}>{item.angle}</Typography>
+                        <Chip size="small" color={item.status === "success" ? "success" : "error"} label={item.status === "success" ? "Thành công" : "Thất bại"} />
+                      </Stack>
+                    ))}
+                  </Stack>
+                </>
+              )}
+
+              <Button variant="contained" startIcon={<RestartAltOutlinedIcon />} onClick={handleReset} sx={{ alignSelf: "flex-start" }}>
+                {success ? "Đăng ký thêm" : "Thử lại"}
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      ) : jobId ? (
+        <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
+          <CircularProgress />
+          <Typography variant="h6" sx={{ mt: 2, fontWeight: 800 }}>Đang xử lý...</Typography>
+          <Typography color="text.secondary" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>Job ID: {jobId}</Typography>
+        </Paper>
+      ) : (
+        <Paper variant="outlined" sx={{ p: 2.5 }}>
+          <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleFilesReady} />
+          {isLoading && <Alert severity="info" sx={{ mt: 2 }}>Đang gửi dữ liệu đăng ký...</Alert>}
+        </Paper>
+      )}
+    </Stack>
+  );
+}
+</file>
+
 <file path="src/app/(dashboard)/patrons/page.tsx">
 "use client";
 
@@ -11393,339 +12344,6 @@ export default function PatronsPage() {
       <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
         {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
       </Snackbar>
-    </Stack>
-  );
-}
-</file>
-
-<file path="src/lib/auth-context.tsx">
-"use client";
-
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
-import { useRouter } from "next/navigation";
-import api from "./api-client";
-import type { AuthContextType, AuthUser, LoginRequest } from "./types";
-
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-function assertWebRole(role: string) {
-  if (role !== "admin" && role !== "staff") {
-    throw new Error("Web quản trị chỉ dành cho admin hoặc staff. Độc giả vui lòng đăng nhập trên ứng dụng mobile.");
-  }
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadUserFromStorage = useCallback(() => {
-    if (typeof window === "undefined") return;
-
-    const storedToken = localStorage.getItem("access_token");
-    const storedUser = localStorage.getItem("user");
-
-    if (storedToken && storedUser) {
-      try {
-        setAccessToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
-      }
-    }
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    loadUserFromStorage();
-  }, [loadUserFromStorage]);
-
-  const setTokenCookie = (token: string) => {
-    document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=lax`;
-  };
-
-  const clearTokenCookie = () => {
-    document.cookie = "access_token=; path=/; max-age=0";
-  };
-
-  const login = async (email: string, password: string) => {
-    const data: LoginRequest = { email, password };
-    const response = await api.login(data);
-    if (!response.access_token) {
-      throw new Error("Backend did not return access_token");
-    }
-
-    localStorage.setItem("access_token", response.access_token);
-    setTokenCookie(response.access_token);
-    if (response.refresh_token) {
-      localStorage.setItem("refresh_token", response.refresh_token);
-    }
-    setAccessToken(response.access_token);
-
-    const payload = decodeJwtPayload(response.access_token);
-    const userData: AuthUser = {
-      id: (payload?.sub as string) || "",
-      email,
-      role: ((payload?.roles as string[])?.[0]) || "user",
-      full_name: (payload?.full_name as string) || null,
-    };
-    assertWebRole(userData.role);
-    localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
-
-    router.push("/dashboard");
-  };
-
-  const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
-    localStorage.setItem("access_token", accessToken);
-    setTokenCookie(accessToken);
-    if (refreshToken) {
-      localStorage.setItem("refresh_token", refreshToken);
-    }
-
-    // Decode JWT to get user id and role if not provided
-    const payload = decodeJwtPayload(accessToken);
-    const userId = (payload?.sub as string) || "";
-    const userRole = role || ((payload?.roles as string[])?.[0]) || "user";
-    assertWebRole(userRole);
-
-    const userData: AuthUser = { id: userId, email, role: userRole, full_name: (payload?.full_name as string) || null };
-    localStorage.setItem("user", JSON.stringify(userData));
-    setAccessToken(accessToken);
-    setUser(userData);
-  };
-
-  const logout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
-    clearTokenCookie();
-    setUser(null);
-    setAccessToken(null);
-    router.push("/login");
-  };
-
-  const refreshAccessToken = async (): Promise<boolean> => {
-    try {
-      const refreshToken = localStorage.getItem("refresh_token");
-      if (!refreshToken) return false;
-
-      const { access_token } = await api.refreshAuthToken(refreshToken);
-      if (access_token) {
-        localStorage.setItem("access_token", access_token);
-        setTokenCookie(access_token);
-        setAccessToken(access_token);
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        accessToken,
-        login,
-        setAuthFromToken,
-        logout,
-        refreshAccessToken,
-        isAuthenticated: !!user && !!accessToken,
-        isLoading,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
-</file>
-
-<file path="src/app/(dashboard)/enroll/page.tsx">
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
-  Divider,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
-import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
-import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
-import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
-import api, { getErrorMessage } from "@/lib/api-client";
-import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
-
-export default function EnrollPage() {
-  const [consent, setConsent] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState("");
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, []);
-
-  const pollForResult = async (taskId: string) => {
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    pollIntervalRef.current = setInterval(async () => {
-      try {
-        const data = await api.getTaskStatus(taskId);
-        if (data.status === "SUCCESS") {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          const inner = data.result;
-          if (inner?.status === "error") setError(inner.error || "Đăng ký thất bại.");
-          setResult(inner);
-          setIsLoading(false);
-        } else if (data.status === "FAILURE") {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          setError(data.result?.error || "Đăng ký thất bại.");
-          setResult(data.result);
-          setIsLoading(false);
-        }
-      } catch {
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        setError("Không thể lấy trạng thái tác vụ.");
-        setIsLoading(false);
-      }
-    }, 2000);
-  };
-
-  const handleFilesReady = async (files: Record<CaptureAngle, File>) => {
-    setError("");
-    setIsLoading(true);
-    setJobId(null);
-    setResult(null);
-    try {
-      const data = await api.enrollBatch(files, consent);
-      setJobId(data.job_id);
-      await pollForResult(data.job_id);
-    } catch (err: any) {
-      setError(getErrorMessage(err) || "Đăng ký nhiều góc thất bại.");
-      setIsLoading(false);
-    }
-  };
-
-  const handleReset = () => {
-    setConsent(false);
-    setJobId(null);
-    setResult(null);
-    setError("");
-    setIsLoading(false);
-  };
-
-  const failedCount = result?.results?.filter((item: any) => item.status !== "success").length || 0;
-  const success = result && result.status !== "error";
-
-  return (
-    <Stack spacing={3} sx={{ maxWidth: 920, mx: "auto" }}>
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-          <FaceRetouchingNaturalOutlinedIcon color="primary" />
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 850 }}>Đăng ký khuôn mặt</Typography>
-            <Typography color="text.secondary">Chụp đủ 4 góc để hệ thống tạo hồ sơ nhận diện ổn định hơn.</Typography>
-          </Box>
-        </Stack>
-      </Paper>
-
-      {error && <Alert icon={<ErrorOutlineOutlinedIcon />} severity="error">{error}</Alert>}
-
-      {result ? (
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={2.5}>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                {success ? <CheckCircleOutlineOutlinedIcon color="success" sx={{ fontSize: 44 }} /> : <ErrorOutlineOutlinedIcon color="error" sx={{ fontSize: 44 }} />}
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 850 }}>
-                    {success ? "Đăng ký thành công" : "Đăng ký thất bại một phần"}
-                  </Typography>
-                  <Typography color="text.secondary">
-                    {success ? "Khuôn mặt đã được ghi nhận vào hệ thống." : `${failedCount} góc ảnh chưa đạt yêu cầu.`}
-                  </Typography>
-                </Box>
-              </Stack>
-
-              {result.results && (
-                <>
-                  <Divider />
-                  <Stack spacing={1}>
-                    <Typography variant="overline" color="text.secondary">Kết quả từng góc</Typography>
-                    {result.results.map((item: any, index: number) => (
-                      <Stack key={`${item.angle}-${index}`} direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                        <Typography sx={{ textTransform: "capitalize" }}>{item.angle}</Typography>
-                        <Chip size="small" color={item.status === "success" ? "success" : "error"} label={item.status === "success" ? "Thành công" : "Thất bại"} />
-                      </Stack>
-                    ))}
-                  </Stack>
-                </>
-              )}
-
-              <Button variant="contained" startIcon={<RestartAltOutlinedIcon />} onClick={handleReset} sx={{ alignSelf: "flex-start" }}>
-                {success ? "Đăng ký thêm" : "Thử lại"}
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      ) : jobId ? (
-        <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
-          <CircularProgress />
-          <Typography variant="h6" sx={{ mt: 2, fontWeight: 800 }}>Đang xử lý...</Typography>
-          <Typography color="text.secondary" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>Job ID: {jobId}</Typography>
-        </Paper>
-      ) : (
-        <Paper variant="outlined" sx={{ p: 2.5 }}>
-          <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleFilesReady} />
-          {isLoading && <Alert severity="info" sx={{ mt: 2 }}>Đang gửi dữ liệu đăng ký...</Alert>}
-        </Paper>
-      )}
     </Stack>
   );
 }
@@ -14589,9 +15207,11 @@ export interface BookWithStats {
   isbn10: string | null;
   isbn13: string | null;
   shelf_location: string | null;
+  is_available: boolean;
   total_copies: number;
   available_copies: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface BooksListResponse {
@@ -14620,6 +15240,11 @@ export interface BookImportPreviewRow {
   page_count: number | null;
   categories: string | null;
   cover_url: string | null;
+  description: string | null;
+  average_rating: number | null;
+  language: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
   barcodes: string[];
   status: string;
   message: string | null;
@@ -15573,6 +16198,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getBookById(bookId: string): Promise<BookWithStats> {
+    const response = await this.client.get<BookWithStats>(`/api/borrow/books/${bookId}`);
+    return response.data;
+  }
+
   async searchBooks(q: string): Promise<BookWithStats[]> {
     const response = await this.client.get<BookWithStats[]>("/api/borrow/books/search", { params: { q } });
     return response.data;
@@ -15593,6 +16223,22 @@ class ApiClient {
     const response = await this.client.post<BookImportResponse>("/api/borrow/books/import", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
+    return response.data;
+  }
+
+  async importBooksFiltered(rows: Array<{
+    isbn: string;
+    quantity: number;
+    title: string | null;
+    subtitle: string | null;
+    author: string | null;
+    publisher: string | null;
+    published_date: string | null;
+    page_count: number | null;
+    categories: string | null;
+    cover_url: string | null;
+  }>): Promise<BookImportResponse> {
+    const response = await this.client.post<BookImportResponse>("/api/borrow/books/import/filtered", { rows });
     return response.data;
   }
 
@@ -15636,7 +16282,7 @@ class ApiClient {
   }
 
   async bulkDeleteBooks(bookIds: string[]): Promise<{ deleted: number; errors: string[]; success: boolean }> {
-    const response = await this.client.delete<{ deleted: number; errors: string[]; success: boolean }>("/api/borrow/books", { data: { book_ids: bookIds } });
+    const response = await this.client.post<{ deleted: number; errors: string[]; success: boolean }>("/api/borrow/books/delete", { book_ids: bookIds });
     return response.data;
   }
 

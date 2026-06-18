@@ -23,14 +23,21 @@ import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import ErrorIcon from "@mui/icons-material/ReportOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
 
 interface ScannedBorrowItem {
+  barcode: string;
   isbn: string;
-  lookup: BookWithStats | null;
   loading: boolean;
+  can_borrow: boolean;
+  reason: string | null;
+  book: BookWithStats | null;
+  copy_id: string | null;
+  book_id: string | null;
+  copy_barcode: string | null;
 }
 
 export default function BorrowScannerDialog({
@@ -53,9 +60,10 @@ export default function BorrowScannerDialog({
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
-  const [creating, setCreating] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
   const [createError, setCreateError] = useState("");
   const [scanToast, setScanToast] = useState("");
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   const stopCamera = useCallback(() => {
     if (readerRef.current) {
@@ -70,20 +78,45 @@ export default function BorrowScannerDialog({
     setCameraReady(false);
   }, []);
 
-  const lookupIsbn = useCallback(async (isbn: string) => {
+  const lookupItem = useCallback(async (barcode: string, isbn: string) => {
     setScanned((prev) => prev.map((item) =>
-      item.isbn === isbn ? { ...item, loading: true } : item
+      item.barcode === barcode ? { ...item, loading: true } : item
     ));
     try {
-      const book = await api.lookupBookByIsbn(isbn);
-      setScanned((prev) => prev.map((item) =>
-        item.isbn === isbn ? { ...item, lookup: book, loading: false } : item
+      const result = await api.lookupBorrowSlip({
+        patron_id: patronId,
+        items: [{ barcode, isbn }],
+      });
+      const item = result.items.find((i) => i.barcode === barcode);
+      if (!item) {
+        setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
+        setLookupError(`Sách ISBN ${barcode} không tồn tại trong thư viện`);
+        return;
+      }
+      if (!item.can_borrow) {
+        setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
+        const msg = item.reason || 'Sách không thể mượn';
+        const title = item.book?.title || '';
+        setLookupError(title ? `"${title}": ${msg}` : `${msg} (ISBN: ${barcode})`);
+        return;
+      }
+      setScanned((prev) => prev.map((i) =>
+        i.barcode === barcode ? {
+          ...i,
+          loading: false,
+          can_borrow: item.can_borrow,
+          reason: item.reason,
+          book: item.book,
+          copy_id: item.copy?.id || null,
+          book_id: item.book?.id || null,
+          copy_barcode: item.copy?.barcode || null,
+        } : i
       ));
     } catch {
-      setScanned((prev) => prev.filter((item) => item.isbn !== isbn));
-      setScanToast(`Không tìm thấy sách: ${isbn}`);
+      setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
+      setLookupError(`Lỗi tra cứu: ${barcode}`);
     }
-  }, []);
+  }, [patronId]);
 
   const addScanned = useCallback((isbn: string) => {
     if (!/^\d{10,13}$/.test(isbn.replace(/-/g, ""))) return;
@@ -91,7 +124,7 @@ export default function BorrowScannerDialog({
     lastScannedRef.current = normalized;
     setScanToast(normalized);
     setScanned((prev) => {
-      if (prev.some((item) => item.isbn === normalized)) {
+      if (prev.some((item) => item.barcode === normalized)) {
         setScanToast(`Sách ${normalized} đã có trong danh sách`);
         return prev;
       }
@@ -99,10 +132,20 @@ export default function BorrowScannerDialog({
         setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
         return prev;
       }
-      return [...prev, { isbn: normalized, lookup: null, loading: true }];
+      return [...prev, {
+        barcode: normalized,
+        isbn: normalized,
+        loading: true,
+        can_borrow: false,
+        reason: null,
+        book: null,
+        copy_id: null,
+        book_id: null,
+        copy_barcode: null,
+      }];
     });
-    lookupIsbn(normalized);
-  }, [lookupIsbn, maxItems]);
+    lookupItem(normalized, normalized);
+  }, [lookupItem, maxItems]);
 
   useEffect(() => {
     if (!open) {
@@ -165,89 +208,85 @@ export default function BorrowScannerDialog({
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const removeItem = (isbn: string) => {
-    setScanned((prev) => prev.filter((item) => item.isbn !== isbn));
+  const removeItem = (barcode: string) => {
+    setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
   };
 
   const handleCreateSlip = async () => {
-    const valid = scanned.filter((item) => item.lookup);
-    if (!valid.length || !patronId) return;
-    setCreating(true);
+    const validItems = scanned.filter((item) => item.can_borrow && item.book_id && item.copy_id);
+    if (!validItems.length || !patronId) return;
     setCreateError("");
     try {
-      const items = valid.map((item) => ({ barcode: item.isbn, isbn: item.isbn }));
-      const result = await api.createBorrowSlip({ patron_id: patronId, items });
-      if (result.status === "success") {
+      const confirmResult = await api.confirmBorrowSlip({
+        patron_id: patronId,
+        items: validItems.map((item) => ({
+          barcode: item.copy_barcode || item.barcode,
+          isbn: item.isbn,
+          book_id: item.book_id!,
+          copy_id: item.copy_id!,
+        })),
+      });
+      if (confirmResult.status === "success") {
         stopCamera();
         setScanned([]);
-        onSuccess(result.message);
+        onSuccess(confirmResult.message);
         onClose();
       }
     } catch (err) {
       const detail = getErrorMessage(err);
-      const removedIsbns: string[] = [];
+      const removedBarcodes: string[] = [];
       const toastMsg = detail;
-      setScanned((prev) => {
-        const matchTitle = detail.match(/^Sach "(.+)" da duoc doc gia nay muon$/);
-        if (matchTitle) {
-          const title = matchTitle[1];
+
+      const matchTitle = detail.match(/^Sach "(.+)" da duoc doc gia nay muon$/);
+      if (matchTitle) {
+        const title = matchTitle[1];
+        setScanned((prev) => {
           const filtered = prev.filter((item) => {
-            if (item.lookup?.title === title) {
-              removedIsbns.push(item.isbn);
+            if (item.book?.title === title) {
+              removedBarcodes.push(item.barcode);
               return false;
             }
             return true;
           });
           return filtered;
-        }
-        const matchBarcode = detail.match(/^(?:Ma vach|Ban sao) ([^\s]+) (?:da duoc quet trong phieu muon nay|dang duoc muon)$/);
+        });
+      } else {
+        const matchBarcode = detail.match(/^(?:Ban sao|Ma vach) ([^\s]+) (?:dang duoc muon|khong ton tai)/);
         if (matchBarcode) {
           const barcode = matchBarcode[1];
-          const filtered = prev.filter((item) => {
-            if (item.isbn === barcode) {
-              removedIsbns.push(item.isbn);
-              return false;
-            }
-            return true;
+          setScanned((prev) => {
+            const filtered = prev.filter((item) => {
+              if (item.barcode === barcode || item.barcode.includes(barcode)) {
+                removedBarcodes.push(item.barcode);
+                return false;
+              }
+              return true;
+            });
+            return filtered;
           });
-          return filtered;
+        } else {
+          setCreateError(detail);
         }
-        const matchUnavailable = detail.match(/^Sach "(.+)" da het ban co the muon$/);
-        if (matchUnavailable) {
-          const title = matchUnavailable[1];
-          const filtered = prev.filter((item) => {
-            if (item.lookup?.title === title) {
-              removedIsbns.push(item.isbn);
-              return false;
-            }
-            return true;
-          });
-          return filtered;
-        }
-        return prev;
-      });
-      if (removedIsbns.length > 0) {
-        setScanToast(toastMsg);
-      } else {
-        setCreateError(detail);
       }
-    } finally {
-      setCreating(false);
+      if (removedBarcodes.length > 0) {
+        setScanToast(toastMsg);
+      }
     }
   };
 
-  const validCount = scanned.filter((item) => item.lookup).length;
+  const validCount = scanned.filter((item) => item.can_borrow).length;
+  const totalScanned = scanned.length;
 
   return (
     <>
-      <Dialog open={open} onClose={creating ? undefined : onClose} fullWidth maxWidth="xl">
+      <Dialog open={open} onClose={lookingUp ? undefined : onClose} fullWidth maxWidth="xl">
         <DialogTitle>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
               <QrCodeScannerIcon color="primary" />
               <Typography variant="h6" sx={{ fontWeight: 900 }}>Quét ISBN sách</Typography>
             </Stack>
-            {!creating && (
+            {!lookingUp && (
               <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
             )}
           </Stack>
@@ -297,7 +336,7 @@ export default function BorrowScannerDialog({
               <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                 <QrCodeScannerIcon color="primary" sx={{ fontSize: 20 }} />
                 <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
-                  {scanned.length > 0 ? `Đã quét (${scanned.length} cuốn)` : "Sách đã quét"}
+                  {totalScanned > 0 ? `Đã quét (${totalScanned} cuốn)` : "Sách đã quét"}
                 </Typography>
               </Stack>
 
@@ -309,52 +348,68 @@ export default function BorrowScannerDialog({
                 </Alert>
               ) : (
                 scanned.map((item) => {
-                  const isLastScanned = item.isbn === lastScannedRef.current;
+                  const isLastScanned = item.barcode === lastScannedRef.current;
+                  const hasError = !item.loading && !item.can_borrow;
                   return (
                     <Paper
-                      key={item.isbn}
+                      key={item.barcode}
                       variant="outlined"
                       sx={{
                         p: 1.5,
-                        borderColor: isLastScanned ? "primary.main" : undefined,
-                        bgcolor: isLastScanned ? "action.hover" : undefined,
+                        borderColor: isLastScanned ? "primary.main" : hasError ? "error.main" : undefined,
+                        bgcolor: isLastScanned ? "action.hover" : hasError ? "error.50" : undefined,
                       }}
                     >
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                        {item.lookup?.cover_url ? (
+                        {item.loading ? (
+                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
+                            <CircularProgress size={20} />
+                          </Avatar>
+                        ) : item.book?.cover_url ? (
                           <Box
                             component="img"
-                            src={item.lookup.cover_url}
-                            alt={item.lookup.title}
+                            src={item.book.cover_url}
+                            alt={item.book.title}
                             sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
                           />
                         ) : (
-                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
-                            <BookIcon />
+                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: hasError ? "error.main" : "background.default", flexShrink: 0 }}>
+                            {hasError ? <ErrorIcon fontSize="small" /> : <BookIcon />}
                           </Avatar>
                         )}
                         <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
                           {item.loading ? (
                             <Typography variant="body2" color="text.secondary">Đang tra cứu...</Typography>
-                          ) : item.lookup ? (
+                          ) : item.can_borrow && item.book ? (
                             <>
                               <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>
-                                {item.lookup.title}
+                                {item.book.title}
                               </Typography>
                               <Typography variant="caption" color="text.secondary" noWrap>
-                                {item.lookup.author || "-"}
+                                {item.book.author || "-"}
                               </Typography>
                               <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>
-                                {item.isbn}
+                                {item.barcode}
                               </Typography>
                               <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexWrap: "wrap", mt: 0.5 }}>
-                                <Chip size="small" variant="outlined" label={`Kho: ${item.lookup.total_copies}`} sx={{ height: 20, fontSize: 11 }} />
-                                <Chip size="small" variant="outlined" color="success" label={`Sẵn: ${item.lookup.available_copies}`} sx={{ height: 20, fontSize: 11 }} />
+                                <Chip size="small" variant="outlined" label={`Kho: ${item.book.total_copies}`} sx={{ height: 20, fontSize: 11 }} />
+                                <Chip size="small" variant="outlined" color="success" label={`Sẵn: ${item.book.available_copies}`} sx={{ height: 20, fontSize: 11 }} />
                               </Stack>
                             </>
-                          ) : null}
+                          ) : (
+                            <>
+                              <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap color="error">
+                                {item.book?.title || item.barcode}
+                              </Typography>
+                              {item.reason && (
+                                <Typography variant="caption" color="error">
+                                  {item.reason}
+                                </Typography>
+                              )}
+                            </>
+                          )}
                         </Stack>
-                        <IconButton size="small" color="error" onClick={() => removeItem(item.isbn)} sx={{ mt: 0.5 }}>
+                        <IconButton size="small" color="error" onClick={() => removeItem(item.barcode)} sx={{ mt: 0.5 }}>
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Stack>
@@ -366,13 +421,13 @@ export default function BorrowScannerDialog({
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose} disabled={creating}>Hủy</Button>
+          <Button onClick={onClose} disabled={lookingUp}>Hủy</Button>
           <Button
             variant="contained"
-            disabled={creating || validCount === 0}
+            disabled={lookingUp || validCount === 0}
             onClick={handleCreateSlip}
           >
-            {creating ? "Đang tạo phiếu mượn..." : `Tạo phiếu mượn (${validCount} cuốn)`}
+            {lookingUp ? "Đang xử lý..." : `Tạo phiếu mượn (${validCount} cuốn)`}
           </Button>
         </DialogActions>
       </Dialog>
@@ -389,6 +444,16 @@ export default function BorrowScannerDialog({
           </Stack>
         }
       />
+
+      <Dialog open={!!lookupError} onClose={() => setLookupError(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 900 }}>Thông báo</DialogTitle>
+        <DialogContent>
+          <Typography>{lookupError}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLookupError(null)} variant="contained">Đóng</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
