@@ -57,8 +57,13 @@ export default function BorrowPage() {
     } catch (err: any) {
       if (!silent) {
         const status = err?.response?.status || err?.status;
+        const detail = err?.response?.data?.detail || "";
         if (status === 403) {
-          setError("Thẻ độc giả đã bị khóa/hết hạn. Vui lòng liên hệ thư viện.");
+          if (detail.includes("chua vao thu vien")) {
+            setError("Độc giả chưa ở trong thư viện. Vui lòng yêu cầu độc giả quét thẻ tại cửa vào.");
+          } else {
+            setError("Thẻ độc giả đã bị khóa/hết hạn. Vui lòng liên hệ thư viện.");
+          }
         } else {
           setError(getErrorMessage(err) || "Không tìm thấy độc giả");
         }
