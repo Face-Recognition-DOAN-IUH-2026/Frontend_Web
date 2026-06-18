@@ -47,6 +47,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
 
 type BorrowerFilter = "all" | "overdue" | "active";
@@ -387,21 +388,21 @@ export default function ReturnPage() {
           <Divider sx={{ my: 2 }} />
 
           {loadingBorrowers ? (
-            <Box sx={{ py: 8, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+            <Box sx={{ py: 8, display: "grid", placeItems: "center" }}><CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} /></Box>
           ) : borrowers.length === 0 ? (
             <Alert severity="info">Không có độc giả đang mượn sách.</Alert>
           ) : filteredBorrowers.length === 0 ? (
             <Alert severity="info">Không tìm thấy độc giả phù hợp.</Alert>
           ) : (
             <List disablePadding sx={{ maxHeight: 430, overflowY: "auto" }}>
-              {filteredBorrowers.map((borrower) => {
+              {filteredBorrowers.map((borrower, idx) => {
                 const selected = borrower.patron.student_code === selectedStudentCode;
                 return (
                   <ListItemButton
                     key={borrower.patron.id}
                     selected={selected}
                     onClick={() => setSelectedStudentCode(borrower.patron.student_code)}
-                    sx={{ mb: 1, border: 1, borderColor: selected ? "primary.main" : "divider", borderRadius: 1 }}
+                    sx={{ mb: 1, border: 1, borderColor: selected ? "primary.main" : "divider", borderRadius: 1, animation: `${fadeInUp} 0.3s ease-out`, animationDelay: `${idx * 0.04}s`, animationFillMode: "both" }}
                   >
                     <Box sx={{ minWidth: 0, flex: 1, pr: 1 }}>
                       <Typography sx={{ fontWeight: 900 }} noWrap>{borrowerName(borrower)}</Typography>
@@ -448,7 +449,7 @@ export default function ReturnPage() {
           {!selectedStudentCode ? (
             <Alert severity="info">Chọn một độc giả đang mượn để xem sách và xác nhận trả.</Alert>
           ) : loadingDetail ? (
-            <Box sx={{ minHeight: 420, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+            <Box sx={{ minHeight: 420, display: "grid", placeItems: "center" }}><CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} /></Box>
           ) : !detail || detail.records.length === 0 ? (
             <Alert severity="success">Độc giả này đã trả hết sách.</Alert>
           ) : (

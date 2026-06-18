@@ -44,6 +44,7 @@ import {
   YAxis,
 } from "recharts";
 import api from "@/lib/api-client";
+import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
 
 const PAGE_SIZES = [20, 50, 100];
@@ -305,7 +306,7 @@ export default function HistoryPage() {
 
             {freqLoading ? (
               <Stack sx={{ height: 260, alignItems: "center", justifyContent: "center" }}>
-                <CircularProgress size={28} />
+                <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
               </Stack>
             ) : frequency.length === 0 ? (
               <Alert severity="info">Chưa có dữ liệu tần suất trong khoảng thời gian đã chọn.</Alert>
@@ -406,7 +407,7 @@ export default function HistoryPage() {
                 <TableRow>
                   <TableCell colSpan={8}>
                     <Stack sx={{ py: 6, alignItems: "center" }}>
-                      <CircularProgress size={28} />
+                      <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -417,11 +418,11 @@ export default function HistoryPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                logs.map((log) => {
+                logs.map((log, idx) => {
                   const confidence = log.confidence == null ? null : Math.round(log.confidence * 100);
                   const statusColor = getStatusColor(log.status);
                   return (
-                    <TableRow key={log.id} hover>
+                    <TableRow key={log.id} hover sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.03}s`, animationFillMode: "both" }}>
                       <TableCell sx={{ whiteSpace: "nowrap", fontFamily: "monospace", color: "text.secondary" }}>
                         {new Date(log.access_time).toLocaleString("vi-VN")}
                       </TableCell>
@@ -454,7 +455,7 @@ export default function HistoryPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Chip size="small" color={statusColor} label={getStatusLabel(log.status)} />
+                        <Chip size="small" color={statusColor} label={getStatusLabel(log.status)} sx={{ animation: log.status === "success" || log.status === "granted" ? `${successPop} 0.35s ease-out` : undefined }} />
                       </TableCell>
                     </TableRow>
                   );

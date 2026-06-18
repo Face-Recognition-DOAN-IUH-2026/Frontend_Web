@@ -38,6 +38,7 @@ import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { fadeInUp, shimmer, slideInRight } from "@/lib/animations";
 import type { UserPublic } from "@/lib/types";
 
 function roleLabel(role: string) {
@@ -113,7 +114,7 @@ export default function AdminPage() {
   if (isLoading) {
     return (
       <Stack sx={{ minHeight: 400, alignItems: "center", justifyContent: "center" }}>
-        <CircularProgress />
+        <CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
       </Stack>
     );
   }
@@ -150,8 +151,8 @@ export default function AdminPage() {
           { label: "Quản trị viên", value: adminCount, icon: <AdminPanelSettingsOutlinedIcon /> },
           { label: "Nhân viên", value: staffCount, icon: <PersonOutlineOutlinedIcon /> },
           { label: "Đã có khuôn mặt", value: faceCount, icon: <FaceRetouchingNaturalOutlinedIcon /> },
-        ].map((item) => (
-          <Grid key={item.label} size={{ xs: 12, sm: 6, lg: 3 }}>
+        ].map((item, idx) => (
+          <Grid key={item.label} size={{ xs: 12, sm: 6, lg: 3 }} sx={{ animation: `${fadeInUp} 0.35s ease-out`, animationDelay: `${idx * 0.08}s`, animationFillMode: "both" }}>
             <Paper variant="outlined" sx={{ p: 2.25 }}>
               <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                 <Avatar sx={{ bgcolor: "action.hover", color: "primary.main" }}>{item.icon}</Avatar>
@@ -181,7 +182,7 @@ export default function AdminPage() {
                 <TableRow>
                   <TableCell colSpan={4}>
                     <Stack sx={{ py: 6, alignItems: "center" }}>
-                      <CircularProgress size={28} />
+                      <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -192,8 +193,8 @@ export default function AdminPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                users.map((item) => (
-                  <TableRow key={item.id} hover>
+                users.map((item, idx) => (
+                  <TableRow key={item.id} hover sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.03}s`, animationFillMode: "both" }}>
                     <TableCell>
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                         <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 800 }}>

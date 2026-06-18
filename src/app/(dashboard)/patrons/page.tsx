@@ -39,6 +39,7 @@ import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { fadeInUp, shimmer, successPop } from "@/lib/animations";
 import type { CaptureAngle } from "@/components/MultiAngleCapture";
 import MultiAngleCapture from "@/components/MultiAngleCapture";
 import StudentCardScanner, { type ScannedCardData } from "@/components/StudentCardScanner";
@@ -310,7 +311,7 @@ export default function PatronsPage() {
 
       {/* Card Grid */}
       {loading && filtered.length === 0 ? (
-        <Stack sx={{ alignItems: "center", py: 8 }}><CircularProgress /></Stack>
+        <Stack sx={{ alignItems: "center", py: 8 }}><CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} /></Stack>
       ) : filtered.length === 0 ? (
         <Paper variant="outlined" sx={{ p: 5, textAlign: "center" }}>
           <PersonIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
@@ -321,7 +322,7 @@ export default function PatronsPage() {
         </Paper>
       ) : (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "1fr 1fr 1fr" }, gap: 2 }}>
-          {filtered.map((patron) => (
+          {filtered.map((patron, idx) => (
             <Paper
               key={patron.id}
               variant="outlined"
@@ -330,6 +331,9 @@ export default function PatronsPage() {
                 cursor: "pointer",
                 transition: "box-shadow .15s, border-color .15s",
                 "&:hover": { borderColor: "primary.main", boxShadow: (t) => `0 0 0 1px ${alpha(t.palette.primary.main, 0.3)}` },
+                animation: `${fadeInUp} 0.35s ease-out`,
+                animationDelay: `${idx * 0.05}s`,
+                animationFillMode: "both",
               }}
               onClick={() => router.push(`/patrons/${patron.id}`)}
             >

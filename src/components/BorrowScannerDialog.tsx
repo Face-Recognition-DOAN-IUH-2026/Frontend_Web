@@ -27,6 +27,7 @@ import ErrorIcon from "@mui/icons-material/ReportOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
+import { slideInRight, successPop } from "@/lib/animations";
 
 interface ScannedBorrowItem {
   barcode: string;
@@ -350,6 +351,7 @@ export default function BorrowScannerDialog({
                 scanned.map((item) => {
                   const isLastScanned = item.barcode === lastScannedRef.current;
                   const hasError = !item.loading && !item.can_borrow;
+                  const isSuccess = !item.loading && item.can_borrow;
                   return (
                     <Paper
                       key={item.barcode}
@@ -358,6 +360,11 @@ export default function BorrowScannerDialog({
                         p: 1.5,
                         borderColor: isLastScanned ? "primary.main" : hasError ? "error.main" : undefined,
                         bgcolor: isLastScanned ? "action.hover" : hasError ? "error.50" : undefined,
+                        animation: isSuccess
+                          ? `${successPop} 0.4s ease-out`
+                          : isLastScanned
+                          ? `${slideInRight} 0.3s ease-out`
+                          : undefined,
                       }}
                     >
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>

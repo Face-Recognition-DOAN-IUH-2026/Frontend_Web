@@ -19,6 +19,7 @@ import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { shimmer } from "@/lib/animations";
 import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
 
 export default function EnrollPage() {
@@ -139,7 +140,7 @@ export default function EnrollPage() {
         </Card>
       ) : jobId ? (
         <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
-          <CircularProgress />
+          <CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
           <Typography variant="h6" sx={{ mt: 2, fontWeight: 800 }}>Đang xử lý...</Typography>
           <Typography color="text.secondary" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>Job ID: {jobId}</Typography>
         </Paper>

@@ -40,11 +40,16 @@ import type {
   ScheduleStaff,
   StaffAvailabilityRequest,
   StaffScheduleAssignment,
-  StaffShift,
+   StaffShift,
+  OpenShift,
+  ShiftBid,
+  ShiftSwap,
   AiCommandCenterSummary,
   AiInsight,
+  AiInsightExplanation,
   AiInsightList,
   AiChatResponse,
+  BookRecommendationResponse,
 } from "./types";
 
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
@@ -944,8 +949,8 @@ class ApiClient {
     return response.data;
   }
 
-  async checkInScheduleAssignment(id: string): Promise<any> {
-    const response = await this.client.post(`/api/schedules/assignments/${id}/check-in`, { method: "web" });
+  async checkInScheduleAssignment(id: string, options?: { method?: string; lat?: number; lng?: number }): Promise<any> {
+    const response = await this.client.post(`/api/schedules/assignments/${id}/check-in`, { method: options?.method || "web", lat: options?.lat, lng: options?.lng });
     return response.data;
   }
 
@@ -956,6 +961,66 @@ class ApiClient {
 
   async createMyAvailability(data: { dateFrom: string; dateTo: string; reason?: string | null }): Promise<StaffAvailabilityRequest> {
     const response = await this.client.post<StaffAvailabilityRequest>("/api/schedules/me/availability", data);
+    return response.data;
+  }
+
+  // === Shift Bidding ===
+  async getOpenShifts(): Promise<OpenShift[]> {
+    const response = await this.client.get<OpenShift[]>("/api/schedules/open-shifts");
+    return response.data;
+  }
+
+  async createBid(data: { assignmentId: string; note?: string | null }): Promise<ShiftBid> {
+    const response = await this.client.post<ShiftBid>("/api/schedules/bids", data);
+    return response.data;
+  }
+
+  async listMyBids(): Promise<ShiftBid[]> {
+    const response = await this.client.get<ShiftBid[]>("/api/schedules/bids");
+    return response.data;
+  }
+
+  async cancelBid(id: string): Promise<ShiftBid> {
+    const response = await this.client.post<ShiftBid>(`/api/schedules/bids/${id}/cancel`);
+    return response.data;
+  }
+
+  // === Shift Swap ===
+  async createSwap(data: { targetStaffId: string; requesterAssignmentId: string; targetAssignmentId?: string | null; reason?: string | null }): Promise<ShiftSwap> {
+    const response = await this.client.post<ShiftSwap>("/api/schedules/swaps", data);
+    return response.data;
+  }
+
+  async listMySwaps(params?: { status?: string }): Promise<ShiftSwap[]> {
+    const query: any = {};
+    if (params?.status) query.status = params.status;
+    const response = await this.client.get<ShiftSwap[]>("/api/schedules/swaps", { params: query });
+    return response.data;
+  }
+
+  async respondSwap(id: string, data: { action: "accepted" | "rejected"; responseNote?: string | null }): Promise<ShiftSwap> {
+    const response = await this.client.post<ShiftSwap>(`/api/schedules/swaps/${id}/respond`, data);
+    return response.data;
+  }
+
+  async autoSchedule(data: { from: string; to: string }): Promise<{ proposed: Array<{ staffId: string; shiftId: string; zoneId: string; workDate: string; note: string }>; skipped: number; total: number }> {
+    const response = await this.client.post<any>("/api/schedules/auto-schedule", data);
+    return response.data;
+  }
+
+  // === Geofence ===
+  async getGeofenceConfigs(): Promise<Array<{ id: string; zoneId: string; latitude: number; longitude: number; radiusMeters: number; addressHint: string | null; isActive: boolean; zone: { id: string; zoneName: string; floor: number } | null }>> {
+    const response = await this.client.get<any>("/api/schedules/geofence");
+    return response.data;
+  }
+
+  async setGeofenceConfig(data: { zoneId: string; latitude: number; longitude: number; radiusMeters?: number; addressHint?: string | null }): Promise<any> {
+    const response = await this.client.put("/api/schedules/geofence", data);
+    return response.data;
+  }
+
+  async deleteGeofenceConfig(zoneId: string): Promise<any> {
+    const response = await this.client.delete(`/api/schedules/geofence/${zoneId}`);
     return response.data;
   }
 
@@ -979,8 +1044,18 @@ class ApiClient {
     return response.data;
   }
 
+  async explainAiInsight(id: string): Promise<AiInsightExplanation> {
+    const response = await this.client.get<AiInsightExplanation>(`/api/ai/insights/${id}/explain`);
+    return response.data;
+  }
+
   async askAiCommandCenter(question: string): Promise<AiChatResponse> {
     const response = await this.client.post<AiChatResponse>("/api/ai/chat", { question });
+    return response.data;
+  }
+
+  async getBookRecommendations(studentCode: string): Promise<BookRecommendationResponse> {
+    const response = await this.client.get<BookRecommendationResponse>(`/api/ai/recommendations/patron/${studentCode}`);
     return response.data;
   }
 }

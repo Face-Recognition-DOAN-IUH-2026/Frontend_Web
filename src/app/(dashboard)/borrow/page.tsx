@@ -3,23 +3,28 @@
 import { useCallback, useState } from "react";
 import {
   Alert,
+  AlertTitle,
+  Box,
   Button,
   Card,
   CardContent,
   Chip,
+  Collapse,
   InputAdornment,
+  Slide,
   Snackbar,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import ErrorIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import WarningIcon from "@mui/icons-material/WarningAmberOutlined";
 import BorrowScannerDialog from "@/components/BorrowScannerDialog";
+import BookRecommendations from "@/components/BookRecommendations";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { fadeInUp, successPop, slideInRight } from "@/lib/animations";
 
 const MAX_BORROW_BOOKS = 3;
 
@@ -88,7 +93,14 @@ export default function BorrowPage() {
     <Stack spacing={3}>
       <Typography variant="h5" sx={{ fontWeight: 900 }}>Tạo phiếu mượn sách</Typography>
 
-      {error ? <Alert severity="error" onClose={() => setError("")}>{error}</Alert> : null}
+      {error ? (
+        <Slide direction="down" in={!!error} timeout={250}>
+          <Alert severity="error" onClose={() => setError("")} sx={{ animation: `${slideInRight} 0.25s ease-out` }}>
+            <AlertTitle>Lỗi</AlertTitle>
+            {error}
+          </Alert>
+        </Slide>
+      ) : null}
 
       <Card variant="outlined">
         <CardContent>
@@ -122,30 +134,51 @@ export default function BorrowPage() {
       </Card>
 
       {patronId && (
-        <Card variant="outlined" sx={overdueCount > 0 ? { borderLeft: 4, borderLeftColor: "error.main" } : {}}>
-          <CardContent>
-            <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.5 }}>Tình trạng mượn sách</Typography>
-            <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-              <Chip
-                icon={remaining > 0 ? <CheckCircleIcon /> : <ErrorIcon />}
-                color={remaining > 0 ? "success" : "error"}
-                label={`Đã mượn: ${activeCount}/${MAX_BORROW_BOOKS}`}
-              />
-              {overdueCount > 0 && (
-                <Chip
-                  icon={<WarningIcon />}
-                  color="error"
-                  label={`Quá hạn: ${overdueCount} cuốn`}
-                />
-              )}
-              <Typography variant="body2" color={remaining > 0 ? "text.secondary" : "error"}>
-                {remaining > 0
-                  ? `Có thể mượn thêm ${remaining} cuốn`
-                  : "Đã đạt giới hạn mượn sách"}
+        <Slide direction="up" in={!!patronId} timeout={250}>
+          <Card
+            variant="outlined"
+            sx={overdueCount > 0 ? { borderLeft: 4, borderLeftColor: "error.main" } : {}}
+          >
+            <CardContent>
+              <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1.5 }}>
+                Tình trạng mượn sách
               </Typography>
-            </Stack>
-          </CardContent>
-        </Card>
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{ alignItems: "center", flexWrap: "wrap" }}
+              >
+                <Chip
+                  icon={<CheckCircleIcon />}
+                  color={remaining > 0 ? "success" : "error"}
+                  label={`Đã mượn: ${activeCount}/${MAX_BORROW_BOOKS}`}
+                  sx={{
+                    animation: `${successPop} 0.35s ease-out`,
+                  }}
+                />
+                <Collapse in={overdueCount > 0} timeout={300}>
+                  <Chip
+                    icon={<WarningIcon />}
+                    color="error"
+                    label={`Quá hạn: ${overdueCount} cuốn`}
+                    sx={{ animation: `${slideInRight} 0.3s ease-out` }}
+                  />
+                </Collapse>
+                <Typography
+                  variant="body2"
+                  color={remaining > 0 ? "text.secondary" : "error"}
+                  sx={{
+                    animation: `${fadeInUp} 0.3s ease-out`,
+                  }}
+                >
+                  {remaining > 0
+                    ? `Có thể mượn thêm ${remaining} cuốn`
+                    : "Đã đạt giới hạn mượn sách"}
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Slide>
       )}
 
       {patronId && (
@@ -155,10 +188,22 @@ export default function BorrowPage() {
           startIcon={<QrCodeScannerIcon />}
           disabled={!canBorrow}
           onClick={() => setScannerOpen(true)}
-          sx={{ alignSelf: "flex-start" }}
+          sx={{
+            alignSelf: "flex-start",
+            animation: `${fadeInUp} 0.3s ease-out`,
+            "&:active": {
+              transform: "scale(0.97)",
+            },
+          }}
         >
           {canBorrow ? "Quét ISBN" : overdueCount > 0 ? "Cần trả sách quá hạn trước" : "Đã đạt giới hạn mượn"}
         </Button>
+      )}
+
+      {patronId && patronCode.trim() && (
+        <Box sx={{ animation: `${fadeInUp} 0.4s ease-out` }}>
+          <BookRecommendations studentCode={patronCode.trim()} />
+        </Box>
       )}
 
       <BorrowScannerDialog
@@ -169,8 +214,24 @@ export default function BorrowPage() {
         onSuccess={handleScanSuccess}
       />
 
-      <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)}>
-        {snackbar ? <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>{snackbar.message}</Alert> : undefined}
+      <Snackbar
+        open={!!snackbar}
+        autoHideDuration={3200}
+        onClose={() => setSnackbar(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        {snackbar ? (
+          <Alert
+            severity={snackbar.severity}
+            onClose={() => setSnackbar(null)}
+            sx={{
+              animation: `${slideInRight} 0.3s ease-out`,
+              boxShadow: 4,
+            }}
+          >
+            {snackbar.message}
+          </Alert>
+        ) : undefined}
       </Snackbar>
     </Stack>
   );

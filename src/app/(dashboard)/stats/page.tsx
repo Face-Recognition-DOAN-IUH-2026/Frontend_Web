@@ -34,6 +34,7 @@ import RadioIcon from "@mui/icons-material/SettingsInputAntennaOutlined";
 import UserIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api from "@/lib/api-client";
+import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import type { AccessLogPublic, ActivePatron, BorrowRecord, CameraEvent, StatsResponse } from "@/lib/types";
 
 type RealtimeState = "connecting" | "connected" | "disconnected";
@@ -207,7 +208,7 @@ export default function StatsPage() {
     return (
       <Box sx={{ minHeight: 420, display: "grid", placeItems: "center" }}>
         <Stack spacing={2} sx={{ alignItems: "center" }}>
-          <CircularProgress />
+          <CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
           <Typography variant="body2" color="text.secondary">Đang tải thống kê vận hành...</Typography>
         </Stack>
       </Box>
@@ -373,9 +374,15 @@ export default function StatsPage() {
       </Paper>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "repeat(3, 1fr)" }, gap: 2 }}>
-        <MetricCard label="Tổng lượt mượn" value={borrowStats?.total ?? "—"} icon={BookIcon} color={theme.palette.primary.main} description="Tất cả phiếu mượn" />
-        <MetricCard label="Đang mượn" value={borrowStats?.active ?? "—"} icon={BookIcon} color={theme.palette.success.main} description="Chưa trả" />
-        <MetricCard label="Quá hạn" value={borrowStats?.overdue ?? "—"} icon={AlertIcon} color={theme.palette.error.main} description="Cần xử lý" />
+        {[
+          { label: "Tổng lượt mượn", value: borrowStats?.total ?? "—", icon: BookIcon, color: theme.palette.primary.main, description: "Tất cả phiếu mượn" },
+          { label: "Đang mượn", value: borrowStats?.active ?? "—", icon: BookIcon, color: theme.palette.success.main, description: "Chưa trả" },
+          { label: "Quá hạn", value: borrowStats?.overdue ?? "—", icon: AlertIcon, color: theme.palette.error.main, description: "Cần xử lý" },
+        ].map((card, idx) => (
+          <Box key={card.label} sx={{ animation: `${fadeInUp} 0.35s ease-out`, animationDelay: `${idx * 0.08}s`, animationFillMode: "both" }}>
+            <MetricCard {...card} />
+          </Box>
+        ))}
       </Box>
 
       <Paper variant="outlined">
@@ -405,10 +412,10 @@ export default function StatsPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {recentBorrows.map((record) => {
+                {recentBorrows.map((record, idx) => {
                   const overdue = new Date(record.due_at) < new Date();
                   return (
-                    <TableRow key={record.id} selected={overdue}>
+                    <TableRow key={record.id} selected={overdue} sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.04}s`, animationFillMode: "both" }}>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 800 }}>{record.book?.title || record.book_id}</Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{record.book?.isbn || record.book_id}</Typography>
@@ -416,7 +423,7 @@ export default function StatsPage() {
                       <TableCell sx={{ fontFamily: "monospace" }}>{record.patron_id}</TableCell>
                       <TableCell>{new Date(record.borrow_at).toLocaleDateString("vi-VN")}</TableCell>
                       <TableCell>{new Date(record.due_at).toLocaleDateString("vi-VN")}</TableCell>
-                      <TableCell><Chip size="small" color={overdue ? "error" : "success"} label={overdue ? "Quá hạn" : "Đúng hạn"} /></TableCell>
+                      <TableCell><Chip size="small" color={overdue ? "error" : "success"} label={overdue ? "Quá hạn" : "Đúng hạn"} sx={{ animation: `${successPop} 0.35s ease-out` }} /></TableCell>
                     </TableRow>
                   );
                 })}

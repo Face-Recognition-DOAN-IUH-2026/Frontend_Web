@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   AppBar,
@@ -10,10 +10,12 @@ import {
   IconButton,
   Stack,
   Toolbar,
+  Tooltip,
   Typography,
   useTheme,
 } from "@mui/material";
 import BellIcon from "@mui/icons-material/NotificationsOutlined";
+import Brightness6Icon from "@mui/icons-material/Brightness6Outlined";
 import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeIcon from "@mui/icons-material/LightModeOutlined";
 import UserIcon from "@mui/icons-material/PersonOutlined";
@@ -23,7 +25,19 @@ import Sidebar from "@/components/sidebar";
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();
-  const { mode, toggleMode } = useColorMode();
+  const { mode, effectiveMode, preference, reducedMotion, toggleMode } = useColorMode();
+
+  const modeIcon = useMemo(() => {
+    if (preference === "auto") return <Brightness6Icon fontSize="small" />;
+    return preference === "dark" ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />;
+  }, [preference]);
+
+  const modeTooltip = useMemo(() => {
+    if (reducedMotion === "reduce") return "Chế độ hiển thị (Đã bật giảm chuyển động)";
+    if (preference === "auto") return `Chế độ tự động (${effectiveMode === "dark" ? "Tối" : "Sáng"}) - Nhấn để thay đổi`;
+    if (preference === "dark") return "Chế độ tối - Nhấn để chuyển";
+    return "Chế độ sáng - Nhấn để chuyển";
+  }, [preference, effectiveMode, reducedMotion]);
 
   return (
     <AppBar
@@ -40,9 +54,11 @@ function Topbar({ user }: { user: any }) {
         <IconButton color="inherit" title="Thông báo">
           <BellIcon fontSize="small" />
         </IconButton>
-        <IconButton color="inherit" onClick={toggleMode} title={mode === "dark" ? "Chế độ sáng" : "Chế độ tối"}>
-          {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-        </IconButton>
+        <Tooltip title={modeTooltip} arrow>
+          <IconButton color="inherit" onClick={toggleMode}>
+            {modeIcon}
+          </IconButton>
+        </Tooltip>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", pl: 1.5, borderLeft: `1px solid ${theme.palette.divider}` }}>
           <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", color: "primary.contrastText" }}>
             <UserIcon fontSize="small" />
