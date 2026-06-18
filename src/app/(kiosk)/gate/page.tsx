@@ -33,6 +33,7 @@ import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import CameraFeed from "@/components/gate/CameraFeed";
 import { useColorMode } from "@/lib/mui-theme";
+import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import type { AccessLogPublic, CameraEvent, KioskResult, PatronLookupResult } from "@/lib/types";
 
 interface TodayCounts {
@@ -392,7 +393,7 @@ export default function GatePage() {
                     </Stack>
                   </Box>
                   {confidence ? (
-                    <Chip size="small" color={color} label={confidence} />
+                    <Chip size="small" color={color} label={confidence} sx={{ animation: `${successPop} 0.35s ease-out` }} />
                   ) : (
                     <ShieldOutlinedIcon color="disabled" fontSize="small" />
                   )}
@@ -425,11 +426,11 @@ export default function GatePage() {
           </Box>
 
           <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Paper variant="outlined" sx={{ px: 2, py: 1.25 }}>
+            <Paper variant="outlined" sx={{ px: 2, py: 1.25, animation: `${fadeInUp} 0.35s ease-out`, animationFillMode: "both" }}>
               <Typography variant="h4" color="success.main" sx={{ fontWeight: 900, lineHeight: 1 }}>{todayCounts.entries}</Typography>
               <Typography variant="caption" color="text.secondary">Vào hôm nay</Typography>
             </Paper>
-            <Paper variant="outlined" sx={{ px: 2, py: 1.25 }}>
+            <Paper variant="outlined" sx={{ px: 2, py: 1.25, animation: `${fadeInUp} 0.35s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
               <Typography variant="h4" color="warning.main" sx={{ fontWeight: 900, lineHeight: 1 }}>{todayCounts.exits}</Typography>
               <Typography variant="caption" color="text.secondary">Ra hôm nay</Typography>
             </Paper>
@@ -450,16 +451,16 @@ export default function GatePage() {
         <Grid container spacing={2.5}>
           <Grid size={{ xs: 12, lg: 8 }}>
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationFillMode: "both" }}>
                 <CameraFeed src={ENTRY_CAM} label="Cổng vào" overlay={entryOverlay} />
               </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
                 <CameraFeed src={EXIT_CAM} label="Cổng ra" overlay={exitOverlay} />
               </Grid>
             </Grid>
           </Grid>
 
-          <Grid size={{ xs: 12, lg: 4 }}>
+          <Grid size={{ xs: 12, lg: 4 }} sx={{ animation: `${fadeInUp} 0.45s ease-out`, animationDelay: "0.2s", animationFillMode: "both" }}>
             <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
               {step === "idle" && (
                 <Stack spacing={2.5} sx={{ textAlign: "center" }}>
@@ -496,7 +497,7 @@ export default function GatePage() {
                   </Button>
                   {loading && (
                     <Stack spacing={1.25} sx={{ alignItems: "center" }}>
-                      <CircularProgress size={28} />
+                      <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
                       <Typography variant="body2" color="text.secondary">{statusText || "Đang xử lý..."}</Typography>
                     </Stack>
                   )}
@@ -516,7 +517,7 @@ export default function GatePage() {
                     </Box>
                     {loading && (
                       <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.65)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.25}>
-                        <CircularProgress color="inherit" />
+                        <CircularProgress color="inherit" sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
                         <Typography variant="body2">{statusText}</Typography>
                       </Stack>
                     )}
@@ -537,6 +538,7 @@ export default function GatePage() {
                       height: 72,
                       bgcolor: currentResultStatus === "success" ? "success.main" : currentResultStatus === "unregistered" ? "warning.main" : "error.main",
                       color: currentResultStatus === "success" ? "success.contrastText" : currentResultStatus === "unregistered" ? "warning.contrastText" : "error.contrastText",
+                      animation: `${successPop} 0.45s ease-out`,
                     }}
                   >
                     {currentResultStatus === "success" ? <CheckCircleOutlineOutlinedIcon fontSize="large" /> : <ErrorOutlineOutlinedIcon fontSize="large" />}
@@ -568,10 +570,10 @@ export default function GatePage() {
         </Grid>
 
         <Grid container spacing={2.5} sx={{ mt: 2.5 }}>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${slideInRight} 0.4s ease-out`, animationFillMode: "both" }}>
             {renderHistoryColumn("Lịch sử vào", "Các lượt vừa qua cổng vào", entryLogs, "entry")}
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${slideInRight} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
             {renderHistoryColumn("Lịch sử ra", "Các lượt vừa qua cổng ra", exitLogs, "exit")}
           </Grid>
         </Grid>

@@ -19,6 +19,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { shimmer } from "@/lib/animations";
 import type { LivenessBreakdown } from "@/lib/types";
 
 const breakdownLabels: Record<keyof LivenessBreakdown, string> = {

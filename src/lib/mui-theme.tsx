@@ -1,17 +1,26 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import type { PaletteMode } from "@mui/material";
 
+type ColorModePreference = "auto" | "light" | "dark";
+type ReducedMotionPreference = "reduce" | "no-preference" | "unknown";
+
 type ColorModeContextValue = {
   mode: PaletteMode;
+  effectiveMode: PaletteMode;
+  preference: ColorModePreference;
+  reducedMotion: ReducedMotionPreference;
   toggleMode: () => void;
-  setMode: (mode: PaletteMode) => void;
+  setMode: (mode: ColorModePreference) => void;
 };
 
 const ColorModeContext = createContext<ColorModeContextValue>({
   mode: "dark",
+  effectiveMode: "dark",
+  preference: "auto",
+  reducedMotion: "unknown",
   toggleMode: () => {},
   setMode: () => {},
 });
@@ -20,8 +29,21 @@ export function useColorMode() {
   return useContext(ColorModeContext);
 }
 
-function buildTheme(mode: PaletteMode) {
+function getSystemPreference(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+function getReducedMotionPreference(): ReducedMotionPreference {
+  if (typeof window === "undefined") return "unknown";
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  return mq.matches ? "reduce" : "no-preference";
+}
+
+function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
   const dark = mode === "dark";
+  const shouldReduceMotion = reducedMotion === "reduce";
+  const transitionDuration = shouldReduceMotion ? 0 : 200;
 
   return createTheme({
     palette: {
@@ -73,6 +95,17 @@ function buildTheme(mode: PaletteMode) {
       h6: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
       button: { fontWeight: 700, textTransform: "none" },
     },
+    transitions: {
+      duration: {
+        shortest: shouldReduceMotion ? 0 : 150,
+        shorter: shouldReduceMotion ? 0 : 200,
+        short: shouldReduceMotion ? 0 : 250,
+        standard: shouldReduceMotion ? 0 : 300,
+        complex: shouldReduceMotion ? 0 : 375,
+        enteringScreen: shouldReduceMotion ? 0 : 225,
+        leavingScreen: shouldReduceMotion ? 0 : 195,
+      },
+    },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
@@ -95,6 +128,12 @@ function buildTheme(mode: PaletteMode) {
         styleOverrides: {
           root: {
             borderRadius: 8,
+            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1), 
+                        box-shadow ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        transform ${shouldReduceMotion ? 0 : 100}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+            "&:active": {
+              transform: shouldReduceMotion ? "none" : "scale(0.97)",
+            },
           },
         },
       },
@@ -102,6 +141,8 @@ function buildTheme(mode: PaletteMode) {
         styleOverrides: {
           root: {
             borderRadius: 8,
+            transition: `box-shadow ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
           },
         },
       },
@@ -110,6 +151,59 @@ function buildTheme(mode: PaletteMode) {
           root: {
             borderRadius: 8,
             fontWeight: 700,
+            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiListItemButton: {
+        styleOverrides: {
+          root: {
+            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: {
+            transition: `opacity ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        transform ${shouldReduceMotion ? 0 : 100}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+            "&:active": {
+              transform: shouldReduceMotion ? "none" : "scale(0.9)",
+            },
+          },
+        },
+      },
+      MuiDrawer: {
+        styleOverrides: {
+          paper: {
+            transition: `width ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                         background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: {
+          paper: {
+            transition: `transform ${shouldReduceMotion ? 0 : 300}ms cubic-bezier(0.4, 0, 0.2, 1),
+                         opacity ${shouldReduceMotion ? 0 : 300}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiSnackbar: {
+        styleOverrides: {
+          root: {
+            transition: `transform ${shouldReduceMotion ? 0 : 200}ms cubic-bezier(0.4, 0, 0.2, 1),
+                         opacity ${shouldReduceMotion ? 0 : 200}ms cubic-bezier(0.4, 0, 0.2, 1)`,
           },
         },
       },
@@ -117,37 +211,76 @@ function buildTheme(mode: PaletteMode) {
   });
 }
 
+const CYCLE_ORDER: ColorModePreference[] = ["auto", "light", "dark"];
+
 export function MuiThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<PaletteMode>("dark");
+  const [preference, setPreferenceState] = useState<ColorModePreference>("auto");
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => getSystemPreference());
+  const [reducedMotion, setReducedMotion] = useState<ReducedMotionPreference>("unknown");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("themeMode");
-    if (stored === "light" || stored === "dark") {
-      setModeState(stored);
+    const stored = window.localStorage.getItem("themeMode") as ColorModePreference | null;
+    if (stored && CYCLE_ORDER.includes(stored)) {
+      setPreferenceState(stored);
     }
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", mode === "dark");
-    document.documentElement.classList.toggle("light", mode === "light");
-  }, [mode]);
+    const darkMq = window.matchMedia("(prefers-color-scheme: dark)");
+    const motionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    setReducedMotion(getReducedMotionPreference());
+
+    const handleDarkChange = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      setReducedMotion(e.matches ? "reduce" : "no-preference");
+    };
+
+    darkMq.addEventListener("change", handleDarkChange);
+    motionMq.addEventListener("change", handleMotionChange);
+
+    return () => {
+      darkMq.removeEventListener("change", handleDarkChange);
+      motionMq.removeEventListener("change", handleMotionChange);
+    };
+  }, []);
+
+  const effectiveMode = useMemo(() => {
+    if (preference === "auto") {
+      return systemPrefersDark ? "dark" : "light";
+    }
+    return preference;
+  }, [preference, systemPrefersDark]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", effectiveMode === "dark");
+    document.documentElement.classList.toggle("light", effectiveMode === "light");
+  }, [effectiveMode]);
+
+  const toggleMode = useCallback(() => {
+    setPreferenceState((current) => {
+      const idx = CYCLE_ORDER.indexOf(current);
+      const next = CYCLE_ORDER[(idx + 1) % CYCLE_ORDER.length];
+      window.localStorage.setItem("themeMode", next);
+      return next;
+    });
+  }, []);
+
+  const setMode = useCallback((mode: ColorModePreference) => {
+    window.localStorage.setItem("themeMode", mode);
+    setPreferenceState(mode);
+  }, []);
 
   const value = useMemo<ColorModeContextValue>(() => ({
-    mode,
-    toggleMode: () => {
-      setModeState((current) => {
-        const next = current === "dark" ? "light" : "dark";
-        window.localStorage.setItem("themeMode", next);
-        return next;
-      });
-    },
-    setMode: (next) => {
-      window.localStorage.setItem("themeMode", next);
-      setModeState(next);
-    },
-  }), [mode]);
+    mode: effectiveMode,
+    effectiveMode,
+    preference,
+    reducedMotion,
+    toggleMode,
+    setMode,
+  }), [effectiveMode, preference, reducedMotion, toggleMode, setMode]);
 
-  const theme = useMemo(() => buildTheme(mode), [mode]);
+  const theme = useMemo(() => buildTheme(effectiveMode, reducedMotion), [effectiveMode, reducedMotion]);
 
   return (
     <ColorModeContext.Provider value={value}>

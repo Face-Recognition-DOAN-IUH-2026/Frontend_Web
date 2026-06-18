@@ -27,6 +27,7 @@ import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
 import api from "@/lib/api-client";
+import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import type { ActivePatron } from "@/lib/types";
 
 const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);
@@ -272,7 +273,7 @@ export default function ActivePage() {
           {/* Content states */}
           {loading && patrons.length === 0 ? (
             <Stack sx={{ minHeight: 300, alignItems: "center", justifyContent: "center", gap: 2 }}>
-              <CircularProgress size={28} />
+              <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
               <Typography variant="body2" color="text.secondary">
                 Đang tải...
               </Typography>
@@ -326,12 +327,12 @@ export default function ActivePage() {
             </Stack>
           ) : (
             <Grid container spacing={1.5}>
-              {filtered.map((patron) => {
+              {filtered.map((patron, idx) => {
                 const dur = getDuration(patron.entered_at);
                 const accent = DURATION_ACCENT[dur.level];
                 const percent = patron.confidence == null ? null : Math.round(patron.confidence * 100);
                 return (
-                  <Grid key={patron.id} size={{ xs: 12, xl: 6 }}>
+                  <Grid key={patron.id} size={{ xs: 12, xl: 6 }} sx={{ animation: `${fadeInUp} 0.35s ease-out`, animationDelay: `${idx * 0.05}s`, animationFillMode: "both" }}>
                     <Paper
                       variant="outlined"
                       sx={{

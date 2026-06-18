@@ -573,6 +573,42 @@ export interface ScheduleAssignmentList {
   total: number;
 }
 
+export interface OpenShift {
+  shift: StaffShift;
+  zone: LibraryZone;
+  workDate: string;
+}
+
+export interface ShiftBid {
+  id: string;
+  staffId: string;
+  assignmentId: string;
+  status: string;
+  note: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  assignment: StaffScheduleAssignment | null;
+  staff: ScheduleStaff | null;
+}
+
+export interface ShiftSwap {
+  id: string;
+  requesterStaffId: string;
+  targetStaffId: string;
+  requesterAssignmentId: string;
+  targetAssignmentId: string | null;
+  reason: string | null;
+  status: string;
+  responseNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  requester: ScheduleStaff | null;
+  target: ScheduleStaff | null;
+  requesterAssignment: StaffScheduleAssignment | null;
+  targetAssignment: StaffScheduleAssignment | null;
+}
+
 // === AI Command Center ===
 export type AiInsightCategory = "access" | "borrow" | "schedule" | "inventory" | "risk";
 export type AiInsightSeverity = "info" | "warning" | "critical";
@@ -586,8 +622,15 @@ export interface AiInsight {
   summary: string;
   evidence: Array<{ label: string; value: string | number }>;
   recommended_actions: string[];
+  reason: string;
+  confidence: number;
+  alternatives: string[];
   status: AiInsightStatus;
   generated_at: string;
+}
+
+export interface AiInsightExplanation extends AiInsight {
+  reasoning_trace: string;
 }
 
 export interface AiCommandCenterSummary {
@@ -609,6 +652,25 @@ export interface AiCommandCenterSummary {
 export interface AiInsightList {
   items: AiInsight[];
   total: number;
+}
+
+export interface BookRecommendation {
+  book_id: string;
+  isbn: string;
+  title: string;
+  author: string;
+  cover_url: string;
+  category: string;
+  reason: string;
+  relevance_score: number;
+}
+
+export interface BookRecommendationResponse {
+  patron_id: string;
+  patron_name: string;
+  recommendations: BookRecommendation[];
+  generated_at: string;
+  model: string;
 }
 
 export interface AiChatResponse {

@@ -21,6 +21,7 @@ import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
 import { useAuth } from "@/lib/auth-context";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { shimmer } from "@/lib/animations";
 import type { TaskResult } from "@/lib/types";
 
 function decodeJwt(token: string): { sub: string } | null {

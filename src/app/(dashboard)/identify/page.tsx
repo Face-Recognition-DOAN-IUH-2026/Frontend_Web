@@ -25,6 +25,7 @@ import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { shimmer } from "@/lib/animations";
 
 export default function IdentifyPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);

@@ -43,6 +43,7 @@ import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined
 import UpdateOutlinedIcon from "@mui/icons-material/UpdateOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import MultiAngleCapture from "@/components/MultiAngleCapture";
+import { fadeInUp, shimmer, slideInRight } from "@/lib/animations";
 import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
 import type { CaptureAngle } from "@/components/MultiAngleCapture";
 
@@ -230,7 +231,7 @@ export default function PatronDetailPage() {
   if (loading) {
     return (
       <Stack sx={{ minHeight: 420, alignItems: "center", justifyContent: "center" }}>
-        <CircularProgress />
+        <CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
         <Typography color="text.secondary" sx={{ mt: 2 }}>Đang tải hồ sơ độc giả...</Typography>
       </Stack>
     );
@@ -311,8 +312,8 @@ export default function PatronDetailPage() {
           { label: "Đang mượn", value: activeBorrowCount, icon: <AutoStoriesOutlinedIcon />, color: "primary.main" },
           { label: "Quá hạn", value: overdueCount, icon: <EventAvailableOutlinedIcon />, color: "error.main" },
           { label: "Lượt ra/vào", value: logsTotal, icon: <HistoryOutlinedIcon />, color: "success.main" },
-        ].map((item) => (
-          <Grid key={item.label} size={{ xs: 12, sm: 4 }}>
+        ].map((item, idx) => (
+          <Grid key={item.label} size={{ xs: 12, sm: 4 }} sx={{ animation: `${fadeInUp} 0.35s ease-out`, animationDelay: `${idx * 0.08}s`, animationFillMode: "both" }}>
             <Card variant="outlined">
               <CardContent>
                 <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
@@ -380,10 +381,10 @@ export default function PatronDetailPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {borrows.map((record) => {
+                {borrows.map((record, idx) => {
                   const status = borrowStatus(record);
                   return (
-                    <TableRow key={record.id} hover>
+                    <TableRow key={record.id} hover sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.04}s`, animationFillMode: "both" }}>
                       <TableCell>
                         <Typography sx={{ fontWeight: 750 }}>{record.book?.title || record.book_id}</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
@@ -455,10 +456,10 @@ export default function PatronDetailPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {logs.map((log) => {
+                  {logs.map((log, idx) => {
                     const confidence = log.confidence == null ? null : Math.round(log.confidence * 100);
                     return (
-                      <TableRow key={log.id} hover>
+                      <TableRow key={log.id} hover sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.03}s`, animationFillMode: "both" }}>
                         <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDateTime(log.access_time)}</TableCell>
                         <TableCell>
                           <Chip size="small" color={log.access_type === "entry" ? "success" : "warning"} label={log.access_type === "entry" ? "Vào" : "Ra"} />

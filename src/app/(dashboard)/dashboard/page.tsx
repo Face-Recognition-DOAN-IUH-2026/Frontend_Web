@@ -26,6 +26,7 @@ import {
   useTheme,
 } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import ClockIcon from "@mui/icons-material/ScheduleOutlined";
 import LoginIcon from "@mui/icons-material/LoginOutlined";
@@ -36,6 +37,7 @@ import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import type { AccessLogPublic } from "@/lib/types";
 
 interface Stats {
@@ -51,7 +53,7 @@ function formatTime(value?: string) {
 }
 
 function statusChip(status?: string) {
-  if (status === "success" || status === "granted") return <Chip size="small" color="success" label="Thành công" />;
+  if (status === "success" || status === "granted") return <Chip size="small" color="success" label="Thành công" sx={{ animation: `${successPop} 0.35s ease-out` }} />;
   if (status === "denied") return <Chip size="small" color="error" label="Từ chối" />;
   return <Chip size="small" color="warning" label={status || "Không rõ"} />;
 }
@@ -186,19 +188,42 @@ export default function DashboardPage() {
     );
   }
 
+  const metrics = useMemo(() => [
+    { label: "Tổng độc giả", value: stats?.total_patrons ?? "—", icon: UsersIcon, color: theme.palette.primary.main, description: "Đã đăng ký" },
+    { label: "Đang có mặt", value: stats?.active_patrons ?? "—", icon: UserCheckIcon, color: theme.palette.success.main, description: "Trong thư viện" },
+    { label: "Lượt vào hôm nay", value: stats?.today_entries ?? "—", icon: LoginIcon, color: theme.palette.info.main, description: "Từ 00:00" },
+    { label: "Lượt ra hôm nay", value: stats?.today_exits ?? "—", icon: LogoutIcon, color: theme.palette.warning.main, description: "Từ 00:00" },
+  ], [stats, theme.palette]);
+
   return (
     <Stack spacing={3}>
       {loadError ? <Alert severity="warning">{loadError}</Alert> : null}
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
-        <MetricCard label="Tổng độc giả" value={stats?.total_patrons ?? "—"} icon={UsersIcon} color={theme.palette.primary.main} description="Đã đăng ký" />
-        <MetricCard label="Đang có mặt" value={stats?.active_patrons ?? "—"} icon={UserCheckIcon} color={theme.palette.success.main} description="Trong thư viện" />
-        <MetricCard label="Lượt vào hôm nay" value={stats?.today_entries ?? "—"} icon={LoginIcon} color={theme.palette.info.main} description="Từ 00:00" />
-        <MetricCard label="Lượt ra hôm nay" value={stats?.today_exits ?? "—"} icon={LogoutIcon} color={theme.palette.warning.main} description="Từ 00:00" />
-      </Box>
+      {/* Bento Grid Layout */}
+      <Box sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(6, 1fr)" },
+        gap: 2,
+      }}>
+        {/* Metric cards - each spans 1 column on lg, 1 on sm, full on xs */}
+        {metrics.map((card, idx) => (
+          <Box key={card.label} sx={{
+            gridColumn: { xs: "span 1", sm: "span 1", lg: "span 1" },
+            animation: `${fadeInUp} 0.35s ease-out`,
+            animationDelay: `${idx * 0.08}s`,
+            animationFillMode: "both",
+          }}>
+            <MetricCard {...card} />
+          </Box>
+        ))}
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1.45fr) minmax(320px, 0.85fr)" }, gap: 3 }}>
-        <Paper variant="outlined">
+        {/* Recent activity - spans 4 columns (hero), same row as quick actions */}
+        <Paper variant="outlined" sx={{
+          gridColumn: { xs: "span 1", sm: "span 2", lg: "span 4" },
+          animation: `${fadeInUp} 0.4s ease-out`,
+          animationDelay: "0.1s",
+          animationFillMode: "both",
+        }}>
           <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", p: 2 }}>
             <Box>
               <Typography variant="h6">Hoạt động gần đây</Typography>
@@ -208,7 +233,10 @@ export default function DashboardPage() {
           </Stack>
           <Divider />
           {loadingData ? (
-            <Box sx={{ p: 5, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+            <Box sx={{ p: 5, display: "grid", placeItems: "center" }}>
+              <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Đang tải...</Typography>
+            </Box>
           ) : recentLogs.length === 0 ? (
             <Alert severity="info" sx={{ m: 2 }}>Chưa có hoạt động nào.</Alert>
           ) : (
@@ -223,8 +251,8 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {recentLogs.map((log) => (
-                    <TableRow key={log.id} hover>
+                  {recentLogs.map((log, idx) => (
+                    <TableRow key={log.id} hover sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.04}s`, animationFillMode: "both" }}>
                       <TableCell sx={{ fontFamily: "monospace" }}>{formatTime(log.access_time)}</TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 800 }}>{log.patron_name || "Không rõ tên"}</Typography>
@@ -242,13 +270,59 @@ export default function DashboardPage() {
           )}
         </Paper>
 
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        {/* Quick actions - spans 2 columns */}
+        <Paper variant="outlined" sx={{
+          p: 2,
+          gridColumn: { xs: "span 1", sm: "span 2", lg: "span 2" },
+          animation: `${fadeInUp} 0.45s ease-out`,
+          animationDelay: "0.15s",
+          animationFillMode: "both",
+        }}>
           <Typography variant="h6">Thao tác nhanh</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Đi đến các luồng vận hành thường dùng</Typography>
           <Stack spacing={1.25}>
-            {quickActions.map((action) => <QuickAction key={action.href} {...action} />)}
+            {quickActions.map((action, idx) => (
+              <Box key={action.href} sx={{ animation: `${fadeInUp} 0.3s ease-out`, animationDelay: `${idx * 0.06}s`, animationFillMode: "both" }}>
+                <QuickAction {...action} />
+              </Box>
+            ))}
           </Stack>
         </Paper>
+
+        {/* AI mini-summary card - spans full width if admin */}
+        {role === "admin" && (
+          <Paper
+            variant="outlined"
+            component={Link}
+            href="/ai-command-center"
+            sx={{
+              gridColumn: { xs: "span 1", sm: "span 2", lg: "span 6" },
+              p: 2,
+              textDecoration: "none",
+              cursor: "pointer",
+              animation: `${fadeInUp} 0.4s ease-out`,
+              animationDelay: "0.2s",
+              animationFillMode: "both",
+              "&:hover": {
+                borderColor: "primary.main",
+                bgcolor: "action.hover",
+              },
+            }}
+          >
+            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+              <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText", borderRadius: 2 }}>
+                <AutoAwesomeIcon />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>AI Command Center</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Phân tích vận hành thư viện bởi AI — cảnh báo, thống kê và đề xuất thông minh
+                </Typography>
+              </Box>
+              <ArrowForwardIcon color="disabled" />
+            </Stack>
+          </Paper>
+        )}
       </Box>
     </Stack>
   );

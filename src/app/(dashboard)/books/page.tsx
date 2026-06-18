@@ -49,6 +49,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import IsbnScannerDialog from "@/components/IsbnScannerDialog";
 import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
 
@@ -396,7 +397,7 @@ export default function BooksPage() {
             <Button variant="text" color="inherit" onClick={() => { setPreviewFile(null); setPreviewData(null); setSelectedPreviewIndices(new Set()); }}>Hủy</Button>
           </Stack>
           {previewLoading ? (
-            <Box sx={{ py: 5, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+            <Box sx={{ py: 5, display: "grid", placeItems: "center" }}><CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} /></Box>
           ) : previewData?.length ? (
             <Stack spacing={2}>
               <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
@@ -600,7 +601,7 @@ export default function BooksPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}><CircularProgress /></TableCell>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}><CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} /></TableCell>
                 </TableRow>
               ) : displayBooks.length === 0 ? (
                 <TableRow>
@@ -608,7 +609,7 @@ export default function BooksPage() {
                     <Typography color="text.secondary">{searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}</Typography>
                   </TableCell>
                 </TableRow>
-              ) : displayBooks.map((book) => {
+              ) : displayBooks.map((book, idx) => {
                 const isSelected = selectedIds.has(book.id);
                 const hasBorrowed = book.total_copies - book.available_copies > 0;
                 return (
@@ -621,6 +622,9 @@ export default function BooksPage() {
                     borderLeft: isSelected ? "3px solid" : "3px solid transparent",
                     borderColor: "warning.main",
                     bgcolor: isSelected ? "rgba(255, 183, 77, 0.08)" : undefined,
+                    animation: `${slideInRight} 0.3s ease-out`,
+                    animationDelay: `${idx * 0.03}s`,
+                    animationFillMode: "both",
                   }}
                   onClick={() => router.push(`/books/${book.id}`)}
                 >
