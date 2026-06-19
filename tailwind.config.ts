@@ -56,6 +56,7 @@ const config: Config = {
         display: ["Outfit", "sans-serif"],
         body: ["Inter", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
+        serif: ["Playfair Display", "serif"],
       },
       boxShadow: {
         glow: "0 0 20px rgba(212, 168, 83, 0.3)",

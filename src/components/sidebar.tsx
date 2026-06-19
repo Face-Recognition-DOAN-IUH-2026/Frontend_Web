@@ -29,6 +29,7 @@ import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import LibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
+import MapIcon from "@mui/icons-material/MapOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import ShieldIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
@@ -50,6 +51,7 @@ const circulationItems = [
   { href: "/borrow", label: "Mượn sách", icon: BookPlusIcon },
   { href: "/return", label: "Trả sách", icon: BookReturnIcon },
   { href: "/books", label: "Kho sách", icon: LibraryIcon },
+  { href: "/library/map", label: "Bản đồ 3D", icon: MapIcon },
 ];
 
 const staffItems = [

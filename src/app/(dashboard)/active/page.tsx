@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -165,7 +165,7 @@ export default function ActivePage() {
               <Stack spacing={2}>
                 <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap" }}>
                   {Object.entries(CAMERA_CONFIG).map(([id, cfg]) => {
-                    const Icon = cfg.icon;
+                    const Icon = cfg.icon as React.ComponentType<{ fontSize?: string; sx?: object }>;
                     return (
                       <Paper
                         key={id}

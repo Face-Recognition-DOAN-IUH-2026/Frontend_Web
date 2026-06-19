@@ -227,7 +227,7 @@ function AssignmentCard({ item, onDelete }: { item: StaffScheduleAssignment; onD
           left: 0,
           width: 3,
           height: "100%",
-          bgcolor: state.color === "success" ? "success.main" : state.color === "warning" ? "warning.main" : state.color === "info" ? "info.main" : "primary.main",
+          bgcolor: state.color === "success" ? "success.main" : state.color === "info" ? "info.main" : state.color === "primary" ? "primary.main" : "action.disabled",
           borderRadius: "0 2px 2px 0",
           opacity: 0.7,
         },

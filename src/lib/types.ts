@@ -81,6 +81,10 @@ export interface TaskResult {
   access_token?: string;
   refresh_token?: string;
   detail?: string;
+  patron_id?: string;
+  student_code?: string;
+  full_name?: string;
+  access_type?: string;
 }
 
 // === Users ===
@@ -177,6 +181,7 @@ export interface PatronLookupResult {
   patron: PatronPublic | null;
   has_face: boolean;
   is_expired: boolean;
+  is_locked: boolean;
 }
 
 // === Borrow ===
