@@ -5,7 +5,7 @@ export async function GET(_request: NextRequest) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch(`${API_BASE}/library/shelves`, {
+    const res = await fetch(`${API_BASE}/api/library/shelves`, {
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
     });

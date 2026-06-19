@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
 import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 import type { BookData, ShelfData } from "./types";
 import ShelfModel from "./ShelfModel";
@@ -39,7 +40,7 @@ export default function LibraryScene(props: LibrarySceneProps) {
   return (
     <Canvas
       camera={{ position: [8, 6, 10], fov: 50, near: 0.1, far: 50 }}
-      shadows
+      shadows={{ enabled: true, type: THREE.PCFShadowMap }}
       style={{ width: "100vw", height: "100vh", display: "block" }}
     >
       <SceneContent {...props} />

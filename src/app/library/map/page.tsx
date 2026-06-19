@@ -1,16 +1,17 @@
 "use client";
 
-import dynamic from "next/dynamic";
-
-const LibraryMapContent = dynamic(() => import("./LibraryMapContent"), {
-  ssr: false,
-  loading: () => (
-    <div className="w-screen h-screen flex items-center justify-center bg-gray-900">
-      <div className="text-white/60 text-sm animate-pulse">Đang tải bản đồ thư viện...</div>
-    </div>
-  ),
-});
+import { useEffect, useState } from "react";
 
 export default function LibraryMapPage() {
-  return <LibraryMapContent />;
+  const [Comp, setComp] = useState<React.ComponentType<object> | null>(null);
+
+  useEffect(() => {
+    import("./LibraryMapContent").then((m) => setComp(() => m.default));
+  }, []);
+
+  if (!Comp) {
+    return <div className="w-screen h-screen bg-gray-900" />;
+  }
+
+  return <Comp />;
 }

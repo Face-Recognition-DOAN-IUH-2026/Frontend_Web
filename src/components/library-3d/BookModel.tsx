@@ -15,7 +15,6 @@ interface BookModelProps {
 const COLORS = {
   available: "#22c55e",
   borrowed: "#ef4444",
-  hover: "#eab308",
 };
 
 export default function BookModel({ data, position, onClick }: BookModelProps) {
@@ -23,6 +22,7 @@ export default function BookModel({ data, position, onClick }: BookModelProps) {
   const [hovered, setHovered] = useState(false);
   const [clicked, setClicked] = useState(false);
   const scaleRef = useRef(1);
+  const glowRef = useRef(0);
 
   useFrame(() => {
     if (clicked) {
@@ -33,12 +33,18 @@ export default function BookModel({ data, position, onClick }: BookModelProps) {
     } else {
       scaleRef.current += (1 - scaleRef.current) * 0.1;
     }
+
+    glowRef.current += ((hovered ? 0.35 : 0) - glowRef.current) * 0.1;
+
     if (meshRef.current) {
       meshRef.current.scale.setScalar(scaleRef.current);
+      const mat = meshRef.current.material as THREE.MeshStandardMaterial;
+      mat.emissive = new THREE.Color("#D4A853");
+      mat.emissiveIntensity = glowRef.current;
     }
   });
 
-  const color = hovered ? COLORS.hover : COLORS[data.status];
+  const color = COLORS[data.status];
 
   return (
     <group position={position}>
@@ -54,17 +60,17 @@ export default function BookModel({ data, position, onClick }: BookModelProps) {
         castShadow
       >
         <boxGeometry args={[0.2, 0.5, 0.3]} />
-        <meshStandardMaterial color={color} roughness={0.6} />
+        <meshStandardMaterial color={color} roughness={0.6} emissive="#000000" emissiveIntensity={0} />
       </mesh>
       {hovered && (
         <Text
           position={[0, 0.45, 0]}
           fontSize={0.06}
-          color="white"
+          color="#EDE8DF"
           anchorX="center"
           anchorY="bottom"
           outlineWidth={0.01}
-          outlineColor="black"
+          outlineColor="#000"
         >
           {data.title}
         </Text>

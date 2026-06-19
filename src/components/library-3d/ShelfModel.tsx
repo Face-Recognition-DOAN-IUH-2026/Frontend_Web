@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import * as THREE from "three";
+import { Html } from "@react-three/drei";
 import type { BookData, ShelfData } from "./types";
 import BookModel from "./BookModel";
 
@@ -30,14 +31,14 @@ export default function ShelfModel({ data, onBookClick }: ShelfModelProps) {
     return result;
   }, [books, numTiers]);
 
-  const woodMaterial = new THREE.MeshStandardMaterial({
-    color: "#8B5E3C",
-    roughness: 0.8,
+  const woodMaterial = useMemo(() => new THREE.MeshStandardMaterial({
+    color: "#5C3D2E",
+    roughness: 0.85,
     metalness: 0,
-  });
+  }), []);
 
   return (
-    <group position={data.position}>
+    <group position={[data.position[0], data.position[1] + SHELF_HEIGHT / 2, data.position[2]]}>
       {/* Backboard */}
       <mesh position={[0, 0, -SHELF_DEPTH / 2 + BOARD_THICKNESS / 2]} material={woodMaterial}>
         <boxGeometry args={[SHELF_WIDTH, SHELF_HEIGHT, BOARD_THICKNESS]} />
@@ -59,6 +60,13 @@ export default function ShelfModel({ data, onBookClick }: ShelfModelProps) {
           <boxGeometry args={[SHELF_WIDTH - BOARD_THICKNESS * 2, BOARD_THICKNESS, SHELF_DEPTH - BOARD_THICKNESS]} />
         </mesh>
       ))}
+
+      {/* Shelf label */}
+      <Html position={[0, SHELF_HEIGHT / 2 + 0.15, 0]} center>
+        <div className="px-2 py-0.5 rounded-md bg-surface/80 backdrop-blur-sm border border-primary/20 text-xs text-primary font-medium whitespace-nowrap select-none">
+          {data.code}
+        </div>
+      </Html>
 
       {/* Books on each tier */}
       {tiers.map((tier, ti) =>

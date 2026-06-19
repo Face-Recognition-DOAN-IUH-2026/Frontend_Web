@@ -181,6 +181,7 @@ export interface PatronLookupResult {
   patron: PatronPublic | null;
   has_face: boolean;
   is_expired: boolean;
+  is_locked: boolean;
 }
 
 // === Borrow ===
