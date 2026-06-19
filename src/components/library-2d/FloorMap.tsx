@@ -48,7 +48,8 @@ function buildGroups(shelves: ShelfData[], query: string): ShelfGroup[] {
           if (!match) continue;
         }
         if (!tierMap.has(book.tierIndex)) tierMap.set(book.tierIndex, [[], []]);
-        tierMap.get(book.tierIndex)![book.face].push(book);
+        const face = book.face === 1 ? 1 : 0;
+        tierMap.get(book.tierIndex)![face].push(book);
       }
       const tiers: TierRow[] = Array.from(tierMap.entries())
         .sort(([a], [b]) => a - b)
