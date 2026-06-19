@@ -13,7 +13,7 @@ interface ResultCardProps {
 }
 
 export default function ResultCard({ status, patronInfo, message }: ResultCardProps) {
-  type PulseColor = 'emerald' | 'red' | 'amber' | 'none';
+  type PulseColor = 'emerald' | 'red' | 'blue' | 'none';
   const config: Record<string, {
     borderColor: string;
     bgColor: string;
@@ -41,11 +41,11 @@ export default function ResultCard({ status, patronInfo, message }: ResultCardPr
       ),
     },
     unregistered: {
-      borderColor: 'border-amber-500',
-      bgColor: 'bg-amber-500/10',
-      pulseColor: 'amber',
+      borderColor: 'border-blue-500',
+      bgColor: 'bg-blue-500/10',
+      pulseColor: 'blue',
       icon: (
-        <svg className="w-16 h-16 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-16 h-16 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
         </svg>
       ),
@@ -76,13 +76,13 @@ export default function ResultCard({ status, patronInfo, message }: ResultCardPr
         {patronInfo && (
           <div className="space-y-2 mb-4">
             <h3 className="text-2xl font-bold text-white">{patronInfo.fullName}</h3>
-            <p className="text-amber-400 font-mono text-lg">{patronInfo.mssv}</p>
+            <p className="text-blue-400 font-mono text-lg">{patronInfo.mssv}</p>
             <p className="text-slate-400">{patronInfo.faculty}</p>
           </div>
         )}
 
         {message && (
-          <p className={`text-lg ${status === 'success' ? 'text-emerald-400' : status === 'error' ? 'text-red-400' : 'text-amber-400'}`}>
+          <p className={`text-lg ${status === 'success' ? 'text-emerald-400' : status === 'error' ? 'text-red-400' : 'text-blue-400'}`}>
             {message}
           </p>
         )}

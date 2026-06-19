@@ -25,13 +25,13 @@ export default function MssvInput({ onSubmit, disabled }: MssvInputProps) {
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder="Nhập MSSV..."
-        className="w-full bg-slate-800/80 border border-slate-600 rounded-xl px-5 py-4 text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all disabled:opacity-50 font-mono tracking-wider text-center"
+        className="w-full bg-slate-800/80 border border-slate-600 rounded-xl px-5 py-4 text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all disabled:opacity-50 font-mono tracking-wider text-center"
       />
       {value && (
         <button
           onClick={() => onSubmit(value.trim())}
           disabled={disabled}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 disabled:opacity-50 transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-white disabled:opacity-50 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />

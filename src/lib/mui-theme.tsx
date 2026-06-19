@@ -49,8 +49,8 @@ function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
     palette: {
       mode,
       primary: {
-        main: dark ? "#E0B75D" : "#7A540E",
-        contrastText: dark ? "#0D111B" : "#FFFFFF",
+        main: "#1A73E8",
+        contrastText: "#FFFFFF",
       },
       secondary: {
         main: dark ? "#69C58A" : "#226B42",

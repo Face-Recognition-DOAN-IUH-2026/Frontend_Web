@@ -69,7 +69,7 @@ const config: Config = {
         xl: "16px",
       },
       animation: {
-        "pulse-amber": "pulse-amber 2s ease-in-out infinite",
+        "pulse-blue": "pulse-blue 2s ease-in-out infinite",
         "slide-in": "slide-in 200ms ease-out",
         shimmer: "shimmer 1.5s ease-in-out infinite",
         "success-pop": "success-pop 300ms ease-out",
@@ -77,7 +77,7 @@ const config: Config = {
         "fade-in-up": "fade-in-up 300ms ease-out",
       },
       keyframes: {
-        "pulse-amber": {
+        "pulse-blue": {
           "0%, 100%": { opacity: "1", transform: "scale(1)" },
           "50%": { opacity: "0.5", transform: "scale(1.3)" },
         },

@@ -1,13 +1,13 @@
 'use client';
 
 interface PulseAnimationProps {
-  color?: 'amber' | 'emerald' | 'red';
+  color?: 'blue' | 'emerald' | 'red';
   size?: number;
 }
 
-export default function PulseAnimation({ color = 'amber', size = 120 }: PulseAnimationProps) {
+export default function PulseAnimation({ color = 'blue', size = 120 }: PulseAnimationProps) {
   const colorMap = {
-    amber: 'border-amber-500',
+    blue: 'border-blue-500',
     emerald: 'border-emerald-500',
     red: 'border-red-500',
   };
