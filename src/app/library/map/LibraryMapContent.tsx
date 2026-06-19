@@ -17,6 +17,14 @@ export default function LibraryMapContent() {
   const [flyToTarget, setFlyToTarget] = useState<[number, number, number] | null>(null);
   const [showFloorPanel, setShowFloorPanel] = useState(false);
 
+  const handleFloorSelect = (floor: string) => {
+    const floorShelves = shelves.filter((s) => s.floor === floor);
+    if (floorShelves.length === 0) return;
+    const avgX = floorShelves.reduce((sum, s) => sum + s.position[0], 0) / floorShelves.length;
+    const avgZ = floorShelves.reduce((sum, s) => sum + s.position[2], 0) / floorShelves.length;
+    setFlyToTarget([avgX, 0, avgZ]);
+  };
+
   if (loading) {
     return (
       <div className="w-screen h-screen flex flex-col items-center justify-center gap-8 bg-bg">
@@ -78,6 +86,7 @@ export default function LibraryMapContent() {
         <FloorTablePanel
           shelves={shelves}
           onBookClick={(book) => setSelectedBook(book)}
+          onFloorSelect={handleFloorSelect}
         />
       )}
     </div>

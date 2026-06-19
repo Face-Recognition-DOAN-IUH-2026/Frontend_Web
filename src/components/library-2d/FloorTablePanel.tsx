@@ -6,6 +6,7 @@ import type { BookData, ShelfData } from "@/components/library-3d/types";
 interface FloorTablePanelProps {
   shelves: ShelfData[];
   onBookClick?: (book: BookData) => void;
+  onFloorSelect?: (floor: string) => void;
 }
 
 const FACE_LABELS = ["Mặt trái", "Mặt phải"] as const;
@@ -23,12 +24,17 @@ function groupByFloor(shelves: ShelfData[]): Record<string, ShelfData[]> {
   return map;
 }
 
-export default function FloorTablePanel({ shelves, onBookClick }: FloorTablePanelProps) {
+export default function FloorTablePanel({ shelves, onBookClick, onFloorSelect }: FloorTablePanelProps) {
   const floorMap = useMemo(() => groupByFloor(shelves), [shelves]);
   const floors = useMemo(() => Object.keys(floorMap).sort(), [floorMap]);
   const [activeFloor, setActiveFloor] = useState(() => floors[0] || "A");
 
   const currentShelves = floorMap[activeFloor] || [];
+
+  const handleFloorClick = (f: string) => {
+    setActiveFloor(f);
+    onFloorSelect?.(f);
+  };
 
   return (
     <div className="absolute top-14 left-4 z-20 w-[420px] max-h-[calc(100vh-80px)] rounded-xl bg-surface/95 backdrop-blur-xl shadow-xl border border-primary/10 flex flex-col animate-fade-in">
@@ -46,7 +52,7 @@ export default function FloorTablePanel({ shelves, onBookClick }: FloorTablePane
           {floors.map((f) => (
             <button
               key={f}
-              onClick={() => setActiveFloor(f)}
+              onClick={() => handleFloorClick(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
                 activeFloor === f
                   ? "bg-primary text-white border-primary"
