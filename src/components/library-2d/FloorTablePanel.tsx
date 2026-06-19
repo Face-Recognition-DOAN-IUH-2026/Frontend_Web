@@ -37,9 +37,12 @@ export default function FloorTablePanel({ shelves, onBookClick, onFloorSelect }:
   };
 
   return (
-    <div className="absolute top-14 left-4 z-20 w-[420px] max-h-[calc(100vh-80px)] rounded-xl bg-surface/95 backdrop-blur-xl shadow-xl border border-primary/10 flex flex-col animate-fade-in">
+    <div
+      className="absolute top-14 left-4 z-20 w-[520px] rounded-xl bg-surface/95 backdrop-blur-xl shadow-xl border border-primary/10 flex flex-col animate-fade-in"
+      style={{ maxHeight: "calc(100vh - 80px)" }}
+    >
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-border">
+      <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border">
         <h3 className="text-sm font-bold text-text flex items-center gap-1.5">
           <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -62,16 +65,19 @@ export default function FloorTablePanel({ shelves, onBookClick, onFloorSelect }:
               Tầng {f}
             </button>
           ))}
+          <span className="ml-auto text-[10px] text-text-3">
+            {currentShelves.length} kệ
+          </span>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-xs">
+      {/* Table scroll area */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <table className="w-full text-xs border-collapse">
           <thead className="sticky top-0 z-10">
             <tr className="bg-surface-2">
               <th className="px-3 py-2 text-left font-bold text-text-3 uppercase tracking-wider w-[60px]">Kệ</th>
-              <th className="px-3 py-2 text-left font-bold text-text-3 uppercase tracking-wider w-[55px]">Tầng</th>
+              <th className="px-3 py-2 text-left font-bold text-text-3 uppercase tracking-wider w-[50px]">Tầng</th>
               <th className="px-3 py-2 text-left font-bold text-text-3 uppercase tracking-wider w-[70px]">Mặt</th>
               <th className="px-3 py-2 text-left font-bold text-text-3 uppercase tracking-wider">Sách</th>
             </tr>
