@@ -5,13 +5,14 @@ import type { BookData } from "./types";
 interface InfoPanelProps {
   book: BookData | null;
   onClose: () => void;
+  className?: string;
 }
 
-export default function InfoPanel({ book, onClose }: InfoPanelProps) {
+export default function InfoPanel({ book, onClose, className }: InfoPanelProps) {
   if (!book) return null;
 
   return (
-    <div className="absolute top-6 right-6 z-10 w-72 p-5 rounded-2xl bg-surface/95 backdrop-blur-xl shadow-glow-sm border border-primary/10 animate-fade-in">
+    <div className={`absolute top-6 right-6 z-10 w-72 p-5 rounded-2xl bg-surface/95 backdrop-blur-xl shadow-glow-sm border border-primary/10 animate-fade-in${className ? ` ${className}` : ""}`}>
       <div className="flex items-start justify-between mb-4">
         <h3 className="font-serif text-lg font-semibold text-primary leading-tight pr-2">Chi tiết sách</h3>
         <button
