@@ -49,8 +49,8 @@ export default function HomePage() {
 
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-4 pt-24 pb-20 text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             Hệ thống quản lý thư viện thông minh
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 leading-tight tracking-tight">

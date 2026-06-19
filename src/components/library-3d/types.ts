@@ -5,11 +5,14 @@ export interface BookData {
   isbn: string;
   status: "available" | "borrowed";
   tierIndex: number;
+  face: 0 | 1;
 }
 
 export interface ShelfData {
   id: string;
   code: string;
+  floor: string;
+  shelfNum: number;
   position: [number, number, number];
   numTiers: number;
   books: BookData[];

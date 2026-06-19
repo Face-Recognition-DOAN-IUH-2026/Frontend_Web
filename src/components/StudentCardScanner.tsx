@@ -602,8 +602,8 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
                   backdropFilter: "blur(4px)",
                 }}
               >
-                {phase === "detecting" && <RadioButtonUncheckedIcon sx={{ fontSize: 18, color: "#7A8CA8", animation: "pulse-amber 2s ease-in-out infinite" }} />}
-                {phase === "processing" && <HourglassBottomIcon sx={{ fontSize: 18, color: "#D4A853", animation: "pulse-amber 1s ease-in-out infinite" }} />}
+                {phase === "detecting" && <RadioButtonUncheckedIcon sx={{ fontSize: 18, color: "#7A8CA8", animation: "pulse-blue 2s ease-in-out infinite" }} />}
+                {phase === "processing" && <HourglassBottomIcon sx={{ fontSize: 18, color: "#1A73E8", animation: "pulse-blue 1s ease-in-out infinite" }} />}
                 <Typography variant="body2" sx={{ fontWeight: 600, color: "common.white", whiteSpace: "nowrap" }}>
                   {phase === "processing"
                     ? `Đang nhận dạng... ${detectAttempts > 0 ? `(${detectAttempts}/${MAX_DETECT_ATTEMPTS})` : ""}`

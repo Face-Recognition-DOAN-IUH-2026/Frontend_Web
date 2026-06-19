@@ -39,7 +39,7 @@ export default function BookModel({ data, position, onClick }: BookModelProps) {
     if (meshRef.current) {
       meshRef.current.scale.setScalar(scaleRef.current);
       const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-      mat.emissive = new THREE.Color("#D4A853");
+      mat.emissive = new THREE.Color("#1A73E8");
       mat.emissiveIntensity = glowRef.current;
     }
   });

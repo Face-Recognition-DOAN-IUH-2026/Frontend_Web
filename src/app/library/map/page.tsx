@@ -1,17 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+
+const LibraryMapContent = dynamic(() => import("./LibraryMapContent"), { ssr: false });
 
 export default function LibraryMapPage() {
-  const [Comp, setComp] = useState<React.ComponentType<object> | null>(null);
-
-  useEffect(() => {
-    import("./LibraryMapContent").then((m) => setComp(() => m.default));
-  }, []);
-
-  if (!Comp) {
-    return <div className="w-screen h-screen bg-gray-900" />;
-  }
-
-  return <Comp />;
+  return <LibraryMapContent />;
 }

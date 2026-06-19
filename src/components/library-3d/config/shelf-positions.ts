@@ -11,13 +11,13 @@ export const AUTO_POSITIONS: [number, number, number][] = [
 ];
 
 export const SHELF_POSITIONS: Record<string, [number, number, number]> = {
-  "A-12-3": AUTO_POSITIONS[0],
-  "A-12-2": AUTO_POSITIONS[1],
-  "A-12-1": AUTO_POSITIONS[2],
-  "B-05-1": AUTO_POSITIONS[3],
-  "B-05-2": AUTO_POSITIONS[4],
-  "C-01-1": AUTO_POSITIONS[6],
-  "C-01-2": AUTO_POSITIONS[7],
+  "A-10": AUTO_POSITIONS[0],
+  "A-11": AUTO_POSITIONS[1],
+  "A-12": AUTO_POSITIONS[2],
+  "B-05": AUTO_POSITIONS[3],
+  "B-08": AUTO_POSITIONS[4],
+  "C-01": AUTO_POSITIONS[6],
+  "C-03": AUTO_POSITIONS[7],
 };
 
 export function assignPositions(shelves: ShelfData[]): ShelfData[] {

@@ -93,9 +93,12 @@ export default function StaffSchedulesPage() {
   }, [loadData]);
 
   const shiftList = useMemo(() => {
-    if (isAdmin) return shifts;
-    const used = new Set(assignments.map((a) => a.shiftId));
-    return Array.from(used).map((id) => assignments.find((a) => a.shiftId === id)?.shift).filter(Boolean) as StaffShift[];
+    const list = isAdmin
+      ? shifts
+      : Array.from(new Set(assignments.map((a) => a.shiftId)))
+          .map((id) => assignments.find((a) => a.shiftId === id)?.shift)
+          .filter(Boolean) as StaffShift[];
+    return [...list].sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
   }, [shifts, assignments, isAdmin]);
 
   const weekStats = useMemo(() => {

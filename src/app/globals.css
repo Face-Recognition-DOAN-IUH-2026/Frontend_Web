@@ -10,9 +10,9 @@
     --color-surface: 255 255 255;
     --color-surface-2: 241 245 249;
     --color-surface-3: 226 232 240;
-    --color-primary: 122 84 14;
-    --color-primary-dark: 91 62 10;
-    --color-primary-dim: 146 104 25;
+    --color-primary: 26 115 232;
+    --color-primary-dark: 21 87 176;
+    --color-primary-dim: 210 100% 85%;
     --color-secondary: 34 107 66;
     --color-secondary-dark: 27 84 52;
     --color-tertiary: 23 92 211;
@@ -56,9 +56,9 @@
     --color-surface: 28 32 48;
     --color-surface-2: 36 40 56;
     --color-surface-3: 44 48 66;
-    --color-primary: 212 168 83;
-    --color-primary-dark: 168 132 48;
-    --color-primary-dim: 138 106 40;
+    --color-primary: 26 115 232;
+    --color-primary-dark: 21 87 176;
+    --color-primary-dim: 210 100% 85%;
     --color-secondary: 74 140 92;
     --color-secondary-dark: 61 115 80;
     --color-tertiary: 91 155 213;
@@ -79,7 +79,7 @@
     --foreground: 35 18% 91%;
     --card: 222 30% 11%;
     --card-foreground: 35 18% 91%;
-    --primary: 39 54% 59%; /* #D4A853 amber gold */
+    --primary: 212 100% 51%; /* #1A73E8 */
     --primary-foreground: 222 30% 7%;
     --secondary: 150 28% 38%; /* #4A8C5C */
     --secondary-foreground: 35 18% 91%;
@@ -91,7 +91,7 @@
     --destructive-foreground: 35 18% 91%;
     --border: 222 20% 22%;
     --input: 222 20% 22%;
-    --ring: 39 54% 59%;
+    --ring: 212 100% 51%;
     --radius: 0.5rem;
   }
 
@@ -121,7 +121,7 @@
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #D4A853;
+    background: #1A73E8;
   }
 }
 
@@ -234,10 +234,10 @@
   }
   .btn-primary {
     @apply btn bg-primary px-4 py-2.5 active:scale-[0.98];
-    color: #12151E;
+    color: #FFFFFF;
   }
   .btn-primary:hover {
-    background-color: #A88430;
+    background-color: #1557B0;
   }
   .btn-secondary {
     @apply btn bg-surface-2 text-text border px-4 py-2.5 active:scale-[0.98];
@@ -347,7 +347,7 @@
 
   /* Selection color */
   ::selection {
-    background: rgba(212, 168, 83, 0.3);
+    background: rgba(26, 115, 232, 0.3);
     color: #EDE8DF;
   }
 }
