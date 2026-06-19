@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  AlertTitle,
   Avatar,
   Box,
   Button,
@@ -16,21 +17,17 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
+  Grid,
   IconButton,
   InputAdornment,
+  LinearProgress,
   List,
-  ListItemButton,
   MenuItem,
   Paper,
   Select,
+  Slide,
   Snackbar,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -39,16 +36,19 @@ import {
 import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
-import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import SearchIcon from "@mui/icons-material/Search";
+import RefreshIcon from "@mui/icons-material/RefreshOutlined";
+import SearchIcon from "@mui/icons-material/SearchOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
+import { fadeInUp, slideInRight, successPop } from "@/lib/animations";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
+
+const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.13:8080/video";
+const BORROW_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
 
 type BorrowerFilter = "all" | "overdue" | "active";
 
@@ -99,16 +99,17 @@ export default function ReturnPage() {
   const [condition, setCondition] = useState("");
   const [error, setError] = useState("");
   const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
-
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const readerRef = useRef<any>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState("");
   const [scannedReturns, setScannedReturns] = useState<ScannedReturnItem[]>([]);
   const [batchReturning, setBatchReturning] = useState(false);
   const [scanToast, setScanToast] = useState("");
+  const imgRef = useRef<HTMLImageElement>(null);
+  const readerRef = useRef<any>(null);
+  const [imgReady, setImgReady] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastScannedRef = useRef<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadBorrowers = useCallback(async () => {
     setLoadingBorrowers(true);
@@ -227,21 +228,12 @@ export default function ReturnPage() {
     setScannedReturns((prev) => prev.filter((item) => item.isbn !== isbn));
   };
 
-  const stopCamera = useCallback(() => {
-    if (readerRef.current) {
-      try { readerRef.current.reset(); } catch {}
-      readerRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setCameraReady(false);
-  }, []);
-
   const handleScanned = useCallback((isbn: string) => {
     const normalized = isbn.replace(/-/g, "");
+    if (!/^\d{10,13}$/.test(normalized)) return;
+    if (normalized === lastScannedRef.current) return;
+    lastScannedRef.current = normalized;
+
     let toast = "";
     setScannedReturns((prev) => {
       if (prev.some((item) => item.isbn === normalized)) {
@@ -260,258 +252,339 @@ export default function ReturnPage() {
       return prev;
     });
     setScanToast(toast);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      lastScannedRef.current = null;
+    }, 2000);
   }, [detail]);
+
+  const stopScanning = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const stopReader = useCallback(() => {
+    if (readerRef.current) {
+      try { readerRef.current.reset(); } catch {}
+      readerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!scannerOpen) {
-      stopCamera();
+      stopScanning();
       setCameraError("");
-      setCameraReady(false);
+      setImgReady(false);
+      setScannedReturns([]);
       return;
     }
-    let active = true;
-    (async () => {
-      try {
-        setCameraError("");
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
-        if (!active) return;
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
-        });
-        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => { setCameraReady(true); };
-        }
-      } catch (err: any) {
-        if (!active) return;
-        if (err.name === "NotAllowedError") setCameraError("Không có quyền truy cập camera.");
-        else if (err.name === "NotFoundError") setCameraError("Không tìm thấy camera trên thiết bị.");
-        else setCameraError("Không thể khởi động camera.");
-      }
-    })();
-    return () => { active = false; };
-  }, [scannerOpen, stopCamera]);
+    setImgReady(false);
+    setCameraError("");
+  }, [scannerOpen, stopScanning]);
 
   useEffect(() => {
-    if (!cameraReady || !videoRef.current || !scannerOpen) return;
+    if (!imgReady || !imgRef.current) return;
+    stopScanning();
+    intervalRef.current = setInterval(async () => {
+      if (!imgRef.current) return;
+      if (!readerRef.current) return;
+      const img = imgRef.current;
+      if (!img.complete) return;
+      try {
+        const result = await readerRef.current.decodeFromImageElement(img);
+        if (result) {
+          handleScanned(result.getText());
+        }
+      } catch {}
+    }, 200);
+    return () => stopScanning();
+  }, [imgReady, handleScanned, stopScanning]);
+
+  useEffect(() => {
     let active = true;
     (async () => {
       try {
         const { BrowserMultiFormatReader } = await import("@zxing/browser");
         if (!active) return;
-        const reader = new BrowserMultiFormatReader();
-        readerRef.current = reader;
-        reader.decodeFromVideoElement(videoRef.current!, (result, err) => {
-          if (!active) return;
-          if (result) {
-            const code = result.getText();
-            if (/^\d{10,13}$/.test(code.replace(/-/g, ""))) {
-              handleScanned(code);
-            }
-          }
-        });
-      } catch {}
+        readerRef.current = new BrowserMultiFormatReader();
+      } catch (err) {
+        console.error("Failed to load ZXing:", err);
+      }
     })();
-    return () => { active = false; };
-  }, [cameraReady, scannerOpen, handleScanned]);
-
-  useEffect(() => () => stopCamera(), [stopCamera]);
+    return () => { active = false; stopReader(); };
+  }, []);
 
   return (
-    <Stack spacing={3}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 2 }}>
-        {[
-          { label: "Độc giả đang mượn", value: totals.borrowers, icon: UsersIcon, color: "primary.main" },
-          { label: "Sách chưa trả", value: totals.books, icon: BookIcon, color: "success.main" },
-          { label: "Sách quá hạn", value: totals.overdue, icon: AlertIcon, color: "error.main" },
-        ].map((item) => {
-          const Icon = item.icon;
-          return (
-            <Card key={item.label} variant="outlined">
-              <CardContent>
-                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>{item.label}</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 900 }}>{item.value}</Typography>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: "calc(100vh - 120px)" }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Typography variant="h5" sx={{ fontWeight: 900, display: "flex", alignItems: "center", gap: 1 }}>
+          <BookIcon color="primary" />
+          Trả sách
+        </Typography>
+        {selectedStudentCode && (
+          <Button variant="outlined" color="error" size="small" onClick={() => { setSelectedStudentCode(null); setDetail(null); }}>
+            Hủy chọn
+          </Button>
+        )}
+      </Box>
+
+      {error ? (
+        <Slide direction="down" in={!!error} timeout={250}>
+          <Alert severity="error" onClose={() => setError("")} sx={{ animation: `${slideInRight} 0.25s ease-out` }}>
+            <AlertTitle>Lỗi</AlertTitle>
+            {error}
+          </Alert>
+        </Slide>
+      ) : null}
+
+      <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
+        <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Card variant="outlined" sx={{ flex: "0 0 auto" }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <UsersIcon color="primary" />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Danh sách độc giả</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {totals.borrowers} độc giả | {totals.books} sách | {totals.overdue} quá hạn
+                    </Typography>
                   </Box>
-                  <Avatar sx={{ bgcolor: item.color, color: "primary.contrastText" }}>
-                    <Icon />
-                  </Avatar>
+                  <Button size="small" startIcon={<RefreshIcon />} onClick={loadBorrowers} disabled={loadingBorrowers} />
+                </Stack>
+
+                <TextField
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Tìm theo MSSV hoặc tên..."
+                  fullWidth
+                  size="small"
+                  slotProps={{
+                    input: {
+                      startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                    },
+                  }}
+                />
+
+                <ToggleButtonGroup exclusive fullWidth size="small" value={filter} onChange={(_, value) => value && setFilter(value)}>
+                  <ToggleButton value="all">Tất cả</ToggleButton>
+                  <ToggleButton value="overdue">Quá hạn</ToggleButton>
+                  <ToggleButton value="active">Đúng hạn</ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {loadingBorrowers ? (
+            <Card variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <CircularProgress />
+            </Card>
+          ) : filteredBorrowers.length === 0 ? (
+            <Card variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <CardContent>
+                <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary" }}>
+                  <UsersIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+                  <Typography>Không tìm thấy độc giả phù hợp</Typography>
                 </Stack>
               </CardContent>
             </Card>
-          );
-        })}
-      </Box>
-
-      {error ? <Alert severity="error" onClose={() => setError("")}>{error}</Alert> : null}
-
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", xl: "420px minmax(0, 1fr)" }, gap: 3 }}>
-        <Paper variant="outlined" sx={{ minHeight: 620, p: 2 }}>
-          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
-            <Box>
-              <Typography variant="h6">Độc giả đang mượn</Typography>
-              <Typography variant="body2" color="text.secondary">Chọn độc giả để xem sách cần trả</Typography>
-            </Box>
-            <Button startIcon={<RefreshIcon />} onClick={loadBorrowers} disabled={loadingBorrowers}>Tải lại</Button>
-          </Stack>
-
-          <TextField
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Tìm theo MSSV hoặc tên..."
-            fullWidth
-            size="small"
-            slotProps={{
-              input: {
-                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
-              },
-            }}
-          />
-
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            value={filter}
-            onChange={(_, value) => value && setFilter(value)}
-            sx={{ mt: 2 }}
-          >
-            <ToggleButton value="all">Tất cả</ToggleButton>
-            <ToggleButton value="overdue">Quá hạn</ToggleButton>
-            <ToggleButton value="active">Đúng hạn</ToggleButton>
-          </ToggleButtonGroup>
-
-          <Divider sx={{ my: 2 }} />
-
-          {loadingBorrowers ? (
-            <Box sx={{ py: 8, display: "grid", placeItems: "center" }}><CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} /></Box>
-          ) : borrowers.length === 0 ? (
-            <Alert severity="info">Không có độc giả đang mượn sách.</Alert>
-          ) : filteredBorrowers.length === 0 ? (
-            <Alert severity="info">Không tìm thấy độc giả phù hợp.</Alert>
           ) : (
-            <List disablePadding sx={{ maxHeight: 430, overflowY: "auto" }}>
-              {filteredBorrowers.map((borrower, idx) => {
+            <List disablePadding sx={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
+              {filteredBorrowers.map((borrower) => {
                 const selected = borrower.patron.student_code === selectedStudentCode;
+                const hasOverdue = borrower.overdue_count > 0;
                 return (
-                  <ListItemButton
+                  <Paper
                     key={borrower.patron.id}
-                    selected={selected}
+                    variant="outlined"
                     onClick={() => setSelectedStudentCode(borrower.patron.student_code)}
-                    sx={{ mb: 1, border: 1, borderColor: selected ? "primary.main" : "divider", borderRadius: 1, animation: `${fadeInUp} 0.3s ease-out`, animationDelay: `${idx * 0.04}s`, animationFillMode: "both" }}
+                    sx={{
+                      cursor: "pointer",
+                      p: 1.5,
+                      borderLeft: 4,
+                      borderLeftColor: hasOverdue ? "error.main" : "success.main",
+                      borderColor: selected ? "primary.main" : "divider",
+                      bgcolor: selected ? "action.selected" : undefined,
+                      transition: "all .15s",
+                      "&:hover": { borderColor: "primary.light" },
+                    }}
                   >
-                    <Box sx={{ minWidth: 0, flex: 1, pr: 1 }}>
-                      <Typography sx={{ fontWeight: 900 }} noWrap>{borrowerName(borrower)}</Typography>
-                      <Typography variant="caption" sx={{ display: "block", mt: 0.5, fontFamily: "monospace" }}>
-                        {borrower.patron.student_code}
+                    <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                      <Avatar sx={{ width: 36, height: 36, bgcolor: hasOverdue ? "error.main" : "success.main", fontSize: 13, fontWeight: 700 }}>
+                        {borrowerName(borrower)[0]?.toUpperCase() || "?"}
+                      </Avatar>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography sx={{ fontWeight: 900, fontSize: 14 }} noWrap>{borrowerName(borrower)}</Typography>
+                        <Typography variant="caption" sx={{ fontFamily: "monospace", display: "block" }}>
+                          {borrower.patron.student_code}
+                        </Typography>
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", mt: 0.3 }}>
+                          <Chip size="small" label={`${borrower.total_borrowed} sách`} sx={{ height: 18, fontSize: 10 }} />
+                          {hasOverdue ? (
+                            <Chip size="small" color="error" label={`${borrower.overdue_count} quá hạn`} sx={{ height: 18, fontSize: 10 }} />
+                          ) : (
+                            <Chip size="small" color="success" label="Tốt" sx={{ height: 18, fontSize: 10 }} />
+                          )}
+                        </Stack>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ textAlign: "right", flexShrink: 0 }}>
+                        {formatDate(borrower.nearest_due_at)}
                       </Typography>
-                      <Stack direction="row" spacing={1} sx={{ mt: 0.75, alignItems: "center", justifyContent: "space-between" }}>
-                        <Typography variant="caption" color="text.secondary">{borrower.total_borrowed} sách đang mượn</Typography>
-                        <Typography variant="caption" color="text.secondary">Hạn gần nhất {formatDate(borrower.nearest_due_at)}</Typography>
-                      </Stack>
-                    </Box>
-                    <Chip
-                      size="small"
-                      color={borrower.overdue_count > 0 ? "error" : "success"}
-                      label={borrower.overdue_count > 0 ? `${borrower.overdue_count} quá hạn` : "Đúng hạn"}
-                    />
-                  </ListItemButton>
+                    </Stack>
+                  </Paper>
                 );
               })}
             </List>
           )}
-        </Paper>
 
-        <Paper variant="outlined" sx={{ minHeight: 620, p: 2 }}>
-          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
-            <Box>
-              <Typography variant="h6">Chi tiết trả sách</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {selectedBorrower ? `${borrowerName(selectedBorrower)} - ${selectedBorrower.patron.student_code}` : "Chọn một độc giả ở danh sách bên trái"}
-              </Typography>
-            </Box>
-            {selectedStudentCode && (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<QrCodeScannerIcon />}
-                onClick={() => setScannerOpen(true)}
-              >
-                Quét ISBN
-              </Button>
-            )}
-          </Stack>
+          {selectedBorrower ? (
+            <Card
+              variant="outlined"
+              sx={{
+                flex: "0 0 auto",
+                borderLeft: 4,
+                borderLeftColor: selectedBorrower.overdue_count > 0 ? "error.main" : "success.main",
+              }}
+            >
+              <CardContent>
+                <Stack spacing={2}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <Avatar sx={{ width: 48, height: 48, bgcolor: "primary.main" }}>
+                      {selectedBorrower.patron.full_name?.[0]?.toUpperCase() || "?"}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 900 }} noWrap>
+                        {borrowerName(selectedBorrower)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {selectedBorrower.patron.student_code}
+                      </Typography>
+                    </Box>
+                    <Chip size="small" color="success" label="Đang mượn" icon={<CheckCircleIcon />} />
+                  </Box>
 
-          {!selectedStudentCode ? (
-            <Alert severity="info">Chọn một độc giả đang mượn để xem sách và xác nhận trả.</Alert>
-          ) : loadingDetail ? (
-            <Box sx={{ minHeight: 420, display: "grid", placeItems: "center" }}><CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} /></Box>
-          ) : !detail || detail.records.length === 0 ? (
-            <Alert severity="success">Độc giả này đã trả hết sách.</Alert>
-          ) : (
-            <Stack spacing={2}>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                <Chip color="primary" label={`${detail.total} sách đang mượn`} />
-                <Chip color={detail.overdue_count > 0 ? "error" : "success"} label={detail.overdue_count > 0 ? `${detail.overdue_count} quá hạn` : "Không quá hạn"} />
-                {detail.patron.email ? <Chip variant="outlined" label={detail.patron.email} /> : null}
-              </Stack>
+                  <Divider />
 
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Sách</TableCell>
-                      <TableCell>ISBN</TableCell>
-                      <TableCell>Ngày mượn</TableCell>
-                      <TableCell>Hạn trả</TableCell>
-                      <TableCell>Vị trí</TableCell>
-                      <TableCell>Trạng thái</TableCell>
-                      <TableCell align="right">Thao tác</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
+                  <Stack spacing={1}>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                      <Chip size="small" color="primary" label={`${selectedBorrower.total_borrowed} sách`} />
+                      {selectedBorrower.overdue_count > 0 && (
+                        <Chip size="small" color="error" label={`${selectedBorrower.overdue_count} quá hạn`} />
+                      )}
+                    </Stack>
+
+                    {selectedBorrower.overdue_count > 0 && (
+                      <Alert severity="error" sx={{ py: 0.5 }}>
+                        <AlertIcon fontSize="small" sx={{ mr: 0.5 }} />
+                        Có {selectedBorrower.overdue_count} cuốn sách quá hạn
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      size="large"
+                      fullWidth
+                      startIcon={<QrCodeScannerIcon />}
+                      onClick={() => setScannerOpen(true)}
+                      sx={{ animation: `${fadeInUp} 0.3s ease-out` }}
+                    >
+                      Quét mã vạch trả sách
+                    </Button>
+                  </Stack>
+                </Stack>
+              </CardContent>
+            </Card>
+          ) : null}
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 7, lg: 8 }} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {selectedBorrower ? (
+            <Card variant="outlined" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+              <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 1, md: 2 }, overflow: "auto" }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
+                  <BookIcon color="primary" />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
+                    Sách cần trả
+                  </Typography>
+                  {detail && (
+                    <Chip size="small" label={`${detail.total} cuốn`} sx={{ ml: "auto" }} />
+                  )}
+                </Stack>
+
+                {loadingDetail ? (
+                  <Stack sx={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                    <CircularProgress />
+                  </Stack>
+                ) : !detail || detail.records.length === 0 ? (
+                  <Stack sx={{ flex: 1, alignItems: "center", justifyContent: "center" }} spacing={1}>
+                    <CheckCircleIcon sx={{ fontSize: 48, color: "success.main" }} />
+                    <Typography color="success.main" sx={{ fontWeight: 900 }}>Độc giả đã trả hết sách</Typography>
+                  </Stack>
+                ) : (
+                  <Stack spacing={1.5}>
                     {detail.records.map((record) => (
-                      <TableRow key={record.id} selected={isOverdue(record)}>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{record.book?.title || record.book_id}</Typography>
-                          {record.book?.author ? <Typography variant="caption" color="text.secondary">{record.book.author}</Typography> : null}
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: "monospace" }}>{record.book?.isbn || record.book_id}</TableCell>
-                        <TableCell>{formatDate(record.borrow_at)}</TableCell>
-                        <TableCell>{formatDate(record.due_at)}</TableCell>
-                        <TableCell>{record.shelf_location || record.book?.shelf_location || "-"}</TableCell>
-                        <TableCell>{dueChip(record)}</TableCell>
-                        <TableCell align="right">
+                      <Paper key={record.id} variant="outlined" sx={{ p: 1.5, borderLeft: isOverdue(record) ? 4 : 0, borderLeftColor: "error.main" }}>
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                          {record.book?.cover_url ? (
+                            <Box component="img" src={record.book.cover_url} alt={record.book.title} sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }} />
+                          ) : (
+                            <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
+                              <BookIcon />
+                            </Avatar>
+                          )}
+                          <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>{record.book?.title || record.book_id}</Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap>{record.book?.author || "-"}</Typography>
+                            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
+                              <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>{record.book?.isbn}</Typography>
+                              {dueChip(record)}
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              Mượn: {formatDate(record.borrow_at)} | Hạn: {formatDate(record.due_at)}
+                            </Typography>
+                          </Stack>
                           <Button
                             size="small"
                             variant="contained"
-                            startIcon={<CheckIcon />}
+                            color="success"
+                            startIcon={<CheckCircleIcon />}
                             disabled={!!returningId}
                             onClick={() => setConfirmRecord(record)}
+                            sx={{ flexShrink: 0 }}
                           >
-                            Xác nhận trả
+                            Trả
                           </Button>
-                        </TableCell>
-                      </TableRow>
+                        </Stack>
+                      </Paper>
                     ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Stack>
+                  </Stack>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <CardContent>
+                <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary" }}>
+                  <UsersIcon sx={{ fontSize: 72, opacity: 0.3 }} />
+                  <Typography variant="body1" sx={{ fontWeight: 900 }}>Chọn độc giả để xem sách cần trả</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+                    Chọn một độc giả từ danh sách bên trái
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
           )}
-        </Paper>
-      </Box>
+        </Grid>
+      </Grid>
 
-      <Dialog open={scannerOpen} onClose={batchReturning ? undefined : () => setScannerOpen(false)} fullWidth maxWidth="md">
+      <Dialog open={scannerOpen} onClose={batchReturning ? undefined : () => setScannerOpen(false)} fullWidth maxWidth="xl">
         <DialogTitle>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
               <QrCodeScannerIcon color="primary" />
-              <Typography variant="h6" sx={{ fontWeight: 900 }}>Quét ISBN trả sách</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>Quét mã vạch trả sách (IP Camera)</Typography>
             </Stack>
             {!batchReturning && (
               <IconButton size="small" onClick={() => setScannerOpen(false)}><CloseIcon fontSize="small" /></IconButton>
@@ -520,44 +593,29 @@ export default function ReturnPage() {
         </DialogTitle>
         <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                position: "relative",
-                overflow: "hidden",
-                bgcolor: "black",
-                width: { md: "45%" },
-                aspectRatio: { xs: "16/9", md: "4/3" },
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              {cameraError ? (
-                <Stack spacing={1} sx={{ alignItems: "center", color: "grey.300", p: 3, textAlign: "center" }}>
-                  <CameraAltIcon sx={{ fontSize: 42 }} />
-                  <Typography variant="body2">{cameraError}</Typography>
-                </Stack>
-              ) : (
-                <>
-                  <Box
-                    component="video"
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    sx={{ width: "100%", height: "100%", objectFit: "contain" }}
-                  />
-                  {!cameraReady && (
-                    <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-                      <CircularProgress size={26} color="inherit" />
-                      <Typography variant="body2">Đang kết nối camera...</Typography>
-                    </Stack>
-                  )}
-                </>
-              )}
-            </Paper>
+            <Box sx={{ width: { md: "50%" }, flexShrink: 0 }}>
+              <Box sx={{ position: "relative", width: "100%", aspectRatio: "4/3", bgcolor: "black", borderRadius: 1, overflow: "hidden" }}>
+                {cameraError ? (
+                  <Stack spacing={1.5} sx={{ alignItems: "center", justifyContent: "center", height: "100%", color: "grey.300", p: 3 }}>
+                    <CameraAltIcon sx={{ fontSize: 48 }} />
+                    <Typography sx={{ textAlign: "center" }}>{cameraError}</Typography>
+                  </Stack>
+                ) : (
+                  <>
+                    <Box component="img" ref={imgRef} src={BORROW_CAM_URL} onLoad={() => setImgReady(true)} onError={() => setCameraError("Không thể kết nối IP Camera")} alt="IP Camera" sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    {!imgReady && !cameraError && (
+                      <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+                        <CircularProgress size={28} color="inherit" />
+                        <Typography variant="body2">Đang kết nối camera...</Typography>
+                      </Stack>
+                    )}
+                    <Box sx={{ position: "absolute", top: 8, left: 8, px: 1, py: 0.5, bgcolor: "rgba(0,0,0,.6)", borderRadius: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: "common.white", fontSize: 11 }}>IP Camera</Typography>
+                    </Box>
+                  </>
+                )}
+              </Box>
+            </Box>
 
             <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto" }}>
               <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -569,50 +627,30 @@ export default function ReturnPage() {
 
               {scannedReturns.length === 0 ? (
                 <Alert severity="info" sx={{ flex: 1, display: "flex", alignItems: "center" }}>
-                  Đưa mã vạch ISBN vào camera. Sách sẽ xuất hiện tại đây.
+                  Đưa mã vạch vào camera. Sách sẽ xuất hiện tại đây.
                 </Alert>
               ) : (
                 scannedReturns.map((item) => (
                   <Paper key={item.isbn} variant="outlined" sx={{ p: 1.5 }}>
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
                       {item.record.book?.cover_url ? (
-                        <Box
-                          component="img"
-                          src={item.record.book.cover_url}
-                          alt={item.record.book.title}
-                          sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
-                        />
+                        <Box component="img" src={item.record.book.cover_url} alt={item.record.book.title} sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }} />
                       ) : (
                         <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
                           <BookIcon />
                         </Avatar>
                       )}
                       <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>
-                          {item.record.book?.title || item.record.book_id}
-                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>{item.record.book?.title || item.record.book_id}</Typography>
                         {item.record.book?.author && (
-                          <Typography variant="caption" color="text.secondary" noWrap>
-                            {item.record.book.author}
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap>{item.record.book.author}</Typography>
                         )}
-                        <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>
-                          {item.isbn}
-                        </Typography>
+                        <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>{item.isbn}</Typography>
                         <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
                           {dueChip(item.record)}
-                          <Typography variant="caption" color="text.secondary">
-                            Mượn: {formatDate(item.record.borrow_at)}
-                          </Typography>
+                          {item.condition && <Chip size="small" variant="outlined" label={item.condition} />}
                         </Stack>
-                        <Select
-                          value={item.condition}
-                          onChange={(e) => updateCondition(item.isbn, e.target.value)}
-                          displayEmpty
-                          fullWidth
-                          size="small"
-                          sx={{ mt: 0.5 }}
-                        >
+                        <Select value={item.condition} onChange={(e) => updateCondition(item.isbn, e.target.value)} displayEmpty fullWidth size="small" sx={{ mt: 0.5 }}>
                           <MenuItem value="">Tình trạng (tuỳ chọn)</MenuItem>
                           <MenuItem value="Còn mới">Còn mới</MenuItem>
                           <MenuItem value="Bình thường">Bình thường</MenuItem>
@@ -637,11 +675,7 @@ export default function ReturnPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setScannerOpen(false)} disabled={batchReturning}>Đóng</Button>
-          <Button
-            variant="contained"
-            disabled={batchReturning || scannedReturns.length === 0}
-            onClick={handleBatchReturn}
-          >
+          <Button variant="contained" color="success" disabled={batchReturning || scannedReturns.length === 0} onClick={handleBatchReturn}>
             {batchReturning ? "Đang trả sách..." : `Xác nhận trả (${scannedReturns.length} cuốn)`}
           </Button>
         </DialogActions>
@@ -653,13 +687,7 @@ export default function ReturnPage() {
           <DialogContentText sx={{ mb: 2 }}>
             Trả sách "{confirmRecord?.book?.title || confirmRecord?.book_id}" cho độc giả {detail?.patron.full_name || detail?.patron.student_code}?
           </DialogContentText>
-          <Select
-            value={condition}
-            onChange={(e) => setCondition(e.target.value)}
-            displayEmpty
-            fullWidth
-            size="small"
-          >
+          <Select value={condition} onChange={(e) => setCondition(e.target.value)} displayEmpty fullWidth size="small">
             <MenuItem value="">Tình trạng sách (tuỳ chọn)</MenuItem>
             <MenuItem value="Còn mới">Còn mới</MenuItem>
             <MenuItem value="Bình thường">Bình thường</MenuItem>
@@ -674,23 +702,25 @@ export default function ReturnPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setConfirmRecord(null); setCondition(""); }}>Hủy</Button>
-          <Button variant="contained" onClick={handleReturnRecord} disabled={!!returningId || !condition}>
+          <Button variant="contained" color="success" onClick={handleReturnRecord} disabled={!!returningId}>
             {returningId ? "Đang trả..." : "Xác nhận trả"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)}>
-        {snackbar ? <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>{snackbar.message}</Alert> : undefined}
+      <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
+        {snackbar ? (
+          <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)} sx={{ animation: `${slideInRight} 0.3s ease-out`, boxShadow: 4 }}>
+            {snackbar.message}
+          </Alert>
+        ) : undefined}
       </Snackbar>
 
-      <Snackbar
-        open={!!scanToast}
-        autoHideDuration={2000}
-        onClose={() => setScanToast("")}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        message={scanToast}
-      />
-    </Stack>
+      <Snackbar open={!!scanToast} autoHideDuration={2000} onClose={() => setScanToast("")} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
+        <Alert severity="success" onClose={() => setScanToast("")} sx={{ animation: `${successPop} 0.3s ease-out`, boxShadow: 4 }}>
+            {scanToast}
+          </Alert>
+      </Snackbar>
+    </Box>
   );
 }
