@@ -1,0 +1,4 @@
+{
+  "name": "tvl-ai-command-center",
+  "main": "party/ai-command-center.ts"
+}
