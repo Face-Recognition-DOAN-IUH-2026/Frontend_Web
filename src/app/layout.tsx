@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" className="dark">
+    <html lang="vi" className="dark" suppressHydrationWarning>
       <body suppressHydrationWarning className="bg-bg text-text">
         <MuiThemeProvider>
           <AuthProvider>

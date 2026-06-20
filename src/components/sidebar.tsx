@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import BarChartIcon from "@mui/icons-material/BarChartOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import BookPlusIcon from "@mui/icons-material/BookmarkAddOutlined";
 import BookReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
@@ -65,8 +66,12 @@ const aiItems = [
   { href: "/liveness", label: "Kiểm tra sống", icon: VisibilityIcon },
 ];
 
-const adminItems = [
+const staffAiItems = [
+  { href: "/ai-assistant", label: "Trợ lý AI", icon: AssistantIcon },
   { href: "/ai-command-center", label: "AI Command Center", icon: AutoAwesomeIcon },
+];
+
+const adminItems = [
   { href: "/dashboard/admin", label: "Quản trị", icon: ShieldIcon },
   { href: "/stats", label: "Thống kê", icon: BarChartIcon },
 ];
@@ -160,6 +165,7 @@ export default function Sidebar() {
           {isAdminOrStaff ? <NavSection title="Mượn / Trả" items={circulationItems} /> : null}
           {isAdminOrStaff ? <NavSection title="Nhân sự" items={staffItems} /> : null}
           {isAdmin ? <NavSection title="Chẩn đoán AI" items={aiItems} /> : null}
+          {isAdminOrStaff ? <NavSection title="AI" items={staffAiItems} /> : null}
           {isAdmin ? <NavSection title="Quản trị" items={adminItems} /> : null}
         </Stack>
         <Divider />
