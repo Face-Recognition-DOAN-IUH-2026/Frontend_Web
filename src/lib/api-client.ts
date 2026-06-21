@@ -76,7 +76,7 @@ function normalizeAccessLog(log: any): AccessLogPublic {
 function setStoredAccessToken(token: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem("access_token", token);
-  document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=lax`;
+  document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict; secure`;
 }
 
 function clearStoredAuth() {
@@ -247,9 +247,12 @@ class ApiClient {
           { refresh_token: refreshToken }
         );
       }
-      const { access_token } = response.data;
+      const { access_token, refresh_token: newRefreshToken } = response.data;
       if (!access_token) return false;
       setStoredAccessToken(access_token);
+      if (newRefreshToken) {
+        localStorage.setItem("refresh_token", newRefreshToken);
+      }
       return true;
     } catch {
       return false;

@@ -111,6 +111,9 @@ export default function PatronsPage() {
   const [deleteTarget, setDeleteTarget] = useState<PatronPublic | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
+  const [renewTarget, setRenewTarget] = useState<PatronPublic | null>(null);
+  const [renewMonths, setRenewMonths] = useState(12);
+
   const [notice, setNotice] = useState<Notice>(null);
 
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
@@ -232,13 +235,17 @@ export default function PatronsPage() {
     }
   };
 
-  const handleRenew = async (patron: PatronPublic) => {
-    const next = new Date(patron.membership_expiry);
-    next.setFullYear(next.getFullYear() + 1);
+  const handleRenew = async () => {
+    if (!renewTarget) return;
+    const next = new Date(renewTarget.membership_expiry);
+    if (next < new Date()) next.setTime(Date.now());
+    next.setMonth(next.getMonth() + renewMonths);
     try {
-      await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
+      await api.updatePatron(renewTarget.id, { membership_expiry: next.toISOString().split("T")[0] });
+      setRenewTarget(null);
+      setRenewMonths(12);
       await load();
-      showNotice("success", `Đã gia hạn thẻ ${patron.full_name} thêm 1 năm`);
+      showNotice("success", `Đã gia hạn thẻ ${renewTarget.full_name} ${renewMonths} tháng`);
     } catch (err) {
       showNotice("error", getErrorMessage(err) || "Gia hạn thất bại");
     }
@@ -369,8 +376,14 @@ export default function PatronsPage() {
                     <FaceIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: "text-top" }} />
                     {patron.has_face ? "Đã có khuôn mặt" : "Chưa có"}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color={
+                    new Date(patron.membership_expiry) < new Date() ? "error.main" :
+                    (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000 ? "warning.main" :
+                    "text.secondary"
+                  }>
                     Hạn: {patron.membership_expiry}
+                    {new Date(patron.membership_expiry) < new Date() ? " (Hết hạn)" :
+                     (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000 ? " (Sắp hết hạn)" : ""}
                   </Typography>
                 </Stack>
 
@@ -378,7 +391,7 @@ export default function PatronsPage() {
                   <IconButton size="small" title="Sửa" onClick={() => openEdit(patron)} sx={{ color: "text.secondary" }}>
                     <EditIcon fontSize="small" />
                   </IconButton>
-                  <IconButton size="small" title="Gia hạn" onClick={() => handleRenew(patron)} sx={{ color: "success.main" }}>
+                  <IconButton size="small" title="Gia hạn" onClick={() => { setRenewTarget(patron); setRenewMonths(12); }} sx={{ color: "success.main" }}>
                     <UpdateIcon fontSize="small" />
                   </IconButton>
                   <IconButton size="small" title="Chi tiết" onClick={() => router.push(`/patrons/${patron.id}`)} sx={{ color: "text.secondary" }}>
@@ -531,6 +544,46 @@ export default function PatronsPage() {
           </Stack>
         </Box>
       </Drawer>
+
+      {/* ─── RENEW DIALOG ─── */}
+      <Dialog open={!!renewTarget} onClose={() => { setRenewTarget(null); setRenewMonths(12); }}>
+        <DialogTitle>Gia hạn thẻ độc giả</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Typography>
+              Gia hạn thẻ cho <strong>{renewTarget?.full_name}</strong> ({renewTarget?.student_code})
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Hạn hiện tại: {renewTarget?.membership_expiry}
+            </Typography>
+            <TextField
+              select
+              label="Gia hạn thêm"
+              value={renewMonths}
+              onChange={(e) => setRenewMonths(Number(e.target.value))}
+              fullWidth
+            >
+              <MenuItem value={1}>1 tháng</MenuItem>
+              <MenuItem value={3}>3 tháng</MenuItem>
+              <MenuItem value={6}>6 tháng</MenuItem>
+              <MenuItem value={12}>1 năm</MenuItem>
+              <MenuItem value={24}>2 năm</MenuItem>
+            </TextField>
+            <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
+              Hạn mới: {(() => {
+                const d = new Date(renewTarget?.membership_expiry || Date.now());
+                if (d < new Date()) d.setTime(Date.now());
+                d.setMonth(d.getMonth() + renewMonths);
+                return d.toISOString().split("T")[0];
+              })()}
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setRenewTarget(null); setRenewMonths(12); }} color="inherit">Hủy</Button>
+          <Button variant="contained" onClick={handleRenew}>Gia hạn</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ─── DELETE CONFIRM ─── */}
       <Dialog open={!!deleteTarget} onClose={() => { setDeleteTarget(null); setDeleteConfirmText(""); }}>
