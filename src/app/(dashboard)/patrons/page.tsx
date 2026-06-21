@@ -48,6 +48,9 @@ import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face";
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
+const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.13:8080/video";
+const CARD_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
+
 const defaultIssueDate = new Date().toISOString().split("T")[0];
 const defaultExpiry = new Date();
 defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
@@ -404,6 +407,8 @@ export default function PatronsPage() {
                 onScanned={handleCardScanned}
                 onError={(msg) => setCreateError(msg)}
                 onSkip={() => { setCreateScan(false); setCreateStep("form"); }}
+                videoSource="ipcamera"
+                ipCameraUrl={CARD_CAM_URL}
               />
               {createError && <Alert severity="error" sx={{ mt: 2 }}>{createError}</Alert>}
             </DialogContent>

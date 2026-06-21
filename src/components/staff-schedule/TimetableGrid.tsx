@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import type { StaffScheduleAssignment, StaffShift } from "@/lib/types";
 import TimetableCell from "./TimetableCell";
 
@@ -96,10 +96,9 @@ export default function TimetableGrid({
 
       {/* Shift rows */}
       {shifts.map((shift) => (
-        <>
+        <Fragment key={shift.id}>
           {/* Row label */}
           <div
-            key={`label-${shift.id}`}
             className="bg-primary/[0.06] p-2 flex flex-col justify-center border-b border-border"
           >
             <span className="text-xs font-semibold text-primary">{shift.name}</span>
@@ -128,7 +127,7 @@ export default function TimetableGrid({
               </div>
             );
           })}
-        </>
+        </Fragment>
       ))}
     </div>
   );
