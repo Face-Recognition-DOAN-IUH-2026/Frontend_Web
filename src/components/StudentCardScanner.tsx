@@ -29,6 +29,8 @@ interface StudentCardScannerProps {
   onScanned: (data: ScannedCardData) => void;
   onError?: (error: string) => void;
   onSkip?: () => void;
+  videoSource?: "webcam" | "ipcamera";
+  ipCameraUrl?: string;
 }
 
 type Phase = "detecting" | "processing" | "confirm";
@@ -92,12 +94,12 @@ function parseCardText(text: string): Partial<ScannedCardData> {
   const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
 
   const studentCodeRegex = /(?:MSSV|M[aã]\s*SV|M[aã]\s*S[oố]\s*SV|Student\s*Code|M[aã]\s*s[oố]\s*sinh\s*vi[eê]n|MSV|M\.S\.V)[:\s]*(\S{4,})/i;
-  const fullNameRegex = /(?:H[oọ]\s*v[aà]\s*t[eê]n|Full\s*Name|H[oọ]\s*t[eê]n|H[oọ]\s*V[AÀ]\s*T[EÊ]N|HỌ\s*TÊN|HỌ\s*VÀ\s*TÊN)[:\s]*([A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+(?:\s+[A-ZÀ-ỸĂÂĐÊÔƠƯ][A-ZÀ-ỸĂÂĐÊÔƠƯa-zà-ỹăâđêôơưừếệấ]+)+)/i;
-  const classNameRegex = /(?:L[oớ]p|Class|LỚP)[:\s]*(\S+)/i;
+  const fullNameRegexWithLabel = /(?:H[oọ]\s*v[aà]\s*t[eê]n|Full\s*Name|H[oọ]\s*t[eê]n|H[oọ]\s*V[AÀ]\s*T[EÊ]N|HỌ\s*TÊN|HỌ\s*VÀ\s*TÊN)[:\s]*(.+)/i;
+  const classNameRegex = /(?:L[oớ]p|Class|LỚP)[:\s]*(.+)/i;
   const dobRegex = /(?:NS|Ng[aà]y\s*sinh|DOB|Birth|Ng[aà]y\s*th[aá]ng\s*n[aǎ]m\s*sinh|NGÀY\s*SINH|Sinh)[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
   const courseRegex = /(?:Kh[oó]a\s*h[oọô]c|Course|Kh[oó]a|KHÓA)[:\s]*(.+)/i;
-  const addressRegex = /(?:HKTT|H[oộ]\s*kh[aẩ]u|Đ[iịa]\s*ch[ỉi]|Address|H[oộ]\s*kh[aẩ]u\s*th[öo]ng\s*tr[uú]):\s*(.+)/i;
-  const facultyRegex = /(?:Khoa|Faculty|Department|KHOA)[:\s]*(.+)/i;
+  const addressRegex = /(?:HKTT|H[oộ]\s*kh[aẩ]u|Đ[iịa]\s*ch[ỉi]|Address|H[oộ]\s*kh[aẩ]u\s*th[öo]ng\s*tr[uú])[:\s]*(.+)/i;
+  const facultyRegex = /(?:Khoa|Faculty|Department|KHOA|Ngành)[:\s]*(.+)/i;
 
   for (const line of lines) {
     if (!result.studentCode) {
@@ -105,8 +107,11 @@ function parseCardText(text: string): Partial<ScannedCardData> {
       if (m) result.studentCode = m[1].replace(/[^A-Za-z0-9]/g, "");
     }
     if (!result.fullName) {
-      const m = line.match(fullNameRegex);
-      if (m) result.fullName = m[1].trim();
+      const m = line.match(fullNameRegexWithLabel);
+      if (m) {
+        const name = m[1].trim();
+        if (name.length >= 6) result.fullName = name;
+      }
     }
     if (!result.className) {
       const m = line.match(classNameRegex);
@@ -131,12 +136,12 @@ function parseCardText(text: string): Partial<ScannedCardData> {
   }
 
   if (!result.studentCode) {
-    const strictMatch = normalized.match(/\b(\d{8})\b/);
-    if (strictMatch) {
-      result.studentCode = strictMatch[1];
-    } else {
-      const looseMatch = normalized.match(/\b(\d{7,13})\b/);
-      if (looseMatch) result.studentCode = looseMatch[1];
+    const allNums = normalized.match(/\b(\d{6,13})\b/g);
+    if (allNums) {
+      const validCodes = allNums.filter(n => n.length >= 7 && n.length <= 13);
+      if (validCodes.length > 0) {
+        result.studentCode = validCodes[validCodes.length - 1];
+      }
     }
   }
 
@@ -147,6 +152,7 @@ function parseCardText(text: string): Partial<ScannedCardData> {
       if (/^\d+$/.test(line.trim())) return false;
       if (line.trim().length < 5) return false;
       if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(line.trim())) return false;
+      if (/^(?:DH|CD|CA|KH|CH)[A-Z0-9]+/i.test(line.trim())) return false;
       return true;
     });
 
@@ -157,19 +163,25 @@ function parseCardText(text: string): Partial<ScannedCardData> {
       );
     });
     if (nameBySurname) {
-      result.fullName = nameBySurname.replace(/^[\d:\s]+/, "").trim();
+      const cleaned = nameBySurname.replace(/^[\d:\s]+/, "").trim();
+      if (cleaned.length >= 6) result.fullName = cleaned;
     }
 
     if (!result.fullName) {
-      const nameByCase = candidateLines.find((l) => {
+      const nameByMixedCase = candidateLines.find((l) => {
         const words = l.trim().split(/\s+/);
         if (words.length < 2 || words.length > 6) return false;
-        if (!/^[A-ZÀ-ỸĂÂĐÊÔƠƯ]/.test(l.trim())) return false;
+        const firstChar = l.trim()[0];
+        if (!/[A-ZÀ-ỸĂÂĐÊÔƠƯ]/.test(firstChar)) return false;
+        const hasLower = /[a-zà-ỹăâđêôơưừếệấ]/.test(l);
+        const hasUpper = /[A-ZÀ-ỸĂÂĐÊÔƠƯ]/.test(l);
+        if (!hasLower || !hasUpper) return false;
         if (/^[A-Z0-9]{4,}$/.test(words[0])) return false;
         return true;
       });
-      if (nameByCase) {
-        result.fullName = nameByCase.replace(/^[\d:\s]+/, "").trim();
+      if (nameByMixedCase) {
+        const cleaned = nameByMixedCase.replace(/^[\d:\s]+/, "").trim();
+        if (cleaned.length >= 6) result.fullName = cleaned;
       }
     }
 
@@ -181,7 +193,10 @@ function parseCardText(text: string): Partial<ScannedCardData> {
         if (!/[À-ỸĂÂĐÊÔƠƯ]/.test(l)) return false;
         return true;
       });
-      if (allCapsName) result.fullName = allCapsName.trim();
+      if (allCapsName) {
+        const cleaned = allCapsName.trim();
+        if (cleaned.length >= 6) result.fullName = cleaned;
+      }
     }
   }
 
@@ -195,9 +210,19 @@ function parseCardText(text: string): Partial<ScannedCardData> {
     if (khoaMatch) result.course = khoaMatch[1];
   }
 
+  if (!result.course) {
+    const kMatch = normalized.match(/\bK\s*(\d{2,4})\b/);
+    if (kMatch) result.course = "K" + kMatch[1];
+  }
+
   if (!result.className) {
-    const classMatch = normalized.match(/\b(DH[A-Z]{2,}\d{2,}[A-Z]?)\b/i);
-    if (classMatch) result.className = classMatch[1].toUpperCase();
+    const classMatch = normalized.match(/\b(DH|CD|CA|KH|CK)[A-Z0-9]{2,}[A-Z0-9]?\b/gi);
+    if (classMatch) result.className = classMatch[0].toUpperCase();
+  }
+
+  if (!result.permanentAddress) {
+    const addrMatch = normalized.match(/(?:HKTT|Hộ khẩu)[:\s]*(.+?)(?=\s*(?:Khoa|Ngành|Lớp|MSSV|$))/i);
+    if (addrMatch) result.permanentAddress = addrMatch[1].trim();
   }
 
   return result;
@@ -219,8 +244,9 @@ function phaseColor(phase: Phase): "info" | "primary" | "success" {
   }
 }
 
-export default function StudentCardScanner({ onScanned, onError, onSkip }: StudentCardScannerProps) {
+export default function StudentCardScanner({ onScanned, onError, onSkip, videoSource = "webcam", ipCameraUrl }: StudentCardScannerProps) {
   const webcamRef = useRef<Webcam>(null);
+  const ipCamRef = useRef<HTMLImageElement>(null);
   const [phase, setPhase] = useState<Phase>("detecting");
   const [ocrResult, setOcrResult] = useState<Partial<ScannedCardData> | null>(null);
   const [error, setError] = useState("");
@@ -286,6 +312,18 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
     }
   }, [onError]);
 
+  const captureFrameFromIpCam = useCallback((): string | null => {
+    const img = ipCamRef.current;
+    if (!img || !img.complete || img.naturalWidth === 0) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    return canvas.toDataURL("image/jpeg", 0.95);
+  }, []);
+
   const checkImageHasContent = useCallback((dataUrl: string): Promise<boolean> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -320,6 +358,62 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
 
   const attemptAutoDetect = useCallback(async () => {
     if (!isMounted.current || phaseRef.current !== "detecting") return;
+
+    if (videoSource === "ipcamera") {
+      if (!ipCamRef.current) {
+        if (isMounted.current && phaseRef.current === "detecting") {
+          detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+        }
+        return;
+      }
+      try {
+        setDetectAttempts((prev) => {
+          const next = prev + 1;
+          if (next >= MAX_DETECT_ATTEMPTS && isMounted.current) {
+            setError("Không thể phát hiện thẻ sau nhiều lần thử. Hãy chụp thủ công hoặc tải ảnh.");
+          }
+          return next;
+        });
+
+        const imageSrc = captureFrameFromIpCam();
+        if (!imageSrc) {
+          if (isMounted.current && phaseRef.current === "detecting") {
+            detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+          }
+          return;
+        }
+
+        const hasContent = await checkImageHasContent(imageSrc);
+        if (!hasContent) {
+          if (isMounted.current && phaseRef.current === "detecting") {
+            detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+          }
+          return;
+        }
+
+        setPhase("processing");
+        const parsed = await runOcr(imageSrc);
+
+        if (!isMounted.current) return;
+
+        if (parsed && parsed.studentCode && parsed.fullName) {
+          setOcrResult(parsed);
+          setPhase("confirm");
+          return;
+        }
+
+        setPhase("detecting");
+      } catch (err: any) {
+        if (isMounted.current) {
+          setPhase("detecting");
+        }
+      }
+      if (isMounted.current && phaseRef.current === "detecting") {
+        detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
+      }
+      return;
+    }
+
     if (!webcamRef.current) {
       if (isMounted.current && phaseRef.current === "detecting") {
         detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
@@ -371,7 +465,7 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
     if (isMounted.current && phaseRef.current === "detecting") {
       detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
     }
-  }, [runOcr, checkImageHasContent]);
+  }, [runOcr, checkImageHasContent, videoSource, captureFrameFromIpCam]);
 
   const startDetection = useCallback(() => {
     if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
@@ -389,12 +483,20 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
   }, [cameraReady, phase, startDetection]);
 
   const handleManualCapture = useCallback(async () => {
-    if (!webcamRef.current) return;
+    if (videoSource === "ipcamera" && !ipCamRef.current) return;
+    if (videoSource !== "ipcamera" && !webcamRef.current) return;
     if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
     setPhase("processing");
     setError("");
     try {
-      const imageSrc = webcamRef.current.getScreenshot();
+      let imageSrc: string | null = null;
+
+      if (videoSource === "ipcamera") {
+        imageSrc = captureFrameFromIpCam();
+      } else {
+        imageSrc = webcamRef.current?.getScreenshot() || null;
+      }
+
       if (!imageSrc) {
         setError("Không thể chụp ảnh từ camera");
         setPhase("detecting");
@@ -417,7 +519,7 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
       setPhase("detecting");
       startDetection();
     }
-  }, [runOcr, startDetection]);
+  }, [runOcr, startDetection, videoSource, captureFrameFromIpCam]);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -540,16 +642,28 @@ export default function StudentCardScanner({ onScanned, onError, onSkip }: Stude
               minHeight: { xs: 280, md: 420 },
             }}
           >
-            <Webcam
-              ref={webcamRef}
-              audio={false}
-              screenshotFormat="image/jpeg"
-              screenshotQuality={0.9}
-              videoConstraints={videoConstraints}
-              onUserMedia={() => setCameraReady(true)}
-              onUserMediaError={() => setError("Không thể truy cập camera")}
-              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-            />
+            {videoSource === "ipcamera" ? (
+              <Box
+                component="img"
+                ref={ipCamRef}
+                src={ipCameraUrl}
+                alt="IP Camera"
+                onLoad={() => setCameraReady(true)}
+                onError={() => setError("Không thể kết nối IP Camera")}
+                sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+              />
+            ) : (
+              <Webcam
+                ref={webcamRef}
+                audio={false}
+                screenshotFormat="image/jpeg"
+                screenshotQuality={0.9}
+                videoConstraints={videoConstraints}
+                onUserMedia={() => setCameraReady(true)}
+                onUserMediaError={() => setError("Không thể truy cập camera")}
+                style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+              />
+            )}
 
             {/* Card frame overlay */}
             <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>

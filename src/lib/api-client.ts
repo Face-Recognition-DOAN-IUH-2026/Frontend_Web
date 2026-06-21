@@ -50,6 +50,8 @@ import type {
   AiInsightList,
   AiChatResponse,
   BookRecommendationResponse,
+  Notification,
+  NotificationListResponse,
 } from "./types";
 
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
@@ -1057,6 +1059,29 @@ class ApiClient {
   async getBookRecommendations(studentCode: string): Promise<BookRecommendationResponse> {
     const response = await this.client.get<BookRecommendationResponse>(`/api/ai/recommendations/patron/${studentCode}`);
     return response.data;
+  }
+
+  // === Notifications ===
+  async getNotifications(params?: { unread?: boolean; skip?: number; limit?: number }): Promise<NotificationListResponse> {
+    const query: Record<string, string> = {};
+    if (params?.unread !== undefined) query.unread = String(params.unread);
+    if (params?.skip !== undefined) query.skip = String(params.skip);
+    if (params?.limit !== undefined) query.limit = String(params.limit);
+    const response = await this.client.get<NotificationListResponse>("/api/notifications", { params: query });
+    return response.data;
+  }
+
+  async getUnreadCount(): Promise<number> {
+    const response = await this.client.get<{ count: number }>("/api/notifications/unread-count");
+    return response.data.count;
+  }
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    await this.client.put(`/api/notifications/${id}/read`);
+  }
+
+  async markAllNotificationsAsRead(): Promise<void> {
+    await this.client.put("/api/notifications/read-all");
   }
 }
 
