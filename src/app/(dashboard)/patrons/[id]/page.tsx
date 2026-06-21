@@ -100,6 +100,7 @@ export default function PatronDetailPage() {
   const [editForm, setEditForm] = useState<PatronUpdate>({});
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [showEnroll, setShowEnroll] = useState(false);
   const [consent, setConsent] = useState(false);
   const [enrollError, setEnrollError] = useState("");
@@ -178,7 +179,7 @@ export default function PatronDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!patron) return;
+    if (!patron || deleteConfirmText !== "XÓA") return;
     try {
       await api.deletePatron(patron.id);
       router.push("/patrons");
@@ -535,16 +536,31 @@ export default function PatronDetailPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={showDelete} onClose={() => setShowDelete(false)} fullWidth maxWidth="xs">
+      <Dialog open={showDelete} onClose={() => { setShowDelete(false); setDeleteConfirmText(""); }} fullWidth maxWidth="xs">
         <DialogTitle>Xóa độc giả?</DialogTitle>
         <DialogContent>
-          <Typography color="text.secondary">
-            Hồ sơ {patron.full_name} sẽ bị xóa khỏi danh sách độc giả.
-          </Typography>
+          <Stack spacing={2}>
+            <Typography color="text.secondary">
+              Hồ sơ <strong>{patron.full_name}</strong> sẽ bị xóa khỏi danh sách độc giả. Dữ liệu liên quan (thông báo, lịch trực) cũng sẽ bị xóa.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Nhập <strong>XÓA</strong> để xác nhận:
+            </Typography>
+            <TextField
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Nhập XÓA"
+              size="small"
+              autoFocus
+              fullWidth
+            />
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowDelete(false)}>Hủy</Button>
-          <Button color="error" variant="contained" onClick={handleDelete}>Xóa</Button>
+          <Button onClick={() => { setShowDelete(false); setDeleteConfirmText(""); }}>Hủy</Button>
+          <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>
+            Xóa vĩnh viễn
+          </Button>
         </DialogActions>
       </Dialog>
 

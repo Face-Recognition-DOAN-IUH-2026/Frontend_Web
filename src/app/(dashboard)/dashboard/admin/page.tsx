@@ -60,6 +60,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [createForm, setCreateForm] = useState({ email: "", password: "", role: "staff" });
   const [createError, setCreateError] = useState("");
   const [notice, setNotice] = useState("");
@@ -98,9 +99,10 @@ export default function AdminPage() {
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleteConfirmText !== "XÓA") return;
     const current = deleteTarget;
     setDeleteTarget(null);
+    setDeleteConfirmText("");
     setUsers((prev) => prev.filter((u) => u.id !== current.id));
     try {
       await api.deleteUser(current.id);
@@ -277,16 +279,31 @@ export default function AdminPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} fullWidth maxWidth="xs">
+      <Dialog open={Boolean(deleteTarget)} onClose={() => { setDeleteTarget(null); setDeleteConfirmText(""); }} fullWidth maxWidth="xs">
         <DialogTitle>Xóa người dùng?</DialogTitle>
         <DialogContent>
-          <Typography color="text.secondary">
-            Tài khoản {deleteTarget?.email} sẽ bị xóa khỏi hệ thống.
-          </Typography>
+          <Stack spacing={2}>
+            <Typography color="text.secondary">
+              Tài khoản <strong>{deleteTarget?.email}</strong> sẽ bị xóa khỏi hệ thống. Dữ liệu liên quan (thông báo, lịch trực) cũng sẽ bị xóa.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Nhập <strong>XÓA</strong> để xác nhận:
+            </Typography>
+            <TextField
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Nhập XÓA"
+              size="small"
+              autoFocus
+              fullWidth
+            />
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Hủy</Button>
-          <Button color="error" variant="contained" onClick={handleDelete}>Xóa</Button>
+          <Button onClick={() => { setDeleteTarget(null); setDeleteConfirmText(""); }}>Hủy</Button>
+          <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>
+            Xóa vĩnh viễn
+          </Button>
         </DialogActions>
       </Dialog>
 
