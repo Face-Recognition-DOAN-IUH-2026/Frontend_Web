@@ -63,15 +63,17 @@ export default function TimetableGrid({
 
   const numCols = 7;
 
-  return (
+return (
+    <div className="w-full overflow-x-auto">
     <div
-      className="dot-grid-bg rounded-lg overflow-hidden"
+      className="dot-grid-bg rounded-lg"
       style={{
         display: "grid",
-        gridTemplateColumns: `180px repeat(${numCols}, 1fr)`,
+        gridTemplateColumns: `180px repeat(${numCols}, minmax(120px, 1fr))`,
         gap: "1px",
         backgroundColor: "rgb(var(--color-border) / 1)",
         border: "1px solid rgb(var(--color-border) / 1)",
+        minWidth: "fit-content",
       }}
     >
       {/* Corner cell */}
@@ -129,6 +131,7 @@ export default function TimetableGrid({
           })}
         </Fragment>
       ))}
+    </div>
     </div>
   );
 }

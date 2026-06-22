@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadUserFromStorage]);
 
   const setTokenCookie = (token: string) => {
-    document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=lax`;
+    document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict; secure`;
   };
 
   const clearTokenCookie = () => {
@@ -134,11 +134,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const refreshToken = localStorage.getItem("refresh_token");
       if (!refreshToken) return false;
 
-      const { access_token } = await api.refreshAuthToken(refreshToken);
+      const { access_token, refresh_token: newRefreshToken } = await api.refreshAuthToken(refreshToken);
       if (access_token) {
         localStorage.setItem("access_token", access_token);
         setTokenCookie(access_token);
         setAccessToken(access_token);
+      }
+      if (newRefreshToken) {
+        localStorage.setItem("refresh_token", newRefreshToken);
       }
       return true;
     } catch {

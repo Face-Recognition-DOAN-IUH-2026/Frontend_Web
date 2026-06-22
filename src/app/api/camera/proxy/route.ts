@@ -1,13 +1,39 @@
 import { NextRequest } from "next/server";
 
+const ALLOWED_HOSTS = [
+  "192.168.1.13",
+  "192.168.1.240",
+  "192.168.1.113",
+];
+
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get("url");
   if (!url) {
     return new Response("Missing url parameter", { status: 400 });
   }
 
+  let parsed: URL;
   try {
-    const response = await fetch(url);
+    parsed = new URL(url);
+  } catch {
+    return new Response("Invalid URL", { status: 400 });
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return new Response("Protocol not allowed", { status: 403 });
+  }
+
+  if (!ALLOWED_HOSTS.includes(parsed.hostname)) {
+    return new Response("Host not allowed", { status: 403 });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(parsed.toString(), { signal: controller.signal });
+    clearTimeout(timeout);
+
     const contentType = response.headers.get("Content-Type") || "multipart/x-mixed-replace; boundary=--BoundaryBoundary";
 
     return new Response(response.body, {

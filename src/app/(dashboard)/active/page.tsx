@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -8,9 +8,15 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Grid,
+  IconButton,
   InputAdornment,
   Paper,
+  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -26,9 +32,10 @@ import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
-import api from "@/lib/api-client";
+import LogoutIcon from "@mui/icons-material/LogoutOutlined";
+import api, { getErrorMessage } from "@/lib/api-client";
 import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
-import type { ActivePatron } from "@/lib/types";
+import type { ActivePatron, CameraEvent } from "@/lib/types";
 
 const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);
 
@@ -82,8 +89,14 @@ export default function ActivePage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [exitPatron, setExitPatron] = useState<ActivePatron | null>(null);
+  const [exiting, setExiting] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error"; message: string } | null>(null);
+  const [sseConnected, setSseConnected] = useState(false);
+  const hasLoadedRef = useRef(false);
+  const fallbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setError(null);
       const data = await api.getActivePatrons();
@@ -92,18 +105,73 @@ export default function ActivePage() {
         .sort((a, b) => new Date(b.entered_at).getTime() - new Date(a.entered_at).getTime());
       setPatrons(allowed);
       setLastUpdate(new Date());
+      hasLoadedRef.current = true;
     } catch {
       setError("Không thể tải danh sách độc giả.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const handleSSEEvent = useCallback((event: CameraEvent) => {
+    if (!event.access_type || !event.patron_id) return;
+    if (!ACTIVE_CAMERA_IDS.has(event.camera_id)) return;
+
+    if (event.access_type === "entry" && event.status === "granted") {
+      setPatrons((prev) => {
+        if (prev.some((p) => p.id === event.patron_id)) return prev;
+        const newPatron: ActivePatron = {
+          id: event.patron_id!,
+          full_name: event.full_name || event.student_code || "",
+          student_code: event.student_code || "",
+          entered_at: new Date().toISOString(),
+          camera_id: event.camera_id,
+          image_url: null,
+          confidence: event.score ?? null,
+        };
+        return [newPatron, ...prev];
+      });
+      setLastUpdate(new Date());
+    } else if (event.access_type === "exit" && event.status === "granted") {
+      setPatrons((prev) => prev.filter((p) => p.id !== event.patron_id));
+      setLastUpdate(new Date());
+    }
+  }, []);
+
+  const startFallbackPolling = useCallback(() => {
+    if (fallbackRef.current) clearInterval(fallbackRef.current);
+    fallbackRef.current = setInterval(() => {
+      if (!hasLoadedRef.current) return;
+      load();
+    }, 60000);
+  }, [load]);
+
+  const stopFallbackPolling = useCallback(() => {
+    if (fallbackRef.current) {
+      clearInterval(fallbackRef.current);
+      fallbackRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
-  }, []);
+
+    const cleanup = api.connectAccessSSE(handleSSEEvent, (connected) => {
+      setSseConnected(connected);
+      if (connected) {
+        stopFallbackPolling();
+      } else {
+        startFallbackPolling();
+      }
+    });
+
+    startFallbackPolling();
+
+    return () => {
+      cleanup();
+      stopFallbackPolling();
+    };
+  }, [handleSSEEvent, load, startFallbackPolling, stopFallbackPolling]);
 
   const q = normalizeQuery(search);
   const filtered = useMemo(() => {
@@ -120,6 +188,29 @@ export default function ActivePage() {
     }, {}),
     [patrons]
   );
+
+  const stalePatrons = useMemo(() => {
+    const now = Date.now();
+    return patrons.filter((p) => {
+      const hours = (now - new Date(p.entered_at).getTime()) / (1000 * 60 * 60);
+      return hours > 8;
+    });
+  }, [patrons]);
+
+  const handleForceExit = async () => {
+    if (!exitPatron) return;
+    setExiting(true);
+    try {
+      await api.forceExitPatron(exitPatron.id);
+      setSnackbar({ severity: "success", message: `Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra` });
+      setExitPatron(null);
+      await load();
+    } catch (err) {
+      setSnackbar({ severity: "error", message: getErrorMessage(err) || "Lỗi khi đánh dấu ra" });
+    } finally {
+      setExiting(false);
+    }
+  };
 
   return (
     <Stack spacing={3}>
@@ -218,11 +309,13 @@ export default function ActivePage() {
                         width: 6,
                         height: 6,
                         borderRadius: "50%",
-                        bgcolor: error ? "error.main" : "success.main",
+                        bgcolor: error ? "error.main" : sseConnected ? "success.main" : "warning.main",
+                        animation: sseConnected ? "pulse 2s ease-in-out infinite" : undefined,
                       }}
                     />
                     <Typography variant="caption" color="text.secondary">
-                      {error ? "Lỗi cập nhật" : `Cập nhật: ${lastUpdate.toLocaleTimeString("vi-VN")}`}
+                      {error ? "Lỗi cập nhật" : sseConnected ? "Live" : "Polling"}
+                      {` · ${lastUpdate.toLocaleTimeString("vi-VN")}`}
                     </Typography>
                   </Stack>
                   <Button size="small" variant="outlined" startIcon={<RefreshOutlinedIcon />} onClick={load} disabled={loading}>
@@ -234,6 +327,17 @@ export default function ActivePage() {
           </Grid>
         </Box>
       </Paper>
+
+      {stalePatrons.length > 0 && (
+        <Alert severity="warning" sx={{ borderRadius: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            {stalePatrons.length} độc giả ở trong thư viện quá 8 giờ
+          </Typography>
+          <Typography variant="body2">
+            Có thể gate không detect exit. Kiểm tra và sử dụng nút &ldquo;Đánh dấu đã ra&rdquo; nếu cần.
+          </Typography>
+        </Alert>
+      )}
 
       {/* Patron list */}
       <Paper variant="outlined" sx={{ borderRadius: 3 }}>
@@ -442,6 +546,16 @@ export default function ActivePage() {
                               </Stack>
                             </Stack>
                           </Box>
+                          <Tooltip title="Đánh dấu đã ra">
+                            <IconButton
+                              size="small"
+                              color="warning"
+                              onClick={() => setExitPatron(patron)}
+                              sx={{ flexShrink: 0, mt: 0.5 }}
+                            >
+                              <LogoutIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                         </Stack>
                       </Box>
                     </Paper>
@@ -452,6 +566,32 @@ export default function ActivePage() {
           )}
         </Box>
       </Paper>
+
+      <Dialog open={!!exitPatron} onClose={() => !exiting && setExitPatron(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 900 }}>Xác nhận đánh dấu đã ra?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Độc giả <strong>{exitPatron?.full_name || exitPatron?.student_code}</strong> sẽ được đánh dấu đã rời khỏi thư viện.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Dùng khi gate không detect được exit.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExitPatron(null)} disabled={exiting}>Hủy</Button>
+          <Button variant="contained" color="warning" onClick={handleForceExit} disabled={exiting}>
+            {exiting ? "Đang xử lý..." : "Đánh dấu đã ra"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={!!snackbar} autoHideDuration={3000} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
+        {snackbar ? (
+          <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>
+            {snackbar.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Stack>
   );
 }

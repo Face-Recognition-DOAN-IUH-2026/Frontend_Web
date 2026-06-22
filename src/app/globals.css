@@ -379,3 +379,67 @@
 .toast-container > * {
   pointer-events: auto;
 }
+
+/* Print styles - only show schedule table */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide everything except table and print-only header */
+  nav,
+  header,
+  header nav,
+  [class*="sidebar"],
+  [class*="drawer"],
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Show print-only header */
+  .hidden.print\:block {
+    display: block !important;
+  }
+
+  /* Page setup for landscape A4 */
+  @page {
+    size: landscape A4;
+    margin: 8mm;
+  }
+
+  /* Ensure grid fits on page */
+  .dot-grid-bg {
+    font-size: 11px;
+    overflow-x: visible !important;
+    page-break-inside: avoid;
+  }
+
+  .dot-grid-bg > div {
+    min-width: fit-content !important;
+  }
+
+  .dot-grid-bg {
+    border: 1px solid #ccc !important;
+  }
+
+  .dot-grid-bg > div > div {
+    border: 1px solid #ccc !important;
+  }
+
+  .dot-grid-bg > div > div.bg-surface {
+    background: white !important;
+  }
+
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Keep table visible in print */
+  .space-y-5 .dot-grid-bg {
+    display: grid !important;
+  }
+}

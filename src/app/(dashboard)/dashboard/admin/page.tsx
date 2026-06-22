@@ -61,6 +61,8 @@ export default function AdminPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [restoreTarget, setRestoreTarget] = useState<UserPublic | null>(null);
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
   const [createForm, setCreateForm] = useState({ email: "", password: "", role: "staff" });
   const [createError, setCreateError] = useState("");
   const [notice, setNotice] = useState("");
@@ -109,6 +111,22 @@ export default function AdminPage() {
       setNotice("Đã xóa người dùng.");
     } catch {
       setNotice("Xóa thất bại, dữ liệu đã được tải lại.");
+      load();
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!restoreTarget || restoreConfirmText !== "KHÔI PHỤC") return;
+    const current = restoreTarget;
+    setRestoreTarget(null);
+    setRestoreConfirmText("");
+    setUsers((prev) => prev.filter((u) => u.id !== current.id));
+    try {
+      await api.restoreUser(current.id);
+      setNotice("Đã khôi phục người dùng.");
+      load();
+    } catch {
+      setNotice("Khôi phục thất bại.");
       load();
     }
   };
@@ -223,15 +241,26 @@ export default function AdminPage() {
                       />
                     </TableCell>
                     <TableCell align="right">
-                      <Button
-                        color="error"
-                        variant="outlined"
-                        size="small"
-                        startIcon={<DeleteOutlineOutlinedIcon />}
-                        onClick={() => setDeleteTarget(item)}
-                      >
-                        Xóa
-                      </Button>
+                      {item.status === "deleted" ? (
+                        <Button
+                          color="success"
+                          variant="outlined"
+                          size="small"
+                          onClick={() => setRestoreTarget(item)}
+                        >
+                          Khôi phục
+                        </Button>
+                      ) : (
+                        <Button
+                          color="error"
+                          variant="outlined"
+                          size="small"
+                          startIcon={<DeleteOutlineOutlinedIcon />}
+                          onClick={() => setDeleteTarget(item)}
+                        >
+                          Xóa
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -303,6 +332,34 @@ export default function AdminPage() {
           <Button onClick={() => { setDeleteTarget(null); setDeleteConfirmText(""); }}>Hủy</Button>
           <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>
             Xóa vĩnh viễn
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(restoreTarget)} onClose={() => { setRestoreTarget(null); setRestoreConfirmText(""); }} fullWidth maxWidth="xs">
+        <DialogTitle>Khôi phục người dùng?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Typography color="text.secondary">
+              Khôi phục tài khoản <strong>{restoreTarget?.email}</strong>?
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Nhập <strong>KHÔI PHỤC</strong> để xác nhận:
+            </Typography>
+            <TextField
+              value={restoreConfirmText}
+              onChange={(e) => setRestoreConfirmText(e.target.value)}
+              placeholder="Nhập KHÔI PHỤC"
+              size="small"
+              autoFocus
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setRestoreTarget(null); setRestoreConfirmText(""); }}>Hủy</Button>
+          <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC"}>
+            Khôi phục
           </Button>
         </DialogActions>
       </Dialog>

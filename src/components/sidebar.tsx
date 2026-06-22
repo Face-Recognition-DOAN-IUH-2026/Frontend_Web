@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,6 +18,9 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
+import LogoutIcon from "@mui/icons-material/LogoutOutlined";
+import { useAuth } from "@/lib/auth-context";
+import ProfileDialog from "./ProfileDialog";
 import BarChartIcon from "@mui/icons-material/BarChartOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
@@ -29,14 +33,12 @@ import DoorIcon from "@mui/icons-material/DoorFrontOutlined";
 import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import LibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
-import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import MapIcon from "@mui/icons-material/MapOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import ShieldIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
-import { useAuth } from "@/lib/auth-context";
 
 const drawerWidth = 268;
 
@@ -127,6 +129,7 @@ function NavSection({ title, items }: { title: string; items: Array<{ href: stri
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const theme = useTheme();
+  const [profileOpen, setProfileOpen] = useState(false);
   const role = user?.role || "staff";
   const isAdminOrStaff = role === "admin" || role === "staff";
   const isAdmin = role === "admin";
@@ -169,18 +172,43 @@ export default function Sidebar() {
           {isAdmin ? <NavSection title="Quản trị" items={adminItems} /> : null}
         </Stack>
         <Divider />
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", p: 1.5 }}>
-          <Avatar sx={{ width: 38, height: 38, bgcolor: "primary.main", color: "primary.contrastText", fontWeight: 900 }}>
-            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
-          </Avatar>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>{user?.full_name || user?.email?.split("@")[0] || "Người dùng"}</Typography>
-            <Typography variant="caption" color="text.secondary">{role === "admin" ? "Quản trị viên" : "Nhân viên"}</Typography>
-          </Box>
+<Stack direction="row" spacing={1.25} sx={{ alignItems: "center", p: 1.5 }}>
+          <ButtonBase
+            onClick={() => setProfileOpen(true)}
+            sx={{
+              borderRadius: 2,
+              px: 1,
+              py: 0.5,
+              width: "100%",
+              "&:hover": { bgcolor: "action.hover" },
+            }}
+          >
+            <Avatar
+              src={user?.avatar_url || undefined}
+              sx={{
+                width: 38,
+                height: 38,
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+                fontWeight: 900,
+              }}
+            >
+              {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
+            </Avatar>
+            <Box sx={{ minWidth: 0, flex: 1, textAlign: "left", ml: 0.75 }}>
+              <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>
+                {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {role === "admin" ? "Quản trị viên" : "Nhân viên"}
+              </Typography>
+            </Box>
+          </ButtonBase>
           <IconButton onClick={logout} title="Đăng xuất" color="error" size="small">
             <LogoutIcon fontSize="small" />
           </IconButton>
         </Stack>
+        <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
       </Stack>
     </Drawer>
   );

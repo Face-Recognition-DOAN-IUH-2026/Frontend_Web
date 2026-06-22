@@ -45,7 +45,7 @@ import MultiAngleCapture from "@/components/MultiAngleCapture";
 import StudentCardScanner, { type ScannedCardData } from "@/components/StudentCardScanner";
 import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 
-type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face";
+type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face" | "deleted";
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.13:8080/video";
@@ -65,6 +65,9 @@ function emptyCreateForm(): PatronCreate {
     membership_expiry: defaultExpiryStr,
     course: "",
     permanent_address: "",
+    identity_number: "",
+    email: "",
+    phone: "",
   };
 }
 
@@ -72,6 +75,7 @@ function statusLabel(status: string) {
   if (status === "active") return "Hoạt động";
   if (status === "inactive") return "Tạm khóa";
   if (status === "expired") return "Hết hạn";
+  if (status === "deleted") return "Đã xóa";
   return status;
 }
 
@@ -79,6 +83,7 @@ function statusColor(status: string) {
   if (status === "active") return "success" as const;
   if (status === "inactive") return "warning" as const;
   if (status === "expired") return "error" as const;
+  if (status === "deleted") return "error" as const;
   return "default" as const;
 }
 
@@ -111,6 +116,12 @@ export default function PatronsPage() {
   const [deleteTarget, setDeleteTarget] = useState<PatronPublic | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
+  const [restoreTarget, setRestoreTarget] = useState<PatronPublic | null>(null);
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
+
+  const [renewTarget, setRenewTarget] = useState<PatronPublic | null>(null);
+  const [renewMonths, setRenewMonths] = useState(12);
+
   const [notice, setNotice] = useState<Notice>(null);
 
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
@@ -133,6 +144,7 @@ export default function PatronsPage() {
     if (filter === "active") list = list.filter((p) => p.status === "active");
     else if (filter === "inactive") list = list.filter((p) => p.status === "inactive");
     else if (filter === "expired") list = list.filter((p) => p.status === "expired");
+    else if (filter === "deleted") list = list.filter((p) => p.status === "deleted");
     else if (filter === "has_face") list = list.filter((p) => p.has_face);
     else if (filter === "no_face") list = list.filter((p) => !p.has_face);
     return list;
@@ -232,13 +244,17 @@ export default function PatronsPage() {
     }
   };
 
-  const handleRenew = async (patron: PatronPublic) => {
-    const next = new Date(patron.membership_expiry);
-    next.setFullYear(next.getFullYear() + 1);
+  const handleRenew = async () => {
+    if (!renewTarget) return;
+    const next = new Date(renewTarget.membership_expiry);
+    if (next < new Date()) next.setTime(Date.now());
+    next.setMonth(next.getMonth() + renewMonths);
     try {
-      await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
+      await api.updatePatron(renewTarget.id, { membership_expiry: next.toISOString().split("T")[0] });
+      setRenewTarget(null);
+      setRenewMonths(12);
       await load();
-      showNotice("success", `Đã gia hạn thẻ ${patron.full_name} thêm 1 năm`);
+      showNotice("success", `Đã gia hạn thẻ ${renewTarget.full_name} ${renewMonths} tháng`);
     } catch (err) {
       showNotice("error", getErrorMessage(err) || "Gia hạn thất bại");
     }
@@ -256,6 +272,21 @@ export default function PatronsPage() {
     } catch (err: any) {
       if (err?.response?.status === 404) showNotice("info", "Độc giả đã bị xóa trước đó");
       else { showNotice("error", getErrorMessage(err) || "Xóa thất bại"); await load(); }
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!restoreTarget || restoreConfirmText !== "KHÔI PHỤC") return;
+    const target = restoreTarget;
+    setRestoreTarget(null);
+    setRestoreConfirmText("");
+    setPatrons((prev) => prev.filter((p) => p.id !== target.id));
+    try {
+      await api.restorePatron(target.id);
+      showNotice("success", `Đã khôi phục độc giả ${target.full_name}`);
+    } catch (err: any) {
+      showNotice("error", getErrorMessage(err) || "Khôi phục thất bại");
+      await load();
     }
   };
 
@@ -310,6 +341,7 @@ export default function PatronsPage() {
               Có khuôn mặt
             </ToggleButton>
             <ToggleButton value="no_face">Chưa có khuôn mặt</ToggleButton>
+            <ToggleButton value="deleted">Đã xóa</ToggleButton>
           </ToggleButtonGroup>
         </Stack>
       </Paper>
@@ -369,21 +401,35 @@ export default function PatronsPage() {
                     <FaceIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: "text-top" }} />
                     {patron.has_face ? "Đã có khuôn mặt" : "Chưa có"}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color={
+                    new Date(patron.membership_expiry) < new Date() ? "error.main" :
+                    (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000 ? "warning.main" :
+                    "text.secondary"
+                  }>
                     Hạn: {patron.membership_expiry}
+                    {new Date(patron.membership_expiry) < new Date() ? " (Hết hạn)" :
+                     (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000 ? " (Sắp hết hạn)" : ""}
                   </Typography>
                 </Stack>
 
                 <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
-                  <IconButton size="small" title="Sửa" onClick={() => openEdit(patron)} sx={{ color: "text.secondary" }}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" title="Gia hạn" onClick={() => handleRenew(patron)} sx={{ color: "success.main" }}>
-                    <UpdateIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" title="Chi tiết" onClick={() => router.push(`/patrons/${patron.id}`)} sx={{ color: "text.secondary" }}>
-                    <ChevronRightIcon fontSize="small" />
-                  </IconButton>
+                  {patron.status === "deleted" ? (
+                    <Button size="small" variant="outlined" color="success" onClick={() => { setRestoreTarget(patron); setRestoreConfirmText(""); }} sx={{ textTransform: "none", fontWeight: 600 }}>
+                      Khôi phục
+                    </Button>
+                  ) : (
+                    <>
+                      <IconButton size="small" title="Sửa" onClick={() => openEdit(patron)} sx={{ color: "text.secondary" }}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" title="Gia hạn" onClick={() => { setRenewTarget(patron); setRenewMonths(12); }} sx={{ color: "success.main" }}>
+                        <UpdateIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" title="Chi tiết" onClick={() => router.push(`/patrons/${patron.id}`)} sx={{ color: "text.secondary" }}>
+                        <ChevronRightIcon fontSize="small" />
+                      </IconButton>
+                    </>
+                  )}
                 </Stack>
               </Stack>
             </Paper>
@@ -437,6 +483,9 @@ export default function PatronsPage() {
                 <TextField label="MSSV" value={createForm.student_code} onChange={(e) => { setCreateForm({ ...createForm, student_code: e.target.value }); setCreateError(""); }} required fullWidth />
                 <TextField label="Lớp" value={createForm.class_name || ""} onChange={(e) => setCreateForm({ ...createForm, class_name: e.target.value })} fullWidth />
                 <TextField label="Khóa học" value={createForm.course || ""} onChange={(e) => setCreateForm({ ...createForm, course: e.target.value })} fullWidth />
+                <TextField label="CMND/CCCD" value={createForm.identity_number || ""} onChange={(e) => setCreateForm({ ...createForm, identity_number: e.target.value })} fullWidth placeholder="Không bắt buộc" />
+                <TextField label="Email" value={createForm.email || ""} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} fullWidth placeholder="Không bắt buộc" />
+                <TextField label="SĐT" value={createForm.phone || ""} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} fullWidth placeholder="Không bắt buộc" />
                 <TextField label="HKTT" value={createForm.permanent_address || ""} onChange={(e) => setCreateForm({ ...createForm, permanent_address: e.target.value })} fullWidth multiline rows={2} />
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
                   <TextField label="Ngày cấp thẻ" type="date" value={createForm.issue_date} onChange={(e) => setCreateForm({ ...createForm, issue_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
@@ -532,6 +581,46 @@ export default function PatronsPage() {
         </Box>
       </Drawer>
 
+      {/* ─── RENEW DIALOG ─── */}
+      <Dialog open={!!renewTarget} onClose={() => { setRenewTarget(null); setRenewMonths(12); }}>
+        <DialogTitle>Gia hạn thẻ độc giả</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Typography>
+              Gia hạn thẻ cho <strong>{renewTarget?.full_name}</strong> ({renewTarget?.student_code})
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Hạn hiện tại: {renewTarget?.membership_expiry}
+            </Typography>
+            <TextField
+              select
+              label="Gia hạn thêm"
+              value={renewMonths}
+              onChange={(e) => setRenewMonths(Number(e.target.value))}
+              fullWidth
+            >
+              <MenuItem value={1}>1 tháng</MenuItem>
+              <MenuItem value={3}>3 tháng</MenuItem>
+              <MenuItem value={6}>6 tháng</MenuItem>
+              <MenuItem value={12}>1 năm</MenuItem>
+              <MenuItem value={24}>2 năm</MenuItem>
+            </TextField>
+            <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
+              Hạn mới: {(() => {
+                const d = new Date(renewTarget?.membership_expiry || Date.now());
+                if (d < new Date()) d.setTime(Date.now());
+                d.setMonth(d.getMonth() + renewMonths);
+                return d.toISOString().split("T")[0];
+              })()}
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setRenewTarget(null); setRenewMonths(12); }} color="inherit">Hủy</Button>
+          <Button variant="contained" onClick={handleRenew}>Gia hạn</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* ─── DELETE CONFIRM ─── */}
       <Dialog open={!!deleteTarget} onClose={() => { setDeleteTarget(null); setDeleteConfirmText(""); }}>
         <DialogTitle>Xóa độc giả?</DialogTitle>
@@ -557,6 +646,35 @@ export default function PatronsPage() {
           <Button onClick={() => { setDeleteTarget(null); setDeleteConfirmText(""); }} color="inherit">Hủy</Button>
           <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>
             Xóa vĩnh viễn
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ─── RESTORE CONFIRM ─── */}
+      <Dialog open={!!restoreTarget} onClose={() => { setRestoreTarget(null); setRestoreConfirmText(""); }}>
+        <DialogTitle>Khôi phục độc giả?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Typography>
+              Khôi phục <strong>{restoreTarget?.full_name}</strong>? Nếu thẻ đã hết hạn, hạn thẻ sẽ được tự động gia hạn 1 năm.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Nhập <strong>KHÔI PHỤC</strong> để xác nhận:
+            </Typography>
+            <TextField
+              value={restoreConfirmText}
+              onChange={(e) => setRestoreConfirmText(e.target.value)}
+              placeholder="Nhập KHÔI PHỤC"
+              size="small"
+              autoFocus
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setRestoreTarget(null); setRestoreConfirmText(""); }} color="inherit">Hủy</Button>
+          <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC"}>
+            Khôi phục
           </Button>
         </DialogActions>
       </Dialog>

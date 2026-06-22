@@ -7,6 +7,10 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  IconButton,
+  InputAdornment,
   Paper,
   Stack,
   TextField,
@@ -15,6 +19,9 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import CloseIcon from "@mui/icons-material/Close";
 import AutoStoriesOutlinedIcon from "@mui/icons-material/AutoStoriesOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
@@ -33,12 +40,23 @@ export default function LoginPage() {
   const [mode, setMode] = useState<LoginMode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState<1 | 2 | 3 | 4>(1);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotCode, setForgotCode] = useState("");
+  const [forgotPassword, setForgotPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const faceFailCountRef = useRef(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -188,6 +206,80 @@ export default function LoginPage() {
     if (value === "password") stopCamera();
   };
 
+  const handleForgotSendCode = async () => {
+    if (!forgotEmail) {
+      setForgotError("Vui lòng nhập email");
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError("");
+    try {
+      await api.client.post("/auth/forgot-password", { email: forgotEmail });
+      setForgotStep(2);
+    } catch (err: any) {
+      setForgotError(getErrorMessage(err) || "Không thể gửi mã reset");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!forgotCode || forgotCode.length !== 6) {
+      setForgotError("Vui lòng nhập đầy đủ 6 chữ số mã xác minh");
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError("");
+    try {
+      await api.client.post("/auth/verify-reset-code", { email: forgotEmail, code: forgotCode });
+      setForgotStep(3);
+    } catch (err: any) {
+      setForgotError(getErrorMessage(err) || "Mã xác minh không hợp lệ");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleForgotReset = async () => {
+    if (!forgotPassword || !forgotConfirmPassword) {
+      setForgotError("Vui lòng nhập mật khẩu mới");
+      return;
+    }
+    if (forgotPassword !== forgotConfirmPassword) {
+      setForgotError("Mật khẩu mới không khớp");
+      return;
+    }
+    if (forgotPassword.length < 6) {
+      setForgotError("Mật khẩu phải ít nhất 6 ký tự");
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError("");
+    try {
+      await api.client.post("/auth/reset-password", {
+        email: forgotEmail,
+        code: forgotCode,
+        new_password: forgotPassword,
+      });
+      setForgotStep(4);
+    } catch (err: any) {
+      setForgotError(getErrorMessage(err) || "Đặt lại mật khẩu thất bại");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const closeForgotDialog = () => {
+    setForgotOpen(false);
+    setForgotStep(1);
+    setForgotEmail("");
+    setForgotCode("");
+    setForgotPassword("");
+    setForgotConfirmPassword("");
+    setForgotError("");
+    setShowForgotPassword(false);
+  };
+
   return (
     <Box
       sx={{
@@ -242,6 +334,25 @@ export default function LoginPage() {
                 <Button type="submit" variant="contained" startIcon={<LoginOutlinedIcon />} size="large" fullWidth>
                   Đăng nhập
                 </Button>
+                <Typography variant="body2" sx={{ textAlign: "center" }}>
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => setForgotOpen(true)}
+                    sx={{
+                      border: "none",
+                      bgcolor: "transparent",
+                      color: "primary.main",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      fontSize: "0.875rem",
+                      textDecoration: "underline",
+                      "&:hover": { color: "primary.dark" },
+                    }}
+                  >
+                    Quên mật khẩu?
+                  </Box>
+                </Typography>
               </Stack>
             </Box>
           ) : (
@@ -290,6 +401,189 @@ export default function LoginPage() {
           )}
         </Stack>
       </Paper>
+
+      <Dialog open={forgotOpen} onClose={closeForgotDialog} maxWidth="xs" fullWidth>
+        <DialogContent sx={{ p: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              {forgotStep === 4 ? "Thành công" : "Quên mật khẩu"}
+            </Typography>
+            <IconButton onClick={closeForgotDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+
+          {forgotStep < 4 && (
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", mb: 3, mt: 1 }}>
+              {[1, 2, 3].map((s) => (
+                <Box key={s} sx={{ display: "flex", alignItems: "center" }}>
+                  <Box
+                    sx={{
+                      width: 32, height: 32, borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 14, fontWeight: 700,
+                      bgcolor: forgotStep >= s ? "primary.main" : "action.hover",
+                      color: forgotStep >= s ? "primary.contrastText" : "text.secondary",
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    {forgotStep > s ? "✓" : s}
+                  </Box>
+                  {s < 3 && (
+                    <Box sx={{
+                      width: 40, height: 2, mx: 0.5,
+                      bgcolor: forgotStep > s ? "primary.main" : "action.hover",
+                      transition: "background-color 0.3s ease",
+                    }} />
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {forgotError && (
+            <Alert severity="error" sx={{ mb: 2 }}>{forgotError}</Alert>
+          )}
+
+          {forgotStep === 1 && (
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                Nhập email để nhận mã xác minh.
+              </Typography>
+              <TextField
+                label="Email"
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                fullWidth
+                autoFocus
+              />
+              <Button
+                variant="contained"
+                onClick={handleForgotSendCode}
+                disabled={forgotLoading}
+                fullWidth
+              >
+                {forgotLoading ? "Đang gửi..." : "Gửi mã xác minh"}
+              </Button>
+            </Stack>
+          )}
+
+          {forgotStep === 2 && (
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                Nhập mã 6 chữ số đã gửi đến <strong>{forgotEmail}</strong>
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <TextField
+                    key={i}
+                    id={`code-${i}`}
+                    value={forgotCode[i] || ""}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      if (val.length > 1) return;
+                      const newCode = forgotCode.split("");
+                      newCode[i] = val;
+                      const code = newCode.join("").slice(0, 6);
+                      setForgotCode(code);
+                      if (val && i < 5) {
+                        setTimeout(() => document.getElementById(`code-${i + 1}`)?.focus(), 10);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Backspace" && !forgotCode[i] && i > 0) {
+                        setTimeout(() => document.getElementById(`code-${i - 1}`)?.focus(), 10);
+                      }
+                    }}
+                    slotProps={{ htmlInput: { maxLength: 1, style: { textAlign: "center", fontSize: "1.5rem", fontWeight: 700, width: 44, height: 44, padding: 0 } } }}
+                    sx={{ "& fieldset": { borderRadius: 1.5 } }}
+                  />
+                ))}
+              </Box>
+              <Button
+                variant="contained"
+                onClick={handleVerifyCode}
+                disabled={forgotLoading || forgotCode.length !== 6}
+                fullWidth
+              >
+                {forgotLoading ? "Đang xác minh..." : "Xác minh mã"}
+              </Button>
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => { setForgotStep(1); setForgotCode(""); setForgotError(""); }}
+              >
+                ← Quay lại
+              </Button>
+            </Stack>
+          )}
+
+          {forgotStep === 3 && (
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                Tạo mật khẩu mới cho tài khoản của bạn.
+              </Typography>
+              <TextField
+                label="Mật khẩu mới"
+                type={showForgotPassword ? "text" : "password"}
+                value={forgotPassword}
+                onChange={(e) => setForgotPassword(e.target.value)}
+                fullWidth
+                autoFocus
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowForgotPassword(!showForgotPassword)} edge="end" size="small">
+                          {showForgotPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+              <TextField
+                label="Xác nhận mật khẩu mới"
+                type={showForgotPassword ? "text" : "password"}
+                value={forgotConfirmPassword}
+                onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                fullWidth
+              />
+              <Button
+                variant="contained"
+                onClick={handleForgotReset}
+                disabled={forgotLoading}
+                fullWidth
+              >
+                {forgotLoading ? "Đang xử lý..." : "Đặt lại mật khẩu"}
+              </Button>
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => { setForgotStep(2); setForgotError(""); setForgotPassword(""); setForgotConfirmPassword(""); }}
+              >
+                ← Quay lại
+              </Button>
+            </Stack>
+          )}
+
+          {forgotStep === 4 && (
+            <Stack spacing={2} sx={{ alignItems: "center", py: 2 }}>
+              <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: "success.light", display: "grid", placeItems: "center" }}>
+                <CheckCircleOutlineOutlinedIcon sx={{ fontSize: 40, color: "success.main" }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Đặt lại mật khẩu thành công!</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+                Bạn có thể đăng nhập bằng mật khẩu mới ngay bây giờ.
+              </Typography>
+              <Button variant="contained" onClick={closeForgotDialog} fullWidth sx={{ mt: 1 }}>
+                Quay lại đăng nhập
+              </Button>
+            </Stack>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

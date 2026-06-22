@@ -177,6 +177,7 @@ export default function BorrowPage() {
 
   const handleScanSuccess = useCallback((message: string) => {
     setSnackbar({ severity: "success", message });
+    setTimeout(() => window.location.reload(), 1500);
   }, []);
 
   const handleClearPatron = () => {
@@ -213,7 +214,7 @@ export default function BorrowPage() {
       ) : null}
 
       <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
-        <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", minHeight: 0 }}>
           <Card variant="outlined" sx={{ flex: patronId ? "0 0 auto" : 1 }}>
             <CardContent>
               <Stack spacing={2}>
@@ -313,16 +314,11 @@ export default function BorrowPage() {
             </Card>
           )}
 
-          {patronId && patronCode.trim() && (
-            <Box sx={{ flex: "0 0 auto", animation: `${fadeInUp} 0.4s ease-out` }}>
-              <BookRecommendations studentCode={patronCode.trim()} />
-            </Box>
-          )}
         </Grid>
 
-        <Grid size={{ xs: 12, md: 7, lg: 8 }} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Card variant="outlined" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 1, md: 2 } }}>
+        <Grid size={{ xs: 12, md: 7, lg: 8 }} sx={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", minHeight: 0 }}>
+          <Card variant="outlined" sx={{ display: "flex", flexDirection: "column" }}>
+            <CardContent sx={{ display: "flex", flexDirection: "column", p: { xs: 1, md: 2 } }}>
               <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
                 {patronId ? <CameraAltIcon color="primary" /> : <VideocamIcon color="primary" />}
                 <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
@@ -331,7 +327,7 @@ export default function BorrowPage() {
               </Stack>
 
               {patronId ? (
-                <Box sx={{ flex: 1, bgcolor: "black", borderRadius: 1, overflow: "hidden", position: "relative", minHeight: 300 }}>
+                <Box sx={{ bgcolor: "black", borderRadius: 1, overflow: "hidden", position: "relative", minHeight: 300 }}>
                   <Stack spacing={2} sx={{ alignItems: "center", justifyContent: "center", height: "100%", color: "grey.400", p: 4 }}>
                     <QrCodeScannerIcon sx={{ fontSize: 72, opacity: 0.3 }} />
                     <Typography variant="body1" color="text.secondary" sx={{ textAlign: "center" }}>
@@ -343,7 +339,7 @@ export default function BorrowPage() {
                   </Stack>
                 </Box>
               ) : (
-                <Box sx={{ flex: 1, bgcolor: "black", borderRadius: 1, overflow: "hidden", position: "relative", minHeight: 400 }}>
+                <Box sx={{ bgcolor: "black", borderRadius: 1, overflow: "hidden", position: "relative", minHeight: 400 }}>
                   {cameraError ? (
                     <Stack spacing={1.5} sx={{ alignItems: "center", justifyContent: "center", height: "100%", color: "grey.300", p: 3 }}>
                       <VideocamIcon sx={{ fontSize: 48 }} />
@@ -398,6 +394,12 @@ export default function BorrowPage() {
               )}
             </CardContent>
           </Card>
+
+          {patronId && patronCode.trim() && (
+            <Box sx={{ animation: `${fadeInUp} 0.4s ease-out` }}>
+              <BookRecommendations studentCode={patronCode.trim()} />
+            </Box>
+          )}
         </Grid>
       </Grid>
 
