@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth-context";
 import { MuiThemeProvider } from "@/lib/mui-theme";
 import { ToastProvider } from "@/components/ui/Toast";
+import ClientLayout from "@/components/ClientLayout";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,7 +20,9 @@ export default function RootLayout({
       <body suppressHydrationWarning className="bg-bg text-text">
         <MuiThemeProvider>
           <AuthProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              <ClientLayout>{children}</ClientLayout>
+            </ToastProvider>
           </AuthProvider>
         </MuiThemeProvider>
       </body>
