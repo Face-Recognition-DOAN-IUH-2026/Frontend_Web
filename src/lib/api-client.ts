@@ -306,6 +306,17 @@ class ApiClient {
     return response.data;
   }
 
+  async uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    const response = await this.client.post<{ avatarUrl: string }>("/users/me/avatar", formData);
+    return response.data;
+  }
+
+  async deleteAvatar(): Promise<void> {
+    await this.client.delete("/users/me/avatar");
+  }
+
   // Face enrollment status from face-recognition-api
   async getFaceEnrollmentStatus(): Promise<{ has_face: boolean; full_name: string | null; role: string }> {
     // /api/users/me routes to face-recognition-api via gateway
@@ -326,6 +337,11 @@ class ApiClient {
 
   async deleteUser(userId: string): Promise<void> {
     await this.client.delete(`/api/users/${userId}`);
+  }
+
+  async restoreUser(userId: string): Promise<UserPublic> {
+    const response = await this.client.put<UserPublic>(`/api/users/${userId}/restore`, {});
+    return response.data;
   }
 
   // === Face Operations ===
@@ -450,6 +466,11 @@ class ApiClient {
     await this.client.delete(`/api/patrons/${id}`);
   }
 
+  async restorePatron(id: string): Promise<PatronPublic> {
+    const response = await this.client.put<PatronPublic>(`/api/patrons/${id}/restore`, {});
+    return response.data;
+  }
+
   // === Access ===
   async getAccessLogs(
     params?: {
@@ -543,6 +564,10 @@ class ApiClient {
       items,
       total: typeof (data as any)?.total === "number" ? (data as any).total : items.length,
     };
+  }
+
+  async forceExitPatron(patronId: string): Promise<void> {
+    await this.client.post("/api/access/force-exit", { patron_id: patronId });
   }
 
   async getAccessFrequency(params?: { dateFrom?: string; dateTo?: string }): Promise<AccessFrequencyResponse> {

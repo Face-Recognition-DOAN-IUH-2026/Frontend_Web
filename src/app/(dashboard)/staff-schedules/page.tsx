@@ -174,7 +174,7 @@ export default function StaffSchedulesPage() {
         onAutoSchedule={handleAutoSchedule}
       />
 
-      <div className="flex items-center gap-4 text-xs text-text-3">
+      <div className="flex items-center gap-4 text-xs text-text-3 print:hidden">
         <span className="font-medium text-text-2">
           Tổng ca: <span className="text-primary font-bold">{weekStats.total}</span>
         </span>
@@ -188,7 +188,7 @@ export default function StaffSchedulesPage() {
         </span>
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 print:hidden">
         {FILTERS.map((f) => (
           <button
             key={f.value}
@@ -205,13 +205,21 @@ export default function StaffSchedulesPage() {
       </div>
 
       {error && (
-        <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-3 py-2">
+        <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-3 py-2 print:hidden">
           {error}
         </div>
       )}
 
+      {/* Print-only header */}
+      <div className="hidden print:block mb-4">
+        <h1 className="font-serif text-2xl font-semibold text-text tracking-tight mb-1">
+          Lịch trực thư viện
+        </h1>
+        <p className="text-sm text-text-2 font-mono">{from} ~ {to}</p>
+      </div>
+
       {loading ? (
-        <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center h-64 print:hidden">
           <div className="flex flex-col items-center gap-3">
             <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <span className="text-xs text-text-3">Đang tải lịch trực...</span>

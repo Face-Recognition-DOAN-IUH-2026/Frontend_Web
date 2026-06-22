@@ -75,6 +75,7 @@ function statusLabel(status: string) {
   if (status === "active") return "Đang hoạt động";
   if (status === "inactive") return "Tạm khóa";
   if (status === "expired") return "Hết hạn";
+  if (status === "deleted") return "Đã xóa";
   return status;
 }
 
@@ -101,6 +102,8 @@ export default function PatronDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [showRestore, setShowRestore] = useState(false);
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
   const [showEnroll, setShowEnroll] = useState(false);
   const [consent, setConsent] = useState(false);
   const [enrollError, setEnrollError] = useState("");
@@ -193,6 +196,19 @@ export default function PatronDetailPage() {
     }
   };
 
+  const handleRestore = async () => {
+    if (!patron || restoreConfirmText !== "KHÔI PHỤC") return;
+    try {
+      await api.restorePatron(patron.id);
+      setShowRestore(false);
+      setRestoreConfirmText("");
+      setNotice("Đã khôi phục độc giả.");
+      await loadPatron();
+    } catch (err: any) {
+      setNotice(`Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
+    }
+  };
+
   const handleEnroll = async (files: Record<CaptureAngle, File>) => {
     if (!patron) return;
     setEnrollLoading(true);
@@ -266,10 +282,26 @@ export default function PatronDetailPage() {
         Quay lại danh sách
       </Button>
 
+      {patron.status === "deleted" && (
+        <Alert severity="error" sx={{ fontWeight: 600 }}>
+          Độc giả này đã bị xóa. Dữ liệu sẽ được giữ lại và có thể khôi phục.
+        </Alert>
+      )}
+      {patron.status === "inactive" && (
+        <Alert severity="warning" sx={{ fontWeight: 600 }}>
+          Thẻ độc giả đang bị tạm khóa.
+        </Alert>
+      )}
+      {patron.status === "expired" && (
+        <Alert severity="warning" sx={{ fontWeight: 600 }}>
+          Thẻ độc giả đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.
+        </Alert>
+      )}
+
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack direction={{ xs: "column", lg: "row" }} spacing={3} sx={{ justifyContent: "space-between" }}>
           <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", minWidth: 0 }}>
-            <Avatar sx={{ width: 72, height: 72, bgcolor: "primary.main", color: "primary.contrastText", fontSize: 26, fontWeight: 900 }}>
+            <Avatar sx={{ width: 72, height: 72, bgcolor: patron.status === "deleted" ? "grey.500" : "primary.main", color: "primary.contrastText", fontSize: 26, fontWeight: 900 }}>
               {initials(patron.full_name)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
@@ -280,7 +312,10 @@ export default function PatronDetailPage() {
                 MSSV: {patron.student_code} · Mã thẻ: {patron.card_number}
               </Typography>
               <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap" }}>
-                <Chip color={patron.status === "active" ? "success" : "error"} label={statusLabel(patron.status)} />
+                <Chip
+                  color={patron.status === "active" ? "success" : patron.status === "deleted" ? "error" : "warning"}
+                  label={statusLabel(patron.status)}
+                />
                 <Chip color={patron.has_face ? "success" : "default"} icon={<FaceRetouchingNaturalOutlinedIcon />} label={patron.has_face ? "Đã có khuôn mặt" : "Chưa có khuôn mặt"} />
                 <Chip color={expired ? "error" : "primary"} icon={<EventAvailableOutlinedIcon />} label={`Hạn thẻ: ${formatDate(patron.membership_expiry)}`} />
               </Stack>
@@ -288,20 +323,28 @@ export default function PatronDetailPage() {
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "flex-start" }}>
-            <Button variant="outlined" startIcon={<EditOutlinedIcon />} onClick={openEdit}>
-              Sửa thông tin
-            </Button>
-            <Button variant="outlined" startIcon={<UpdateOutlinedIcon />} onClick={handleRenew}>
-              Gia hạn thẻ
-            </Button>
-            {!patron.has_face && (
-              <Button variant="contained" startIcon={<FaceRetouchingNaturalOutlinedIcon />} onClick={() => setShowEnroll(true)}>
-                Đăng ký khuôn mặt
+            {patron.status === "deleted" ? (
+              <Button variant="contained" color="success" onClick={() => setShowRestore(true)}>
+                Khôi phục
               </Button>
+            ) : (
+              <>
+                <Button variant="outlined" startIcon={<EditOutlinedIcon />} onClick={openEdit}>
+                  Sửa thông tin
+                </Button>
+                <Button variant="outlined" startIcon={<UpdateOutlinedIcon />} onClick={handleRenew}>
+                  Gia hạn thẻ
+                </Button>
+                {!patron.has_face && (
+                  <Button variant="contained" startIcon={<FaceRetouchingNaturalOutlinedIcon />} onClick={() => setShowEnroll(true)}>
+                    Đăng ký khuôn mặt
+                  </Button>
+                )}
+                <Button color="error" variant="outlined" startIcon={<DeleteOutlineOutlinedIcon />} onClick={() => setShowDelete(true)}>
+                  Xóa
+                </Button>
+              </>
             )}
-            <Button color="error" variant="outlined" startIcon={<DeleteOutlineOutlinedIcon />} onClick={() => setShowDelete(true)}>
-              Xóa
-            </Button>
           </Stack>
         </Stack>
 
@@ -560,6 +603,34 @@ export default function PatronDetailPage() {
           <Button onClick={() => { setShowDelete(false); setDeleteConfirmText(""); }}>Hủy</Button>
           <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>
             Xóa vĩnh viễn
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showRestore} onClose={() => { setShowRestore(false); setRestoreConfirmText(""); }} fullWidth maxWidth="xs">
+        <DialogTitle>Khôi phục độc giả?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Typography color="text.secondary">
+              Khôi phục hồ sơ <strong>{patron.full_name}</strong>? Nếu thẻ đã hết hạn, hạn thẻ sẽ được tự động gia hạn 1 năm.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Nhập <strong>KHÔI PHỤC</strong> để xác nhận:
+            </Typography>
+            <TextField
+              value={restoreConfirmText}
+              onChange={(e) => setRestoreConfirmText(e.target.value)}
+              placeholder="Nhập KHÔI PHỤC"
+              size="small"
+              autoFocus
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setShowRestore(false); setRestoreConfirmText(""); }}>Hủy</Button>
+          <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC"}>
+            Khôi phục
           </Button>
         </DialogActions>
       </Dialog>

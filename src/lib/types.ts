@@ -43,7 +43,9 @@ export interface UserPublic {
   email: string;
   full_name: string | null;
   role: string;
+  status?: string;
   has_face?: boolean;
+  avatar_url?: string | null;
 }
 
 export interface RefreshRequest {
@@ -121,6 +123,7 @@ export interface AuthUser {
   email: string;
   role: string;
   full_name?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface AuthContextType {
@@ -162,6 +165,9 @@ export interface PatronCreate {
   issue_date?: string;
   course?: string;
   permanent_address?: string;
+  identity_number?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface PatronUpdate {

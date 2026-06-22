@@ -43,8 +43,9 @@ export default function TimetableHeader({
       <div className="flex items-center justify-between">
         <h1 className="font-serif text-xl font-semibold text-text tracking-tight">
           Lịch trực theo tuần
+          <span className="hidden print:inline ml-4 text-sm font-mono font-normal text-text-3">{dateRange}</span>
         </h1>
-        <div className="flex items-center gap-2 text-xs text-text-3">
+        <div className="flex items-center gap-2 text-xs text-text-3 print:hidden">
           <span className="font-mono">{dateRange}</span>
         </div>
       </div>
@@ -103,7 +104,10 @@ export default function TimetableHeader({
               )}
             </>
           )}
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-text-2 hover:bg-surface-2 transition border border-border">
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-text-2 hover:bg-surface-2 transition border border-border"
+          >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10V5z" />
             </svg>
