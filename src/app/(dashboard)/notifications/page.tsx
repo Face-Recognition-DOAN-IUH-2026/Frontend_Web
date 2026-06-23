@@ -75,6 +75,7 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const pageSize = 20;
 
   useEffect(() => {
@@ -123,6 +124,15 @@ export default function NotificationsPage() {
         // silently fail
       }
     }
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const totalPages = Math.ceil(total / pageSize);
@@ -202,9 +212,33 @@ export default function NotificationsPage() {
                       <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", flexShrink: 0 }} />
                     )}
                   </Box>
-                  <Typography variant="body2" color="text.secondary" noWrap>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      display: "-webkit-box",
+                      WebkitLineClamp: expandedIds.has(notification.id) ? "unset" : 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: expandedIds.has(notification.id) ? "visible" : "hidden",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    }}
+                  >
                     {notification.body}
                   </Typography>
+                  {(notification.body?.length ?? 0) > 100 && (
+                    <Typography
+                      variant="caption"
+                      color="primary.main"
+                      sx={{ cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(notification.id);
+                      }}
+                    >
+                      {expandedIds.has(notification.id) ? "Thu gọn" : "Xem thêm"}
+                    </Typography>
+                  )}
                   <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
                     {formatRelativeTime(notification.createdAt)}
                   </Typography>

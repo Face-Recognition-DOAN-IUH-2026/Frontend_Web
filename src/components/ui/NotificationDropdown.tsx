@@ -201,7 +201,7 @@ export default function NotificationDropdown({ anchorEl, open, onClose }: Notifi
                   <Typography variant="body2" sx={{ fontWeight: notification.isRead ? 400 : 700 }} noWrap>
                     {notification.title}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block" }} noWrap>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                     {notification.body}
                   </Typography>
                   <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
