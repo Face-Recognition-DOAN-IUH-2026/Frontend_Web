@@ -32,6 +32,7 @@ import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
 import Tooltip from "@mui/material/Tooltip";
 import Markdown from "react-markdown";
 import api from "@/lib/api-client";
+import BookCard, { parseBookCard } from "@/components/BookCard";
 
 interface Message {
   id: string;
@@ -58,13 +59,20 @@ const STORAGE_KEY = "ai-assistant-session";
 
 function buildApiUrl(path: string) {
   const base = process.env.NEXT_PUBLIC_API_URL || "";
-  return `${base}/api/ai/agent${path}`;
+  return `${base}/api/ai${path}`;
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("access_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
 }
 
 async function chat(message: string, sessionId?: string, patronId?: string) {
   const res = await fetch(buildApiUrl("/chat"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ message, sessionId, patronId }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -74,7 +82,7 @@ async function chat(message: string, sessionId?: string, patronId?: string) {
 async function confirmAction(sessionId: string, action: "approve" | "reject") {
   const res = await fetch(buildApiUrl("/confirm"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ sessionId, action }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -82,9 +90,23 @@ async function confirmAction(sessionId: string, action: "approve" | "reject") {
 }
 
 async function getSession(sessionId: string) {
-  const res = await fetch(buildApiUrl(`/sessions/${sessionId}`));
+  const res = await fetch(buildApiUrl(`/sessions/${sessionId}`), {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function MessageContent({ content }: { content: string }) {
+  const { before, bookData, after } = parseBookCard(content);
+
+  return (
+    <>
+      {before && <Markdown>{before}</Markdown>}
+      {bookData && <BookCard data={bookData} />}
+      {after && <Markdown>{after}</Markdown>}
+    </>
+  );
 }
 
 export default function AiAssistantPage() {
@@ -675,7 +697,7 @@ function MessageBubble({ msg }: { msg: Message }) {
             {isUser ? (
               <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{msg.content}</Typography>
             ) : (
-              <Markdown>{msg.content}</Markdown>
+              <MessageContent content={msg.content} />
             )}
           </Paper>
 

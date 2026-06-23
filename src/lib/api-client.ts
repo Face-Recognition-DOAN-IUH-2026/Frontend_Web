@@ -1080,7 +1080,7 @@ class ApiClient {
   }
 
   async askAiCommandCenter(question: string): Promise<AiChatResponse> {
-    const response = await this.client.post<AiChatResponse>("/api/ai/chat", { question });
+    const response = await this.client.post<AiChatResponse>("/api/ai/command-center/chat", { question });
     return response.data;
   }
 
