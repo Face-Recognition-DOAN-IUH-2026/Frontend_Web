@@ -16,6 +16,7 @@ import {
   Paper,
   Snackbar,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
@@ -64,6 +65,7 @@ export default function BorrowIPCameraDialog({
   const [createError, setCreateError] = useState("");
   const [scanToast, setScanToast] = useState("");
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [note, setNote] = useState("");
   const lastScannedRef = useRef<string | null>(null);
 
   const lookupItem = useCallback(async (barcode: string, isbn: string) => {
@@ -140,6 +142,7 @@ export default function BorrowIPCameraDialog({
       setScanned([]);
       setCreateError("");
       setScanToast("");
+      setNote("");
       lastScannedRef.current = null;
     }
   }, [open]);
@@ -161,6 +164,7 @@ export default function BorrowIPCameraDialog({
           book_id: item.book_id!,
           copy_id: item.copy_id!,
         })),
+        note: note.trim() || null,
       });
       if (confirmResult.status === "success") {
         setScanned([]);
@@ -331,15 +335,27 @@ export default function BorrowIPCameraDialog({
             </Stack>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose} disabled={lookingUp}>Hủy</Button>
-          <Button
-            variant="contained"
-            disabled={lookingUp || validCount === 0}
-            onClick={handleCreateSlip}
-          >
-            {lookingUp ? "Đang xử lý..." : `Tạo phiếu mượn (${validCount} cuốn)`}
-          </Button>
+        <DialogActions sx={{ flexDirection: "column", alignItems: "stretch", px: 3, pb: 2, gap: 1.5 }}>
+          <TextField
+            size="small"
+            placeholder="Ghi chú phiếu mượn (tùy chọn)..."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            fullWidth
+            multiline
+            maxRows={3}
+            sx={{ "& .MuiInputBase-root": { fontSize: 13 } }}
+          />
+          <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+            <Button onClick={onClose} disabled={lookingUp}>Hủy</Button>
+            <Button
+              variant="contained"
+              disabled={lookingUp || validCount === 0}
+              onClick={handleCreateSlip}
+            >
+              {lookingUp ? "Đang xử lý..." : `Tạo phiếu mượn (${validCount} cuốn)`}
+            </Button>
+          </Stack>
         </DialogActions>
       </Dialog>
 

@@ -445,6 +445,7 @@ export interface BorrowSlipItem {
 export interface CreateBorrowSlipRequest {
   patron_id: string;
   items: BorrowSlipItem[];
+  note?: string | null;
 }
 
 export interface BorrowSlip {
@@ -456,6 +457,7 @@ export interface BorrowSlip {
   created_by_user_id?: string;
   created_by_email?: string;
   total_items: number;
+  note?: string | null;
   created_at: string;
   updated_at: string;
   records?: BorrowRecord[];
@@ -499,6 +501,7 @@ export interface ConfirmBorrowSlipRequest {
     book_id: string;
     copy_id: string;
   }[];
+  note?: string | null;
 }
 
 export interface CameraEvent {
