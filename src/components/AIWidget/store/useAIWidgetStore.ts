@@ -69,10 +69,10 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
         }));
 
         try {
-          const response = await fetch('/api/ai/chat', {
+          const response = await fetch('/api/ai/command-center/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message }),
+            body: JSON.stringify({ question: message }),
           });
 
           if (!response.ok) throw new Error('Chat request failed');

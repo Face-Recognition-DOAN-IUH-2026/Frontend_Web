@@ -97,10 +97,23 @@ src/app/library/map/page.tsx
 src/app/login/page.tsx
 src/app/page.tsx
 src/app/register/page.tsx
+src/components/AIWidget/AIWidget.tsx
+src/components/AIWidget/AIWidgetHeader.tsx
+src/components/AIWidget/AIWidgetPanel.tsx
+src/components/AIWidget/AIWidgetTrigger.tsx
+src/components/AIWidget/cards/AIActionCard.tsx
+src/components/AIWidget/cards/AIScoreCard.tsx
+src/components/AIWidget/index.tsx
+src/components/AIWidget/store/useAIWidgetStore.ts
+src/components/AIWidget/tabs/ActionsTab.tsx
+src/components/AIWidget/tabs/ChatTab.tsx
+src/components/AIWidget/tabs/ScoreTab.tsx
+src/components/BookCard.tsx
 src/components/BookRecommendations.tsx
 src/components/BorrowIPCameraDialog.tsx
 src/components/BorrowScannerDialog.tsx
 src/components/camera-capture.tsx
+src/components/ClientLayout.tsx
 src/components/frequency-chart.tsx
 src/components/gate/CameraFeed.tsx
 src/components/gate/GateButton.tsx
@@ -173,6 +186,158 @@ module.exports = {
     autoprefixer: {},
   },
 };
+</file>
+
+<file path="src/components/BookCard.tsx">
+"use client";
+
+import {
+  Card,
+  CardContent,
+  CardMedia,
+  Typography,
+  Box,
+  Chip,
+  Divider,
+} from "@mui/material";
+
+export interface BookCardData {
+  title: string;
+  author?: string;
+  isbn?: string;
+  categories?: string;
+  description?: string;
+  cover_url?: string;
+  publisher?: string;
+  published_date?: string;
+  page_count?: number;
+  language?: string;
+  source?: "database" | "google_books" | "not_found";
+}
+
+interface BookCardProps {
+  data: BookCardData;
+  showActions?: boolean;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+}
+
+export default function BookCard({
+  data,
+  showActions = false,
+  onConfirm,
+  onCancel,
+}: BookCardProps) {
+  return (
+    <Card
+      sx={{
+        maxWidth: 360,
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 2,
+        overflow: "hidden",
+        my: 1,
+      }}
+    >
+      {data.cover_url && (
+        <CardMedia
+          component="img"
+          height="200"
+          image={data.cover_url}
+          alt={data.title}
+          sx={{ objectFit: "contain", bgcolor: "grey.100", p: 1 }}
+          onError={(e: any) => {
+            e.target.style.display = "none";
+          }}
+        />
+      )}
+      <CardContent sx={{ p: 2 }}>
+        <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mb: 0.5 }}>
+          {data.title}
+        </Typography>
+
+        {data.author && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Tác giả: {data.author}
+          </Typography>
+        )}
+
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 1 }}>
+          {data.isbn && (
+            <Chip label={`ISBN: ${data.isbn}`} size="small" variant="outlined" />
+          )}
+          {data.categories && (
+            <Chip label={data.categories} size="small" color="primary" variant="outlined" />
+          )}
+          {data.source && (
+            <Chip
+              label={data.source === "database" ? "Trong thư viện" : "Google Books"}
+              size="small"
+              color={data.source === "database" ? "success" : "info"}
+            />
+          )}
+        </Box>
+
+        {data.description && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                lineHeight: 1.5,
+              }}
+            >
+              {data.description}
+            </Typography>
+          </>
+        )}
+
+        <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
+          {data.publisher && (
+            <Typography variant="caption" color="text.secondary">
+              NXB: {data.publisher}
+            </Typography>
+          )}
+          {data.published_date && (
+            <Typography variant="caption" color="text.secondary">
+              Năm: {data.published_date}
+            </Typography>
+          )}
+          {data.page_count && (
+            <Typography variant="caption" color="text.secondary">
+              {data.page_count} trang
+            </Typography>
+          )}
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function parseBookCard(text: string): { before: string; bookData: BookCardData | null; after: string } {
+  const marker = /:::book_card\s*\n([\s\S]*?)\n:::/;
+  const match = text.match(marker);
+
+  if (!match) {
+    return { before: text, bookData: null, after: "" };
+  }
+
+  const idx = text.indexOf(match[0]);
+  const before = text.substring(0, idx).trim();
+  const after = text.substring(idx + match[0].length).trim();
+
+  try {
+    const bookData = JSON.parse(match[1]) as BookCardData;
+    return { before, bookData, after };
+  } catch {
+    return { before: text, bookData: null, after: "" };
+  }
+}
 </file>
 
 <file path="e2e/tests/auth.spec.ts">
@@ -1555,6 +1720,7 @@ import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
 import Tooltip from "@mui/material/Tooltip";
 import Markdown from "react-markdown";
 import api from "@/lib/api-client";
+import BookCard, { parseBookCard } from "@/components/BookCard";
 
 interface Message {
   id: string;
@@ -1581,13 +1747,20 @@ const STORAGE_KEY = "ai-assistant-session";
 
 function buildApiUrl(path: string) {
   const base = process.env.NEXT_PUBLIC_API_URL || "";
-  return `${base}/api/ai/agent${path}`;
+  return `${base}/api/ai${path}`;
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("access_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
 }
 
 async function chat(message: string, sessionId?: string, patronId?: string) {
   const res = await fetch(buildApiUrl("/chat"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ message, sessionId, patronId }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1597,7 +1770,7 @@ async function chat(message: string, sessionId?: string, patronId?: string) {
 async function confirmAction(sessionId: string, action: "approve" | "reject") {
   const res = await fetch(buildApiUrl("/confirm"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ sessionId, action }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1605,9 +1778,23 @@ async function confirmAction(sessionId: string, action: "approve" | "reject") {
 }
 
 async function getSession(sessionId: string) {
-  const res = await fetch(buildApiUrl(`/sessions/${sessionId}`));
+  const res = await fetch(buildApiUrl(`/sessions/${sessionId}`), {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function MessageContent({ content }: { content: string }) {
+  const { before, bookData, after } = parseBookCard(content);
+
+  return (
+    <>
+      {before && <Markdown>{before}</Markdown>}
+      {bookData && <BookCard data={bookData} />}
+      {after && <Markdown>{after}</Markdown>}
+    </>
+  );
 }
 
 export default function AiAssistantPage() {
@@ -2198,7 +2385,7 @@ function MessageBubble({ msg }: { msg: Message }) {
             {isUser ? (
               <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{msg.content}</Typography>
             ) : (
-              <Markdown>{msg.content}</Markdown>
+              <MessageContent content={msg.content} />
             )}
           </Paper>
 
@@ -2499,6 +2686,8 @@ import AssistantIcon from "@mui/icons-material/SupportAgent";
 import UserIcon from "@mui/icons-material/Person";
 import Markdown from "react-markdown";
 import type { BookData } from "@/components/library-3d/types";
+import BookCard, { parseBookCard } from "@/components/BookCard";
+import type { BookCardData } from "@/components/BookCard";
 import QuickActions from "./QuickActions";
 
 type ChatState = "idle" | "thinking" | "responding";
@@ -2521,17 +2710,36 @@ const STORAGE_KEY = "ai-command-center-session";
 
 function buildApiUrl(path: string) {
   const base = process.env.NEXT_PUBLIC_API_URL || "";
-  return `${base}/api/ai/agent${path}`;
+  return `${base}/api/ai${path}`;
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("access_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
 }
 
 async function chat(message: string, sessionId?: string, patronId?: string) {
   const res = await fetch(buildApiUrl("/chat"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ message, sessionId, patronId }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function MessageContent({ content }: { content: string }) {
+  const { before, bookData, after } = parseBookCard(content);
+
+  return (
+    <div className="text-sm">
+      {before && <Markdown>{before}</Markdown>}
+      {bookData && <BookCard data={bookData} />}
+      {after && <Markdown>{after}</Markdown>}
+    </div>
+  );
 }
 
 export default function ChatPanel({
@@ -2672,9 +2880,7 @@ export default function ChatPanel({
                   : "bg-surface"
               }`}
             >
-              <div className="text-sm">
-                <Markdown>{msg.content}</Markdown>
-              </div>
+              <MessageContent content={msg.content} />
               <Typography
                 variant="caption"
                 className="block mt-1 opacity-60"
@@ -3627,381 +3833,977 @@ export default function Error({
 }
 </file>
 
-<file path="src/components/BorrowIPCameraDialog.tsx">
+<file path="src/components/AIWidget/AIWidget.tsx">
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Paper,
-  Snackbar,
-  Stack,
-  Typography,
-} from "@mui/material";
-import BookIcon from "@mui/icons-material/MenuBookOutlined";
-import CloseIcon from "@mui/icons-material/Close";
-import DeleteIcon from "@mui/icons-material/DeleteOutlined";
-import ErrorIcon from "@mui/icons-material/ReportOutlined";
-import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import api, { getErrorMessage } from "@/lib/api-client";
-import type { BookWithStats } from "@/lib/types";
-import { slideInRight, successPop } from "@/lib/animations";
-import IPCameraStream from "./IPCameraStream";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { Box, Backdrop } from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
+import AIWidgetTrigger from "./AIWidgetTrigger";
+import AIWidgetPanel from "./AIWidgetPanel";
+import { useAIWidgetStore } from "./store/useAIWidgetStore";
 
-interface ScannedBorrowItem {
-  barcode: string;
-  isbn: string;
-  loading: boolean;
-  can_borrow: boolean;
-  reason: string | null;
-  book: BookWithStats | null;
-  copy_id: string | null;
-  book_id: string | null;
-  copy_barcode: string | null;
-}
+const BLACKLIST_PATHS = ["/login", "/register", "/gate", "/liveness", "/identify"];
 
-interface Props {
-  open: boolean;
-  patronId: string;
-  patronName: string;
-  maxItems?: number;
-  cameraUrl: string;
-  onClose: () => void;
-  onSuccess: (message: string) => void;
-}
+export default function AIWidget() {
+  const pathname = usePathname();
+  const { isOpen, close } = useAIWidgetStore();
 
-export default function BorrowIPCameraDialog({
-  open,
-  patronId,
-  patronName,
-  maxItems,
-  cameraUrl,
-  onClose,
-  onSuccess,
-}: Props) {
-  const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
-  const [lookingUp, setLookingUp] = useState(false);
-  const [createError, setCreateError] = useState("");
-  const [scanToast, setScanToast] = useState("");
-  const [lookupError, setLookupError] = useState<string | null>(null);
-  const lastScannedRef = useRef<string | null>(null);
-
-  const lookupItem = useCallback(async (barcode: string, isbn: string) => {
-    setScanned((prev) => prev.map((item) =>
-      item.barcode === barcode ? { ...item, loading: true } : item
-    ));
-    try {
-      const result = await api.lookupBorrowSlip({
-        patron_id: patronId,
-        items: [{ barcode, isbn }],
-      });
-      const item = result.items.find((i) => i.barcode === barcode);
-      if (!item) {
-        setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
-        setLookupError(`Sách ISBN ${barcode} không tồn tại trong thư viện`);
-        return;
-      }
-      if (!item.can_borrow) {
-        setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
-        const msg = item.reason || "Sách không thể mượn";
-        const title = item.book?.title || "";
-        setLookupError(title ? `"${title}": ${msg}` : `${msg} (ISBN: ${barcode})`);
-        return;
-      }
-      setScanned((prev) => prev.map((i) =>
-        i.barcode === barcode ? {
-          ...i,
-          loading: false,
-          can_borrow: item.can_borrow,
-          reason: item.reason,
-          book: item.book,
-          copy_id: item.copy?.id || null,
-          book_id: item.book?.id || null,
-          copy_barcode: item.copy?.barcode || null,
-        } : i
-      ));
-    } catch {
-      setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
-      setLookupError(`Lỗi tra cứu: ${barcode}`);
-    }
-  }, [patronId]);
-
-  const addScanned = useCallback((isbn: string) => {
-    if (!/^\d{10,13}$/.test(isbn.replace(/-/g, ""))) return;
-    const normalized = isbn.replace(/-/g, "");
-    lastScannedRef.current = normalized;
-    setScanToast(normalized);
-    setScanned((prev) => {
-      if (prev.some((item) => item.barcode === normalized)) {
-        setScanToast(`Sách ${normalized} đã có trong danh sách`);
-        return prev;
-      }
-      if (maxItems !== undefined && prev.length >= maxItems) {
-        setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
-        return prev;
-      }
-      return [...prev, {
-        barcode: normalized,
-        isbn: normalized,
-        loading: true,
-        can_borrow: false,
-        reason: null,
-        book: null,
-        copy_id: null,
-        book_id: null,
-        copy_barcode: null,
-      }];
-    });
-    lookupItem(normalized, normalized);
-  }, [lookupItem, maxItems]);
+  const isBlacklisted = BLACKLIST_PATHS.some((p) => pathname?.startsWith(p));
 
   useEffect(() => {
-    if (!open) {
-      setScanned([]);
-      setCreateError("");
-      setScanToast("");
-      lastScannedRef.current = null;
-    }
-  }, [open]);
-
-  const removeItem = (barcode: string) => {
-    setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
-  };
-
-  const handleCreateSlip = async () => {
-    const validItems = scanned.filter((item) => item.can_borrow && item.book_id && item.copy_id);
-    if (!validItems.length || !patronId) return;
-    setCreateError("");
-    try {
-      const confirmResult = await api.confirmBorrowSlip({
-        patron_id: patronId,
-        items: validItems.map((item) => ({
-          barcode: item.copy_barcode || item.barcode,
-          isbn: item.isbn,
-          book_id: item.book_id!,
-          copy_id: item.copy_id!,
-        })),
-      });
-      if (confirmResult.status === "success") {
-        setScanned([]);
-        onSuccess(confirmResult.message);
-        onClose();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        close();
       }
-    } catch (err) {
-      const detail = getErrorMessage(err);
-      const removedBarcodes: string[] = [];
-      const toastMsg = detail;
+    };
 
-      const matchTitle = detail.match(/^Sach "(.+)" da duoc doc gia nay muon$/);
-      if (matchTitle) {
-        const title = matchTitle[1];
-        setScanned((prev) => {
-          const filtered = prev.filter((item) => {
-            if (item.book?.title === title) {
-              removedBarcodes.push(item.barcode);
-              return false;
-            }
-            return true;
-          });
-          return filtered;
-        });
-      } else {
-        const matchBarcode = detail.match(/^(?:Ban sao|Ma vach) ([^\s]+) (?:dang duoc muon|khong ton tai)/);
-        if (matchBarcode) {
-          const barcode = matchBarcode[1];
-          setScanned((prev) => {
-            const filtered = prev.filter((item) => {
-              if (item.barcode === barcode || item.barcode.includes(barcode)) {
-                removedBarcodes.push(item.barcode);
-                return false;
-              }
-              return true;
-            });
-            return filtered;
-          });
-        } else {
-          setCreateError(detail);
-        }
-      }
-      if (removedBarcodes.length > 0) {
-        setScanToast(toastMsg);
-      }
-    }
-  };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, close]);
 
-  const validCount = scanned.filter((item) => item.can_borrow).length;
-  const totalScanned = scanned.length;
+  if (isBlacklisted) return null;
 
   return (
     <>
-      <Dialog open={open} onClose={lookingUp ? undefined : onClose} fullWidth maxWidth="xl">
-        <DialogTitle>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <QrCodeScannerIcon color="primary" />
-              <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                Quét mã vạch sách (IP Camera)
-              </Typography>
-            </Stack>
-            {!lookingUp && (
-              <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
-            )}
-          </Stack>
-        </DialogTitle>
-        <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
-            <Box sx={{ width: { md: "50%" }, flexShrink: 0 }}>
-              <IPCameraStream
-                cameraUrl={cameraUrl}
-                onBarcodeDetected={addScanned}
-              />
-            </Box>
-
-            <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto" }}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                <QrCodeScannerIcon color="primary" sx={{ fontSize: 20 }} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
-                  {totalScanned > 0 ? `Đã quét (${totalScanned} cuốn)` : "Sách đã quét"}
-                </Typography>
-              </Stack>
-
-              {createError ? <Alert severity="error" onClose={() => setCreateError("")}>{createError}</Alert> : null}
-
-              {scanned.length === 0 ? (
-                <Alert severity="info" sx={{ flex: 1, display: "flex", alignItems: "center" }}>
-                  Đưa mã vạch vào camera. Sách sẽ xuất hiện tại đây.
-                </Alert>
-              ) : (
-                scanned.map((item) => {
-                  const isLastScanned = item.barcode === lastScannedRef.current;
-                  const hasError = !item.loading && !item.can_borrow;
-                  const isSuccess = !item.loading && item.can_borrow;
-                  return (
-                    <Paper
-                      key={item.barcode}
-                      variant="outlined"
-                      sx={{
-                        p: 1.5,
-                        borderColor: isLastScanned ? "primary.main" : hasError ? "error.main" : undefined,
-                        bgcolor: isLastScanned ? "action.hover" : hasError ? "error.50" : undefined,
-                        animation: isSuccess
-                          ? `${successPop} 0.4s ease-out`
-                          : isLastScanned
-                          ? `${slideInRight} 0.3s ease-out`
-                          : undefined,
-                      }}
-                    >
-                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                        {item.loading ? (
-                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
-                            <CircularProgress size={20} />
-                          </Avatar>
-                        ) : item.book?.cover_url ? (
-                          <Box
-                            component="img"
-                            src={item.book.cover_url}
-                            alt={item.book.title}
-                            sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
-                          />
-                        ) : (
-                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: hasError ? "error.main" : "background.default", flexShrink: 0 }}>
-                            {hasError ? <ErrorIcon fontSize="small" /> : <BookIcon />}
-                          </Avatar>
-                        )}
-                        <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
-                          {item.loading ? (
-                            <Typography variant="body2" color="text.secondary">Đang tra cứu...</Typography>
-                          ) : item.can_borrow && item.book ? (
-                            <>
-                              <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>
-                                {item.book.title}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" noWrap>
-                                {item.book.author || "-"}
-                              </Typography>
-                              <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>
-                                {item.barcode}
-                              </Typography>
-                              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexWrap: "wrap", mt: 0.5 }}>
-                                <Chip size="small" variant="outlined" label={`Kho: ${item.book.total_copies}`} sx={{ height: 20, fontSize: 11 }} />
-                                <Chip size="small" variant="outlined" color="success" label={`Sẵn: ${item.book.available_copies}`} sx={{ height: 20, fontSize: 11 }} />
-                              </Stack>
-                            </>
-                          ) : (
-                            <>
-                              <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap color="error">
-                                {item.book?.title || item.barcode}
-                              </Typography>
-                              {item.reason && (
-                                <Typography variant="caption" color="error">
-                                  {item.reason}
-                                </Typography>
-                              )}
-                            </>
-                          )}
-                        </Stack>
-                        <IconButton size="small" color="error" onClick={() => removeItem(item.barcode)} sx={{ mt: 0.5 }}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Stack>
-                    </Paper>
-                  );
-                })
-              )}
-            </Stack>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose} disabled={lookingUp}>Hủy</Button>
-          <Button
-            variant="contained"
-            disabled={lookingUp || validCount === 0}
-            onClick={handleCreateSlip}
-          >
-            {lookingUp ? "Đang xử lý..." : `Tạo phiếu mượn (${validCount} cuốn)`}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={!!scanToast}
-        autoHideDuration={2000}
-        onClose={() => setScanToast("")}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        {scanToast ? (
-          <Alert
-            severity="success"
-            onClose={() => setScanToast("")}
+      <AIWidgetTrigger />
+      <AnimatePresence>
+        {isOpen && (
+          <Backdrop
+            open
+            onClick={close}
             sx={{
-              animation: `${slideInRight} 0.3s ease-out`,
-              boxShadow: 4,
+              position: "fixed",
+              inset: 0,
+              bgcolor: "rgba(0,0,0,0.3)",
+              zIndex: 99998,
+              backdropFilter: "blur(2px)",
+            }}
+          />
+        )}
+      </AnimatePresence>
+      <AIWidgetPanel />
+    </>
+  );
+}
+</file>
+
+<file path="src/components/AIWidget/AIWidgetHeader.tsx">
+"use client";
+
+import { Box, IconButton, Typography, Tabs, Tab, useTheme, useMediaQuery } from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
+import CloseIcon from "@mui/icons-material/CloseOutlined";
+import MinimizeIcon from "@mui/icons-material/MinimizeOutlined";
+import { useAIWidgetStore } from "./store/useAIWidgetStore";
+
+interface AIWidgetHeaderProps {
+  onMinimize: () => void;
+}
+
+export default function AIWidgetHeader({ onMinimize }: AIWidgetHeaderProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { activeTab, setActiveTab } = useAIWidgetStore();
+
+  const handleTabChange = (_: React.SyntheticEvent, newValue: 'score' | 'chat' | 'actions') => {
+    setActiveTab(newValue);
+  };
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        px: 2,
+        py: 1.5,
+        borderBottom: 1,
+        borderColor: "divider",
+        bgcolor: "background.paper",
+      }}
+    >
+      <Typography
+        variant="subtitle1"
+        sx={{ fontWeight: 800, color: "text.primary", display: "flex", alignItems: "center", gap: 1 }}
+      >
+        <Box
+          component="span"
+          sx={{
+            width: 28,
+            height: 28,
+            borderRadius: 1,
+            bgcolor: "primary.main",
+            color: "primary.contrastText",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          🤖
+        </Box>
+        AI Library Helper
+      </Typography>
+
+      <Box sx={{ display: "flex", gap: 0.5 }}>
+        <IconButton size="small" onClick={onMinimize} sx={{ color: "text.secondary" }}>
+          <MinimizeIcon fontSize="small" />
+        </IconButton>
+        <IconButton size="small" onClick={() => useAIWidgetStore.getState().close()} sx={{ color: "text.secondary" }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    </Box>
+  );
+}
+</file>
+
+<file path="src/components/AIWidget/AIWidgetPanel.tsx">
+"use client";
+
+import { Box, useTheme, useMediaQuery, Tabs, Tab } from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAIWidgetStore } from "./store/useAIWidgetStore";
+import AIWidgetHeader from "./AIWidgetHeader";
+import ScoreTab from "./tabs/ScoreTab";
+import ChatTab from "./tabs/ChatTab";
+import ActionsTab from "./tabs/ActionsTab";
+
+export default function AIWidgetPanel() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { isOpen, activeTab, minimize } = useAIWidgetStore();
+
+  const panelWidth = isMobile ? "100vw" : 420;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <Box
+          sx={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: isMobile ? 0 : "auto",
+            zIndex: 99999,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+          }}
+        >
+          <motion.div
+            initial={{ x: panelWidth, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: panelWidth, opacity: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 30,
+            }}
+            style={{
+              width: panelWidth,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
-            {scanToast}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+            <Box
+              sx={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                bgcolor: "background.paper",
+                boxShadow: isMobile ? 0 : 6,
+                borderLeft: isMobile ? 0 : 1,
+                borderColor: "divider",
+                borderRadius: isMobile ? 0 : "12px 0 0 12px",
+                overflow: "hidden",
+              }}
+            >
+              <AIWidgetHeader onMinimize={minimize} />
 
-      <Dialog open={!!lookupError} onClose={() => setLookupError(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 900 }}>Thông báo</DialogTitle>
-        <DialogContent>
-          <Typography>{lookupError}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLookupError(null)} variant="contained">Đóng</Button>
-        </DialogActions>
-      </Dialog>
+              <TabNavigation />
+
+              <Box sx={{ flex: 1, overflow: "auto" }}>
+                <AnimatePresence mode="wait">
+                  {activeTab === "score" && <ScoreTab key="score" />}
+                  {activeTab === "chat" && <ChatTab key="chat" />}
+                  {activeTab === "actions" && <ActionsTab key="actions" />}
+                </AnimatePresence>
+              </Box>
+            </Box>
+          </motion.div>
+        </Box>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function TabNavigation() {
+  const theme = useTheme();
+  const { activeTab, setActiveTab } = useAIWidgetStore();
+
+  const handleChange = (_: React.SyntheticEvent, newValue: 'score' | 'chat' | 'actions') => {
+    setActiveTab(newValue);
+  };
+
+  return (
+    <Box sx={{ borderBottom: 1, borderColor: "divider", bgcolor: "background.default" }}>
+      <Tabs
+        value={activeTab}
+        onChange={handleChange}
+        variant="fullWidth"
+        sx={{
+          minHeight: 44,
+          "& .MuiTab-root": {
+            minHeight: 44,
+            fontWeight: 600,
+            fontSize: "0.8rem",
+            textTransform: "none",
+          },
+          "& .Mui-selected": {
+            color: "primary.main",
+          },
+          "& .MuiTabs-indicator": {
+            bgcolor: "primary.main",
+          },
+        }}
+      >
+        <Tab label="Score" value="score" />
+        <Tab label="Chat" value="chat" />
+        <Tab label="Actions" value="actions" />
+      </Tabs>
+    </Box>
+  );
+}
+</file>
+
+<file path="src/components/AIWidget/AIWidgetTrigger.tsx">
+"use client";
+
+import { Box, IconButton, Badge, useTheme } from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
+import { useAIWidgetStore } from "./store/useAIWidgetStore";
+
+export default function AIWidgetTrigger() {
+  const theme = useTheme();
+  const { isOpen, toggle, isMinimized, activeTab } = useAIWidgetStore();
+
+  return (
+    <AnimatePresence>
+      {!isMinimized && (
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: { xs: 80, sm: 24 },
+            right: 24,
+            zIndex: 9999,
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 25,
+            }}
+          >
+            <Badge
+              overlap="circular"
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              badgeContent={
+                activeTab === "score" ? null : (
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      bgcolor: "primary.main",
+                      border: "2px solid",
+                      borderColor: "background.paper",
+                    }}
+                  />
+                )
+              }
+            >
+              <IconButton
+                onClick={toggle}
+                sx={{
+                  width: 56,
+                  height: 56,
+                  bgcolor: "primary.main",
+                  color: "primary.contrastText",
+                  boxShadow: 6,
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    bgcolor: "primary.dark",
+                    transform: "scale(1.05)",
+                    boxShadow: 8,
+                  },
+                }}
+              >
+                <SmartToyIcon sx={{ fontSize: 28 }} />
+              </IconButton>
+            </Badge>
+          </motion.div>
+        </Box>
+      )}
+    </AnimatePresence>
+  );
+}
+</file>
+
+<file path="src/components/AIWidget/cards/AIActionCard.tsx">
+"use client";
+
+import { Card, CardActionArea, CardContent, Box, Typography, Stack } from "@mui/material";
+import { useRouter } from "next/navigation";
+import { useAIWidgetStore } from "../store/useAIWidgetStore";
+
+interface AIActionCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  path: string;
+  color?: string;
+}
+
+export default function AIActionCard({ icon, title, description, path, color = "primary.main" }: AIActionCardProps) {
+  const router = useRouter();
+  const { close } = useAIWidgetStore();
+
+  const handleClick = () => {
+    router.push(path);
+    close();
+  };
+
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        flex: "1 1 calc(50% - 8px)",
+        minWidth: 0,
+        transition: "all 0.2s ease",
+        "&:hover": {
+          boxShadow: 2,
+          borderColor: color,
+        },
+      }}
+    >
+      <CardActionArea onClick={handleClick} sx={{ p: 1.5 }}>
+        <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
+          <Stack spacing={1}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: 1,
+                bgcolor: `${color}15`,
+                color: color,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {icon}
+            </Box>
+            <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              {title}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
+              {description}
+            </Typography>
+          </Stack>
+        </CardContent>
+      </CardActionArea>
+    </Card>
+  );
+}
+</file>
+
+<file path="src/components/AIWidget/cards/AIScoreCard.tsx">
+"use client";
+
+import { Box, Card, CardContent, Typography, Stack, LinearProgress, Chip, useTheme } from "@mui/material";
+import TrendingUpIcon from "@mui/icons-material/TrendingUpOutlined";
+import TrendingDownIcon from "@mui/icons-material/TrendingDownOutlined";
+import GroupsIcon from "@mui/icons-material/GroupsOutlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
+import CalendarTodayIcon from "@mui/icons-material/CalendarTodayOutlined";
+import { useAIWidgetStore } from "../store/useAIWidgetStore";
+
+export default function AIScoreCard() {
+  const theme = useTheme();
+  const { lastSummary } = useAIWidgetStore();
+
+  if (!lastSummary) {
+    return (
+      <Card variant="outlined" sx={{ mb: 2 }}>
+        <CardContent>
+          <Stack spacing={2} sx={{ alignItems: "center", py: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Đang tải dữ liệu...
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const score = lastSummary.operational_score;
+  const scoreGrade = score >= 80 ? "Tốt" : score >= 60 ? "Bình thường" : score >= 40 ? "Cảnh báo" : "Nguy hiểm";
+  const scoreColor = score >= 80 ? "success" : score >= 60 ? "warning" : score >= 40 ? "warning" : "error";
+
+  return (
+    <Stack spacing={2}>
+      <Card
+        variant="outlined"
+        sx={{
+          borderColor: `${scoreColor}.main`,
+          borderWidth: 2,
+          background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.mode === "dark" ? "rgba(3,168,244,0.1)" : "rgba(3,168,244,0.05)"})`,
+        }}
+      >
+        <CardContent>
+          <Stack spacing={2}>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                Điểm vận hành
+              </Typography>
+              {score >= 70 ? (
+                <TrendingUpIcon color="success" fontSize="small" />
+              ) : (
+                <TrendingDownIcon color="error" fontSize="small" />
+              )}
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "baseline", gap: 1 }}>
+              <Typography variant="h2" sx={{ fontWeight: 900, lineHeight: 1, color: `${scoreColor}.main` }}>
+                {score}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                / 100
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Chip
+                size="small"
+                color={scoreColor}
+                label={scoreGrade}
+                sx={{ fontWeight: 700 }}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`Cập nhật: ${new Date(lastSummary.generated_at).toLocaleTimeString("vi-VN")}`}
+                sx={{ fontSize: 10 }}
+              />
+            </Box>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Thông số hiện tại
+            </Typography>
+
+            <Stack spacing={1.5}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <GroupsIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                  <Typography variant="body2">Độc giả trong thư viện</Typography>
+                </Stack>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {lastSummary.active_patrons}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <WarningAmberIcon sx={{ fontSize: 18, color: lastSummary.overdue_borrows > 5 ? "error.main" : "text.secondary" }} />
+                  <Typography variant="body2" color={lastSummary.overdue_borrows > 5 ? "error.main" : "text.secondary"}>
+                    Sách quá hạn
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: lastSummary.overdue_borrows > 5 ? "error.main" : "text.primary" }}>
+                  {lastSummary.overdue_borrows}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <CalendarTodayIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                  <Typography variant="body2">Nhân viên trực hôm nay</Typography>
+                </Stack>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {lastSummary.scheduled_staff_today}
+                </Typography>
+              </Box>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={1.5}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Lượt ra vào hôm nay
+            </Typography>
+            <Stack direction="row" spacing={2}>
+              <Box sx={{ flex: 1, textAlign: "center" }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: "success.main" }}>
+                  {lastSummary.today_entries}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Lượt vào
+                </Typography>
+              </Box>
+              <Box sx={{ flex: 1, textAlign: "center" }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: "warning.main" }}>
+                  {lastSummary.today_exits}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Lượt ra
+                </Typography>
+              </Box>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Stack>
+  );
+}
+</file>
+
+<file path="src/components/AIWidget/index.tsx">
+import AIWidget from "./AIWidget";
+
+export default AIWidget;
+export { useAIWidgetStore } from "./store/useAIWidgetStore";
+</file>
+
+<file path="src/components/AIWidget/store/useAIWidgetStore.ts">
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+export interface CommandCenterSummary {
+  operational_score: number;
+  active_patrons: number;
+  overdue_borrows: number;
+  scheduled_staff_today: number;
+  today_entries: number;
+  today_exits: number;
+  generated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+interface AIWidgetStore {
+  isOpen: boolean;
+  isMinimized: boolean;
+  activeTab: 'score' | 'chat' | 'actions';
+  lastSummary: CommandCenterSummary | null;
+  messages: ChatMessage[];
+  isLoadingChat: boolean;
+
+  open: () => void;
+  close: () => void;
+  toggle: () => void;
+  minimize: () => void;
+  setActiveTab: (tab: 'score' | 'chat' | 'actions') => void;
+  updateSummary: (summary: CommandCenterSummary) => void;
+  sendMessage: (message: string) => Promise<void>;
+  clearMessages: () => void;
+}
+
+export const useAIWidgetStore = create<AIWidgetStore>()(
+  persist(
+    (set, get) => ({
+      isOpen: false,
+      isMinimized: false,
+      activeTab: 'score',
+      lastSummary: null,
+      messages: [],
+      isLoadingChat: false,
+
+      open: () => set({ isOpen: true }),
+      close: () => set({ isOpen: false }),
+      toggle: () => set((state) => ({ isOpen: !state.isOpen })),
+      minimize: () => set((state) => ({ isMinimized: !state.isMinimized })),
+
+      setActiveTab: (tab) => set({ activeTab: tab }),
+
+      updateSummary: (summary) => set({ lastSummary: summary }),
+
+      sendMessage: async (message: string) => {
+        const userMessage: ChatMessage = {
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content: message,
+          timestamp: Date.now(),
+        };
+
+        set((state) => ({
+          messages: [...state.messages, userMessage],
+          isLoadingChat: true,
+        }));
+
+        try {
+          const response = await fetch('/api/ai/command-center/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: message }),
+          });
+
+          if (!response.ok) throw new Error('Chat request failed');
+
+          const data = await response.json();
+
+          const assistantMessage: ChatMessage = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: data.answer || data.message || 'Xin lỗi, tôi không thể trả lời lúc này.',
+            timestamp: Date.now(),
+          };
+
+          set((state) => ({
+            messages: [...state.messages, assistantMessage],
+            isLoadingChat: false,
+          }));
+        } catch {
+          const errorMessage: ChatMessage = {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+            timestamp: Date.now(),
+          };
+
+          set((state) => ({
+            messages: [...state.messages, errorMessage],
+            isLoadingChat: false,
+          }));
+        }
+      },
+
+      clearMessages: () => set({ messages: [] }),
+    }),
+    {
+      name: 'ai-widget-storage',
+      partialize: (state) => ({
+        isMinimized: state.isMinimized,
+        activeTab: state.activeTab,
+        messages: state.messages,
+      }),
+    }
+  )
+);
+</file>
+
+<file path="src/components/AIWidget/tabs/ActionsTab.tsx">
+"use client";
+
+import { Box, Typography } from "@mui/material";
+import CalendarTodayIcon from "@mui/icons-material/CalendarTodayOutlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
+import GroupsIcon from "@mui/icons-material/GroupsOutlined";
+import AIActionCard from "../cards/AIActionCard";
+
+const ACTIONS = [
+  {
+    icon: <CalendarTodayIcon sx={{ fontSize: 20 }} />,
+    title: "Xem lịch trực",
+    description: "Kiểm tra lịch trực nhân viên hôm nay",
+    path: "/staff-schedules",
+    color: "#4A8C5C",
+  },
+  {
+    icon: <WarningAmberIcon sx={{ fontSize: 20 }} />,
+    title: "Sách quá hạn",
+    description: "Danh sách sách quá hạn chưa trả",
+    path: "/history?filter=overdue",
+    color: "#B85C4A",
+  },
+  {
+    icon: <GroupsIcon sx={{ fontSize: 20 }} />,
+    title: "Độc giả trong thư viện",
+    description: "Xem ai đang ở trong thư viện",
+    path: "/active",
+    color: "#3B82F6",
+  },
+];
+
+export default function ActionsTab() {
+  return (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
+        Hành động nhanh
+      </Typography>
+
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+        {ACTIONS.map((action) => (
+          <AIActionCard
+            key={action.path}
+            icon={action.icon}
+            title={action.title}
+            description={action.description}
+            path={action.path}
+            color={action.color}
+          />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+</file>
+
+<file path="src/components/AIWidget/tabs/ChatTab.tsx">
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
+import { Box, Typography, TextField, IconButton, Paper, Stack, Avatar, useTheme, CircularProgress } from "@mui/material";
+import SendIcon from "@mui/icons-material/SendOutlined";
+import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
+import PersonIcon from "@mui/icons-material/PersonOutlined";
+import { useAIWidgetStore, ChatMessage } from "../store/useAIWidgetStore";
+
+export default function ChatTab() {
+  const theme = useTheme();
+  const { messages, sendMessage, isLoadingChat, clearMessages } = useAIWidgetStore();
+  const [input, setInput] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isLoadingChat) return;
+
+    setInput("");
+    await sendMessage(trimmed);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
+        {messages.length === 0 ? (
+          <Stack spacing={2} sx={{ alignItems: "center", justifyContent: "center", height: "100%" }}>
+            <Avatar sx={{ width: 48, height: 48, bgcolor: "primary.main" }}>
+              <SmartToyIcon />
+            </Avatar>
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+              Xin chào! Tôi là AI Library Helper.
+              <br />
+              Hỏi tôi về thư viện, lịch trực, sách...
+            </Typography>
+          </Stack>
+        ) : (
+          <Stack spacing={1.5}>
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id} message={msg} />
+            ))}
+            {isLoadingChat && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 2 }}>
+                <Avatar sx={{ width: 28, height: 28, bgcolor: "primary.main" }}>
+                  <SmartToyIcon sx={{ fontSize: 16 }} />
+                </Avatar>
+                <CircularProgress size={16} />
+                <Typography variant="caption" color="text.secondary">
+                  AI đang trả lời...
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        )}
+        <div ref={messagesEndRef} />
+      </Box>
+
+      <Box
+        sx={{
+          p: 1.5,
+          borderTop: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Box sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
+          <TextField
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Hỏi AI..."
+            size="small"
+            fullWidth
+            multiline
+            maxRows={4}
+            disabled={isLoadingChat}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          />
+          <IconButton
+            color="primary"
+            onClick={handleSend}
+            disabled={!input.trim() || isLoadingChat}
+            sx={{
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
+              "&:hover": { bgcolor: "primary.dark" },
+              "&.Mui-disabled": { bgcolor: "action.disabledBackground" },
+            }}
+          >
+            <SendIcon />
+          </IconButton>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+function MessageBubble({ message }: { message: ChatMessage }) {
+  const theme = useTheme();
+  const isUser = message.role === "user";
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: isUser ? "row-reverse" : "row",
+        alignItems: "flex-start",
+        gap: 1,
+      }}
+    >
+      {!isUser && (
+        <Avatar sx={{ width: 28, height: 28, bgcolor: "primary.main" }}>
+          <SmartToyIcon sx={{ fontSize: 16 }} />
+        </Avatar>
+      )}
+      <Paper
+        sx={{
+          p: 1.5,
+          maxWidth: "75%",
+          bgcolor: isUser ? "primary.main" : theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "grey.100",
+          color: isUser ? "primary.contrastText" : "text.primary",
+          borderRadius: 2,
+          borderBottomRightRadius: isUser ? 0 : 2,
+          borderBottomLeftRadius: isUser ? 2 : 0,
+        }}
+      >
+        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+          {message.content}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            textAlign: isUser ? "right" : "left",
+            opacity: 0.7,
+            mt: 0.5,
+            fontSize: 10,
+          }}
+        >
+          {new Date(message.timestamp).toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </Typography>
+      </Paper>
+      {isUser && (
+        <Avatar sx={{ width: 28, height: 28, bgcolor: "secondary.main" }}>
+          <PersonIcon sx={{ fontSize: 16 }} />
+        </Avatar>
+      )}
+    </Box>
+  );
+}
+</file>
+
+<file path="src/components/AIWidget/tabs/ScoreTab.tsx">
+"use client";
+
+import React, { useState } from "react";
+import { Box, Typography, Button, CircularProgress, Stack } from "@mui/material";
+import RefreshIcon from "@mui/icons-material/RefreshOutlined";
+import AIScoreCard from "../cards/AIScoreCard";
+import { useAIWidgetStore } from "../store/useAIWidgetStore";
+
+export default function ScoreTab() {
+  const { lastSummary, updateSummary } = useAIWidgetStore();
+  const [loading, setLoading] = useState(false);
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/ai/command-center/summary");
+      if (response.ok) {
+        const data = await response.json();
+        updateSummary(data);
+      }
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box sx={{ p: 2 }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1 }}>
+          Tình trạng hệ thống
+        </Typography>
+        <Button
+          size="small"
+          startIcon={loading ? <CircularProgress size={14} /> : <RefreshIcon />}
+          onClick={handleRefresh}
+          disabled={loading}
+          sx={{ fontSize: "0.75rem" }}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      <AIScoreCard />
+    </Box>
+  );
+}
+</file>
+
+<file path="src/components/ClientLayout.tsx">
+"use client";
+
+import AIWidget from "@/components/AIWidget";
+
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      {children}
+      <AIWidget />
     </>
   );
 }
@@ -8251,6 +9053,402 @@ function RecommendationCard({ book, index }: { book: BookRecommendation; index: 
         </Stack>
       </CardContent>
     </Card>
+  );
+}
+</file>
+
+<file path="src/components/BorrowIPCameraDialog.tsx">
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Paper,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import ErrorIcon from "@mui/icons-material/ReportOutlined";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type { BookWithStats } from "@/lib/types";
+import { slideInRight, successPop } from "@/lib/animations";
+import IPCameraStream from "./IPCameraStream";
+
+interface ScannedBorrowItem {
+  barcode: string;
+  isbn: string;
+  loading: boolean;
+  can_borrow: boolean;
+  reason: string | null;
+  book: BookWithStats | null;
+  copy_id: string | null;
+  book_id: string | null;
+  copy_barcode: string | null;
+}
+
+interface Props {
+  open: boolean;
+  patronId: string;
+  patronName: string;
+  maxItems?: number;
+  cameraUrl: string;
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+}
+
+export default function BorrowIPCameraDialog({
+  open,
+  patronId,
+  patronName,
+  maxItems,
+  cameraUrl,
+  onClose,
+  onSuccess,
+}: Props) {
+  const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [scanToast, setScanToast] = useState("");
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const lastScannedRef = useRef<string | null>(null);
+
+  const lookupItem = useCallback(async (barcode: string, isbn: string) => {
+    setScanned((prev) => prev.map((item) =>
+      item.barcode === barcode ? { ...item, loading: true } : item
+    ));
+    try {
+      const result = await api.lookupBorrowSlip({
+        patron_id: patronId,
+        items: [{ barcode, isbn }],
+      });
+      const item = result.items.find((i) => i.barcode === barcode);
+      if (!item) {
+        setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
+        setLookupError(`Sách ISBN ${barcode} không tồn tại trong thư viện`);
+        return;
+      }
+      if (!item.can_borrow) {
+        setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
+        const msg = item.reason || "Sách không thể mượn";
+        const title = item.book?.title || "";
+        setLookupError(title ? `"${title}": ${msg}` : `${msg} (ISBN: ${barcode})`);
+        return;
+      }
+      setScanned((prev) => prev.map((i) =>
+        i.barcode === barcode ? {
+          ...i,
+          loading: false,
+          can_borrow: item.can_borrow,
+          reason: item.reason,
+          book: item.book,
+          copy_id: item.copy?.id || null,
+          book_id: item.book?.id || null,
+          copy_barcode: item.copy?.barcode || null,
+        } : i
+      ));
+    } catch {
+      setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
+      setLookupError(`Lỗi tra cứu: ${barcode}`);
+    }
+  }, [patronId]);
+
+  const addScanned = useCallback((isbn: string) => {
+    if (!/^\d{10,13}$/.test(isbn.replace(/-/g, ""))) return;
+    const normalized = isbn.replace(/-/g, "");
+    lastScannedRef.current = normalized;
+    setScanToast(normalized);
+    setScanned((prev) => {
+      if (prev.some((item) => item.barcode === normalized)) {
+        setScanToast(`Sách ${normalized} đã có trong danh sách`);
+        return prev;
+      }
+      if (maxItems !== undefined && prev.length >= maxItems) {
+        setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
+        return prev;
+      }
+      return [...prev, {
+        barcode: normalized,
+        isbn: normalized,
+        loading: true,
+        can_borrow: false,
+        reason: null,
+        book: null,
+        copy_id: null,
+        book_id: null,
+        copy_barcode: null,
+      }];
+    });
+    lookupItem(normalized, normalized);
+  }, [lookupItem, maxItems]);
+
+  useEffect(() => {
+    if (!open) {
+      setScanned([]);
+      setCreateError("");
+      setScanToast("");
+      setNote("");
+      lastScannedRef.current = null;
+    }
+  }, [open]);
+
+  const removeItem = (barcode: string) => {
+    setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
+  };
+
+  const handleCreateSlip = async () => {
+    const validItems = scanned.filter((item) => item.can_borrow && item.book_id && item.copy_id);
+    if (!validItems.length || !patronId) return;
+    setCreateError("");
+    try {
+      const confirmResult = await api.confirmBorrowSlip({
+        patron_id: patronId,
+        items: validItems.map((item) => ({
+          barcode: item.copy_barcode || item.barcode,
+          isbn: item.isbn,
+          book_id: item.book_id!,
+          copy_id: item.copy_id!,
+        })),
+        note: note.trim() || null,
+      });
+      if (confirmResult.status === "success") {
+        setScanned([]);
+        onSuccess(confirmResult.message);
+        onClose();
+      }
+    } catch (err) {
+      const detail = getErrorMessage(err);
+      const removedBarcodes: string[] = [];
+      const toastMsg = detail;
+
+      const matchTitle = detail.match(/^Sach "(.+)" da duoc doc gia nay muon$/);
+      if (matchTitle) {
+        const title = matchTitle[1];
+        setScanned((prev) => {
+          const filtered = prev.filter((item) => {
+            if (item.book?.title === title) {
+              removedBarcodes.push(item.barcode);
+              return false;
+            }
+            return true;
+          });
+          return filtered;
+        });
+      } else {
+        const matchBarcode = detail.match(/^(?:Ban sao|Ma vach) ([^\s]+) (?:dang duoc muon|khong ton tai)/);
+        if (matchBarcode) {
+          const barcode = matchBarcode[1];
+          setScanned((prev) => {
+            const filtered = prev.filter((item) => {
+              if (item.barcode === barcode || item.barcode.includes(barcode)) {
+                removedBarcodes.push(item.barcode);
+                return false;
+              }
+              return true;
+            });
+            return filtered;
+          });
+        } else {
+          setCreateError(detail);
+        }
+      }
+      if (removedBarcodes.length > 0) {
+        setScanToast(toastMsg);
+      }
+    }
+  };
+
+  const validCount = scanned.filter((item) => item.can_borrow).length;
+  const totalScanned = scanned.length;
+
+  return (
+    <>
+      <Dialog open={open} onClose={lookingUp ? undefined : onClose} fullWidth maxWidth="xl">
+        <DialogTitle>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <QrCodeScannerIcon color="primary" />
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>
+                Quét mã vạch sách (IP Camera)
+              </Typography>
+            </Stack>
+            {!lookingUp && (
+              <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
+            )}
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
+            <Box sx={{ width: { md: "50%" }, flexShrink: 0 }}>
+              <IPCameraStream
+                cameraUrl={cameraUrl}
+                onBarcodeDetected={addScanned}
+              />
+            </Box>
+
+            <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto" }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <QrCodeScannerIcon color="primary" sx={{ fontSize: 20 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
+                  {totalScanned > 0 ? `Đã quét (${totalScanned} cuốn)` : "Sách đã quét"}
+                </Typography>
+              </Stack>
+
+              {createError ? <Alert severity="error" onClose={() => setCreateError("")}>{createError}</Alert> : null}
+
+              {scanned.length === 0 ? (
+                <Alert severity="info" sx={{ flex: 1, display: "flex", alignItems: "center" }}>
+                  Đưa mã vạch vào camera. Sách sẽ xuất hiện tại đây.
+                </Alert>
+              ) : (
+                scanned.map((item) => {
+                  const isLastScanned = item.barcode === lastScannedRef.current;
+                  const hasError = !item.loading && !item.can_borrow;
+                  const isSuccess = !item.loading && item.can_borrow;
+                  return (
+                    <Paper
+                      key={item.barcode}
+                      variant="outlined"
+                      sx={{
+                        p: 1.5,
+                        borderColor: isLastScanned ? "primary.main" : hasError ? "error.main" : undefined,
+                        bgcolor: isLastScanned ? "action.hover" : hasError ? "error.50" : undefined,
+                        animation: isSuccess
+                          ? `${successPop} 0.4s ease-out`
+                          : isLastScanned
+                          ? `${slideInRight} 0.3s ease-out`
+                          : undefined,
+                      }}
+                    >
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                        {item.loading ? (
+                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
+                            <CircularProgress size={20} />
+                          </Avatar>
+                        ) : item.book?.cover_url ? (
+                          <Box
+                            component="img"
+                            src={item.book.cover_url}
+                            alt={item.book.title}
+                            sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
+                          />
+                        ) : (
+                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: hasError ? "error.main" : "background.default", flexShrink: 0 }}>
+                            {hasError ? <ErrorIcon fontSize="small" /> : <BookIcon />}
+                          </Avatar>
+                        )}
+                        <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
+                          {item.loading ? (
+                            <Typography variant="body2" color="text.secondary">Đang tra cứu...</Typography>
+                          ) : item.can_borrow && item.book ? (
+                            <>
+                              <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>
+                                {item.book.title}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" noWrap>
+                                {item.book.author || "-"}
+                              </Typography>
+                              <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>
+                                {item.barcode}
+                              </Typography>
+                              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexWrap: "wrap", mt: 0.5 }}>
+                                <Chip size="small" variant="outlined" label={`Kho: ${item.book.total_copies}`} sx={{ height: 20, fontSize: 11 }} />
+                                <Chip size="small" variant="outlined" color="success" label={`Sẵn: ${item.book.available_copies}`} sx={{ height: 20, fontSize: 11 }} />
+                              </Stack>
+                            </>
+                          ) : (
+                            <>
+                              <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap color="error">
+                                {item.book?.title || item.barcode}
+                              </Typography>
+                              {item.reason && (
+                                <Typography variant="caption" color="error">
+                                  {item.reason}
+                                </Typography>
+                              )}
+                            </>
+                          )}
+                        </Stack>
+                        <IconButton size="small" color="error" onClick={() => removeItem(item.barcode)} sx={{ mt: 0.5 }}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </Paper>
+                  );
+                })
+              )}
+            </Stack>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: "column", alignItems: "stretch", px: 3, pb: 2, gap: 1.5 }}>
+          <TextField
+            size="small"
+            placeholder="Ghi chú phiếu mượn (tùy chọn)..."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            fullWidth
+            multiline
+            maxRows={3}
+            sx={{ "& .MuiInputBase-root": { fontSize: 13 } }}
+          />
+          <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+            <Button onClick={onClose} disabled={lookingUp}>Hủy</Button>
+            <Button
+              variant="contained"
+              disabled={lookingUp || validCount === 0}
+              onClick={handleCreateSlip}
+            >
+              {lookingUp ? "Đang xử lý..." : `Tạo phiếu mượn (${validCount} cuốn)`}
+            </Button>
+          </Stack>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={!!scanToast}
+        autoHideDuration={2000}
+        onClose={() => setScanToast("")}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        {scanToast ? (
+          <Alert
+            severity="success"
+            onClose={() => setScanToast("")}
+            sx={{
+              animation: `${slideInRight} 0.3s ease-out`,
+              boxShadow: 4,
+            }}
+          >
+            {scanToast}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
+
+      <Dialog open={!!lookupError} onClose={() => setLookupError(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 900 }}>Thông báo</DialogTitle>
+        <DialogContent>
+          <Typography>{lookupError}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLookupError(null)} variant="contained">Đóng</Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
 </file>
@@ -15065,598 +16263,6 @@ export default function IdentifyPage() {
 }
 </file>
 
-<file path="src/app/(kiosk)/gate/page.tsx">
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Grid,
-  IconButton,
-  LinearProgress,
-  Paper,
-  Snackbar,
-  Stack,
-  TextField,
-  Typography,
-  useTheme,
-} from "@mui/material";
-import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
-import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
-import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
-import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
-import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
-import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
-import api, { getErrorMessage } from "@/lib/api-client";
-import CameraFeed from "@/components/gate/CameraFeed";
-import { useColorMode } from "@/lib/mui-theme";
-import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
-import type { AccessLogPublic, CameraEvent, KioskResult, PatronLookupResult } from "@/lib/types";
-
-interface TodayCounts {
-  entries: number;
-  exits: number;
-  no_match: number;
-  spoof: number;
-}
-
-type Step = "idle" | "verify" | "result";
-
-interface GateToast {
-  id: number;
-  severity: "success" | "warning" | "error" | "info";
-  message: string;
-}
-
-const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || "http://192.168.1.121:8080/video";
-const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || "http://192.168.1.240:8080/video";
-const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || "entry_gate";
-const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || "exit_gate";
-const HISTORY_LIMIT = 8;
-
-let toastId = 0;
-
-function formatGateTime(value?: string) {
-  if (!value) return "--:--";
-  return new Date(value).toLocaleTimeString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function formatConfidence(value?: number | null) {
-  if (typeof value !== "number") return null;
-  return `${Math.round(value * 100)}%`;
-}
-
-function buildLogFromEvent(event: CameraEvent): AccessLogPublic {
-  return {
-    id: `${event.camera_id}-${event.patron_id || event.student_code || "unknown"}-${Date.now()}`,
-    patron_id: event.patron_id || null,
-    patron_name: event.full_name || null,
-    student_code: event.student_code || null,
-    access_type: event.access_type === "exit" ? "exit" : "entry",
-    verify_method: "face",
-    confidence: event.score ?? null,
-    camera_id: event.camera_id,
-    access_time: new Date().toISOString(),
-    status: event.status,
-  };
-}
-
-function resultStatus(result: KioskResult | null) {
-  if (!result) return "processing";
-  if (result.success) return "success";
-  if (result.message?.toLowerCase().includes("đăng ký tại quầy")) return "unregistered";
-  return "error";
-}
-
-export default function GatePage() {
-  const router = useRouter();
-  const theme = useTheme();
-  const { mode, toggleMode } = useColorMode();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const [step, setStep] = useState<Step>("idle");
-  const [mssv, setMssv] = useState("");
-  const [mssvInput, setMssvInput] = useState("");
-  const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
-  const [result, setResult] = useState<KioskResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState("");
-  const [toasts, setToasts] = useState<GateToast[]>([]);
-  const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
-  const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
-  const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
-  const [todayCounts, setTodayCounts] = useState<TodayCounts>({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
-
-  useEffect(() => {
-    const cached = window.localStorage.getItem("gate_today_counts");
-    if (!cached) return;
-    try {
-      setTodayCounts(JSON.parse(cached) as TodayCounts);
-    } catch {
-      setTodayCounts({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
-    }
-  }, []);
-
-  const addToast = useCallback((toast: Omit<GateToast, "id">) => {
-    const id = ++toastId;
-    setToasts((prev) => [{ ...toast, id }, ...prev.slice(0, 4)]);
-    setTimeout(() => setToasts((prev) => prev.filter((item) => item.id !== id)), 6000);
-  }, []);
-
-  const addRecentLog = useCallback((log: AccessLogPublic) => {
-    setRecentLogs((prev) => [log, ...prev].slice(0, HISTORY_LIMIT * 2));
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => () => stopCamera(), [stopCamera]);
-
-  const startCamera = useCallback(async () => {
-    try {
-      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch {
-      addToast({ severity: "error", message: "Không thể mở camera." });
-    }
-  }, [addToast]);
-
-  const captureImage = useCallback((): Promise<File> => (
-    new Promise((resolve, reject) => {
-      const video = videoRef.current;
-      if (!video || !video.videoWidth) {
-        reject(new Error("Camera chưa sẵn sàng"));
-        return;
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Không thể tạo canvas"));
-        return;
-      }
-      ctx.drawImage(video, 0, 0);
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error("Không thể tạo ảnh"));
-          return;
-        }
-        resolve(new File([blob], "face_capture.jpg", { type: "image/jpeg" }));
-      }, "image/jpeg", 0.9);
-    })
-  ), []);
-
-  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-      try {
-        const task = await api.getTaskStatus(jobId);
-        if (task.status === "SUCCESS") return task.result;
-        if (task.status === "FAILURE") throw new Error(task.result?.error || "Task failed");
-        setStatusText(task.result?.status === "granted" ? "Đã ghi nhận..." : "Đang xử lý...");
-      } catch {
-        // Task state can lag behind the worker; continue until timeout.
-      }
-    }
-    throw new Error("Quá thời gian chờ kết quả");
-  }, []);
-
-  const handleLookup = async (inputMssv: string) => {
-    const normalized = inputMssv.trim();
-    if (!normalized) return;
-    setMssv(normalized);
-    setLoading(true);
-    setStatusText("Đang tra cứu...");
-    try {
-      const response = await api.kioskLookup(normalized);
-      setLookup(response);
-      if (response.exists && response.has_face && !response.is_expired) {
-        setStep("verify");
-        setStatusText("Mở camera...");
-        await startCamera();
-      } else if (response.exists && !response.has_face) {
-        setStep("result");
-        setResult({
-          success: false,
-          message: "Tài khoản chưa được đăng ký khuôn mặt. Vui lòng đăng ký tại quầy.",
-          patron: response.patron,
-          job_id: null,
-        });
-      } else if (response.exists && response.is_expired) {
-        setStep("result");
-        setResult({ success: false, message: "Thẻ hội viên đã hết hạn.", patron: response.patron, job_id: null });
-      } else {
-        setStep("result");
-        setResult({ success: false, message: "Không tìm thấy tài khoản. Vui lòng đăng ký tại quầy.", patron: null, job_id: null });
-      }
-    } catch (err: any) {
-      setStep("result");
-      setResult({ success: false, message: getErrorMessage(err) || "Tra cứu thất bại.", patron: null, job_id: null });
-    } finally {
-      setLoading(false);
-      setStatusText("");
-    }
-  };
-
-  const handleVerify = async () => {
-    setLoading(true);
-    setStatusText("Đang chụp ảnh...");
-    try {
-      const imageFile = await captureImage();
-      stopCamera();
-      setStatusText("Đang xác thực khuôn mặt...");
-      const response = await api.kioskEnter(imageFile, mssv);
-      if (response.job_id) {
-        const taskResult = await pollTask(response.job_id);
-        const success = taskResult?.status === "success";
-        const confidence = taskResult?.score ?? taskResult?.confidence;
-        setResult({
-          success,
-          message: success
-            ? `Xác thực thành công - ${taskResult?.access_type === "exit" ? "Ra" : "Vào"} thư viện`
-            : (taskResult?.error || "Xác thực thất bại."),
-          patron: response.patron,
-          job_id: response.job_id,
-          confidence,
-        });
-      } else {
-        setResult(response);
-      }
-      setStep("result");
-    } catch (err: any) {
-      const message = getErrorMessage(err) || "Xác thực thất bại.";
-      setResult({ success: false, message, patron: null, job_id: null });
-      setStep("result");
-      addToast({ severity: "error", message });
-    } finally {
-      setLoading(false);
-      setStatusText("");
-    }
-  };
-
-  const reset = () => {
-    setStep("idle");
-    setMssv("");
-    setMssvInput("");
-    setLookup(null);
-    setResult(null);
-    stopCamera();
-  };
-
-  useEffect(() => {
-    api.getStats().then((stats) => {
-      if (!stats) return;
-      const fresh: TodayCounts = { entries: stats.today_entries ?? 0, exits: stats.today_exits ?? 0, no_match: 0, spoof: 0 };
-      setTodayCounts(fresh);
-      localStorage.setItem("gate_today_counts", JSON.stringify(fresh));
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    api.getRecentLogs()
-      .then((response) => setRecentLogs(response.items.slice(0, HISTORY_LIMIT * 2)))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("gate_today_counts", JSON.stringify(todayCounts));
-  }, [todayCounts]);
-
-  useEffect(() => {
-    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
-      if (event.bbox || event.landmarks) {
-        const overlay = { bbox: event.bbox, landmarks: event.landmarks };
-        if (event.camera_id === ENTRY_CAM_ID) {
-          setEntryOverlay({ ...overlay, status: event.status });
-        } else if (event.camera_id === EXIT_CAM_ID) {
-          setExitOverlay({ ...overlay, status: event.status });
-        }
-        if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
-        overlayTimeoutRef.current = setTimeout(() => {
-          setEntryOverlay(null);
-          setExitOverlay(null);
-        }, 2000);
-      }
-
-      if (event.status === "granted") {
-        const type = event.access_type === "entry" ? "entry" : "exit";
-        addRecentLog(buildLogFromEvent(event));
-        addToast({
-          severity: type === "entry" ? "success" : "warning",
-          message: `${event.full_name || "Độc giả"} - ${type === "entry" ? "Vào" : "Ra"} thư viện`,
-        });
-        setTodayCounts((prev) => ({
-          ...prev,
-          [type === "entry" ? "entries" : "exits"]: prev[type === "entry" ? "entries" : "exits"] + 1,
-        }));
-      } else if (event.status === "no_match") {
-        setTodayCounts((prev) => ({ ...prev, no_match: prev.no_match + 1 }));
-        addToast({ severity: "info", message: "Khuôn mặt mới - không nhận diện được." });
-      } else if (event.status === "spoof") {
-        setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
-        addToast({ severity: "error", message: "Phát hiện giả mạo!" });
-      }
-    });
-    return cleanup;
-  }, [addRecentLog, addToast]);
-
-  const entryLogs = recentLogs.filter((log) => log.access_type === "entry").slice(0, HISTORY_LIMIT);
-  const exitLogs = recentLogs.filter((log) => log.access_type === "exit").slice(0, HISTORY_LIMIT);
-  const currentResultStatus = resultStatus(result);
-
-  const renderHistoryColumn = (
-    title: string,
-    subtitle: string,
-    logs: AccessLogPublic[],
-    type: "entry" | "exit",
-  ) => {
-    const Icon = type === "entry" ? LoginOutlinedIcon : LogoutOutlinedIcon;
-    const color = type === "entry" ? "success" : "warning";
-
-    return (
-      <Paper variant="outlined" sx={{ overflow: "hidden", height: "100%" }}>
-        <Stack
-          direction="row"
-          spacing={1.5}
-          sx={{ alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}
-        >
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", minWidth: 0 }}>
-            <Avatar sx={{ bgcolor: `${color}.main`, color: `${color}.contrastText`, width: 40, height: 40 }}>
-              <Icon fontSize="small" />
-            </Avatar>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 850 }}>{title}</Typography>
-              <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
-            </Box>
-          </Stack>
-          <Typography variant="h5" color={`${color}.main`} sx={{ fontWeight: 900 }}>{logs.length}</Typography>
-        </Stack>
-
-        <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
-          {logs.length === 0 ? (
-            <Box sx={{ px: 2, py: 4, textAlign: "center" }}>
-              <Typography variant="body2" color="text.secondary">
-                Chưa có lượt {type === "entry" ? "vào" : "ra"} gần đây
-              </Typography>
-            </Box>
-          ) : (
-            logs.map((log) => {
-              const confidence = formatConfidence(log.confidence);
-              return (
-                <Stack key={log.id} direction="row" spacing={1.5} sx={{ px: 2, py: 1.5, alignItems: "flex-start", justifyContent: "space-between" }}>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography noWrap sx={{ fontWeight: 750 }}>{log.patron_name || "Không rõ tên"}</Typography>
-                    <Stack direction="row" spacing={1.25} sx={{ flexWrap: "wrap", mt: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{log.student_code || "---"}</Typography>
-                      <Typography variant="caption" color="text.secondary">{formatGateTime(log.access_time)}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{log.camera_id || "-"}</Typography>
-                    </Stack>
-                  </Box>
-                  {confidence ? (
-                    <Chip size="small" color={color} label={confidence} sx={{ animation: `${successPop} 0.35s ease-out` }} />
-                  ) : (
-                    <ShieldOutlinedIcon color="disabled" fontSize="small" />
-                  )}
-                </Stack>
-              );
-            })
-          )}
-        </Stack>
-      </Paper>
-    );
-  };
-
-  return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
-      <Box sx={{ maxWidth: 1500, mx: "auto", p: { xs: 2, md: 3 } }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ alignItems: { md: "center" }, justifyContent: "space-between", mb: 3 }}>
-          <Box>
-            <Button startIcon={<ArrowBackOutlinedIcon />} onClick={() => router.push("/dashboard")} sx={{ mb: 1 }}>
-              Quay lại Dashboard
-            </Button>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText" }}>
-                <VideocamOutlinedIcon />
-              </Avatar>
-              <Box>
-                <Typography variant="h4" sx={{ fontWeight: 900 }}>Cổng Thư Viện</Typography>
-                <Typography color="text.secondary">Theo dõi camera vào/ra và xác thực độc giả tại kiosk.</Typography>
-              </Box>
-            </Stack>
-          </Box>
-
-          <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Paper variant="outlined" sx={{ px: 2, py: 1.25, animation: `${fadeInUp} 0.35s ease-out`, animationFillMode: "both" }}>
-              <Typography variant="h4" color="success.main" sx={{ fontWeight: 900, lineHeight: 1 }}>{todayCounts.entries}</Typography>
-              <Typography variant="caption" color="text.secondary">Vào hôm nay</Typography>
-            </Paper>
-            <Paper variant="outlined" sx={{ px: 2, py: 1.25, animation: `${fadeInUp} 0.35s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
-              <Typography variant="h4" color="warning.main" sx={{ fontWeight: 900, lineHeight: 1 }}>{todayCounts.exits}</Typography>
-              <Typography variant="caption" color="text.secondary">Ra hôm nay</Typography>
-            </Paper>
-            <IconButton onClick={toggleMode} title={mode === "dark" ? "Chế độ sáng" : "Chế độ tối"} color="primary">
-              {mode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
-            </IconButton>
-          </Stack>
-        </Stack>
-
-        <Box sx={{ position: "fixed", top: 16, right: 16, zIndex: theme.zIndex.snackbar, width: 360, maxWidth: "calc(100vw - 32px)" }}>
-          <Stack spacing={1}>
-            {toasts.map((toast) => (
-              <Alert key={toast.id} severity={toast.severity} variant="filled">{toast.message}</Alert>
-            ))}
-          </Stack>
-        </Box>
-
-        <Grid container spacing={2.5}>
-          <Grid size={{ xs: 12, lg: 8 }}>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationFillMode: "both" }}>
-                <CameraFeed src={ENTRY_CAM} label="Cổng vào" overlay={entryOverlay} />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
-                <CameraFeed src={EXIT_CAM} label="Cổng ra" overlay={exitOverlay} />
-              </Grid>
-            </Grid>
-          </Grid>
-
-          <Grid size={{ xs: 12, lg: 4 }} sx={{ animation: `${fadeInUp} 0.45s ease-out`, animationDelay: "0.2s", animationFillMode: "both" }}>
-            <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
-              {step === "idle" && (
-                <Stack spacing={2.5} sx={{ textAlign: "center" }}>
-                  <Avatar sx={{ mx: "auto", width: 64, height: 64, bgcolor: "primary.main", color: "primary.contrastText" }}>
-                    <PersonSearchOutlinedIcon fontSize="large" />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 850 }}>Chào mừng</Typography>
-                    <Typography color="text.secondary">Nhập MSSV để xác thực khuôn mặt.</Typography>
-                  </Box>
-                  <TextField
-                    value={mssvInput}
-                    onChange={(event) => setMssvInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") handleLookup(mssvInput);
-                    }}
-                    disabled={loading}
-                    placeholder="Nhập MSSV..."
-                    fullWidth
-                    autoFocus
-                    slotProps={{
-                      htmlInput: {
-                        style: {
-                          textAlign: "center",
-                          fontFamily: "monospace",
-                          fontSize: 20,
-                          letterSpacing: 1,
-                        },
-                      },
-                    }}
-                  />
-                  <Button variant="contained" size="large" onClick={() => handleLookup(mssvInput)} disabled={loading || !mssvInput.trim()} fullWidth>
-                    Tra cứu
-                  </Button>
-                  {loading && (
-                    <Stack spacing={1.25} sx={{ alignItems: "center" }}>
-                      <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
-                      <Typography variant="body2" color="text.secondary">{statusText || "Đang xử lý..."}</Typography>
-                    </Stack>
-                  )}
-                </Stack>
-              )}
-
-              {step === "verify" && (
-                <Stack spacing={2}>
-                  <Box sx={{ textAlign: "center" }}>
-                    <Typography variant="h5" sx={{ fontWeight: 850 }}>Xác thực khuôn mặt</Typography>
-                    <Typography color="text.secondary">{lookup?.patron?.full_name || mssv}</Typography>
-                  </Box>
-                  <Paper variant="outlined" sx={{ position: "relative", overflow: "hidden", aspectRatio: "4 / 3", bgcolor: "common.black" }}>
-                    <Box component="video" ref={videoRef} autoPlay playsInline muted sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none" }}>
-                      <Box sx={{ width: 140, height: 140, border: 2, borderColor: "primary.main", borderRadius: "50%", opacity: 0.75 }} />
-                    </Box>
-                    {loading && (
-                      <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.65)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.25}>
-                        <CircularProgress color="inherit" sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
-                        <Typography variant="body2">{statusText}</Typography>
-                      </Stack>
-                    )}
-                  </Paper>
-                  <Button variant="contained" size="large" startIcon={<CheckCircleOutlineOutlinedIcon />} onClick={handleVerify} disabled={loading} fullWidth>
-                    Xác thực
-                  </Button>
-                  <Button onClick={reset} disabled={loading} fullWidth>Hủy</Button>
-                </Stack>
-              )}
-
-              {step === "result" && (
-                <Stack spacing={2.5} sx={{ textAlign: "center" }}>
-                  <Avatar
-                    sx={{
-                      mx: "auto",
-                      width: 72,
-                      height: 72,
-                      bgcolor: currentResultStatus === "success" ? "success.main" : currentResultStatus === "unregistered" ? "warning.main" : "error.main",
-                      color: currentResultStatus === "success" ? "success.contrastText" : currentResultStatus === "unregistered" ? "warning.contrastText" : "error.contrastText",
-                      animation: `${successPop} 0.45s ease-out`,
-                    }}
-                  >
-                    {currentResultStatus === "success" ? <CheckCircleOutlineOutlinedIcon fontSize="large" /> : <ErrorOutlineOutlinedIcon fontSize="large" />}
-                  </Avatar>
-                  {result?.patron && (
-                    <Box>
-                      <Typography variant="h5" sx={{ fontWeight: 850 }}>{result.patron.full_name}</Typography>
-                      <Typography color="primary.main" sx={{ fontFamily: "monospace", fontWeight: 800 }}>{result.patron.student_code || result.patron.id}</Typography>
-                    </Box>
-                  )}
-                  {result?.message && (
-                    <Alert severity={currentResultStatus === "success" ? "success" : currentResultStatus === "unregistered" ? "warning" : "error"}>
-                      {result.message}
-                    </Alert>
-                  )}
-                  {result?.confidence != null && (
-                    <Stack spacing={1}>
-                      <LinearProgress variant="determinate" value={Math.round(result.confidence * 100)} color={currentResultStatus === "success" ? "success" : "warning"} sx={{ height: 8, borderRadius: 99 }} />
-                      <Typography variant="caption" color="text.secondary">Độ tin cậy {Math.round(result.confidence * 100)}%</Typography>
-                    </Stack>
-                  )}
-                  <Button variant="contained" startIcon={<RestartAltOutlinedIcon />} onClick={reset} fullWidth>
-                    Thử lại
-                  </Button>
-                </Stack>
-              )}
-            </Paper>
-          </Grid>
-        </Grid>
-
-        <Grid container spacing={2.5} sx={{ mt: 2.5 }}>
-          <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${slideInRight} 0.4s ease-out`, animationFillMode: "both" }}>
-            {renderHistoryColumn("Lịch sử vào", "Các lượt vừa qua cổng vào", entryLogs, "entry")}
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${slideInRight} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
-            {renderHistoryColumn("Lịch sử ra", "Các lượt vừa qua cổng ra", exitLogs, "exit")}
-          </Grid>
-        </Grid>
-
-        <Snackbar open anchorOrigin={{ vertical: "bottom", horizontal: "left" }}>
-          <Alert severity="success" icon={<Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "success.main" }} />}>
-            Hệ thống đang hoạt động
-          </Alert>
-        </Snackbar>
-      </Box>
-    </Box>
-  );
-}
-</file>
-
 <file path="src/app/library/map/LibraryMapContent.tsx">
 "use client";
 
@@ -16443,6 +17049,598 @@ export default function LivenessPage() {
 }
 </file>
 
+<file path="src/app/(kiosk)/gate/page.tsx">
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Grid,
+  IconButton,
+  LinearProgress,
+  Paper,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
+import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
+import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import api, { getErrorMessage } from "@/lib/api-client";
+import CameraFeed from "@/components/gate/CameraFeed";
+import { useColorMode } from "@/lib/mui-theme";
+import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
+import type { AccessLogPublic, CameraEvent, KioskResult, PatronLookupResult } from "@/lib/types";
+
+interface TodayCounts {
+  entries: number;
+  exits: number;
+  no_match: number;
+  spoof: number;
+}
+
+type Step = "idle" | "verify" | "result";
+
+interface GateToast {
+  id: number;
+  severity: "success" | "warning" | "error" | "info";
+  message: string;
+}
+
+const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || "http://192.168.1.13:8080/video";
+const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || "http://192.168.1.240:8080/video";
+const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || "entry_gate";
+const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || "exit_gate";
+const HISTORY_LIMIT = 8;
+
+let toastId = 0;
+
+function formatGateTime(value?: string) {
+  if (!value) return "--:--";
+  return new Date(value).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function formatConfidence(value?: number | null) {
+  if (typeof value !== "number") return null;
+  return `${Math.round(value * 100)}%`;
+}
+
+function buildLogFromEvent(event: CameraEvent): AccessLogPublic {
+  return {
+    id: `${event.camera_id}-${event.patron_id || event.student_code || "unknown"}-${Date.now()}`,
+    patron_id: event.patron_id || null,
+    patron_name: event.full_name || null,
+    student_code: event.student_code || null,
+    access_type: event.access_type === "exit" ? "exit" : "entry",
+    verify_method: "face",
+    confidence: event.score ?? null,
+    camera_id: event.camera_id,
+    access_time: new Date().toISOString(),
+    status: event.status,
+  };
+}
+
+function resultStatus(result: KioskResult | null) {
+  if (!result) return "processing";
+  if (result.success) return "success";
+  if (result.message?.toLowerCase().includes("đăng ký tại quầy")) return "unregistered";
+  return "error";
+}
+
+export default function GatePage() {
+  const router = useRouter();
+  const theme = useTheme();
+  const { mode, toggleMode } = useColorMode();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [step, setStep] = useState<Step>("idle");
+  const [mssv, setMssv] = useState("");
+  const [mssvInput, setMssvInput] = useState("");
+  const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
+  const [result, setResult] = useState<KioskResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState("");
+  const [toasts, setToasts] = useState<GateToast[]>([]);
+  const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
+  const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
+  const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
+  const [todayCounts, setTodayCounts] = useState<TodayCounts>({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
+
+  useEffect(() => {
+    const cached = window.localStorage.getItem("gate_today_counts");
+    if (!cached) return;
+    try {
+      setTodayCounts(JSON.parse(cached) as TodayCounts);
+    } catch {
+      setTodayCounts({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
+    }
+  }, []);
+
+  const addToast = useCallback((toast: Omit<GateToast, "id">) => {
+    const id = ++toastId;
+    setToasts((prev) => [{ ...toast, id }, ...prev.slice(0, 4)]);
+    setTimeout(() => setToasts((prev) => prev.filter((item) => item.id !== id)), 6000);
+  }, []);
+
+  const addRecentLog = useCallback((log: AccessLogPublic) => {
+    setRecentLogs((prev) => [log, ...prev].slice(0, HISTORY_LIMIT * 2));
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
+
+  const startCamera = useCallback(async () => {
+    try {
+      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch {
+      addToast({ severity: "error", message: "Không thể mở camera." });
+    }
+  }, [addToast]);
+
+  const captureImage = useCallback((): Promise<File> => (
+    new Promise((resolve, reject) => {
+      const video = videoRef.current;
+      if (!video || !video.videoWidth) {
+        reject(new Error("Camera chưa sẵn sàng"));
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Không thể tạo canvas"));
+        return;
+      }
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Không thể tạo ảnh"));
+          return;
+        }
+        resolve(new File([blob], "face_capture.jpg", { type: "image/jpeg" }));
+      }, "image/jpeg", 0.9);
+    })
+  ), []);
+
+  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      try {
+        const task = await api.getTaskStatus(jobId);
+        if (task.status === "SUCCESS") return task.result;
+        if (task.status === "FAILURE") throw new Error(task.result?.error || "Task failed");
+        setStatusText(task.result?.status === "granted" ? "Đã ghi nhận..." : "Đang xử lý...");
+      } catch {
+        // Task state can lag behind the worker; continue until timeout.
+      }
+    }
+    throw new Error("Quá thời gian chờ kết quả");
+  }, []);
+
+  const handleLookup = async (inputMssv: string) => {
+    const normalized = inputMssv.trim();
+    if (!normalized) return;
+    setMssv(normalized);
+    setLoading(true);
+    setStatusText("Đang tra cứu...");
+    try {
+      const response = await api.kioskLookup(normalized);
+      setLookup(response);
+      if (response.exists && response.has_face && !response.is_expired) {
+        setStep("verify");
+        setStatusText("Mở camera...");
+        await startCamera();
+      } else if (response.exists && !response.has_face) {
+        setStep("result");
+        setResult({
+          success: false,
+          message: "Tài khoản chưa được đăng ký khuôn mặt. Vui lòng đăng ký tại quầy.",
+          patron: response.patron,
+          job_id: null,
+        });
+      } else if (response.exists && response.is_expired) {
+        setStep("result");
+        setResult({ success: false, message: "Thẻ hội viên đã hết hạn.", patron: response.patron, job_id: null });
+      } else {
+        setStep("result");
+        setResult({ success: false, message: "Không tìm thấy tài khoản. Vui lòng đăng ký tại quầy.", patron: null, job_id: null });
+      }
+    } catch (err: any) {
+      setStep("result");
+      setResult({ success: false, message: getErrorMessage(err) || "Tra cứu thất bại.", patron: null, job_id: null });
+    } finally {
+      setLoading(false);
+      setStatusText("");
+    }
+  };
+
+  const handleVerify = async () => {
+    setLoading(true);
+    setStatusText("Đang chụp ảnh...");
+    try {
+      const imageFile = await captureImage();
+      stopCamera();
+      setStatusText("Đang xác thực khuôn mặt...");
+      const response = await api.kioskEnter(imageFile, mssv);
+      if (response.job_id) {
+        const taskResult = await pollTask(response.job_id);
+        const success = taskResult?.status === "success";
+        const confidence = taskResult?.score ?? taskResult?.confidence;
+        setResult({
+          success,
+          message: success
+            ? `Xác thực thành công - ${taskResult?.access_type === "exit" ? "Ra" : "Vào"} thư viện`
+            : (taskResult?.error || "Xác thực thất bại."),
+          patron: response.patron,
+          job_id: response.job_id,
+          confidence,
+        });
+      } else {
+        setResult(response);
+      }
+      setStep("result");
+    } catch (err: any) {
+      const message = getErrorMessage(err) || "Xác thực thất bại.";
+      setResult({ success: false, message, patron: null, job_id: null });
+      setStep("result");
+      addToast({ severity: "error", message });
+    } finally {
+      setLoading(false);
+      setStatusText("");
+    }
+  };
+
+  const reset = () => {
+    setStep("idle");
+    setMssv("");
+    setMssvInput("");
+    setLookup(null);
+    setResult(null);
+    stopCamera();
+  };
+
+  useEffect(() => {
+    api.getStats().then((stats) => {
+      if (!stats) return;
+      const fresh: TodayCounts = { entries: stats.today_entries ?? 0, exits: stats.today_exits ?? 0, no_match: 0, spoof: 0 };
+      setTodayCounts(fresh);
+      localStorage.setItem("gate_today_counts", JSON.stringify(fresh));
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api.getRecentLogs()
+      .then((response) => setRecentLogs(response.items.slice(0, HISTORY_LIMIT * 2)))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("gate_today_counts", JSON.stringify(todayCounts));
+  }, [todayCounts]);
+
+  useEffect(() => {
+    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
+      if (event.bbox || event.landmarks) {
+        const overlay = { bbox: event.bbox, landmarks: event.landmarks };
+        if (event.camera_id === ENTRY_CAM_ID) {
+          setEntryOverlay({ ...overlay, status: event.status });
+        } else if (event.camera_id === EXIT_CAM_ID) {
+          setExitOverlay({ ...overlay, status: event.status });
+        }
+        if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
+        overlayTimeoutRef.current = setTimeout(() => {
+          setEntryOverlay(null);
+          setExitOverlay(null);
+        }, 2000);
+      }
+
+      if (event.status === "granted") {
+        const type = event.access_type === "entry" ? "entry" : "exit";
+        addRecentLog(buildLogFromEvent(event));
+        addToast({
+          severity: type === "entry" ? "success" : "warning",
+          message: `${event.full_name || "Độc giả"} - ${type === "entry" ? "Vào" : "Ra"} thư viện`,
+        });
+        setTodayCounts((prev) => ({
+          ...prev,
+          [type === "entry" ? "entries" : "exits"]: prev[type === "entry" ? "entries" : "exits"] + 1,
+        }));
+      } else if (event.status === "no_match") {
+        setTodayCounts((prev) => ({ ...prev, no_match: prev.no_match + 1 }));
+        addToast({ severity: "info", message: "Khuôn mặt mới - không nhận diện được." });
+      } else if (event.status === "spoof") {
+        setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
+        addToast({ severity: "error", message: "Phát hiện giả mạo!" });
+      }
+    });
+    return cleanup;
+  }, [addRecentLog, addToast]);
+
+  const entryLogs = recentLogs.filter((log) => log.access_type === "entry").slice(0, HISTORY_LIMIT);
+  const exitLogs = recentLogs.filter((log) => log.access_type === "exit").slice(0, HISTORY_LIMIT);
+  const currentResultStatus = resultStatus(result);
+
+  const renderHistoryColumn = (
+    title: string,
+    subtitle: string,
+    logs: AccessLogPublic[],
+    type: "entry" | "exit",
+  ) => {
+    const Icon = type === "entry" ? LoginOutlinedIcon : LogoutOutlinedIcon;
+    const color = type === "entry" ? "success" : "warning";
+
+    return (
+      <Paper variant="outlined" sx={{ overflow: "hidden", height: "100%" }}>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{ alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}
+        >
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", minWidth: 0 }}>
+            <Avatar sx={{ bgcolor: `${color}.main`, color: `${color}.contrastText`, width: 40, height: 40 }}>
+              <Icon fontSize="small" />
+            </Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 850 }}>{title}</Typography>
+              <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
+            </Box>
+          </Stack>
+          <Typography variant="h5" color={`${color}.main`} sx={{ fontWeight: 900 }}>{logs.length}</Typography>
+        </Stack>
+
+        <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
+          {logs.length === 0 ? (
+            <Box sx={{ px: 2, py: 4, textAlign: "center" }}>
+              <Typography variant="body2" color="text.secondary">
+                Chưa có lượt {type === "entry" ? "vào" : "ra"} gần đây
+              </Typography>
+            </Box>
+          ) : (
+            logs.map((log) => {
+              const confidence = formatConfidence(log.confidence);
+              return (
+                <Stack key={log.id} direction="row" spacing={1.5} sx={{ px: 2, py: 1.5, alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography noWrap sx={{ fontWeight: 750 }}>{log.patron_name || "Không rõ tên"}</Typography>
+                    <Stack direction="row" spacing={1.25} sx={{ flexWrap: "wrap", mt: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{log.student_code || "---"}</Typography>
+                      <Typography variant="caption" color="text.secondary">{formatGateTime(log.access_time)}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{log.camera_id || "-"}</Typography>
+                    </Stack>
+                  </Box>
+                  {confidence ? (
+                    <Chip size="small" color={color} label={confidence} sx={{ animation: `${successPop} 0.35s ease-out` }} />
+                  ) : (
+                    <ShieldOutlinedIcon color="disabled" fontSize="small" />
+                  )}
+                </Stack>
+              );
+            })
+          )}
+        </Stack>
+      </Paper>
+    );
+  };
+
+  return (
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
+      <Box sx={{ maxWidth: 1500, mx: "auto", p: { xs: 2, md: 3 } }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ alignItems: { md: "center" }, justifyContent: "space-between", mb: 3 }}>
+          <Box>
+            <Button startIcon={<ArrowBackOutlinedIcon />} onClick={() => router.push("/dashboard")} sx={{ mb: 1 }}>
+              Quay lại Dashboard
+            </Button>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+              <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText" }}>
+                <VideocamOutlinedIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 900 }}>Cổng Thư Viện</Typography>
+                <Typography color="text.secondary">Theo dõi camera vào/ra và xác thực độc giả tại kiosk.</Typography>
+              </Box>
+            </Stack>
+          </Box>
+
+          <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+            <Paper variant="outlined" sx={{ px: 2, py: 1.25, animation: `${fadeInUp} 0.35s ease-out`, animationFillMode: "both" }}>
+              <Typography variant="h4" color="success.main" sx={{ fontWeight: 900, lineHeight: 1 }}>{todayCounts.entries}</Typography>
+              <Typography variant="caption" color="text.secondary">Vào hôm nay</Typography>
+            </Paper>
+            <Paper variant="outlined" sx={{ px: 2, py: 1.25, animation: `${fadeInUp} 0.35s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
+              <Typography variant="h4" color="warning.main" sx={{ fontWeight: 900, lineHeight: 1 }}>{todayCounts.exits}</Typography>
+              <Typography variant="caption" color="text.secondary">Ra hôm nay</Typography>
+            </Paper>
+            <IconButton onClick={toggleMode} title={mode === "dark" ? "Chế độ sáng" : "Chế độ tối"} color="primary">
+              {mode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
+            </IconButton>
+          </Stack>
+        </Stack>
+
+        <Box sx={{ position: "fixed", top: 16, right: 16, zIndex: theme.zIndex.snackbar, width: 360, maxWidth: "calc(100vw - 32px)" }}>
+          <Stack spacing={1}>
+            {toasts.map((toast) => (
+              <Alert key={toast.id} severity={toast.severity} variant="filled">{toast.message}</Alert>
+            ))}
+          </Stack>
+        </Box>
+
+        <Grid container spacing={2.5}>
+          <Grid size={{ xs: 12, lg: 8 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationFillMode: "both" }}>
+                <CameraFeed src={ENTRY_CAM} label="Cổng vào" overlay={entryOverlay} />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
+                <CameraFeed src={EXIT_CAM} label="Cổng ra" overlay={exitOverlay} />
+              </Grid>
+            </Grid>
+          </Grid>
+
+          <Grid size={{ xs: 12, lg: 4 }} sx={{ animation: `${fadeInUp} 0.45s ease-out`, animationDelay: "0.2s", animationFillMode: "both" }}>
+            <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
+              {step === "idle" && (
+                <Stack spacing={2.5} sx={{ textAlign: "center" }}>
+                  <Avatar sx={{ mx: "auto", width: 64, height: 64, bgcolor: "primary.main", color: "primary.contrastText" }}>
+                    <PersonSearchOutlinedIcon fontSize="large" />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 850 }}>Chào mừng</Typography>
+                    <Typography color="text.secondary">Nhập MSSV để xác thực khuôn mặt.</Typography>
+                  </Box>
+                  <TextField
+                    value={mssvInput}
+                    onChange={(event) => setMssvInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") handleLookup(mssvInput);
+                    }}
+                    disabled={loading}
+                    placeholder="Nhập MSSV..."
+                    fullWidth
+                    autoFocus
+                    slotProps={{
+                      htmlInput: {
+                        style: {
+                          textAlign: "center",
+                          fontFamily: "monospace",
+                          fontSize: 20,
+                          letterSpacing: 1,
+                        },
+                      },
+                    }}
+                  />
+                  <Button variant="contained" size="large" onClick={() => handleLookup(mssvInput)} disabled={loading || !mssvInput.trim()} fullWidth>
+                    Tra cứu
+                  </Button>
+                  {loading && (
+                    <Stack spacing={1.25} sx={{ alignItems: "center" }}>
+                      <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
+                      <Typography variant="body2" color="text.secondary">{statusText || "Đang xử lý..."}</Typography>
+                    </Stack>
+                  )}
+                </Stack>
+              )}
+
+              {step === "verify" && (
+                <Stack spacing={2}>
+                  <Box sx={{ textAlign: "center" }}>
+                    <Typography variant="h5" sx={{ fontWeight: 850 }}>Xác thực khuôn mặt</Typography>
+                    <Typography color="text.secondary">{lookup?.patron?.full_name || mssv}</Typography>
+                  </Box>
+                  <Paper variant="outlined" sx={{ position: "relative", overflow: "hidden", aspectRatio: "4 / 3", bgcolor: "common.black" }}>
+                    <Box component="video" ref={videoRef} autoPlay playsInline muted sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none" }}>
+                      <Box sx={{ width: 140, height: 140, border: 2, borderColor: "primary.main", borderRadius: "50%", opacity: 0.75 }} />
+                    </Box>
+                    {loading && (
+                      <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.65)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.25}>
+                        <CircularProgress color="inherit" sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
+                        <Typography variant="body2">{statusText}</Typography>
+                      </Stack>
+                    )}
+                  </Paper>
+                  <Button variant="contained" size="large" startIcon={<CheckCircleOutlineOutlinedIcon />} onClick={handleVerify} disabled={loading} fullWidth>
+                    Xác thực
+                  </Button>
+                  <Button onClick={reset} disabled={loading} fullWidth>Hủy</Button>
+                </Stack>
+              )}
+
+              {step === "result" && (
+                <Stack spacing={2.5} sx={{ textAlign: "center" }}>
+                  <Avatar
+                    sx={{
+                      mx: "auto",
+                      width: 72,
+                      height: 72,
+                      bgcolor: currentResultStatus === "success" ? "success.main" : currentResultStatus === "unregistered" ? "warning.main" : "error.main",
+                      color: currentResultStatus === "success" ? "success.contrastText" : currentResultStatus === "unregistered" ? "warning.contrastText" : "error.contrastText",
+                      animation: `${successPop} 0.45s ease-out`,
+                    }}
+                  >
+                    {currentResultStatus === "success" ? <CheckCircleOutlineOutlinedIcon fontSize="large" /> : <ErrorOutlineOutlinedIcon fontSize="large" />}
+                  </Avatar>
+                  {result?.patron && (
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 850 }}>{result.patron.full_name}</Typography>
+                      <Typography color="primary.main" sx={{ fontFamily: "monospace", fontWeight: 800 }}>{result.patron.student_code || result.patron.id}</Typography>
+                    </Box>
+                  )}
+                  {result?.message && (
+                    <Alert severity={currentResultStatus === "success" ? "success" : currentResultStatus === "unregistered" ? "warning" : "error"}>
+                      {result.message}
+                    </Alert>
+                  )}
+                  {result?.confidence != null && (
+                    <Stack spacing={1}>
+                      <LinearProgress variant="determinate" value={Math.round(result.confidence * 100)} color={currentResultStatus === "success" ? "success" : "warning"} sx={{ height: 8, borderRadius: 99 }} />
+                      <Typography variant="caption" color="text.secondary">Độ tin cậy {Math.round(result.confidence * 100)}%</Typography>
+                    </Stack>
+                  )}
+                  <Button variant="contained" startIcon={<RestartAltOutlinedIcon />} onClick={reset} fullWidth>
+                    Thử lại
+                  </Button>
+                </Stack>
+              )}
+            </Paper>
+          </Grid>
+        </Grid>
+
+        <Grid container spacing={2.5} sx={{ mt: 2.5 }}>
+          <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${slideInRight} 0.4s ease-out`, animationFillMode: "both" }}>
+            {renderHistoryColumn("Lịch sử vào", "Các lượt vừa qua cổng vào", entryLogs, "entry")}
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${slideInRight} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
+            {renderHistoryColumn("Lịch sử ra", "Các lượt vừa qua cổng ra", exitLogs, "exit")}
+          </Grid>
+        </Grid>
+
+        <Snackbar open anchorOrigin={{ vertical: "bottom", horizontal: "left" }}>
+          <Alert severity="success" icon={<Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "success.main" }} />}>
+            Hệ thống đang hoạt động
+          </Alert>
+        </Snackbar>
+      </Box>
+    </Box>
+  );
+}
+</file>
+
 <file path="src/app/globals.css">
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@500;600;700&display=swap');
 
@@ -16888,37 +18086,6 @@ export default function LivenessPage() {
   .space-y-5 .dot-grid-bg {
     display: grid !important;
   }
-}
-</file>
-
-<file path="src/app/layout.tsx">
-import type { Metadata } from "next";
-import { AuthProvider } from "@/lib/auth-context";
-import { MuiThemeProvider } from "@/lib/mui-theme";
-import { ToastProvider } from "@/components/ui/Toast";
-import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "Thư Viện IUH - Hệ thống Quản lý Thư viện Thông minh",
-  description: "Nền tảng quản lý thư viện toàn diện: quản lý độc giả, theo dõi mượn trả và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn mặt.",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="vi" className="dark" suppressHydrationWarning>
-      <body suppressHydrationWarning className="bg-bg text-text">
-        <MuiThemeProvider>
-          <AuthProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </AuthProvider>
-        </MuiThemeProvider>
-      </body>
-    </html>
-  );
 }
 </file>
 
@@ -18172,6 +19339,40 @@ export default function VerifyPage() {
         </Paper>
       )}
     </Stack>
+  );
+}
+</file>
+
+<file path="src/app/layout.tsx">
+import type { Metadata } from "next";
+import { AuthProvider } from "@/lib/auth-context";
+import { MuiThemeProvider } from "@/lib/mui-theme";
+import { ToastProvider } from "@/components/ui/Toast";
+import ClientLayout from "@/components/ClientLayout";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Thư Viện IUH - Hệ thống Quản lý Thư viện Thông minh",
+  description: "Nền tảng quản lý thư viện toàn diện: quản lý độc giả, theo dõi mượn trả và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn mặt.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="vi" className="dark" suppressHydrationWarning>
+      <body suppressHydrationWarning className="bg-bg text-text">
+        <MuiThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <ClientLayout>{children}</ClientLayout>
+            </ToastProvider>
+          </AuthProvider>
+        </MuiThemeProvider>
+      </body>
+    </html>
   );
 }
 </file>
@@ -20144,63 +21345,6 @@ export default function Sidebar() {
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "face-recognition-frontend",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbo",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test:e2e": "playwright test"
-  },
-  "dependencies": {
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^9.1.1",
-    "@mui/material": "^9.1.1",
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.1",
-    "@types/three": "^0.184.1",
-    "@zxing/browser": "^0.2.0",
-    "@zxing/library": "^0.22.0",
-    "axios": "^1.7.7",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.454.0",
-    "next": "^16.2.9",
-    "partysocket": "^1.2.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-hook-form": "^7.53.2",
-    "react-is": "^19.2.7",
-    "react-markdown": "^10.1.0",
-    "react-webcam": "^7.2.0",
-    "recharts": "^3.8.1",
-    "tailwind-merge": "^2.5.4",
-    "tesseract.js": "^7.0.0",
-    "three": "^0.184.0",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@hookform/resolvers": "^3.9.1",
-    "@playwright/test": "^1.60.0",
-    "@types/node": "^22.9.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.20",
-    "partykit": "^0.0.115",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
-    "typescript": "^5.6.3"
-  }
-}
-</file>
-
 <file path="src/app/login/page.tsx">
 "use client";
 
@@ -20790,6 +21934,64 @@ export default function LoginPage() {
       </Dialog>
     </Box>
   );
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "face-recognition-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.1.1",
+    "@mui/material": "^9.1.1",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "@types/three": "^0.184.1",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
+    "axios": "^1.7.7",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^0.454.0",
+    "next": "^16.2.9",
+    "partysocket": "^1.2.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-form": "^7.53.2",
+    "react-is": "^19.2.7",
+    "react-markdown": "^10.1.0",
+    "react-webcam": "^7.2.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^2.5.4",
+    "tesseract.js": "^7.0.0",
+    "three": "^0.184.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "partykit": "^0.0.115",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
+  }
 }
 </file>
 
@@ -22844,6 +24046,7 @@ export interface BorrowSlipItem {
 export interface CreateBorrowSlipRequest {
   patron_id: string;
   items: BorrowSlipItem[];
+  note?: string | null;
 }
 
 export interface BorrowSlip {
@@ -22855,6 +24058,7 @@ export interface BorrowSlip {
   created_by_user_id?: string;
   created_by_email?: string;
   total_items: number;
+  note?: string | null;
   created_at: string;
   updated_at: string;
   records?: BorrowRecord[];
@@ -22898,6 +24102,7 @@ export interface ConfirmBorrowSlipRequest {
     book_id: string;
     copy_id: string;
   }[];
+  note?: string | null;
 }
 
 export interface CameraEvent {
@@ -24192,7 +25397,7 @@ class ApiClient {
   }
 
   async askAiCommandCenter(question: string): Promise<AiChatResponse> {
-    const response = await this.client.post<AiChatResponse>("/api/ai/chat", { question });
+    const response = await this.client.post<AiChatResponse>("/api/ai/command-center/chat", { question });
     return response.data;
   }
 

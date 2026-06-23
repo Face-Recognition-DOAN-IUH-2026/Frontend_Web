@@ -15,6 +15,8 @@ import AssistantIcon from "@mui/icons-material/SupportAgent";
 import UserIcon from "@mui/icons-material/Person";
 import Markdown from "react-markdown";
 import type { BookData } from "@/components/library-3d/types";
+import BookCard, { parseBookCard } from "@/components/BookCard";
+import type { BookCardData } from "@/components/BookCard";
 import QuickActions from "./QuickActions";
 
 type ChatState = "idle" | "thinking" | "responding";
@@ -37,17 +39,36 @@ const STORAGE_KEY = "ai-command-center-session";
 
 function buildApiUrl(path: string) {
   const base = process.env.NEXT_PUBLIC_API_URL || "";
-  return `${base}/api/ai/agent${path}`;
+  return `${base}/api/ai${path}`;
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("access_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
 }
 
 async function chat(message: string, sessionId?: string, patronId?: string) {
   const res = await fetch(buildApiUrl("/chat"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ message, sessionId, patronId }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function MessageContent({ content }: { content: string }) {
+  const { before, bookData, after } = parseBookCard(content);
+
+  return (
+    <div className="text-sm">
+      {before && <Markdown>{before}</Markdown>}
+      {bookData && <BookCard data={bookData} />}
+      {after && <Markdown>{after}</Markdown>}
+    </div>
+  );
 }
 
 export default function ChatPanel({
@@ -188,9 +209,7 @@ export default function ChatPanel({
                   : "bg-surface"
               }`}
             >
-              <div className="text-sm">
-                <Markdown>{msg.content}</Markdown>
-              </div>
+              <MessageContent content={msg.content} />
               <Typography
                 variant="caption"
                 className="block mt-1 opacity-60"
