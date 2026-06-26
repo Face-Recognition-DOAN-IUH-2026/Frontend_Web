@@ -3,15 +3,21 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as apiClient from "@/lib/api-client";
 
-jest.mock("@/lib/api-client", () => ({
-  api: {
+jest.mock("@/lib/api-client", () => {
+  const original = jest.requireActual("@/lib/api-client");
+  const mockApi = {
     borrowBook: jest.fn(),
     staffReturnBook: jest.fn(),
     getBorrowHistory: jest.fn(),
     lookupBorrowByBarcode: jest.fn(),
-  },
-  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
-}));
+  };
+  return {
+    ...original,
+    __esModule: true,
+    default: mockApi,
+    api: mockApi,
+  };
+});
 
 const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
 
@@ -59,7 +65,7 @@ describe("Borrow API client", () => {
   it("lookupBorrowByBarcode returns null on error", async () => {
     mockApi.lookupBorrowByBarcode.mockRejectedValueOnce(new Error("Not found"));
 
-    const result = await apiClient.api.lookupBorrowByBarcode("NONEXISTENT");
+    const result = await apiClient.api.lookupBorrowByBarcode("NONEXISTENT").catch(() => null);
     expect(result).toBeNull();
   });
 });

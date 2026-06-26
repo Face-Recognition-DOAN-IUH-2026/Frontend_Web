@@ -76,7 +76,8 @@ function normalizeAccessLog(log: any): AccessLogPublic {
 function setStoredAccessToken(token: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem("access_token", token);
-  document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict; secure`;
+  const isSecure = window.location.protocol === "https:";
+  document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict${isSecure ? "; secure" : ""}`;
 }
 
 function clearStoredAuth() {
@@ -520,7 +521,8 @@ class ApiClient {
     onEvent: (event: CameraEvent) => void,
     onConnectionChange?: (connected: boolean) => void,
   ): () => void {
-    const es = new EventSource(`${API_BASE_URL}/api/access/events`);
+    const token = localStorage.getItem("access_token") || "";
+    const es = new EventSource(`${API_BASE_URL}/api/access/events?token=${encodeURIComponent(token)}`);
     es.addEventListener("open", () => onConnectionChange?.(true));
     es.addEventListener("camera_event", (msg: MessageEvent) => {
       try {

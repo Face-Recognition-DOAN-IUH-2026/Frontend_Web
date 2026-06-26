@@ -50,8 +50,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (storedToken && storedUser) {
       try {
-        setAccessToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        const payload = decodeJwtPayload(storedToken);
+        const exp = payload?.exp as number | undefined;
+        const isExpired = exp ? exp * 1000 < Date.now() : false;
+        if (isExpired) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
+        } else {
+          setAccessToken(storedToken);
+          setUser(JSON.parse(storedUser));
+        }
       } catch {
         localStorage.removeItem("access_token");
         localStorage.removeItem("user");
@@ -65,7 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadUserFromStorage]);
 
   const setTokenCookie = (token: string) => {
-    document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict; secure`;
+    const isSecure = window.location.protocol === "https:";
+    document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict${isSecure ? "; secure" : ""}`;
   };
 
   const clearTokenCookie = () => {
