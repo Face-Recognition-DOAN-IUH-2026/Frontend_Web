@@ -599,17 +599,13 @@ class ApiClient {
   }
 
   async getStats(): Promise<StatsResponse> {
-    const [accessRes, patronRes] = await Promise.all([
-      this.client.get<any>("/api/access/stats").catch(() => null),
-      this.client.get<any>("/api/patrons/stats").catch(() => null),
-    ]);
-    const access = accessRes?.data || {};
-    const patron = patronRes?.data || {};
+    const response = await this.client.get<any>("/api/patrons/stats");
+    const data = response.data || {};
     return {
-      total_patrons: patron.totalPatrons ?? patron.total_patrons ?? 0,
-      active_patrons: patron.activePatrons ?? patron.active_patrons ?? access.active_inside ?? access.activeInside ?? 0,
-      today_entries: access.today_entries ?? access.todayEntries ?? 0,
-      today_exits: access.today_exits ?? access.todayExits ?? 0,
+      total_patrons: data.totalPatrons ?? 0,
+      active_patrons: data.activePatrons ?? 0,
+      today_entries: data.todayEntries ?? 0,
+      today_exits: data.todayExits ?? 0,
     };
   }
 
