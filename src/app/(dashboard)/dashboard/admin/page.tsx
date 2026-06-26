@@ -32,7 +32,6 @@ import {
 } from "@mui/material";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
@@ -59,10 +58,6 @@ export default function AdminPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [restoreTarget, setRestoreTarget] = useState<UserPublic | null>(null);
-  const [restoreConfirmText, setRestoreConfirmText] = useState("");
   const [createForm, setCreateForm] = useState({ email: "", password: "", role: "staff" });
   const [createError, setCreateError] = useState("");
   const [notice, setNotice] = useState("");
@@ -100,36 +95,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget || deleteConfirmText !== "XÓA") return;
-    const current = deleteTarget;
-    setDeleteTarget(null);
-    setDeleteConfirmText("");
-    setUsers((prev) => prev.filter((u) => u.id !== current.id));
-    try {
-      await api.deleteUser(current.id);
-      setNotice("Đã xóa người dùng.");
-    } catch {
-      setNotice("Xóa thất bại, dữ liệu đã được tải lại.");
-      load();
-    }
-  };
-
-  const handleRestore = async () => {
-    if (!restoreTarget || restoreConfirmText !== "KHÔI PHỤC") return;
-    const current = restoreTarget;
-    setRestoreTarget(null);
-    setRestoreConfirmText("");
-    setUsers((prev) => prev.filter((u) => u.id !== current.id));
-    try {
-      await api.restoreUser(current.id);
-      setNotice("Đã khôi phục người dùng.");
-      load();
-    } catch {
-      setNotice("Khôi phục thất bại.");
-      load();
-    }
-  };
 
   if (isLoading) {
     return (
@@ -194,13 +159,12 @@ export default function AdminPage() {
                 <TableCell>Email</TableCell>
                 <TableCell>Vai trò</TableCell>
                 <TableCell>Khuôn mặt</TableCell>
-                <TableCell align="right">Hành động</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={3}>
                     <Stack sx={{ py: 6, alignItems: "center" }}>
                       <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
                     </Stack>
@@ -208,7 +172,7 @@ export default function AdminPage() {
                 </TableRow>
               ) : users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={3}>
                     <Alert severity="info">Không có người dùng nào.</Alert>
                   </TableCell>
                 </TableRow>
@@ -239,28 +203,6 @@ export default function AdminPage() {
                         color={item.has_face ? "success" : "default"}
                         label={item.has_face ? "Đã xác thực" : "Chưa xác thực"}
                       />
-                    </TableCell>
-                    <TableCell align="right">
-                      {item.status === "deleted" ? (
-                        <Button
-                          color="success"
-                          variant="outlined"
-                          size="small"
-                          onClick={() => setRestoreTarget(item)}
-                        >
-                          Khôi phục
-                        </Button>
-                      ) : (
-                        <Button
-                          color="error"
-                          variant="outlined"
-                          size="small"
-                          startIcon={<DeleteOutlineOutlinedIcon />}
-                          onClick={() => setDeleteTarget(item)}
-                        >
-                          Xóa
-                        </Button>
-                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -308,61 +250,6 @@ export default function AdminPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(deleteTarget)} onClose={() => { setDeleteTarget(null); setDeleteConfirmText(""); }} fullWidth maxWidth="xs">
-        <DialogTitle>Xóa người dùng?</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2}>
-            <Typography color="text.secondary">
-              Tài khoản <strong>{deleteTarget?.email}</strong> sẽ bị xóa khỏi hệ thống. Dữ liệu liên quan (thông báo, lịch trực) cũng sẽ bị xóa.
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Nhập <strong>XÓA</strong> để xác nhận:
-            </Typography>
-            <TextField
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="Nhập XÓA"
-              size="small"
-              autoFocus
-              fullWidth
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setDeleteTarget(null); setDeleteConfirmText(""); }}>Hủy</Button>
-          <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>
-            Xóa vĩnh viễn
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={Boolean(restoreTarget)} onClose={() => { setRestoreTarget(null); setRestoreConfirmText(""); }} fullWidth maxWidth="xs">
-        <DialogTitle>Khôi phục người dùng?</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2}>
-            <Typography color="text.secondary">
-              Khôi phục tài khoản <strong>{restoreTarget?.email}</strong>?
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Nhập <strong>KHÔI PHỤC</strong> để xác nhận:
-            </Typography>
-            <TextField
-              value={restoreConfirmText}
-              onChange={(e) => setRestoreConfirmText(e.target.value)}
-              placeholder="Nhập KHÔI PHỤC"
-              size="small"
-              autoFocus
-              fullWidth
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setRestoreTarget(null); setRestoreConfirmText(""); }}>Hủy</Button>
-          <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC"}>
-            Khôi phục
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       <Snackbar open={Boolean(notice)} autoHideDuration={3000} onClose={() => setNotice("")} message={notice} />
     </Stack>

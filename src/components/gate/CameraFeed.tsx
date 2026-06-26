@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
   Chip,
@@ -13,6 +13,7 @@ import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 
 interface CameraFeedProps {
   src: string;
+  cameraId?: string;
   label: string;
   overlay?: {
     bbox?: [number, number, number, number];
@@ -29,15 +30,34 @@ const OVERLAY_COLORS: Record<string, string> = {
   spoof: "#ef4444",
 };
 
-export default function CameraFeed({ src, label, overlay, onStatusChange }: CameraFeedProps) {
+const ONLINE_INTERVAL = 1000;
+const OFFLINE_INTERVAL = 5000;
+
+export default function CameraFeed({ src, cameraId, label, overlay, onStatusChange }: CameraFeedProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [ts] = useState(() => Date.now());
+  const [ts, setTs] = useState(() => Date.now());
   const [ok, setOk] = useState<boolean | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     onStatusChange?.(ok === true);
   }, [ok, onStatusChange]);
+
+  const snapshotUrl = cameraId
+    ? `/api/camera/snapshot/${cameraId}?_t=`
+    : `${src}?_t=`;
+
+  const scheduleNext = useCallback((success: boolean) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setTs(Date.now()), success ? ONLINE_INTERVAL : OFFLINE_INTERVAL);
+  }, []);
+
+  useEffect(() => {
+    if (!cameraId) return;
+    scheduleNext(true);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [cameraId, ts, scheduleNext]);
 
   useEffect(() => {
     if (!overlay?.bbox && !overlay?.landmarks) return;
@@ -94,9 +114,9 @@ export default function CameraFeed({ src, label, overlay, onStatusChange }: Came
         <Box
           component="img"
           ref={imgRef}
-          src={`${src}?_t=${ts}`}
-          onLoad={() => setOk(true)}
-          onError={() => setOk(false)}
+          src={`${snapshotUrl}${ts}`}
+          onLoad={() => { setOk(true); scheduleNext(true); }}
+          onError={() => { setOk(false); scheduleNext(false); }}
           alt={label}
           sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
         />
@@ -105,6 +125,12 @@ export default function CameraFeed({ src, label, overlay, onStatusChange }: Came
           <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
             <CircularProgress color="inherit" size={28} />
             <Typography variant="body2">Đang kết nối...</Typography>
+          </Stack>
+        )}
+        {ok === false && (
+          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.70)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+            <VideocamOutlinedIcon sx={{ fontSize: 48, opacity: 0.4 }} />
+            <Typography variant="body2" color="rgba(255,255,255,0.6)">Camera ngoại tuyến</Typography>
           </Stack>
         )}
       </Box>

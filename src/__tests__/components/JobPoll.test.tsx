@@ -4,12 +4,17 @@ import userEvent from "@testing-library/user-event";
 import JobPoll from "@/components/job-poll";
 import * as apiClient from "@/lib/api-client";
 
-jest.mock("@/lib/api-client", () => ({
-  api: {
+jest.mock("@/lib/api-client", () => {
+  const mockApi = {
     getTaskStatus: jest.fn(),
-  },
-  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
-}));
+  };
+  return {
+    __esModule: true,
+    default: mockApi,
+    api: mockApi,
+    getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
+  };
+});
 
 const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
 

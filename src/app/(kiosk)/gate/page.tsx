@@ -185,7 +185,7 @@ export default function GatePage() {
     })
   ), []);
 
-  const pollTask = useCallback(async (jobId: string, intervalMs = 1000, timeoutMs = 30000): Promise<any> => {
+  const pollTask = useCallback(async (jobId: string, intervalMs = 2000, timeoutMs = 120000): Promise<any> => {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
@@ -452,10 +452,10 @@ export default function GatePage() {
           <Grid size={{ xs: 12, lg: 8 }}>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationFillMode: "both" }}>
-                <CameraFeed src={ENTRY_CAM} label="Cổng vào" overlay={entryOverlay} />
+                <CameraFeed src={ENTRY_CAM} cameraId={ENTRY_CAM_ID} label="Cổng vào" overlay={entryOverlay} />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
-                <CameraFeed src={EXIT_CAM} label="Cổng ra" overlay={exitOverlay} />
+                <CameraFeed src={EXIT_CAM} cameraId={EXIT_CAM_ID} label="Cổng ra" overlay={exitOverlay} />
               </Grid>
             </Grid>
           </Grid>
