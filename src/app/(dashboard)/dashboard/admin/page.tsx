@@ -400,19 +400,22 @@ export default function AdminPage() {
                     <TableCell>
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                         <Avatar
+                          src={item.avatar_url || undefined}
                           sx={{
                             width: 38, height: 38,
-                            background: item.role === "admin"
-                              ? STAT_GRADIENT.admin
-                              : item.role === "staff"
-                              ? STAT_GRADIENT.staff
-                              : STAT_GRADIENT.patron,
+                            background: item.avatar_url ? "transparent" : (
+                              item.role === "admin"
+                                ? STAT_GRADIENT.admin
+                                : item.role === "staff"
+                                ? STAT_GRADIENT.staff
+                                : STAT_GRADIENT.patron
+                            ),
                             fontWeight: 800,
                             fontSize: 14,
                             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                           }}
                         >
-                          {initials(item.full_name || item.email)}
+                          {!item.avatar_url && initials(item.full_name || item.email)}
                         </Avatar>
                         <Box sx={{ minWidth: 0 }}>
                           <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }} noWrap>

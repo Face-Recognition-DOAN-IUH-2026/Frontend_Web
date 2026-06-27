@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "@/lib/api-client";
 import type { UserPublic } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
@@ -21,6 +21,8 @@ export default function ProfilePage() {
   });
 
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Modals state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -53,6 +55,28 @@ export default function ProfilePage() {
       addToast({ type: "error", title: "Không thể tải thông tin cá nhân" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      return addToast({ type: "error", title: "Vui lòng chọn file ảnh" });
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return addToast({ type: "error", title: "Kích thước ảnh tối đa 5MB" });
+    }
+    try {
+      setUploadingAvatar(true);
+      const result = await api.uploadAvatar(file);
+      setUser((prev) => prev ? { ...prev, avatar_url: result.avatarUrl } : prev);
+      addToast({ type: "success", title: "Cập nhật ảnh đại diện thành công!" });
+    } catch (error: any) {
+      addToast({ type: "error", title: error.response?.data?.error || "Upload ảnh thất bại" });
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
     }
   };
 
@@ -167,7 +191,14 @@ export default function ProfilePage() {
         <div className="md:col-span-1 space-y-4">
           {/* Avatar card */}
           <div className="rounded-2xl border border-white/10 bg-white/5 dark:bg-slate-800/60 backdrop-blur-sm p-6 flex flex-col items-center text-center shadow-lg">
-            <div className="relative mb-4 cursor-pointer group">
+            <div className="relative mb-4 cursor-pointer group" onClick={() => avatarInputRef.current?.click()}>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
               <div className="h-28 w-28 rounded-full border-4 border-slate-600/50 shadow-xl overflow-hidden bg-slate-700 flex items-center justify-center">
                 {user?.avatar_url ? (
                   <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
@@ -176,7 +207,11 @@ export default function ProfilePage() {
                 )}
               </div>
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                <Camera className="text-white h-7 w-7" />
+                {uploadingAvatar ? (
+                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Camera className="text-white h-7 w-7" />
+                )}
               </div>
             </div>
 

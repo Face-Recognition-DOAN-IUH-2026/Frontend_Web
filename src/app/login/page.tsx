@@ -30,7 +30,8 @@ import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import { useAuth } from "@/lib/auth-context";
 import api, { getErrorMessage } from "@/lib/api-client";
-import LoginBackground3D from "@/components/LoginBackground3D";
+import dynamic from "next/dynamic";
+const LoginBackground3D = dynamic(() => import("@/components/LoginBackground3D"), { ssr: false });
 
 type LoginMode = "password" | "face";
 
