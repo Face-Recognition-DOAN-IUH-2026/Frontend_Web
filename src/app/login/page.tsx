@@ -30,6 +30,7 @@ import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import { useAuth } from "@/lib/auth-context";
 import api, { getErrorMessage } from "@/lib/api-client";
+import LoginBackground3D from "@/components/LoginBackground3D";
 
 type LoginMode = "password" | "face";
 
@@ -281,15 +282,18 @@ export default function LoginPage() {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        p: 2,
-        bgcolor: "background.default",
-      }}
-    >
+    <>
+      <LoginBackground3D />
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          p: 2,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
       <Paper
         variant="outlined"
         sx={{
@@ -585,5 +589,6 @@ export default function LoginPage() {
         </DialogContent>
       </Dialog>
     </Box>
+    </>
   );
 }

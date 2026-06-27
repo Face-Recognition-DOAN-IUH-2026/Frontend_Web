@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { BookData, ShelfData } from "@/components/library-3d/types";
+import type { ShelfData, BookData } from "./types";
 
 interface FloorTablePanelProps {
   shelves: ShelfData[];

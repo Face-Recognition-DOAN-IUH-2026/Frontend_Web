@@ -7,8 +7,6 @@ import {
   Avatar,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -31,6 +29,7 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
@@ -41,6 +40,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import RefreshIcon from "@mui/icons-material/RefreshOutlined";
+import ReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
@@ -318,16 +318,77 @@ export default function ReturnPage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: "calc(100vh - 120px)" }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Typography variant="h5" sx={{ fontWeight: 900, display: "flex", alignItems: "center", gap: 1 }}>
-          <BookIcon color="primary" />
-          Trả sách
-        </Typography>
-        {selectedStudentCode && (
-          <Button variant="outlined" color="error" size="small" onClick={() => { setSelectedStudentCode(null); setDetail(null); }}>
-            Hủy chọn
-          </Button>
-        )}
+      {/* Gradient Header */}
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+          border: "1px solid",
+          borderColor: "rgba(99,102,241,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+
+        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <ReturnIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          </Avatar>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Trả sách</Typography>
+            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+              {totals.borrowers} độc giả | {totals.books} sách đang mượn | {totals.overdue} quá hạn
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={1} sx={{ zIndex: 1 }}>
+          {selectedStudentCode && (
+            <Button variant="outlined" size="small" onClick={() => { setSelectedStudentCode(null); setDetail(null); }}
+              sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }}>
+              Hủy chọn
+            </Button>
+          )}
+          <Tooltip title="Tải lại">
+            <IconButton onClick={loadBorrowers} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
+
+      {/* Stat Cards */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
+        {[
+          { key: "borrowers", label: "Độc giả", value: totals.borrowers, icon: <UsersIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", pct: 100 },
+          { key: "books", label: "Sách đang mượn", value: totals.books, icon: <BookIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", pct: 100 },
+          { key: "overdue", label: "Quá hạn", value: totals.overdue, icon: <AlertIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)", pct: totals.books ? (totals.overdue / totals.books) * 100 : 0 },
+        ].map((s, idx) => (
+          <Paper key={s.key} variant="outlined" sx={{
+            p: 2.5, borderRadius: 3, position: "relative", overflow: "hidden", borderColor: "divider",
+            transition: "transform 0.2s, box-shadow 0.2s",
+            animation: `${fadeInUp} 0.4s ease-out`, animationDelay: `${idx * 0.07}s`, animationFillMode: "both",
+            "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
+          }}>
+            <Box sx={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: s.gradient, opacity: 0.12, borderRadius: "0 12px 0 80px" }} />
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+              <Avatar sx={{ background: s.gradient, width: 44, height: 44, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>{s.icon}</Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{s.label}</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{s.value}</Typography>
+              </Box>
+            </Stack>
+            <LinearProgress variant="determinate" value={s.pct} sx={{ mt: 1.5, height: 3, borderRadius: 2, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { background: s.gradient, borderRadius: 2 } }} />
+          </Paper>
+        ))}
       </Box>
 
       {error ? (
@@ -341,58 +402,47 @@ export default function ReturnPage() {
 
       <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
         <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Card variant="outlined" sx={{ flex: "0 0 auto" }}>
-            <CardContent>
-              <Stack spacing={2}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                  <UsersIcon color="primary" />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Danh sách độc giả</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {totals.borrowers} độc giả | {totals.books} sách | {totals.overdue} quá hạn
-                    </Typography>
-                  </Box>
-                  <Button size="small" startIcon={<RefreshIcon />} onClick={loadBorrowers} disabled={loadingBorrowers} />
-                </Stack>
+          {/* Search & Filter */}
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
+            <Stack spacing={2}>
+              <TextField
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Tìm theo MSSV hoặc tên..."
+                fullWidth
+                size="small"
+                slotProps={{
+                  input: {
+                    startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                  },
+                }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
+              />
 
-                <TextField
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Tìm theo MSSV hoặc tên..."
-                  fullWidth
-                  size="small"
-                  slotProps={{
-                    input: {
-                      startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
-                    },
-                  }}
-                />
+              <ToggleButtonGroup exclusive fullWidth size="small" value={filter} onChange={(_, value) => value && setFilter(value)}
+                sx={{ "& .MuiToggleButton-root": { px: 2, py: 0.6, borderRadius: "20px!important", textTransform: "none", fontWeight: 600, fontSize: "0.78rem", border: "1px solid", borderColor: "divider" } }}>
+                <ToggleButton value="all">Tất cả</ToggleButton>
+                <ToggleButton value="overdue">Quá hạn</ToggleButton>
+                <ToggleButton value="active">Đúng hạn</ToggleButton>
+              </ToggleButtonGroup>
+            </Stack>
+          </Paper>
 
-                <ToggleButtonGroup exclusive fullWidth size="small" value={filter} onChange={(_, value) => value && setFilter(value)}>
-                  <ToggleButton value="all">Tất cả</ToggleButton>
-                  <ToggleButton value="overdue">Quá hạn</ToggleButton>
-                  <ToggleButton value="active">Đúng hạn</ToggleButton>
-                </ToggleButtonGroup>
-              </Stack>
-            </CardContent>
-          </Card>
-
+          {/* Borrower List */}
           {loadingBorrowers ? (
-            <Card variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Paper variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, borderColor: "divider", p: 4 }}>
               <CircularProgress />
-            </Card>
+            </Paper>
           ) : filteredBorrowers.length === 0 ? (
-            <Card variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <CardContent>
-                <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary" }}>
-                  <UsersIcon sx={{ fontSize: 48, opacity: 0.3 }} />
-                  <Typography>Không tìm thấy độc giả phù hợp</Typography>
-                </Stack>
-              </CardContent>
-            </Card>
+            <Paper variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, borderColor: "divider", p: 4 }}>
+              <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary" }}>
+                <UsersIcon sx={{ fontSize: 48, opacity: 0.3 }} />
+                <Typography>Không tìm thấy độc giả phù hợp</Typography>
+              </Stack>
+            </Paper>
           ) : (
             <List disablePadding sx={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
-              {filteredBorrowers.map((borrower) => {
+              {filteredBorrowers.map((borrower, idx) => {
                 const selected = borrower.patron.student_code === selectedStudentCode;
                 const hasOverdue = borrower.overdue_count > 0;
                 return (
@@ -403,12 +453,16 @@ export default function ReturnPage() {
                     sx={{
                       cursor: "pointer",
                       p: 1.5,
+                      borderRadius: 3,
                       borderLeft: 4,
                       borderLeftColor: hasOverdue ? "error.main" : "success.main",
                       borderColor: selected ? "primary.main" : "divider",
                       bgcolor: selected ? "action.selected" : undefined,
                       transition: "all .15s",
-                      "&:hover": { borderColor: "primary.light" },
+                      animation: `${fadeInUp} 0.3s ease-out`,
+                      animationDelay: `${idx * 0.04}s`,
+                      animationFillMode: "both",
+                      "&:hover": { borderColor: "primary.light", transform: "translateY(-1px)", boxShadow: 2 },
                     }}
                   >
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
@@ -439,16 +493,20 @@ export default function ReturnPage() {
             </List>
           )}
 
+          {/* Selected Borrower Card */}
           {selectedBorrower ? (
-            <Card
+            <Paper
               variant="outlined"
               sx={{
                 flex: "0 0 auto",
+                borderRadius: 3,
                 borderLeft: 4,
                 borderLeftColor: selectedBorrower.overdue_count > 0 ? "error.main" : "success.main",
+                borderColor: "divider",
+                animation: `${fadeInUp} 0.3s ease-out`,
               }}
             >
-              <CardContent>
+              <Box sx={{ p: 2 }}>
                 <Stack spacing={2}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <Avatar sx={{ width: 48, height: 48, bgcolor: "primary.main" }}>
@@ -494,15 +552,16 @@ export default function ReturnPage() {
                     </Button>
                   </Stack>
                 </Stack>
-              </CardContent>
-            </Card>
+              </Box>
+            </Paper>
           ) : null}
         </Grid>
 
+        {/* Right Column - Books to Return */}
         <Grid size={{ xs: 12, md: 7, lg: 8 }} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {selectedBorrower ? (
-            <Card variant="outlined" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 1, md: 2 }, overflow: "auto" }}>
+            <Paper variant="outlined" sx={{ flex: 1, display: "flex", flexDirection: "column", borderRadius: 3, borderColor: "divider" }}>
+              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 1, md: 2 }, overflow: "auto" }}>
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
                   <BookIcon color="primary" />
                   <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
@@ -524,8 +583,16 @@ export default function ReturnPage() {
                   </Stack>
                 ) : (
                   <Stack spacing={1.5}>
-                    {detail.records.map((record) => (
-                      <Paper key={record.id} variant="outlined" sx={{ p: 1.5, borderLeft: isOverdue(record) ? 4 : 0, borderLeftColor: "error.main" }}>
+                    {detail.records.map((record, idx) => (
+                      <Paper key={record.id} variant="outlined" sx={{
+                        p: 1.5,
+                        borderRadius: 3,
+                        borderLeft: isOverdue(record) ? 4 : 0,
+                        borderLeftColor: "error.main",
+                        animation: `${slideInRight} 0.3s ease-out`,
+                        animationDelay: `${idx * 0.05}s`,
+                        animationFillMode: "both",
+                      }}>
                         <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
                           {record.book?.cover_url ? (
                             <Box component="img" src={record.book.cover_url} alt={record.book.title} sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }} />
@@ -561,24 +628,23 @@ export default function ReturnPage() {
                     ))}
                   </Stack>
                 )}
-              </CardContent>
-            </Card>
+              </Box>
+            </Paper>
           ) : (
-            <Card variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <CardContent>
-                <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary" }}>
-                  <UsersIcon sx={{ fontSize: 72, opacity: 0.3 }} />
-                  <Typography variant="body1" sx={{ fontWeight: 900 }}>Chọn độc giả để xem sách cần trả</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
-                    Chọn một độc giả từ danh sách bên trái
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
+            <Paper variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, borderColor: "divider" }}>
+              <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary", p: 4 }}>
+                <UsersIcon sx={{ fontSize: 72, opacity: 0.3 }} />
+                <Typography variant="body1" sx={{ fontWeight: 900 }}>Chọn độc giả để xem sách cần trả</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+                  Chọn một độc giả từ danh sách bên trái
+                </Typography>
+              </Stack>
+            </Paper>
           )}
         </Grid>
       </Grid>
 
+      {/* Scanner Dialog */}
       <Dialog open={scannerOpen} onClose={batchReturning ? undefined : () => setScannerOpen(false)} fullWidth maxWidth="xl">
         <DialogTitle>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
@@ -681,6 +747,7 @@ export default function ReturnPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Confirm Dialog */}
       <Dialog open={!!confirmRecord} onClose={() => { setConfirmRecord(null); setCondition(""); }}>
         <DialogTitle>Xác nhận trả sách</DialogTitle>
         <DialogContent>

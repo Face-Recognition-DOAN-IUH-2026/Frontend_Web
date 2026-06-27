@@ -29,7 +29,7 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import GateIcon from "@mui/icons-material/VideocamOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import CameraFeed from "@/components/gate/CameraFeed";
 import { useColorMode } from "@/lib/mui-theme";
@@ -409,36 +409,56 @@ export default function GatePage() {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
       <Box sx={{ maxWidth: 1500, mx: "auto", p: { xs: 2, md: 3 } }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ alignItems: { md: "center" }, justifyContent: "space-between", mb: 3 }}>
-          <Box>
-            <Button startIcon={<ArrowBackOutlinedIcon />} onClick={() => router.push("/dashboard")} sx={{ mb: 1 }}>
-              Quay lại Dashboard
-            </Button>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <Avatar sx={{ bgcolor: "primary.main", color: "primary.contrastText" }}>
-                <VideocamOutlinedIcon />
+        <Box sx={{ mb: 3 }}>
+          <Button startIcon={<ArrowBackOutlinedIcon />} onClick={() => router.push("/dashboard")} sx={{ mb: 1, textTransform: "none" }}>
+            Quay lại Dashboard
+          </Button>
+          <Box
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+              border: "1px solid",
+              borderColor: "rgba(99,102,241,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 2,
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+            <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+
+            <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
+              <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+                <GateIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
               </Avatar>
               <Box>
-                <Typography variant="h4" sx={{ fontWeight: 900 }}>Cổng Thư Viện</Typography>
-                <Typography color="text.secondary">Theo dõi camera vào/ra và xác thực độc giả tại kiosk.</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Cổng Thư Viện</Typography>
+                <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+                  Theo dõi camera vào/ra và xác thực độc giả tại kiosk
+                </Typography>
               </Box>
             </Stack>
-          </Box>
 
-          <Stack direction="row" spacing={2} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Paper variant="outlined" sx={{ px: 2, py: 1.25, animation: `${fadeInUp} 0.35s ease-out`, animationFillMode: "both" }}>
-              <Typography variant="h4" color="success.main" sx={{ fontWeight: 900, lineHeight: 1 }}>{todayCounts.entries}</Typography>
-              <Typography variant="caption" color="text.secondary">Vào hôm nay</Typography>
-            </Paper>
-            <Paper variant="outlined" sx={{ px: 2, py: 1.25, animation: `${fadeInUp} 0.35s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
-              <Typography variant="h4" color="warning.main" sx={{ fontWeight: 900, lineHeight: 1 }}>{todayCounts.exits}</Typography>
-              <Typography variant="caption" color="text.secondary">Ra hôm nay</Typography>
-            </Paper>
-            <IconButton onClick={toggleMode} title={mode === "dark" ? "Chế độ sáng" : "Chế độ tối"} color="primary">
-              {mode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
-            </IconButton>
-          </Stack>
-        </Stack>
+            <Stack direction="row" spacing={1.5} sx={{ zIndex: 1, alignItems: "center" }}>
+              <Paper sx={{ px: 2, py: 1, borderRadius: 2, bgcolor: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)", textAlign: "center" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#6ee7b7", lineHeight: 1 }}>{todayCounts.entries}</Typography>
+                <Typography variant="caption" sx={{ color: "rgba(110,231,183,0.7)", fontWeight: 600 }}>Vào</Typography>
+              </Paper>
+              <Paper sx={{ px: 2, py: 1, borderRadius: 2, bgcolor: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)", textAlign: "center" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#fcd34d", lineHeight: 1 }}>{todayCounts.exits}</Typography>
+                <Typography variant="caption" sx={{ color: "rgba(252,211,77,0.7)", fontWeight: 600 }}>Ra</Typography>
+              </Paper>
+              <IconButton onClick={toggleMode} sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+                {mode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
+              </IconButton>
+            </Stack>
+          </Box>
+        </Box>
 
         <Box sx={{ position: "fixed", top: 16, right: 16, zIndex: theme.zIndex.snackbar, width: 360, maxWidth: "calc(100vw - 32px)" }}>
           <Stack spacing={1}>
@@ -481,6 +501,16 @@ export default function GatePage() {
                     placeholder="Nhập MSSV..."
                     fullWidth
                     autoFocus
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 2,
+                        bgcolor: "background.paper",
+                        textAlign: "center",
+                        "&:hover": {
+                          "& fieldset": { borderColor: "primary.main" },
+                        },
+                      },
+                    }}
                     slotProps={{
                       htmlInput: {
                         style: {
@@ -492,7 +522,22 @@ export default function GatePage() {
                       },
                     }}
                   />
-                  <Button variant="contained" size="large" onClick={() => handleLookup(mssvInput)} disabled={loading || !mssvInput.trim()} fullWidth>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={() => handleLookup(mssvInput)}
+                    disabled={loading || !mssvInput.trim()}
+                    fullWidth
+                    sx={{
+                      background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                      borderRadius: 2,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      "&:hover": {
+                        background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)",
+                      },
+                    }}
+                  >
                     Tra cứu
                   </Button>
                   {loading && (
@@ -522,7 +567,23 @@ export default function GatePage() {
                       </Stack>
                     )}
                   </Paper>
-                  <Button variant="contained" size="large" startIcon={<CheckCircleOutlineOutlinedIcon />} onClick={handleVerify} disabled={loading} fullWidth>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<CheckCircleOutlineOutlinedIcon />}
+                    onClick={handleVerify}
+                    disabled={loading}
+                    fullWidth
+                    sx={{
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      borderRadius: 2,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      "&:hover": {
+                        background: "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
+                      },
+                    }}
+                  >
                     Xác thực
                   </Button>
                   <Button onClick={reset} disabled={loading} fullWidth>Hủy</Button>
@@ -560,7 +621,21 @@ export default function GatePage() {
                       <Typography variant="caption" color="text.secondary">Độ tin cậy {Math.round(result.confidence * 100)}%</Typography>
                     </Stack>
                   )}
-                  <Button variant="contained" startIcon={<RestartAltOutlinedIcon />} onClick={reset} fullWidth>
+                  <Button
+                    variant="contained"
+                    startIcon={<RestartAltOutlinedIcon />}
+                    onClick={reset}
+                    fullWidth
+                    sx={{
+                      background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                      borderRadius: 2,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      "&:hover": {
+                        background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)",
+                      },
+                    }}
+                  >
                     Thử lại
                   </Button>
                 </Stack>

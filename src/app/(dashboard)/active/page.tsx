@@ -21,7 +21,6 @@ import {
   TextField,
   Tooltip,
   Typography,
-  useTheme,
 } from "@mui/material";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import DoorFrontOutlinedIcon from "@mui/icons-material/DoorFrontOutlined";
@@ -82,8 +81,6 @@ function normalizeQuery(value: string) {
 }
 
 export default function ActivePage() {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
   const [patrons, setPatrons] = useState<ActivePatron[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -214,119 +211,77 @@ export default function ActivePage() {
 
   return (
     <Stack spacing={3}>
-      {/* Header — hero count + camera breakdown */}
-      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
-        <Box sx={{ p: { xs: 2.5, sm: 3 } }}>
-          <Grid container spacing={3} sx={{ alignItems: "flex-end" }}>
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Stack spacing={1}>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    letterSpacing: 1.5,
-                    textTransform: "uppercase",
-                    color: "text.secondary",
-                  }}
-                >
-                  Hiện tại
-                </Typography>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "baseline" }}>
-                  <Typography
-                    variant="h2"
-                    sx={{
-                      fontWeight: 900,
-                      letterSpacing: { xs: -1, sm: -2 },
-                      lineHeight: 1,
-                      fontSize: { xs: "3rem", sm: "3.75rem" },
-                    }}
-                  >
-                    {patrons.length}
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 500, color: "text.secondary" }}>
-                    độc giả
-                  </Typography>
-                </Stack>
-                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 360 }}>
-                  Danh sách độc giả đang ở trong thư viện, cập nhật từ hệ thống cổng và kiosk.
-                </Typography>
-              </Stack>
-            </Grid>
-            <Grid size={{ xs: 12, md: 7 }}>
-              <Stack spacing={2}>
-                <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap" }}>
-                  {Object.entries(CAMERA_CONFIG).map(([id, cfg]) => {
-                    const Icon = cfg.icon as React.ComponentType<{ fontSize?: string; sx?: object }>;
-                    return (
-                      <Paper
-                        key={id}
-                        variant="outlined"
-                        sx={{
-                          flex: { xs: "1 1 100%", sm: "1 1 0" },
-                          minWidth: 0,
-                          p: 1.5,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1.5,
-                          borderRadius: 2,
-                          background: "transparent",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 1.5,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
-                            color: "text.secondary",
-                          }}
-                        >
-                          <Icon fontSize="small" />
-                        </Box>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: "block" }}>
-                            {cfg.label}
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-                            {cameraCounts[id] || 0}
-                          </Typography>
-                        </Box>
-                      </Paper>
-                    );
-                  })}
-                </Stack>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}
-                >
-                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                    <Box
-                      sx={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        bgcolor: error ? "error.main" : sseConnected ? "success.main" : "warning.main",
-                        animation: sseConnected ? "pulse 2s ease-in-out infinite" : undefined,
-                      }}
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                      {error ? "Lỗi cập nhật" : sseConnected ? "Live" : "Polling"}
-                      {` · ${lastUpdate.toLocaleTimeString("vi-VN")}`}
-                    </Typography>
-                  </Stack>
-                  <Button size="small" variant="outlined" startIcon={<RefreshOutlinedIcon />} onClick={load} disabled={loading}>
-                    Làm mới
-                  </Button>
-                </Stack>
-              </Stack>
-            </Grid>
-          </Grid>
-        </Box>
-      </Paper>
+      {/* Gradient Header */}
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+          border: "1px solid",
+          borderColor: "rgba(99,102,241,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+
+        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <GroupsOutlinedIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          </Avatar>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Độc giả đang có mặt</Typography>
+            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+              {patrons.length} độc giả đang ở trong thư viện — cập nhật {lastUpdate.toLocaleTimeString("vi-VN")}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={1} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+            <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: error ? "error.main" : sseConnected ? "#6ee7b7" : "#fcd34d", animation: sseConnected ? "pulse 2s ease-in-out infinite" : undefined }} />
+            <Typography variant="caption" sx={{ color: "rgba(199,210,254,0.7)" }}>
+              {error ? "Lỗi" : sseConnected ? "Live" : "Polling"}
+            </Typography>
+          </Stack>
+          <Tooltip title="Làm mới">
+            <IconButton onClick={load} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <RefreshOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
+
+      {/* Camera Stat Cards */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
+        {[
+          { key: "entry_gate", label: "Cổng vào", icon: <DoorFrontOutlinedIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
+          { key: "exit_gate", label: "Cổng ra", icon: <ExitToAppOutlinedIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" },
+          { key: "kiosk", label: "Kiosk", icon: <TerminalOutlinedIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" },
+        ].map((cam, idx) => (
+          <Paper key={cam.key} variant="outlined" sx={{
+            p: 2, borderRadius: 3, position: "relative", overflow: "hidden", borderColor: "divider",
+            transition: "transform 0.2s, box-shadow 0.2s",
+            animation: `${fadeInUp} 0.4s ease-out`, animationDelay: `${idx * 0.07}s`, animationFillMode: "both",
+            "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
+          }}>
+            <Box sx={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, background: cam.gradient, opacity: 0.12, borderRadius: "0 12px 0 60px" }} />
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+              <Avatar sx={{ background: cam.gradient, width: 40, height: 40, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>{cam.icon}</Avatar>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{cam.label}</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{cameraCounts[cam.key] || 0}</Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        ))}
+      </Box>
 
       {stalePatrons.length > 0 && (
         <Alert severity="warning" sx={{ borderRadius: 2 }}>
@@ -361,7 +316,7 @@ export default function ActivePage() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm theo tên hoặc MSSV..."
               size="small"
-              sx={{ width: { xs: "100%", sm: 320 } }}
+              sx={{ width: { xs: "100%", sm: 320 }, "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
               slotProps={{
                 input: {
                   startAdornment: (
@@ -400,7 +355,7 @@ export default function ActivePage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  bgcolor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)",
+                  bgcolor: "rgba(0,0,0,0.04)",
                   color: "text.disabled",
                   mb: 1,
                 }}
@@ -435,6 +390,12 @@ export default function ActivePage() {
                 const dur = getDuration(patron.entered_at);
                 const accent = DURATION_ACCENT[dur.level];
                 const percent = patron.confidence == null ? null : Math.round(patron.confidence * 100);
+                const avatarGradient =
+                  dur.level <= 1
+                    ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                    : dur.level === 2
+                      ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                      : "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)";
                 return (
                   <Grid key={patron.id} size={{ xs: 12, xl: 6 }} sx={{ animation: `${fadeInUp} 0.35s ease-out`, animationDelay: `${idx * 0.05}s`, animationFillMode: "both" }}>
                     <Paper
@@ -443,13 +404,14 @@ export default function ActivePage() {
                         borderRadius: 2,
                         overflow: "hidden",
                         position: "relative",
-                        transition: "box-shadow 0.15s",
+                        transition: "transform 0.2s, box-shadow 0.2s",
                         "&:hover": {
-                          boxShadow: theme.shadows[2],
+                          transform: "translateY(-1px)",
+                          boxShadow: 4,
                         },
                       }}
                     >
-                      {/* Duration accent bar — like a book spine */}
+                      {/* Duration accent bar */}
                       <Box
                         sx={{
                           position: "absolute",
@@ -470,8 +432,8 @@ export default function ActivePage() {
                               height: 36,
                               fontSize: 13,
                               fontWeight: 700,
-                              bgcolor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-                              color: "text.primary",
+                              background: avatarGradient,
+                              color: "#fff",
                             }}
                           >
                             {initials(patron.full_name)}
@@ -515,10 +477,10 @@ export default function ActivePage() {
                                     borderRadius: 0.75,
                                     bgcolor:
                                       dur.level <= 1
-                                        ? isDark ? "rgba(74,140,92,0.15)" : "rgba(74,140,92,0.1)"
+                                        ? "rgba(74,140,92,0.1)"
                                         : dur.level === 2
-                                          ? isDark ? "rgba(196,154,60,0.15)" : "rgba(196,154,60,0.1)"
-                                          : isDark ? "rgba(184,92,74,0.15)" : "rgba(184,92,74,0.1)",
+                                          ? "rgba(196,154,60,0.1)"
+                                          : "rgba(184,92,74,0.1)",
                                   }}
                                 >
                                   <Typography

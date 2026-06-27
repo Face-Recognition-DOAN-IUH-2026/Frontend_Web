@@ -98,7 +98,7 @@ describe("JobPoll Component", () => {
         result: {
           error: "NO_FACE_DETECTED",
           type: "task_failure",
-        },
+        } as any,
       });
 
     render(<JobPoll jobId="fail-task" />);
@@ -141,7 +141,7 @@ describe("JobPoll Component", () => {
       .mockResolvedValueOnce({
         task_id: "error-task",
         status: "FAILURE",
-        result: { error: "LOW_QUALITY" },
+        result: { error: "LOW_QUALITY" } as any,
       });
 
     render(<JobPoll jobId="error-task" onError={onError} />);
@@ -163,10 +163,9 @@ describe("JobPoll Component", () => {
         status: "SUCCESS",
         result: {
           status: "success",
-          is_live: null,
+          is_live: undefined,
           score: 0,
-          confidence: 0,
-        },
+        } as any,
       });
 
     render(<JobPoll jobId="null-task" />);
@@ -186,7 +185,7 @@ describe("JobPoll Component", () => {
       .mockResolvedValueOnce({
         task_id: "empty-task",
         status: "SUCCESS",
-        result: {},
+        result: { status: "success" } as any,
       });
 
     render(<JobPoll jobId="empty-task" />);

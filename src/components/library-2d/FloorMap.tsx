@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { BookData, ShelfData } from "@/components/library-3d/types";
+import type { BookData, ShelfData } from "./types";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import MenuBookIcon from "@mui/icons-material/MenuBook";

@@ -7,22 +7,21 @@ import {
   Avatar,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Divider,
   Grid,
-  InputAdornment,
   LinearProgress,
+  Paper,
   Slide,
   Snackbar,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import BadgeIcon from "@mui/icons-material/BadgeOutlined";
-import BookIcon from "@mui/icons-material/MenuBookOutlined";
+import BorrowIcon from "@mui/icons-material/AssignmentIndOutlined";
 import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import FaceIcon from "@mui/icons-material/FaceOutlined";
@@ -192,16 +191,46 @@ export default function BorrowPage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: "calc(100vh - 120px)" }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Typography variant="h5" sx={{ fontWeight: 900, display: "flex", alignItems: "center", gap: 1 }}>
-          <BookIcon color="primary" />
-          Tạo phiếu mượn sách
-        </Typography>
-        {patronId && (
-          <Button variant="outlined" color="error" size="small" onClick={handleClearPatron}>
-            Hủy phiên mượn
-          </Button>
-        )}
+      {/* Gradient Header */}
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+          border: "1px solid",
+          borderColor: "rgba(99,102,241,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+
+        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <BorrowIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          </Avatar>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Tạo phiếu mượn sách</Typography>
+            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+              {patronId ? `Đang mượn: ${patronName} — ${activeCount}/${MAX_BORROW_BOOKS} sách` : "Quét khuôn mặt hoặc nhập MSSV để bắt đầu"}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={1} sx={{ zIndex: 1 }}>
+          {patronId && (
+            <Button variant="outlined" size="small" onClick={handleClearPatron}
+              sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }}>
+              Hủy phiên
+            </Button>
+          )}
+        </Stack>
       </Box>
 
       {error ? (
@@ -215,185 +244,182 @@ export default function BorrowPage() {
 
       <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
         <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", minHeight: 0 }}>
-          <Card variant="outlined" sx={{ flex: patronId ? "0 0 auto" : 1 }}>
-            <CardContent>
+          {/* Patron Verification Section */}
+          <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, borderColor: "divider" }}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Avatar sx={{ bgcolor: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", width: 36, height: 36 }}>
+                  <BadgeIcon sx={{ fontSize: 18 }} />
+                </Avatar>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>Xác minh độc giả</Typography>
+              </Stack>
+              <TextField
+                value={patronCode}
+                onChange={(e) => setPatronCode(e.target.value)}
+                placeholder="Nhập mã số sinh viên..."
+                size="small"
+                fullWidth
+                disabled={!!patronId}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
+              />
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => { if (!patronId) startWebcam(); }}
+                disabled={faceVerifyDisabled}
+                startIcon={<FaceIcon />}
+                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)", "&:hover": { background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)", transform: "translateY(-1px)" }, transition: "all 0.2s" }}
+              >
+                Xác minh khuôn mặt
+              </Button>
+            </Stack>
+          </Paper>
+
+          {patronId ? (
+            /* Patron Info Card */
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                borderLeft: 4,
+                borderLeftColor: overdueCount > 0 ? "error.main" : "success.main",
+                animation: `${fadeInUp} 0.4s ease-out`,
+                "&:hover": { boxShadow: 2 },
+                transition: "box-shadow 0.2s",
+              }}
+            >
               <Stack spacing={2}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900, display: "flex", alignItems: "center", gap: 1 }}>
-                  <BadgeIcon fontSize="small" color="primary" />
-                  Xác minh độc giả
-                </Typography>
-
-                <TextField
-                  value={patronCode}
-                  onChange={(e) => setPatronCode(e.target.value)}
-                  placeholder="Nhập mã số sinh viên..."
-                  size="medium"
-                  fullWidth
-                  disabled={!!patronId}
-                />
-
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar sx={{ width: 48, height: 48, background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }}>
+                    {patronName?.[0]?.toUpperCase() || "?"}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800 }} noWrap>{patronName || patronId}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{patronCode}</Typography>
+                  </Box>
+                  <Chip size="small" color="success" label="Đã xác minh" icon={<CheckCircleIcon />} sx={{ fontWeight: 600 }} />
+                </Box>
+                <Divider />
+                <Stack spacing={1}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>Số sách đã mượn</Typography>
+                    <Chip size="small" color={activeCount >= MAX_BORROW_BOOKS ? "error" : "primary"} label={`${activeCount}/${MAX_BORROW_BOOKS}`} sx={{ fontWeight: 700 }} />
+                  </Box>
+                  <LinearProgress variant="determinate" value={(activeCount / MAX_BORROW_BOOKS) * 100} color={activeCount >= MAX_BORROW_BOOKS ? "error" : "primary"} sx={{ borderRadius: 2, height: 6, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { borderRadius: 2 } }} />
+                  {overdueCount > 0 && (
+                    <Alert severity="error" sx={{ py: 0.5, borderRadius: 2 }}>
+                      <WarningIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      Có {overdueCount} cuốn sách quá hạn
+                    </Alert>
+                  )}
+                  <Typography variant="body2" color={remaining > 0 ? "text.secondary" : "error"} sx={{ fontWeight: 600 }}>
+                    {remaining > 0 ? `Có thể mượn thêm ${remaining} cuốn` : "Đã đạt giới hạn mượn"}
+                  </Typography>
+                </Stack>
+                <Divider />
                 <Button
                   variant="contained"
                   fullWidth
-                  onClick={() => { if (!patronId) startWebcam(); }}
-                  disabled={faceVerifyDisabled}
-                  startIcon={<FaceIcon />}
-                  size="large"
+                  startIcon={<QrCodeScannerIcon />}
+                  disabled={!canBorrow}
+                  onClick={() => setScannerOpen(true)}
+                  sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", py: 1.5, background: canBorrow ? "linear-gradient(135deg, #10b981 0%, #059669 100%)" : undefined, "&:hover": canBorrow ? { background: "linear-gradient(135deg, #059669 0%, #047857 100%)" } : {} }}
                 >
-                  Xác minh mặt
+                  {canBorrow ? "Quét mã vạch sách" : overdueCount > 0 ? "Cần trả sách quá hạn" : "Đã đạt giới hạn"}
                 </Button>
               </Stack>
-            </CardContent>
-          </Card>
-
-          {patronId ? (
-            <Card
-              variant="outlined"
-              sx={{
-                flex: "0 0 auto",
-                borderLeft: 4,
-                borderLeftColor: overdueCount > 0 ? "error.main" : "success.main",
-              }}
-            >
-              <CardContent>
-                <Stack spacing={2}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Avatar sx={{ width: 48, height: 48, bgcolor: "primary.main" }}>
-                      {patronName?.[0]?.toUpperCase() || "?"}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 900 }} noWrap>
-                        {patronName || patronId}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {patronCode}
-                      </Typography>
-                    </Box>
-                    <Chip size="small" color="success" label="Đã xác minh" icon={<CheckCircleIcon />} />
-                  </Box>
-
-                  <Divider />
-
-                  <Stack spacing={1}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <Typography variant="body2" color="text.secondary">Số sách đã mượn</Typography>
-                      <Chip size="small" color={activeCount >= MAX_BORROW_BOOKS ? "error" : "default"} label={`${activeCount}/${MAX_BORROW_BOOKS}`} />
-                    </Box>
-                    <LinearProgress variant="determinate" value={(activeCount / MAX_BORROW_BOOKS) * 100} color={activeCount >= MAX_BORROW_BOOKS ? "error" : "primary"} sx={{ borderRadius: 2, height: 6 }} />
-
-                    {overdueCount > 0 && (
-                      <Alert severity="error" sx={{ py: 0.5 }}>
-                        <WarningIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        Có {overdueCount} cuốn sách quá hạn
-                      </Alert>
-                    )}
-
-                    <Typography variant="body2" color={remaining > 0 ? "text.secondary" : "error"}>
-                      {remaining > 0 ? `Có thể mượn thêm ${remaining} cuốn` : "Đã đạt giới hạn mượn"}
-                    </Typography>
-                  </Stack>
-
-                  <Divider />
-
-                  <Button variant="contained" size="large" fullWidth startIcon={<QrCodeScannerIcon />} disabled={!canBorrow} onClick={() => setScannerOpen(true)} sx={{ animation: `${fadeInUp} 0.3s ease-out` }}>
-                    {canBorrow ? "Quét mã vạch sách" : overdueCount > 0 ? "Cần trả sách quá hạn" : "Đã đạt giới hạn"}
-                  </Button>
-                </Stack>
-              </CardContent>
-            </Card>
+            </Paper>
           ) : (
-            <Card variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <CardContent>
-                <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary" }}>
-                  <BadgeIcon sx={{ fontSize: 48, opacity: 0.3 }} />
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
-                    Nhập MSSV hoặc quét khuôn mặt<br />để xác minh độc giả
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
+            /* Empty State */
+            <Paper variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, borderColor: "divider", minHeight: 200 }}>
+              <Stack spacing={1.5} sx={{ alignItems: "center", color: "text.secondary" }}>
+                <BadgeIcon sx={{ fontSize: 56, opacity: 0.2 }} />
+                <Typography variant="body1" sx={{ fontWeight: 700, textAlign: "center" }}>
+                  Nhập MSSV hoặc quét khuôn mặt<br />để xác minh độc giả
+                </Typography>
+              </Stack>
+            </Paper>
           )}
-
         </Grid>
 
         <Grid size={{ xs: 12, md: 7, lg: 8 }} sx={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", minHeight: 0 }}>
-          <Card variant="outlined" sx={{ display: "flex", flexDirection: "column" }}>
-            <CardContent sx={{ display: "flex", flexDirection: "column", p: { xs: 1, md: 2 } }}>
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
-                {patronId ? <CameraAltIcon color="primary" /> : <VideocamIcon color="primary" />}
-                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
-                  {patronId ? "Quét mã vạch sách" : "Xác minh khuôn mặt"}
-                </Typography>
-              </Stack>
+          {/* Camera/Video Area */}
+          <Paper variant="outlined" sx={{ display: "flex", flexDirection: "column", p: { xs: 1, md: 2 }, borderRadius: 3, borderColor: "divider" }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
+              {patronId ? <CameraAltIcon color="primary" /> : <VideocamIcon color="primary" />}
+              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
+                {patronId ? "Quét mã vạch sách" : "Xác minh khuôn mặt"}
+              </Typography>
+            </Stack>
 
-              {patronId ? (
-                <Box sx={{ bgcolor: "black", borderRadius: 1, overflow: "hidden", position: "relative", minHeight: 300 }}>
-                  <Stack spacing={2} sx={{ alignItems: "center", justifyContent: "center", height: "100%", color: "grey.400", p: 4 }}>
-                    <QrCodeScannerIcon sx={{ fontSize: 72, opacity: 0.3 }} />
-                    <Typography variant="body1" color="text.secondary" sx={{ textAlign: "center" }}>
-                      {"Bấm nút \"Quét mã vạch sách\" để mở IP Camera"}
-                    </Typography>
-                    <Button variant="outlined" color="inherit" startIcon={<QrCodeScannerIcon />} onClick={() => setScannerOpen(true)} disabled={!canBorrow}>
-                      Mở IP Camera
-                    </Button>
+            {patronId ? (
+              <Box sx={{ bgcolor: "black", borderRadius: 3, overflow: "hidden", position: "relative", minHeight: 300 }}>
+                <Stack spacing={2} sx={{ alignItems: "center", justifyContent: "center", height: "100%", color: "grey.400", p: 4 }}>
+                  <QrCodeScannerIcon sx={{ fontSize: 72, opacity: 0.3 }} />
+                  <Typography variant="body1" color="text.secondary" sx={{ textAlign: "center" }}>
+                    {"Bấm nút \"Quét mã vạch sách\" để mở IP Camera"}
+                  </Typography>
+                  <Button variant="outlined" color="inherit" startIcon={<QrCodeScannerIcon />} onClick={() => setScannerOpen(true)} disabled={!canBorrow}>
+                    Mở IP Camera
+                  </Button>
+                </Stack>
+              </Box>
+            ) : (
+              <Box sx={{ bgcolor: "black", borderRadius: 3, overflow: "hidden", position: "relative", minHeight: 400 }}>
+                {cameraError ? (
+                  <Stack spacing={1.5} sx={{ alignItems: "center", justifyContent: "center", height: "100%", color: "grey.300", p: 3 }}>
+                    <VideocamIcon sx={{ fontSize: 48 }} />
+                    <Typography sx={{ textAlign: "center" }}>{cameraError}</Typography>
+                    <Button size="small" variant="outlined" color="inherit" onClick={startWebcam}>Thử lại</Button>
                   </Stack>
-                </Box>
-              ) : (
-                <Box sx={{ bgcolor: "black", borderRadius: 1, overflow: "hidden", position: "relative", minHeight: 400 }}>
-                  {cameraError ? (
-                    <Stack spacing={1.5} sx={{ alignItems: "center", justifyContent: "center", height: "100%", color: "grey.300", p: 3 }}>
-                      <VideocamIcon sx={{ fontSize: 48 }} />
-                      <Typography sx={{ textAlign: "center" }}>{cameraError}</Typography>
-                      <Button size="small" variant="outlined" color="inherit" onClick={startWebcam}>Thử lại</Button>
-                    </Stack>
-                  ) : (
-                    <>
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", transform: "scaleX(-1)" }}
-                      />
-                      {!cameraReady && (
-                        <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-                          <CircularProgress size={28} color="inherit" />
-                          <Typography variant="body2">Đang khởi động camera...</Typography>
-                        </Stack>
-                      )}
-                      {faceScanning && cameraReady && (
-                        <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.5)", alignItems: "center", justifyContent: "center" }} spacing={1}>
-                          <CircularProgress size={28} color="inherit" />
-                          <Typography variant="body2" sx={{ color: "common.white" }}>Đang xác minh...</Typography>
-                        </Stack>
-                      )}
-                      <Stack direction="row" spacing={1} sx={{ position: "absolute", bottom: 12, left: 12, right: 12, justifyContent: "center" }}>
-                        <Button
-                          variant="contained"
-                          size="large"
-                          onClick={startWebcam}
-                          disabled={cameraReady}
-                          sx={{ display: cameraReady ? "none" : undefined }}
-                        >
-                          Mở camera
-                        </Button>
-                        <Button
-                          variant="contained"
-                          size="large"
-                          startIcon={<FaceIcon />}
-                          onClick={handleFaceVerify}
-                          disabled={!cameraReady || faceScanning || !patronCode.trim()}
-                          sx={{ display: cameraReady ? undefined : "none", minWidth: 200 }}
-                        >
-                          {faceScanning ? "Đang xác minh..." : "Xác minh khuôn mặt"}
-                        </Button>
+                ) : (
+                  <>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", transform: "scaleX(-1)" }}
+                    />
+                    {!cameraReady && (
+                      <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+                        <CircularProgress size={28} color="inherit" />
+                        <Typography variant="body2">Đang khởi động camera...</Typography>
                       </Stack>
-                    </>
-                  )}
-                </Box>
-              )}
-            </CardContent>
-          </Card>
+                    )}
+                    {faceScanning && cameraReady && (
+                      <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.5)", alignItems: "center", justifyContent: "center" }} spacing={1}>
+                        <CircularProgress size={28} color="inherit" />
+                        <Typography variant="body2" sx={{ color: "common.white" }}>Đang xác minh...</Typography>
+                      </Stack>
+                    )}
+                    <Stack direction="row" spacing={1} sx={{ position: "absolute", bottom: 12, left: 12, right: 12, justifyContent: "center" }}>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={startWebcam}
+                        disabled={cameraReady}
+                        sx={{ display: cameraReady ? "none" : undefined }}
+                      >
+                        Mở camera
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<FaceIcon />}
+                        onClick={handleFaceVerify}
+                        disabled={!cameraReady || faceScanning || !patronCode.trim()}
+                        sx={{ display: cameraReady ? undefined : "none", minWidth: 200 }}
+                      >
+                        {faceScanning ? "Đang xác minh..." : "Xác minh khuôn mặt"}
+                      </Button>
+                    </Stack>
+                  </>
+                )}
+              </Box>
+            )}
+          </Paper>
 
           {patronId && patronCode.trim() && (
             <Box sx={{ animation: `${fadeInUp} 0.4s ease-out` }}>

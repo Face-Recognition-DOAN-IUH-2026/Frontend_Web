@@ -283,6 +283,15 @@ class ApiClient {
     }
   }
 
+  async verifyEmail(data: { email: string; code: string }): Promise<void> {
+    try {
+      await this.client.post("/auth/verify-email", data);
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      await this.client.post("/api/auth/verify-email", data);
+    }
+  }
+
   async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
     try {
       const response = await this.client.post<TokenResponse>("/auth/refresh", { refresh_token: refreshToken });
@@ -318,6 +327,26 @@ class ApiClient {
     await this.client.delete("/users/me/avatar");
   }
 
+  async updateProfile(data: { full_name?: string; phone?: string; permanent_address?: string }): Promise<UserPublic> {
+    const response = await this.client.put<UserPublic>("/users/me/profile", data);
+    return response.data;
+  }
+
+  async changePassword(data: { old_password?: string; new_password?: string }): Promise<{ message: string }> {
+    const response = await this.client.put<{ message: string }>("/users/me/password", data);
+    return response.data;
+  }
+
+  async requestEmailChangeOtp(data: { new_email: string }): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/users/me/email/request-otp", data);
+    return response.data;
+  }
+
+  async verifyAndChangeEmail(data: { new_email: string; code: string }): Promise<{ message: string }> {
+    const response = await this.client.put<{ message: string }>("/users/me/email", data);
+    return response.data;
+  }
+
   // Face enrollment status from face-recognition-api
   async getFaceEnrollmentStatus(): Promise<{ has_face: boolean; full_name: string | null; role: string }> {
     // /api/users/me routes to face-recognition-api via gateway
@@ -333,6 +362,16 @@ class ApiClient {
 
   async listUsers(): Promise<UserListResponse> {
     const response = await this.client.get<UserListResponse>("/api/users");
+    return response.data;
+  }
+
+  async getUser(userId: string): Promise<UserPublic> {
+    const response = await this.client.get<UserPublic>(`/api/users/${userId}`);
+    return response.data;
+  }
+
+  async updateUser(userId: string, data: any): Promise<UserPublic> {
+    const response = await this.client.put<UserPublic>(`/api/users/${userId}`, data);
     return response.data;
   }
 
