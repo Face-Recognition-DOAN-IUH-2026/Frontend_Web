@@ -53,8 +53,8 @@ const mockBooksResponse = {
 describe("BooksPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockApi.listBooks.mockResolvedValue(mockBooksResponse);
-    mockApi.searchBooks.mockResolvedValue(mockBooksResponse.items);
+    mockApi.listBooks.mockResolvedValue(mockBooksResponse as any);
+    mockApi.searchBooks.mockResolvedValue(mockBooksResponse.items as any);
     mockApi.getBarcodes.mockResolvedValue([]);
   });
 

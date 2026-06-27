@@ -25,6 +25,13 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  Stepper,
+  Step,
+  StepLabel,
+  Card,
+  CardContent,
+  Divider,
+  Grid,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
@@ -124,7 +131,47 @@ export default function PatronsPage() {
 
   const [notice, setNotice] = useState<Notice>(null);
 
+  const [showOtp, setShowOtp] = useState(false);
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [otpSubmitting, setOtpSubmitting] = useState(false);
+
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
+
+  // Auto-calculate issue_date and membership_expiry based on course or student_code
+  useEffect(() => {
+    if (createStep === "form") {
+      let startYear = 0;
+      let endYear = 0;
+      
+      const courseStr = (createForm.course || "").toString();
+      // Try to find YYYY format like "2021-2025" or just "2021"
+      const years = courseStr.match(/\b(20\d{2})\b/g);
+      
+      if (years && years.length > 0) {
+        startYear = parseInt(years[0]);
+        endYear = years.length > 1 ? parseInt(years[1]) : startYear + 4; // Default to 4 years
+      } else if (createForm.student_code && createForm.student_code.match(/^(1[0-9]|2[0-9])/)) {
+        // Fallback: extract from IUH student code (e.g. 21xxxxx -> 2021)
+        const prefix = parseInt(createForm.student_code.substring(0, 2));
+        startYear = 2000 + prefix;
+        endYear = startYear + 4;
+      }
+      
+      if (startYear > 0 && endYear > 0) {
+        const newIssue = `${startYear}-09-01`; // Usually starts Sept 1st
+        const newExpiry = `${endYear}-09-01`;
+        
+        setCreateForm(prev => {
+          if (prev.issue_date !== newIssue || prev.membership_expiry !== newExpiry) {
+            return { ...prev, issue_date: newIssue, membership_expiry: newExpiry };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [createForm.course, createForm.student_code, createStep]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -185,9 +232,16 @@ export default function PatronsPage() {
     setCreateError("");
     try {
       await api.createPatron(createForm);
-      closeCreate();
-      await load();
-      showNotice("success", "Đã tạo độc giả mới");
+      if (createForm.email) {
+        setOtpEmail(createForm.email);
+        setOtpCode("");
+        setOtpError("");
+        setShowOtp(true);
+      } else {
+        closeCreate();
+        await load();
+        showNotice("success", "Đã tạo độc giả mới");
+      }
     } catch (err: any) {
       if (err?.response?.status === 409) setCreateError("MSSV hoặc mã thẻ đã tồn tại");
       else setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
@@ -202,14 +256,38 @@ export default function PatronsPage() {
     try {
       const newPatron = await api.createPatron(createForm);
       await api.enrollPatronFaceBatch(newPatron.id, files);
-      closeCreate();
-      await load();
-      showNotice("success", "Đã tạo độc giả và đăng ký khuôn mặt");
+      if (createForm.email) {
+        setOtpEmail(createForm.email);
+        setOtpCode("");
+        setOtpError("");
+        setShowOtp(true);
+      } else {
+        closeCreate();
+        await load();
+        showNotice("success", "Đã tạo độc giả và đăng ký khuôn mặt");
+      }
     } catch (err: any) {
       if (err?.response?.status === 409) setCreateError("MSSV hoặc mã thẻ đã tồn tại");
       else setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode) return;
+    setOtpSubmitting(true);
+    setOtpError("");
+    try {
+      await api.verifyEmail({ email: otpEmail, code: otpCode });
+      setShowOtp(false);
+      closeCreate();
+      showNotice("success", "Đã tạo độc giả và xác thực email thành công!");
+      await load();
+    } catch (err: any) {
+      setOtpError(err?.response?.data?.detail || "Mã OTP không hợp lệ hoặc đã hết hạn.");
+    } finally {
+      setOtpSubmitting(false);
     }
   };
 
@@ -290,243 +368,376 @@ export default function PatronsPage() {
     }
   };
 
-  return (
-    <Stack spacing={2.5}>
-      {/* Header */}
-      <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}
-        sx={{ alignItems: { md: "center" }, justifyContent: "space-between" }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Độc giả</Typography>
-        <Stack direction="row" spacing={1}>
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load} size="small">
-            Tải lại
-          </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCreateScan(true); setShowCreate(true); }}>
-            Thêm độc giả
-          </Button>
-        </Stack>
-      </Stack>
+  // ── stat counts ──
+  const activeCount  = patrons.filter((p) => p.status === "active").length;
+  const expiredCount = patrons.filter((p) => p.status === "expired" || p.status === "inactive").length;
+  const faceCount    = patrons.filter((p) => p.has_face).length;
 
-      {/* Search + Filters */}
-      <Paper variant="outlined" sx={{ p: 1.5 }}>
-        <Stack spacing={1.5}>
-          <TextField
+  const FILTERS: { value: FilterValue; label: string; dot?: string }[] = [
+    { value: "all",      label: "Tất cả" },
+    { value: "active",   label: "Hoạt động",        dot: "bg-emerald-400" },
+    { value: "inactive", label: "Tạm khóa",          dot: "bg-amber-400" },
+    { value: "expired",  label: "Hết hạn",            dot: "bg-red-400" },
+    { value: "has_face", label: "Có khuôn mặt",      dot: "bg-blue-400" },
+    { value: "no_face",  label: "Chưa có khuôn mặt" },
+    { value: "deleted",  label: "Đã xóa",             dot: "bg-slate-500" },
+  ];
+
+  return (
+    <div className="space-y-6 p-1">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100">Quản lý Độc giả</h1>
+          <p className="text-slate-400 text-sm mt-1">
+            {patrons.length} độc giả · {activeCount} đang hoạt động · {faceCount} đã đăng ký khuôn mặt
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={load}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 border border-white/10 transition-all"
+          >
+            <RefreshIcon sx={{ fontSize: 16 }} />
+            Tải lại
+          </button>
+          <button
+            onClick={() => { setCreateScan(true); setShowCreate(true); }}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/20 transition-all"
+          >
+            <AddIcon sx={{ fontSize: 16 }} />
+            Thêm độc giả
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stats mini ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Tổng độc giả",     value: patrons.length, color: "text-indigo-400",  bg: "bg-indigo-500/10 border-indigo-500/20" },
+          { label: "Hoạt động",         value: activeCount,    color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+          { label: "Hết hạn / Khóa",   value: expiredCount,   color: "text-amber-400",   bg: "bg-amber-500/10 border-amber-500/20" },
+          { label: "Có khuôn mặt",      value: faceCount,      color: "text-blue-400",    bg: "bg-blue-500/10 border-blue-500/20" },
+        ].map((s) => (
+          <div key={s.label} className={`rounded-2xl border p-4 backdrop-blur-sm ${s.bg}`}>
+            <p className="text-xs text-slate-500 mb-1">{s.label}</p>
+            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Search + Filter ── */}
+      <div className="rounded-2xl border border-white/10 bg-slate-800/60 backdrop-blur-sm p-4 space-y-3">
+        {/* Search */}
+        <div className="relative">
+          <SearchIcon sx={{ fontSize: 18 }} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          <input
+            type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && load()}
             placeholder="Tìm theo tên, MSSV, mã thẻ..."
-            size="small"
-            fullWidth
-            slotProps={{
-              input: {
-                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
-              },
-            }}
+            className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
           />
-          <ToggleButtonGroup
-            value={filter}
-            exclusive
-            onChange={(_, val) => val && setFilter(val)}
-            size="small"
-            sx={{ flexWrap: "wrap", gap: 0.5, "& .MuiToggleButton-root": { px: 1.5, py: 0.4, borderRadius: "20px!important", border: "1px solid", borderColor: "divider", textTransform: "none", fontWeight: 600, fontSize: "0.8rem" } }}
-          >
-            <ToggleButton value="all">Tất cả</ToggleButton>
-            <ToggleButton value="active">
-              <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "success.main", mr: 0.6, flexShrink: 0 }} />
-              Hoạt động
-            </ToggleButton>
-            <ToggleButton value="inactive">Tạm khóa</ToggleButton>
-            <ToggleButton value="expired">Hết hạn</ToggleButton>
-            <ToggleButton value="has_face">
-              <FaceIcon sx={{ fontSize: 14, mr: 0.4 }} />
-              Có khuôn mặt
-            </ToggleButton>
-            <ToggleButton value="no_face">Chưa có khuôn mặt</ToggleButton>
-            <ToggleButton value="deleted">Đã xóa</ToggleButton>
-          </ToggleButtonGroup>
-        </Stack>
-      </Paper>
-
-      {/* Card Grid */}
-      {loading && filtered.length === 0 ? (
-        <Stack sx={{ alignItems: "center", py: 8 }}><CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} /></Stack>
-      ) : filtered.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 5, textAlign: "center" }}>
-          <PersonIcon sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
-          <Typography color="text.secondary">Không tìm thấy độc giả nào</Typography>
-          <Button variant="outlined" size="small" sx={{ mt: 1.5 }} onClick={() => { setQuery(""); setFilter("all"); }}>
-            Xóa bộ lọc
-          </Button>
-        </Paper>
-      ) : (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "1fr 1fr 1fr" }, gap: 2 }}>
-          {filtered.map((patron, idx) => (
-            <Paper
-              key={patron.id}
-              variant="outlined"
-              sx={{
-                p: 2,
-                cursor: "pointer",
-                transition: "box-shadow .15s, border-color .15s",
-                "&:hover": { borderColor: "primary.main", boxShadow: (t) => `0 0 0 1px ${alpha(t.palette.primary.main, 0.3)}` },
-                animation: `${fadeInUp} 0.35s ease-out`,
-                animationDelay: `${idx * 0.05}s`,
-                animationFillMode: "both",
-              }}
-              onClick={() => router.push(`/patrons/${patron.id}`)}
+        </div>
+        {/* Filter pills */}
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setFilter(f.value)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                filter === f.value
+                  ? "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20"
+                  : "bg-slate-700/40 border-slate-600/40 text-slate-400 hover:text-slate-200 hover:border-slate-500"
+              }`}
             >
-              <Stack spacing={1.5}>
-                <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", justifyContent: "space-between" }}>
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", minWidth: 0 }}>
-                    <Avatar sx={{ width: 40, height: 40, bgcolor: "primary.main", fontWeight: 700, fontSize: 15 }}>
+              {f.dot && <span className={`h-1.5 w-1.5 rounded-full ${f.dot}`} />}
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Card Grid ── */}
+      {loading && filtered.length === 0 ? (
+        <div className="flex justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <PersonIcon sx={{ fontSize: 56 }} className="text-slate-600 mb-3" />
+          <p className="text-slate-400 font-medium">Không tìm thấy độc giả nào</p>
+          <button
+            onClick={() => { setQuery(""); setFilter("all"); }}
+            className="mt-3 px-4 py-2 text-sm rounded-xl text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/10 transition-all"
+          >
+            Xóa bộ lọc
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((patron) => {
+            const isExpired   = new Date(patron.membership_expiry) < new Date();
+            const isSoonExp   = !isExpired && (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000;
+            const expiryColor = isExpired ? "text-red-400" : isSoonExp ? "text-amber-400" : "text-slate-500";
+
+            const statusCls =
+              patron.status === "active"   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
+              patron.status === "inactive" ? "bg-amber-500/10 border-amber-500/20 text-amber-400" :
+              patron.status === "deleted"  ? "bg-red-500/10 border-red-500/20 text-red-400" :
+                                             "bg-slate-500/10 border-slate-500/20 text-slate-400";
+
+            return (
+              <div
+                key={patron.id}
+                onClick={() => router.push(`/patrons/${patron.id}`)}
+                className="group relative rounded-2xl border border-white/10 bg-slate-800/60 backdrop-blur-sm p-5 cursor-pointer hover:border-indigo-500/40 hover:bg-slate-800/80 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-200"
+              >
+                {/* Top row */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Avatar */}
+                    <div className="h-11 w-11 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md shadow-indigo-500/30">
                       {initials(patron.full_name)}
-                    </Avatar>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{patron.full_name}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-                        {patron.student_code}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  <Chip size="small" color={statusColor(patron.status)} label={statusLabel(patron.status)} sx={{ fontWeight: 700, fontSize: 11, height: 22 }} />
-                </Stack>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-100 truncate leading-tight">{patron.full_name}</p>
+                      <p className="text-xs font-mono text-slate-500 mt-0.5">{patron.student_code}</p>
+                    </div>
+                  </div>
+                  <span className={`flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${statusCls}`}>
+                    {statusLabel(patron.status)}
+                  </span>
+                </div>
 
-                <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
+                {/* Info row */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 text-xs">
                   {patron.course && (
-                    <Typography variant="caption" color="text.secondary">
-                      <SchoolIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: "text-top" }} />
+                    <span className="text-slate-500 flex items-center gap-1">
+                      <SchoolIcon sx={{ fontSize: 12 }} />
                       {patron.course}
-                    </Typography>
+                    </span>
                   )}
-                  <Typography variant="caption" color={patron.has_face ? "success.main" : "text.disabled"}>
-                    <FaceIcon sx={{ fontSize: 12, mr: 0.3, verticalAlign: "text-top" }} />
+                  <span className={`flex items-center gap-1 ${patron.has_face ? "text-blue-400" : "text-slate-600"}`}>
+                    <FaceIcon sx={{ fontSize: 12 }} />
                     {patron.has_face ? "Đã có khuôn mặt" : "Chưa có"}
-                  </Typography>
-                  <Typography variant="caption" color={
-                    new Date(patron.membership_expiry) < new Date() ? "error.main" :
-                    (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000 ? "warning.main" :
-                    "text.secondary"
-                  }>
+                  </span>
+                  <span className={`flex items-center gap-1 ${expiryColor}`}>
                     Hạn: {patron.membership_expiry}
-                    {new Date(patron.membership_expiry) < new Date() ? " (Hết hạn)" :
-                     (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000 ? " (Sắp hết hạn)" : ""}
-                  </Typography>
-                </Stack>
+                    {isExpired ? " · Hết hạn" : isSoonExp ? " · Sắp hết" : ""}
+                  </span>
+                </div>
 
-                <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
+                {/* Action row */}
+                <div
+                  className="flex items-center justify-end gap-1 pt-3 border-t border-white/5"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {patron.status === "deleted" ? (
-                    <Button size="small" variant="outlined" color="success" onClick={() => { setRestoreTarget(patron); setRestoreConfirmText(""); }} sx={{ textTransform: "none", fontWeight: 600 }}>
-                      Khôi phục
-                    </Button>
+                    <>
+                      <button
+                        onClick={() => { setRestoreTarget(patron); setRestoreConfirmText(""); }}
+                        className="px-3 py-1.5 text-xs rounded-lg text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 transition-all font-medium"
+                      >
+                        Khôi phục
+                      </button>
+                      <button
+                        onClick={() => { setDeleteTarget(patron); setDeleteConfirmText(""); }}
+                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-all"
+                        title="Xóa vĩnh viễn"
+                      >
+                        <DeleteIcon sx={{ fontSize: 16 }} />
+                      </button>
+                    </>
                   ) : (
                     <>
-                      <IconButton size="small" title="Sửa" onClick={() => openEdit(patron)} sx={{ color: "text.secondary" }}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" title="Gia hạn" onClick={() => { setRenewTarget(patron); setRenewMonths(12); }} sx={{ color: "success.main" }}>
-                        <UpdateIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" title="Chi tiết" onClick={() => router.push(`/patrons/${patron.id}`)} sx={{ color: "text.secondary" }}>
-                        <ChevronRightIcon fontSize="small" />
-                      </IconButton>
+                      <button
+                        onClick={() => openEdit(patron)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-all"
+                        title="Chỉnh sửa"
+                      >
+                        <EditIcon sx={{ fontSize: 16 }} />
+                      </button>
+                      <button
+                        onClick={() => { setRenewTarget(patron); setRenewMonths(12); }}
+                        className="p-1.5 rounded-lg text-emerald-500 hover:bg-emerald-500/10 transition-all"
+                        title="Gia hạn thẻ"
+                      >
+                        <UpdateIcon sx={{ fontSize: 16 }} />
+                      </button>
+                      <button
+                        onClick={() => { setDeleteTarget(patron); setDeleteConfirmText(""); }}
+                        className="p-1.5 rounded-lg text-red-500 hover:bg-red-500/10 transition-all"
+                        title="Xóa"
+                      >
+                        <DeleteIcon sx={{ fontSize: 16 }} />
+                      </button>
+                      <button
+                        onClick={() => router.push(`/patrons/${patron.id}`)}
+                        className="p-1.5 rounded-lg text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                        title="Xem chi tiết"
+                      >
+                        <ChevronRightIcon sx={{ fontSize: 16 }} />
+                      </button>
                     </>
                   )}
-                </Stack>
-              </Stack>
-            </Paper>
-          ))}
-        </Box>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* ─── CREATE DIALOG (full-screen scan-first) ─── */}
-      <Dialog open={showCreate} onClose={closeCreate} fullWidth maxWidth={createStep === "scan" ? "lg" : "sm"}>
-        {createStep === "scan" ? (
-          <>
-            <DialogTitle sx={{ pb: 0 }}>
-              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>Quét thẻ sinh viên</Typography>
-                <IconButton onClick={closeCreate}><CloseIcon /></IconButton>
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                Đặt thẻ sinh viên vào khung hình để tự động nhận dạng thông tin
-              </Typography>
-            </DialogTitle>
-            <DialogContent sx={{ display: "flex", flexDirection: "column", pb: 2 }}>
-              <StudentCardScanner
-                onScanned={handleCardScanned}
-                onError={(msg) => setCreateError(msg)}
-                onSkip={() => { setCreateScan(false); setCreateStep("form"); }}
-                videoSource="ipcamera"
-                ipCameraUrl={CARD_CAM_URL}
-              />
-              {createError && <Alert severity="error" sx={{ mt: 2 }}>{createError}</Alert>}
-            </DialogContent>
-          </>
-        ) : createStep === "form" ? (
-          <>
-            <DialogTitle>
-              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>Thông tin độc giả</Typography>
-                <IconButton onClick={closeCreate}><CloseIcon /></IconButton>
-              </Stack>
-            </DialogTitle>
-            <DialogContent>
-              <Stack spacing={2} sx={{ mt: 1 }}>
-                {scannedFromCard && (
-                  <Alert severity="info" sx={{ fontSize: "0.8rem" }}>Đã điền thông tin từ thẻ sinh viên</Alert>
-                )}
-                {createScan && (
-                  <Button variant="outlined" startIcon={<CameraAltIcon />} onClick={() => setCreateStep("scan")} fullWidth size="small">
-                    Quét lại thẻ
-                  </Button>
-                )}
-                <TextField label="Họ tên" value={createForm.full_name} onChange={(e) => { setCreateForm({ ...createForm, full_name: e.target.value }); setCreateError(""); }} required fullWidth />
-                <TextField label="MSSV" value={createForm.student_code} onChange={(e) => { setCreateForm({ ...createForm, student_code: e.target.value }); setCreateError(""); }} required fullWidth />
-                <TextField label="Lớp" value={createForm.class_name || ""} onChange={(e) => setCreateForm({ ...createForm, class_name: e.target.value })} fullWidth />
-                <TextField label="Khóa học" value={createForm.course || ""} onChange={(e) => setCreateForm({ ...createForm, course: e.target.value })} fullWidth />
-                <TextField label="CMND/CCCD" value={createForm.identity_number || ""} onChange={(e) => setCreateForm({ ...createForm, identity_number: e.target.value })} fullWidth placeholder="Không bắt buộc" />
-                <TextField label="Email" value={createForm.email || ""} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} fullWidth placeholder="Không bắt buộc" />
-                <TextField label="SĐT" value={createForm.phone || ""} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} fullWidth placeholder="Không bắt buộc" />
-                <TextField label="HKTT" value={createForm.permanent_address || ""} onChange={(e) => setCreateForm({ ...createForm, permanent_address: e.target.value })} fullWidth multiline rows={2} />
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
-                  <TextField label="Ngày cấp thẻ" type="date" value={createForm.issue_date} onChange={(e) => setCreateForm({ ...createForm, issue_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
-                  <TextField label="Hạn thẻ" type="date" value={createForm.membership_expiry} onChange={(e) => setCreateForm({ ...createForm, membership_expiry: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+      {/* ─── CREATE DIALOG (full-screen split-pane) ─── */}
+      <Dialog open={showCreate} onClose={closeCreate} fullScreen>
+        <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
+          {/* Header */}
+          <Box sx={{ px: 3, py: 2, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: 1, borderColor: "divider", bgcolor: "background.paper" }}>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>Cấp phát thẻ độc giả mới</Typography>
+            <IconButton onClick={closeCreate} sx={{ bgcolor: "action.hover" }}><CloseIcon /></IconButton>
+          </Box>
+          
+          {/* Body */}
+          <Box sx={{ flex: 1, display: "flex", overflow: "hidden" }}>
+            {/* Left side: Live Preview */}
+            <Box sx={{ flex: 1, bgcolor: "grey.50", display: { xs: "none", md: "flex" }, alignItems: "center", justifyContent: "center", p: 4, borderRight: 1, borderColor: "divider", position: "relative" }}>
+              <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.4, backgroundImage: "radial-gradient(#1976d2 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+              
+              {/* Virtual ID Card */}
+              <Box sx={{ 
+                width: 420, 
+                aspectRatio: "1.586", 
+                borderRadius: 4, 
+                bgcolor: "primary.main", 
+                color: "white", 
+                p: 4, 
+                boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+                position: "relative",
+                overflow: "hidden",
+                background: "linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)",
+                zIndex: 1,
+                transition: "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+                "&:hover": { transform: "scale(1.02)" }
+              }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 4 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: 2 }}>THẺ THƯ VIỆN</Typography>
+                  <SchoolIcon sx={{ opacity: 0.5 }} />
                 </Box>
-                {createError && <Alert severity="error">{createError}</Alert>}
-              </Stack>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2 }}>
-              <Button onClick={closeCreate} color="inherit">Hủy</Button>
-              <Button variant="outlined" onClick={handleSkipFace} disabled={submitting}>
-                {submitting ? <CircularProgress size={18} /> : "Tạo (bỏ qua khuôn mặt)"}
-              </Button>
-              <Button variant="contained" onClick={handleFormNext}>
-                Tiếp tục → Đăng ký khuôn mặt
-              </Button>
-            </DialogActions>
-          </>
-        ) : (
-          <>
-            <DialogTitle>
-              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>Đăng ký khuôn mặt</Typography>
-                <IconButton onClick={closeCreate}><CloseIcon /></IconButton>
-              </Stack>
-            </DialogTitle>
-            <DialogContent>
-              <Stack spacing={2}>
-                <Alert severity="info">Chụp khuôn mặt từ 4 góc để nhận diện tại cổng.</Alert>
-                <MultiAngleCapture consent={true} onFilesReady={handleFaceReady} />
-                {createError && <Alert severity="error">{createError}</Alert>}
-              </Stack>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2 }}>
-              <Button onClick={() => setCreateStep("form")} color="inherit">Quay lại</Button>
-              <Button variant="contained" onClick={handleSkipFace} disabled={submitting}>
-                {submitting ? <CircularProgress size={18} /> : "Bỏ qua + Tạo"}
-              </Button>
-            </DialogActions>
-          </>
-        )}
+                <Stack direction="row" spacing={3} sx={{ alignItems: "center" }}>
+                  <Avatar sx={{ width: 80, height: 80, bgcolor: "rgba(255,255,255,0.2)", fontSize: 32, fontWeight: 700, border: "2px solid rgba(255,255,255,0.4)" }}>
+                    {initials(createForm.full_name || "?")}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 800, textTransform: "uppercase", letterSpacing: 1 }}>{createForm.full_name || "HỌ VÀ TÊN"}</Typography>
+                    <Typography variant="body1" sx={{ opacity: 0.9, fontFamily: "monospace", fontSize: "1.1rem", mt: 0.5 }}>{createForm.student_code || "MSSV"}</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.7, mt: 0.5 }}>{createForm.class_name || "Lớp"}</Typography>
+                  </Box>
+                </Stack>
+                <Box sx={{ position: "absolute", bottom: -20, right: -20, opacity: 0.1 }}>
+                  <SchoolIcon sx={{ fontSize: 160 }} />
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Right side: Stepper and Form */}
+            <Box sx={{ flex: { xs: 1, md: "0 0 500px" }, display: "flex", flexDirection: "column", bgcolor: "background.paper", boxShadow: "-4px 0 24px rgba(0,0,0,0.02)", zIndex: 2 }}>
+              <Box sx={{ p: 4, borderBottom: 1, borderColor: "divider", bgcolor: "background.default" }}>
+                <Stepper activeStep={createStep === "scan" ? 0 : createStep === "form" ? 1 : 2} alternativeLabel>
+                  <Step><StepLabel>Quét thẻ</StepLabel></Step>
+                  <Step><StepLabel>Thông tin</StepLabel></Step>
+                  <Step><StepLabel>Khuôn mặt</StepLabel></Step>
+                </Stepper>
+              </Box>
+              <Box sx={{ flex: 1, overflowY: "auto", p: { xs: 3, md: 5 } }}>
+                {createStep === "scan" && (
+                  <Stack spacing={3}>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Quét thẻ sinh viên</Typography>
+                      <Typography variant="body2" color="text.secondary">Đặt thẻ sinh viên vào camera để hệ thống tự động trích xuất thông tin một cách nhanh chóng.</Typography>
+                    </Box>
+                    <Box sx={{ borderRadius: 3, overflow: "hidden", border: "2px dashed", borderColor: "divider", bgcolor: "grey.50" }}>
+                      <StudentCardScanner
+                        onScanned={handleCardScanned}
+                        onError={(msg) => setCreateError(msg)}
+                        onSkip={() => { setCreateScan(false); setCreateStep("form"); }}
+                        videoSource="ipcamera"
+                        ipCameraUrl={CARD_CAM_URL}
+                      />
+                    </Box>
+                    {createError && <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert>}
+                  </Stack>
+                )}
+                {createStep === "form" && (
+                  <Stack spacing={3}>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Thông tin cá nhân</Typography>
+                      {scannedFromCard ? (
+                        <Alert severity="success" sx={{ borderRadius: 2 }}>Đã trích xuất thông tin thành công từ thẻ sinh viên.</Alert>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">Vui lòng điền thông tin chi tiết của độc giả mới.</Typography>
+                      )}
+                    </Box>
+                    
+                    <Stack spacing={2.5}>
+                      <TextField label="Họ tên" value={createForm.full_name} onChange={(e) => { setCreateForm({ ...createForm, full_name: e.target.value }); setCreateError(""); }} required fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                      <TextField label="MSSV" value={createForm.student_code} onChange={(e) => { setCreateForm({ ...createForm, student_code: e.target.value }); setCreateError(""); }} required fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                      
+                      <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
+                        <Box sx={{ flex: 1 }}><TextField label="Lớp" value={createForm.class_name || ""} onChange={(e) => setCreateForm({ ...createForm, class_name: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} /></Box>
+                        <Box sx={{ flex: 1 }}><TextField label="Khóa học" value={createForm.course || ""} onChange={(e) => setCreateForm({ ...createForm, course: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} /></Box>
+                      </Box>
+                      
+                      <TextField label="CMND/CCCD" value={createForm.identity_number || ""} onChange={(e) => setCreateForm({ ...createForm, identity_number: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                      <TextField label="Email" type="email" value={createForm.email || ""} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                      <TextField label="Số điện thoại" value={createForm.phone || ""} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                      <TextField label="Hộ khẩu thường trú" value={createForm.permanent_address || ""} onChange={(e) => setCreateForm({ ...createForm, permanent_address: e.target.value })} fullWidth multiline rows={2} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                      
+                      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+                        <TextField label="Ngày cấp thẻ" type="date" value={createForm.issue_date} onChange={(e) => setCreateForm({ ...createForm, issue_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} helperText={createForm.course ? "Tự động tính theo khóa" : ""} />
+                        <TextField label="Hạn thẻ" type="date" value={createForm.membership_expiry} onChange={(e) => setCreateForm({ ...createForm, membership_expiry: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} helperText={createForm.course ? "Tự động tính theo khóa" : ""} />
+                      </Box>
+                    </Stack>
+                    {createError && <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert>}
+                  </Stack>
+                )}
+                {createStep === "face" && (
+                  <Stack spacing={3}>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Bảo mật khuôn mặt</Typography>
+                      <Typography variant="body2" color="text.secondary">Vui lòng hướng mặt về phía camera để hệ thống thu thập dữ liệu sinh trắc học dùng cho cổng an ninh.</Typography>
+                    </Box>
+                    <Box sx={{ borderRadius: 3, overflow: "hidden", border: 1, borderColor: "divider", p: 2, bgcolor: "grey.50" }}>
+                      <MultiAngleCapture consent={true} onFilesReady={handleFaceReady} />
+                    </Box>
+                    {createError && <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert>}
+                  </Stack>
+                )}
+              </Box>
+              
+              <Box sx={{ p: { xs: 3, md: 4 }, borderTop: 1, borderColor: "divider", bgcolor: "background.default" }}>
+                {createStep === "scan" && (
+                  <Button variant="contained" fullWidth size="large" onClick={() => { setCreateScan(false); setCreateStep("form"); }} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Nhập thông tin thủ công</Button>
+                )}
+                {createStep === "form" && (
+                  <Stack direction="row" spacing={2}>
+                    <Button variant="outlined" fullWidth onClick={() => setCreateStep("scan")} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Quét lại thẻ</Button>
+                    <Button variant="contained" fullWidth onClick={handleFormNext} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Tiếp tục</Button>
+                  </Stack>
+                )}
+                {createStep === "face" && (
+                  <Stack direction="row" spacing={2}>
+                    <Button variant="outlined" fullWidth onClick={() => setCreateStep("form")} disabled={submitting} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Quay lại</Button>
+                    <Button variant="contained" fullWidth onClick={handleSkipFace} disabled={submitting} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>
+                      {submitting ? <CircularProgress size={24} color="inherit" /> : "Tạo (Bỏ qua Face)"}
+                    </Button>
+                  </Stack>
+                )}
+              </Box>
+            </Box>
+          </Box>
+        </Box>
       </Dialog>
 
       {/* ─── EDIT DRAWER (slide panel) ─── */}
@@ -679,9 +890,40 @@ export default function PatronsPage() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
-        {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
+      <Snackbar open={!!notice} autoHideDuration={4000} onClose={() => setNotice(null)} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
+        {notice ? <Alert onClose={() => setNotice(null)} severity={notice.severity} sx={{ width: "100%" }}>{notice.message}</Alert> : undefined}
       </Snackbar>
-    </Stack>
+
+      {/* ─── OTP DIALOG ─── */}
+      <Dialog open={showOtp} onClose={() => {}}>
+        <DialogTitle>Xác thực Email</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Mã OTP đã được gửi đến <b>{otpEmail}</b>. Vui lòng nhập mã để kích hoạt tài khoản.
+            </Typography>
+            <TextField 
+              label="Mã OTP" 
+              value={otpCode} 
+              onChange={(e) => { setOtpCode(e.target.value); setOtpError(""); }} 
+              fullWidth 
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} 
+            />
+            {otpError && <Alert severity="error">{otpError}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => { 
+            setShowOtp(false); 
+            closeCreate();
+            showNotice("warning", "Đã tạo độc giả (chưa xác thực email).");
+            load(); 
+          }} color="inherit">Để sau</Button>
+          <Button variant="contained" onClick={handleVerifyOtp} disabled={otpSubmitting || !otpCode}>
+            {otpSubmitting ? <CircularProgress size={18} /> : "Xác nhận"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </div>
   );
 }

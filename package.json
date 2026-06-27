@@ -28,7 +28,6 @@
     "framer-motion": "^12.40.0",
     "lucide-react": "^0.454.0",
     "next": "^16.2.9",
-    "partysocket": "^1.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.53.2",
@@ -38,8 +37,9 @@
     "recharts": "^3.8.1",
     "tailwind-merge": "^2.5.4",
     "tesseract.js": "^7.0.0",
-    "three": "^0.184.0",
-    "zod": "^3.23.8"
+    "three": "^0.185.0",
+    "zod": "^3.23.8",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.9.1",

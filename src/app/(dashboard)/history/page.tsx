@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Grid,
@@ -189,29 +188,42 @@ export default function HistoryPage() {
 
   return (
     <Stack spacing={3}>
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack
-          direction={{ xs: "column", lg: "row" }}
-          spacing={2}
-          sx={{ alignItems: { lg: "center" }, justifyContent: "space-between" }}
-        >
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+          border: "1px solid",
+          borderColor: "rgba(99,102,241,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+
+        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <HistoryOutlinedIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          </Avatar>
           <Box>
-            <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-              <HistoryOutlinedIcon color="primary" />
-              <Typography variant="h4" sx={{ fontWeight: 850 }}>
-                Lịch sử ra/vào
-              </Typography>
-            </Stack>
-            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-              Tra cứu log theo độc giả, trạng thái, thời gian và theo dõi live từ camera.
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Lịch sử ra/vào</Typography>
+            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+              Tra cứu log theo độc giả, trạng thái, thời gian và theo dõi live từ camera
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Chip color={live ? "success" : "default"} icon={<SensorsOutlinedIcon />} label={live ? "Live đang bật" : "Live đang tắt"} />
-            <Chip label={`Tổng: ${total}`} />
-          </Stack>
         </Stack>
-      </Paper>
+
+        <Stack direction="row" spacing={1} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Chip icon={<SensorsOutlinedIcon />} label={live ? "Live đang bật" : "Live đang tắt"} sx={{ bgcolor: live ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.08)", color: live ? "#6ee7b7" : "#a5b4fc", border: "1px solid", borderColor: live ? "rgba(16,185,129,0.3)" : "rgba(165,180,252,0.3)", fontWeight: 600 }} />
+          <Chip label={`Tổng: ${total}`} sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "#e0e7ff", border: "1px solid rgba(165,180,252,0.3)", fontWeight: 600 }} />
+        </Stack>
+      </Box>
 
       <Paper variant="outlined" sx={{ p: 2.5 }}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", mb: 2 }}>
@@ -240,6 +252,7 @@ export default function HistoryPage() {
                   ),
                 },
               }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 1.7 }}>
@@ -281,7 +294,13 @@ export default function HistoryPage() {
             />
           </Grid>
           <Grid size={{ xs: 12, md: 1.3 }}>
-            <Button variant="contained" onClick={handleFilter} disabled={loading} fullWidth>
+            <Button
+              variant="contained"
+              onClick={handleFilter}
+              disabled={loading}
+              fullWidth
+              sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}
+            >
               Lọc
             </Button>
           </Grid>
@@ -296,7 +315,7 @@ export default function HistoryPage() {
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 8 }}>
-          <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
+          <Paper variant="outlined" sx={{ p: 2.5, height: "100%", animation: `${fadeInUp} 0.4s ease-out` }}>
             <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", mb: 2 }}>
               <BarChartOutlinedIcon color="disabled" />
               <Typography variant="h6" sx={{ fontWeight: 850 }}>
@@ -349,33 +368,47 @@ export default function HistoryPage() {
 
         <Grid size={{ xs: 12, md: 4 }}>
           <Stack spacing={2} sx={{ height: "100%" }}>
-            <Card variant="outlined" sx={{ flex: 1 }}>
-              <CardContent>
-                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                  <LoginOutlinedIcon color="success" />
-                  <Box>
-                    <Typography color="text.secondary">Lượt vào trong biểu đồ</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 850 }}>{entryTotal}</Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-            <Card variant="outlined" sx={{ flex: 1 }}>
-              <CardContent>
-                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                  <LogoutOutlinedIcon color="warning" />
-                  <Box>
-                    <Typography color="text.secondary">Lượt ra trong biểu đồ</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 850 }}>{exitTotal}</Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
+            <Paper variant="outlined" sx={{
+              p: 2.5, borderRadius: 3, position: "relative", overflow: "hidden", borderColor: "divider",
+              transition: "transform 0.2s, box-shadow 0.2s",
+              animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0s", animationFillMode: "both",
+              "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
+            }}>
+              <Box sx={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", opacity: 0.12, borderRadius: "0 12px 0 80px" }} />
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                <Avatar sx={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", width: 44, height: 44, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+                  <LoginOutlinedIcon />
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Lượt vào trong biểu đồ</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{entryTotal}</Typography>
+                </Box>
+              </Stack>
+              <LinearProgress variant="determinate" value={100} sx={{ mt: 1.5, height: 3, borderRadius: 2, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", borderRadius: 2 } }} />
+            </Paper>
+            <Paper variant="outlined" sx={{
+              p: 2.5, borderRadius: 3, position: "relative", overflow: "hidden", borderColor: "divider",
+              transition: "transform 0.2s, box-shadow 0.2s",
+              animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0.07s", animationFillMode: "both",
+              "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
+            }}>
+              <Box sx={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)", opacity: 0.12, borderRadius: "0 12px 0 80px" }} />
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                <Avatar sx={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)", width: 44, height: 44, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+                  <LogoutOutlinedIcon />
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Lượt ra trong biểu đồ</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{exitTotal}</Typography>
+                </Box>
+              </Stack>
+              <LinearProgress variant="determinate" value={100} sx={{ mt: 1.5, height: 3, borderRadius: 2, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)", borderRadius: 2 } }} />
+            </Paper>
           </Stack>
         </Grid>
       </Grid>
 
-      <Paper variant="outlined" sx={{ overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ overflow: "hidden", animation: `${fadeInUp} 0.4s ease-out` }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ p: 2, alignItems: { md: "center" }, justifyContent: "space-between" }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 850 }}>
@@ -392,14 +425,14 @@ export default function HistoryPage() {
           <Table size="small" sx={{ minWidth: 980 }}>
             <TableHead>
               <TableRow>
-                <TableCell>Thời gian</TableCell>
-                <TableCell>Độc giả</TableCell>
-                <TableCell>MSSV</TableCell>
-                <TableCell>Loại</TableCell>
-                <TableCell>Phương thức</TableCell>
-                <TableCell>Cổng</TableCell>
-                <TableCell>Độ tin cậy</TableCell>
-                <TableCell>Kết quả</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Thời gian</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Độc giả</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>MSSV</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Loại</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Phương thức</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Cổng</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Độ tin cậy</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Kết quả</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

@@ -46,6 +46,8 @@ export interface UserPublic {
   status?: string;
   has_face?: boolean;
   avatar_url?: string | null;
+  phone?: string | null;
+  permanentAddress?: string | null;
 }
 
 export interface RefreshRequest {

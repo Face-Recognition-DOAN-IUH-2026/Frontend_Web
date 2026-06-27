@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import { useAuth } from "@/lib/auth-context";
-import ProfileDialog from "./ProfileDialog";
+import { useRouter } from "next/navigation";
 import BarChartIcon from "@mui/icons-material/BarChartOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
@@ -54,7 +54,6 @@ const circulationItems = [
   { href: "/borrow", label: "Mượn sách", icon: BookPlusIcon },
   { href: "/return", label: "Trả sách", icon: BookReturnIcon },
   { href: "/books", label: "Kho sách", icon: LibraryIcon },
-  { href: "/library/map", label: "Bản đồ 3D", icon: MapIcon },
 ];
 
 const staffItems = [
@@ -70,7 +69,6 @@ const aiItems = [
 
 const staffAiItems = [
   { href: "/ai-assistant", label: "Trợ lý AI", icon: AssistantIcon },
-  { href: "/ai-command-center", label: "AI Command Center", icon: AutoAwesomeIcon },
 ];
 
 const adminItems = [
@@ -129,7 +127,7 @@ function NavSection({ title, items }: { title: string; items: Array<{ href: stri
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const theme = useTheme();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const router = useRouter();
   const role = user?.role || "staff";
   const isAdminOrStaff = role === "admin" || role === "staff";
   const isAdmin = role === "admin";
@@ -174,7 +172,7 @@ export default function Sidebar() {
         <Divider />
 <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", p: 1.5 }}>
           <ButtonBase
-            onClick={() => setProfileOpen(true)}
+            onClick={() => router.push('/profile')}
             sx={{
               borderRadius: 2,
               px: 1,
@@ -208,7 +206,6 @@ export default function Sidebar() {
             <LogoutIcon fontSize="small" />
           </IconButton>
         </Stack>
-        <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
       </Stack>
     </Drawer>
   );

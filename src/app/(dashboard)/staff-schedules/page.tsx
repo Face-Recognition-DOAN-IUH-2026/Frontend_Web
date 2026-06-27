@@ -1,10 +1,38 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  IconButton,
+  LinearProgress,
+  Paper,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+  alpha,
+} from "@mui/material";
+import CalendarIcon from "@mui/icons-material/CalendarTodayOutlined";
+import PrevIcon from "@mui/icons-material/ArrowBack";
+import NextIcon from "@mui/icons-material/ArrowForward";
+import TodayIcon from "@mui/icons-material/TodayOutlined";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import PrintIcon from "@mui/icons-material/PrintOutlined";
+import GroupIcon from "@mui/icons-material/GroupsOutlined";
+import ActiveIcon from "@mui/icons-material/CheckCircleOutlined";
+import TotalIcon from "@mui/icons-material/AssignmentOutlined";
+import StaffIcon from "@mui/icons-material/PersonOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { fadeInUp } from "@/lib/animations";
 import type { ScheduleStaff, LibraryZone, StaffShift, StaffScheduleAssignment } from "@/lib/types";
-import TimetableHeader from "@/components/staff-schedule/TimetableHeader";
 import TimetableGrid from "@/components/staff-schedule/TimetableGrid";
 import TimetableLegend from "@/components/staff-schedule/TimetableLegend";
 import AssignStaffDialog from "@/components/staff-schedule/AssignStaffDialog";
@@ -16,6 +44,12 @@ const FILTERS = [
   { value: "future", label: "Sắp tới" },
   { value: "past", label: "Đã qua" },
 ] as const;
+
+const STAT_GRADIENT = {
+  total: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+  active: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  staff: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+};
 
 function startOfWeek(date = new Date()) {
   const value = new Date(date);
@@ -40,6 +74,12 @@ function toDateInput(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
+function formatDateRange(days: Date[]) {
+  const from = days[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  const to = days[6].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return `${from} — ${to}`;
+}
+
 export default function StaffSchedulesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -53,7 +93,6 @@ export default function StaffSchedulesPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
 
-  // Management state
   const [showManagement, setShowManagement] = useState(false);
   const [assignDialog, setAssignDialog] = useState<{ date: string; shiftId: string; shiftName: string } | null>(null);
 
@@ -88,9 +127,7 @@ export default function StaffSchedulesPage() {
     }
   }, [from, isAdmin, isStaff, to]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const shiftList = useMemo(() => {
     const list = isAdmin
@@ -107,18 +144,8 @@ export default function StaffSchedulesPage() {
     return { total, active };
   }, [assignments]);
 
-  const goPrevWeek = () => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() - 7);
-    setWeekStart(d);
-  };
-
-  const goNextWeek = () => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + 7);
-    setWeekStart(d);
-  };
-
+  const goPrevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); };
+  const goNextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); };
   const goToday = () => setWeekStart(startOfWeek());
 
   const handleCellClick = (date: string, shiftId: string) => {
@@ -128,12 +155,8 @@ export default function StaffSchedulesPage() {
 
   const handleDeleteAssignment = async (id: string) => {
     if (!confirm("Xóa ca trực này?")) return;
-    try {
-      await api.deleteScheduleAssignment(id);
-      await loadData();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    }
+    try { await api.deleteScheduleAssignment(id); await loadData(); }
+    catch (err) { setError(getErrorMessage(err)); }
   };
 
   const handleAutoSchedule = async () => {
@@ -141,103 +164,221 @@ export default function StaffSchedulesPage() {
     try {
       const result = await api.autoSchedule({ from, to });
       const count = result.proposed?.length || 0;
-      if (count === 0) {
-        setError("Không có đề xuất lịch mới");
-        return;
-      }
-      for (const item of result.proposed) {
-        await api.createScheduleAssignment(item);
-      }
+      if (count === 0) { setError("Không có đề xuất lịch mới"); return; }
+      for (const item of result.proposed) { await api.createScheduleAssignment(item); }
       await loadData();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    }
+    } catch (err) { setError(getErrorMessage(err)); }
   };
 
   if (!isStaff) {
     return (
-      <div className="flex items-center justify-center h-64 text-sm text-text-3">
-        Bạn không có quyền xem trang này.
-      </div>
+      <Box sx={{ minHeight: 300, display: "grid", placeItems: "center" }}>
+        <Typography color="text.secondary">Bạn không có quyền xem trang này.</Typography>
+      </Box>
     );
   }
 
+  const isCurrentWeek = toDateInput(days[0]) === toDateInput(getWeekDays(new Date())[0]);
+
   return (
-    <div className="max-w-[1200px] mx-auto py-6 px-4 space-y-5">
-      <TimetableHeader
-        weekStart={weekStart}
-        onPrevWeek={goPrevWeek}
-        onNextWeek={goNextWeek}
-        onToday={goToday}
-        isAdmin={isAdmin}
-        onOpenManagement={() => setShowManagement(true)}
-        onAutoSchedule={handleAutoSchedule}
-      />
+    <Stack spacing={3}>
+      {/* ── Gradient Header ── */}
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+          border: "1px solid",
+          borderColor: "rgba(99,102,241,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
 
-      <div className="flex items-center gap-4 text-xs text-text-3 print:hidden">
-        <span className="font-medium text-text-2">
-          Tổng ca: <span className="text-primary font-bold">{weekStats.total}</span>
-        </span>
-        <span className="w-px h-3 bg-border" />
-        <span>
-          Đang trực: <span className="text-success font-bold">{weekStats.active}</span>
-        </span>
-        <span className="w-px h-3 bg-border" />
-        <span>
-          Nhân viên: <span className="text-text font-bold">{staff.length}</span>
-        </span>
-      </div>
+        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <CalendarIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          </Avatar>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>
+              Lịch trực theo tuần
+            </Typography>
+            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+              {formatDateRange(days)}
+            </Typography>
+          </Box>
+        </Stack>
 
-      <div className="flex items-center gap-1.5 print:hidden">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
-              filter === f.value
-                ? "bg-primary/10 text-primary border-primary/20"
-                : "text-text-3 border-border hover:bg-surface-2"
-            }`}
+        <Stack direction="row" spacing={1} sx={{ zIndex: 1, flexWrap: "wrap" }}>
+          <Tooltip title="Tuần trước">
+            <IconButton onClick={goPrevWeek} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <PrevIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Button
+            onClick={goToday}
+            size="small"
+            variant={isCurrentWeek ? "contained" : "outlined"}
+            startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 700,
+              fontSize: "0.75rem",
+              ...(isCurrentWeek
+                ? { bgcolor: "#6366f1", "&:hover": { bgcolor: "#4f46e5" } }
+                : { color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }
+              ),
+            }}
           >
-            {f.label}
-          </button>
+            Hôm nay
+          </Button>
+          <Tooltip title="Tuần sau">
+            <IconButton onClick={goNextWeek} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <NextIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {isAdmin && (
+            <>
+              <Tooltip title="Gợi ý lịch tự động">
+                <IconButton onClick={handleAutoSchedule} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+                  <AutoAwesomeIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Quản lý ca/khu vực">
+                <IconButton onClick={() => setShowManagement(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+                  <SettingsIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+          <Tooltip title="In lịch">
+            <IconButton onClick={() => window.print()} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <PrintIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
+
+      {/* ── Stat Cards ── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
+        {[
+          { key: "total", label: "Tổng ca tuần", value: weekStats.total, icon: <TotalIcon sx={{ fontSize: 22 }} />, gradient: STAT_GRADIENT.total, pct: 100 },
+          { key: "active", label: "Đang trực", value: weekStats.active, icon: <ActiveIcon sx={{ fontSize: 22 }} />, gradient: STAT_GRADIENT.active, pct: weekStats.total ? (weekStats.active / weekStats.total) * 100 : 0 },
+          { key: "staff", label: "Nhân viên", value: staff.length, icon: <StaffIcon sx={{ fontSize: 22 }} />, gradient: STAT_GRADIENT.staff, pct: 100 },
+        ].map((s, idx) => (
+          <Paper
+            key={s.key}
+            variant="outlined"
+            sx={{
+              p: 2.5,
+              borderRadius: 3,
+              position: "relative",
+              overflow: "hidden",
+              borderColor: "divider",
+              transition: "transform 0.2s, box-shadow 0.2s",
+              animation: `${fadeInUp} 0.4s ease-out`,
+              animationDelay: `${idx * 0.07}s`,
+              animationFillMode: "both",
+              "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
+            }}
+          >
+            <Box sx={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: s.gradient, opacity: 0.12, borderRadius: "0 12px 0 80px" }} />
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+              <Avatar sx={{ background: s.gradient, width: 44, height: 44, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+                {s.icon}
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  {s.label}
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                  {s.value}
+                </Typography>
+              </Box>
+            </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={s.pct}
+              sx={{
+                mt: 1.5, height: 3, borderRadius: 2,
+                bgcolor: "action.hover",
+                "& .MuiLinearProgress-bar": { background: s.gradient, borderRadius: 2 },
+              }}
+            />
+          </Paper>
         ))}
-      </div>
+      </Box>
+
+      {/* ── Filter Chips ── */}
+      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, borderColor: "divider" }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 1, textTransform: "uppercase", letterSpacing: 0.5, fontSize: "0.7rem" }}>
+            Bộ lọc:
+          </Typography>
+          <ToggleButtonGroup
+            value={filter}
+            exclusive
+            onChange={(_, v) => v && setFilter(v)}
+            size="small"
+            sx={{
+              "& .MuiToggleButton-root": {
+                px: 2, py: 0.6,
+                borderRadius: "20px!important",
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.78rem",
+                border: "1px solid",
+                borderColor: "divider",
+              },
+              gap: 0.5,
+            }}
+          >
+            {FILTERS.map((f) => (
+              <ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Stack>
+      </Paper>
 
       {error && (
-        <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-3 py-2 print:hidden">
+        <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>
           {error}
-        </div>
+        </Alert>
       )}
 
-      {/* Print-only header */}
-      <div className="hidden print:block mb-4">
-        <h1 className="font-serif text-2xl font-semibold text-text tracking-tight mb-1">
-          Lịch trực thư viện
-        </h1>
-        <p className="text-sm text-text-2 font-mono">{from} ~ {to}</p>
-      </div>
-
+      {/* ── Timetable Grid ── */}
       {loading ? (
-        <div className="flex items-center justify-center h-64 print:hidden">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs text-text-3">Đang tải lịch trực...</span>
-          </div>
-        </div>
+        <Box sx={{ minHeight: 300, display: "grid", placeItems: "center" }}>
+          <Stack spacing={2} sx={{ alignItems: "center" }}>
+            <CircularProgress sx={{ animation: `${fadeInUp} 0.3s ease-out` }} />
+            <Typography variant="body2" color="text.secondary">Đang tải lịch trực...</Typography>
+          </Stack>
+        </Box>
       ) : (
-        <TimetableGrid
-          days={days}
-          shifts={shiftList}
-          assignments={assignments}
-          filter={filter}
-          isAdmin={isAdmin}
-          onCellClick={isAdmin ? handleCellClick : undefined}
-          onDeleteAssignment={isAdmin ? handleDeleteAssignment : undefined}
-        />
+        <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
+          <TimetableGrid
+            days={days}
+            shifts={shiftList}
+            assignments={assignments}
+            filter={filter}
+            isAdmin={isAdmin}
+            onCellClick={isAdmin ? handleCellClick : undefined}
+            onDeleteAssignment={isAdmin ? handleDeleteAssignment : undefined}
+          />
+        </Paper>
       )}
 
-      <TimetableLegend />
+      {/* ── Legend ── */}
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
+        <TimetableLegend />
+      </Paper>
 
       <AssignStaffDialog
         open={!!assignDialog}
@@ -261,6 +402,6 @@ export default function StaffSchedulesPage() {
         shifts={shiftList}
         onUpdate={loadData}
       />
-    </div>
+    </Stack>
   );
 }

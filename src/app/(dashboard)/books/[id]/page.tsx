@@ -40,8 +40,11 @@ import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
 import MenuBookIcon from "@mui/icons-material/MenuBookOutlined";
 import StarIcon from "@mui/icons-material/StarOutlined";
 import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
+import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import api from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
+import Book3DViewer from "@/components/Book3DViewer";
+import { Dialog, DialogContent, DialogTitle } from "@mui/material";
 
 function StatCard({ label, value, color, icon }: { label: string; value: number; color: "info" | "success" | "warning"; icon: React.ReactNode }) {
   return (
@@ -96,6 +99,7 @@ export default function BookDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [show3D, setShow3D] = useState(false);
 
   useEffect(() => {
     if (!bookId) return;
@@ -231,6 +235,25 @@ export default function BookDetailPage() {
                 >
                   {book.is_available ? "Còn hàng" : "Hết hàng"}
                 </Box>
+                <Button 
+                  variant="contained"
+                  color="primary"
+                  startIcon={<ViewInArIcon />}
+                  onClick={() => setShow3D(true)}
+                  sx={{ 
+                    position: "absolute", 
+                    bottom: 16, 
+                    left: 16, 
+                    right: 16,
+                    width: "auto",
+                    borderRadius: 2,
+                    boxShadow: 3,
+                    bgcolor: "rgba(25, 118, 210, 0.9)",
+                    backdropFilter: "blur(4px)"
+                  }}
+                >
+                  Góc nhìn 3D
+                </Button>
               </Box>
 
               <CardContent sx={{ p: 2.5 }}>
@@ -440,6 +463,18 @@ export default function BookDetailPage() {
             </Stack>
           </Grid>
         </Grid>
+
+        <Dialog open={show3D} onClose={() => setShow3D(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Góc nhìn 3D</Typography>
+            <IconButton onClick={() => setShow3D(false)}>
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers sx={{ p: 0, overflow: 'hidden' }}>
+            {show3D && <Book3DViewer coverUrl={book.cover_url || ""} />}
+          </DialogContent>
+        </Dialog>
       </Box>
     </Box>
   );

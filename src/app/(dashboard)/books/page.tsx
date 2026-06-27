@@ -7,8 +7,6 @@ import {
   Avatar,
   Box,
   Button,
-  Card,
-  CardContent,
   Checkbox,
   Chip,
   CircularProgress,
@@ -20,6 +18,7 @@ import {
   Fade,
   IconButton,
   InputAdornment,
+  LinearProgress,
   Paper,
   Snackbar,
   Stack,
@@ -30,18 +29,21 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
-  useTheme,
 } from "@mui/material";
 import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
+import AssignmentIcon from "@mui/icons-material/AssignmentOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import DownloadIcon from "@mui/icons-material/DownloadOutlined";
+import DescriptionIcon from "@mui/icons-material/DescriptionOutlined";
+import TableChartIcon from "@mui/icons-material/TableChartOutlined";
 import EyeIcon from "@mui/icons-material/VisibilityOutlined";
 import FileIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
+import LibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
 import LockIcon from "@mui/icons-material/LockOutlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
@@ -54,6 +56,13 @@ import IsbnScannerDialog from "@/components/IsbnScannerDialog";
 import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
 
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
+
+const STAT_GRADIENT = {
+  books: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+  copies: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+  available: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  borrowed: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+};
 
 function statusColor(status: string): "success" | "info" | "warning" | "error" | "default" {
   if (["new", "imported"].includes(status)) return "success";
@@ -77,27 +86,7 @@ function statusLabel(status: string) {
   return labels[status] || status;
 }
 
-function MetricCard({ label, value, description, icon: Icon, color }: any) {
-  return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-          <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900 }}>{label}</Typography>
-            <Typography variant="h4" sx={{ fontWeight: 900 }}>{value}</Typography>
-            <Typography variant="caption" color="text.secondary">{description}</Typography>
-          </Box>
-          <Avatar sx={{ bgcolor: color, color: "primary.contrastText" }}>
-            <Icon />
-          </Avatar>
-        </Stack>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function BooksPage() {
-  const theme = useTheme();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [books, setBooks] = useState<BookWithStats[]>([]);
@@ -336,16 +325,117 @@ export default function BooksPage() {
   };
   const displayBooks = searchQuery.trim() ? searchResults : books;
 
+  const statItems = [
+    { label: "TỔNG ĐẦU SÁCH", value: stats.totalBooks, gradient: STAT_GRADIENT.books, icon: BookIcon, pct: total > 0 ? 100 : 0 },
+    { label: "TỔNG BẢN SAO", value: stats.totalCopies, gradient: STAT_GRADIENT.copies, icon: InventoryIcon, pct: stats.totalCopies > 0 ? Math.round((stats.totalCopies / (stats.totalCopies || 1)) * 100) : 0 },
+    { label: "SẴN SÀNG", value: stats.availableCopies, gradient: STAT_GRADIENT.available, icon: CheckIcon, pct: stats.totalCopies > 0 ? Math.round((stats.availableCopies / stats.totalCopies) * 100) : 0 },
+    { label: "ĐANG MƯỢN", value: stats.borrowedCopies, gradient: STAT_GRADIENT.borrowed, icon: AssignmentIcon, pct: stats.totalCopies > 0 ? Math.round((stats.borrowedCopies / stats.totalCopies) * 100) : 0 },
+  ];
+
   return (
     <Stack spacing={3}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
-        <MetricCard label="Tổng đầu sách" value={stats.totalBooks} icon={BookIcon} color={theme.palette.primary.main} description="Trong hệ thống" />
-        <MetricCard label="Tổng bản sao" value={stats.totalCopies} icon={InventoryIcon} color={theme.palette.info.main} description="Tất cả các bản" />
-        <MetricCard label="Sẵn sàng" value={stats.availableCopies} icon={CheckIcon} color={theme.palette.success.main} description="Có thể mượn" />
-        <MetricCard label="Đang được mượn" value={stats.borrowedCopies} icon={AlertIcon} color={theme.palette.warning.main} description="Đang lưu hành" />
+      {/* Gradient Header */}
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+          border: "1px solid",
+          borderColor: "rgba(99,102,241,0.3)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+
+        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <LibraryIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          </Avatar>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Quản lý sách</Typography>
+            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+              {total} đầu sách trong hệ thống
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={1} sx={{ zIndex: 1, flexWrap: "wrap" }}>
+          <Tooltip title="Tải lại">
+            <IconButton
+              onClick={() => { setPage(0); setSearchQuery(""); loadBooks(); }}
+              size="small"
+              sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}
+            >
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Tải mẫu">
+            <IconButton
+              onClick={() => api.downloadBookTemplate()}
+              size="small"
+              sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}
+            >
+              <DescriptionIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Xuất Excel">
+            <IconButton
+              onClick={() => api.exportBooks()}
+              size="small"
+              sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}
+            >
+              <TableChartIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
       </Box>
 
-      <Paper variant="outlined" sx={{ p: 2 }}>
+      {/* Stat Cards */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
+        {statItems.map((item, idx) => (
+          <Paper
+            key={item.label}
+            variant="outlined"
+            sx={{
+              borderRadius: 3,
+              position: "relative",
+              overflow: "hidden",
+              p: 2.5,
+              transition: "all 0.25s ease",
+              animation: `${fadeInUp} 0.5s ease-out`,
+              animationDelay: `${idx * 0.07}s`,
+              animationFillMode: "both",
+              "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
+            }}
+          >
+            <Box sx={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: item.gradient, opacity: 0.12, pointerEvents: "none" }} />
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 1.5 }}>
+              <Avatar sx={{ background: item.gradient, width: 44, height: 44 }}>
+                <item.icon sx={{ color: "#fff", fontSize: 22 }} />
+              </Avatar>
+              <Typography variant="caption" sx={{ fontWeight: 600, textTransform: "uppercase", color: "text.secondary", letterSpacing: 0.5 }}>
+                {item.label}
+              </Typography>
+            </Stack>
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>{item.value}</Typography>
+            <LinearProgress
+              variant="determinate"
+              value={item.pct}
+              sx={{ height: 3, borderRadius: 2, bgcolor: "rgba(99,102,241,0.08)", "& .MuiLinearProgress-bar": { background: item.gradient, borderRadius: 2 } }}
+            />
+          </Paper>
+        ))}
+      </Box>
+
+      {/* Search Bar */}
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
         <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ alignItems: { lg: "center" } }}>
           <TextField
             value={searchQuery}
@@ -353,6 +443,7 @@ export default function BooksPage() {
             placeholder="Tìm kiếm sách theo ISBN, tên, tác giả..."
             size="small"
             fullWidth
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
             slotProps={{
               input: {
                 startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
@@ -366,29 +457,53 @@ export default function BooksPage() {
           />
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
-            <Button variant="contained" startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Nhập Excel</Button>
-            <Button variant="contained" color="secondary" startIcon={<QrCodeScannerIcon />} onClick={() => setIsbnScannerOpen(true)}>Quét ISBN</Button>
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => { setPage(0); setSearchQuery(""); loadBooks(); }}>Tải lại</Button>
-            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.downloadBookTemplate()}>Tải mẫu</Button>
-            <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => api.exportBooks()}>Xuất Excel</Button>
+            <Button
+              variant="contained"
+              startIcon={<UploadIcon />}
+              onClick={() => fileInputRef.current?.click()}
+              sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}
+            >
+              Nhập Excel
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<QrCodeScannerIcon />}
+              onClick={() => setIsbnScannerOpen(true)}
+              sx={{ background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", "&:hover": { background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)" } }}
+            >
+              Quét ISBN
+            </Button>
           </Stack>
         </Stack>
       </Paper>
 
+      {/* Search Results Info */}
       {searchQuery.trim() ? (
-        <Alert
-          severity="info"
-          action={searchResults.length > 0 ? <Button color="inherit" size="small" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()}>In mã vạch</Button> : undefined}
-        >
-          Kết quả tìm kiếm: {searchResults.length} cuốn sách
-        </Alert>
+        <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, borderColor: "divider", bgcolor: "rgba(99,102,241,0.04)" }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <SearchIcon sx={{ fontSize: 18, color: "primary.main" }} />
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Kết quả tìm kiếm: <strong>{searchResults.length}</strong> cuốn sách
+              </Typography>
+            </Stack>
+            {searchResults.length > 0 && (
+              <Button color="primary" size="small" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()} sx={{ textTransform: "none", fontWeight: 600 }}>
+                In mã vạch
+              </Button>
+            )}
+          </Stack>
+        </Paper>
       ) : null}
 
+      {/* Preview Section */}
       {previewFile ? (
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
           <Stack direction={{ xs: "column", sm: "row" }} sx={{ justifyContent: "space-between", gap: 1.5, mb: 2 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <FileIcon color="primary" />
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+              <Avatar sx={{ bgcolor: "primary.main", width: 40, height: 40 }}>
+                <FileIcon sx={{ color: "#fff", fontSize: 22 }} />
+              </Avatar>
               <Box>
                 <Typography variant="h6">Xem trước: {previewFile.name}</Typography>
                 <Typography variant="body2" color="text.secondary">Kiểm tra dữ liệu trước khi nhập kho</Typography>
@@ -425,11 +540,11 @@ export default function BooksPage() {
                   </Button>
                 )}
               </Stack>
-              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320 }}>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, borderRadius: 2 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
-                    <TableRow sx={{ "& > th": { bgcolor: theme.palette.mode === "dark" ? "#1a1a1a" : "#f5f5f5" } }}>
-                      <TableCell padding="checkbox">
+                    <TableRow>
+                      <TableCell padding="checkbox" sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>
                         <Checkbox
                           size="small"
                           indeterminate={selectedPreviewIndices.size > 0 && selectedPreviewIndices.size < (previewData?.filter(r => r.status !== "invalid").length ?? 0)}
@@ -443,14 +558,14 @@ export default function BooksPage() {
                           }}
                         />
                       </TableCell>
-                      <TableCell>ISBN</TableCell>
-                      <TableCell>Tên sách</TableCell>
-                      <TableCell>Tác giả</TableCell>
-                      <TableCell>NXB</TableCell>
-                      <TableCell>Số lượng</TableCell>
-                      <TableCell>Mã vạch mẫu</TableCell>
-                      <TableCell>Trạng thái</TableCell>
-                      <TableCell align="center">Xóa</TableCell>
+                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>ISBN</TableCell>
+                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Tên sách</TableCell>
+                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Tác giả</TableCell>
+                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>NXB</TableCell>
+                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Số lượng</TableCell>
+                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Mã vạch mẫu</TableCell>
+                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Trạng thái</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Xóa</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -471,6 +586,9 @@ export default function BooksPage() {
                             "&:hover .preview-delete-btn": { opacity: 1 },
                             "& > td": { py: 0.5 },
                             cursor: isInvalid ? "default" : "pointer",
+                            animation: `${slideInRight} 0.3s ease-out`,
+                            animationDelay: `${index * 0.03}s`,
+                            animationFillMode: "both",
                           }}
                         >
                           <TableCell padding="checkbox">
@@ -530,6 +648,7 @@ export default function BooksPage() {
         </Paper>
       ) : null}
 
+      {/* Import Results */}
       {showResults && importResults ? (
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="h6">Kết quả nhập kho</Typography>
@@ -567,6 +686,7 @@ export default function BooksPage() {
         </Paper>
       ) : null}
 
+      {/* Recently Printed */}
       {recentlyPrinted.length > 0 ? (
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="h6">Mã vạch sẵn sàng in ({recentlyPrinted.length})</Typography>
@@ -576,12 +696,13 @@ export default function BooksPage() {
         </Paper>
       ) : null}
 
-      <Paper variant="outlined">
+      {/* Main Book Table */}
+      <Paper variant="outlined" sx={{ borderRadius: 3, animation: `${fadeInUp} 0.5s ease-out` }}>
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell padding="checkbox">
+                <TableCell padding="checkbox" sx={{ fontWeight: 700 }}>
                   <Checkbox
                     size="small"
                     checked={displayBooks.length > 0 && selectedIds.size === displayBooks.length}
@@ -589,13 +710,13 @@ export default function BooksPage() {
                     onChange={handleToggleSelectAll}
                   />
                 </TableCell>
-                <TableCell>ISBN</TableCell>
-                <TableCell>Tiêu đề</TableCell>
-                <TableCell>Tác giả</TableCell>
-                <TableCell>NXB</TableCell>
-                <TableCell align="center">Tổng</TableCell>
-                <TableCell align="center">Sẵn sàng</TableCell>
-                <TableCell align="center">Mượn</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>ISBN</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Tiêu đề</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Tác giả</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>NXB</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700 }}>Tổng</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700 }}>Sẵn sàng</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700 }}>Mượn</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -611,7 +732,6 @@ export default function BooksPage() {
                 </TableRow>
               ) : displayBooks.map((book, idx) => {
                 const isSelected = selectedIds.has(book.id);
-                const hasBorrowed = book.total_copies - book.available_copies > 0;
                 return (
                 <TableRow
                   key={book.id}
@@ -673,6 +793,7 @@ export default function BooksPage() {
         ) : null}
       </Paper>
 
+      {/* Quantity Edit Dialog */}
       <Dialog open={!!selectedBook} onClose={() => setSelectedBook(null)} fullWidth maxWidth="sm">
         <DialogTitle>Sửa số lượng sách</DialogTitle>
         <DialogContent>
@@ -726,16 +847,19 @@ export default function BooksPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Snackbar */}
       <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
         {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
       </Snackbar>
 
+      {/* ISBN Scanner Dialog */}
       <IsbnScannerDialog
         open={isbnScannerOpen}
         onClose={() => setIsbnScannerOpen(false)}
         onImportComplete={handleIsbnImportComplete}
       />
 
+      {/* Floating Selection Bar */}
       <Fade in={selectedIds.size > 0}>
         <Paper
           elevation={8}
@@ -786,6 +910,7 @@ export default function BooksPage() {
         </Paper>
       </Fade>
 
+      {/* Delete Confirm Dialog */}
       <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <AlertIcon sx={{ color: "warning.main" }} />
@@ -841,6 +966,7 @@ export default function BooksPage() {
         </DialogActions>
       </Dialog>
 
+      {/* Delete Preview Dialog */}
       <Dialog open={deletePreviewOpen} onClose={() => setDeletePreviewOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <AlertIcon sx={{ color: "warning.main" }} />
