@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Library, Users, BookOpen, ScanFace, ArrowRight } from "lucide-react";
+import { Library, Users, BookOpen, ScanFace, ArrowRight, Compass } from "lucide-react";
 import { motion } from "framer-motion";
 
 const features = [
@@ -84,6 +84,13 @@ export default function LandingOverlay() {
             >
               Truy cập hệ thống
               <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/library/vr-tour"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-white/20 hover:border-white/40 text-white rounded-lg font-medium hover:bg-white/5 transition-all shadow-lg"
+            >
+              <Compass className="w-4 h-4 text-blue-400" />
+              Tham quan 3D
             </Link>
           </div>
         </motion.section>
