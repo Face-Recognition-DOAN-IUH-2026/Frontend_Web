@@ -1091,6 +1091,105 @@ class ApiClient {
     return response.data;
   }
 
+  // === Admin Schedule Operations ===
+  async getScheduleAvailability(filters?: { staffId?: string; status?: string }): Promise<StaffAvailabilityRequest[]> {
+    const query: any = {};
+    if (filters?.staffId) query.staff_id = filters.staffId;
+    if (filters?.status) query.status = filters.status;
+    const response = await this.client.get<StaffAvailabilityRequest[]>("/api/schedules/availability", { params: query });
+    return response.data;
+  }
+
+  async approveScheduleAvailability(id: string): Promise<StaffAvailabilityRequest> {
+    const response = await this.client.post<StaffAvailabilityRequest>(`/api/schedules/availability/${id}/approve`);
+    return response.data;
+  }
+
+  async rejectScheduleAvailability(id: string): Promise<StaffAvailabilityRequest> {
+    const response = await this.client.post<StaffAvailabilityRequest>(`/api/schedules/availability/${id}/reject`);
+    return response.data;
+  }
+
+  async listAllBids(filters?: { staffId?: string; status?: string }): Promise<ShiftBid[]> {
+    const query: any = {};
+    if (filters?.staffId) query.staff_id = filters.staffId;
+    if (filters?.status) query.status = filters.status;
+    const response = await this.client.get<ShiftBid[]>("/api/schedules/bids", { params: query });
+    return response.data;
+  }
+
+  async approveBid(id: string): Promise<ShiftBid> {
+    const response = await this.client.post<ShiftBid>(`/api/schedules/bids/${id}/approve`);
+    return response.data;
+  }
+
+  async rejectBid(id: string): Promise<ShiftBid> {
+    const response = await this.client.post<ShiftBid>(`/api/schedules/bids/${id}/reject`);
+    return response.data;
+  }
+
+  async listAllSwaps(filters?: { status?: string }): Promise<ShiftSwap[]> {
+    const query: any = {};
+    if (filters?.status) query.status = filters.status;
+    const response = await this.client.get<ShiftSwap[]>("/api/schedules/swaps", { params: query });
+    return response.data;
+  }
+
+  async adminConfirmAssignment(id: string): Promise<StaffScheduleAssignment> {
+    const response = await this.client.post<StaffScheduleAssignment>(`/api/schedules/assignments/${id}/admin-confirm`);
+    return response.data;
+  }
+
+  async adminFixAttendance(scheduleId: string, data: { checkInAt?: string; checkOutAt?: string; status?: string }): Promise<any> {
+    const response = await this.client.put(`/api/schedules/assignments/${scheduleId}/attendance`, data);
+    return response.data;
+  }
+
+  async autoCheckout(): Promise<{ checkedOut: number }> {
+    const response = await this.client.post<{ checkedOut: number }>("/api/schedules/auto-checkout");
+    return response.data;
+  }
+
+  async getAuditLogs(params?: {
+    page?: number; limit?: number; action?: string; entityType?: string;
+    actorId?: string; fromDate?: string; toDate?: string; search?: string;
+  }): Promise<{ items: any[]; total: number; page: number; limit: number; totalPages: number }> {
+    const query: any = {};
+    if (params?.page) query.page = params.page;
+    if (params?.limit) query.limit = params.limit;
+    if (params?.action) query.action = params.action;
+    if (params?.entityType) query.entityType = params.entityType;
+    if (params?.actorId) query.actorId = params.actorId;
+    if (params?.fromDate) query.fromDate = params.fromDate;
+    if (params?.toDate) query.toDate = params.toDate;
+    if (params?.search) query.search = params.search;
+    const response = await this.client.get<any>("/api/schedules/audit-logs", { params: query });
+    return response.data;
+  }
+
+  async getAuditStats(params?: { fromDate?: string; toDate?: string }): Promise<any> {
+    const query: any = {};
+    if (params?.fromDate) query.fromDate = params.fromDate;
+    if (params?.toDate) query.toDate = params.toDate;
+    const response = await this.client.get<any>("/api/schedules/audit-logs/stats", { params: query });
+    return response.data;
+  }
+
+  async getScheduleTemplates(): Promise<any[]> {
+    const response = await this.client.get<any[]>("/api/schedules/templates");
+    return response.data;
+  }
+
+  async createScheduleTemplate(data: any): Promise<any> {
+    const response = await this.client.post<any>("/api/schedules/templates", data);
+    return response.data;
+  }
+
+  async deleteScheduleTemplate(id: string): Promise<any> {
+    const response = await this.client.delete(`/api/schedules/templates/${id}`);
+    return response.data;
+  }
+
   async getAiCommandCenterSummary(): Promise<AiCommandCenterSummary> {
     const response = await this.client.get<AiCommandCenterSummary>("/api/ai/command-center/summary");
     return response.data;

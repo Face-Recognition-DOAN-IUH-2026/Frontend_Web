@@ -29,6 +29,9 @@ import GroupIcon from "@mui/icons-material/GroupsOutlined";
 import ActiveIcon from "@mui/icons-material/CheckCircleOutlined";
 import TotalIcon from "@mui/icons-material/AssignmentOutlined";
 import StaffIcon from "@mui/icons-material/PersonOutlined";
+import MapIcon from "@mui/icons-material/PinDropOutlined";
+import HistoryIcon from "@mui/icons-material/HistoryOutlined";
+import LeaveIcon from "@mui/icons-material/BeachAccessOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { fadeInUp } from "@/lib/animations";
@@ -37,6 +40,17 @@ import TimetableGrid from "@/components/staff-schedule/TimetableGrid";
 import TimetableLegend from "@/components/staff-schedule/TimetableLegend";
 import AssignStaffDialog from "@/components/staff-schedule/AssignStaffDialog";
 import ScheduleManagementPanel from "@/components/staff-schedule/ScheduleManagementPanel";
+import AvailabilityDialog from "@/components/staff-schedule/AvailabilityDialog";
+import OpenShiftsPanel from "@/components/staff-schedule/OpenShiftsPanel";
+import MySwapsPanel from "@/components/staff-schedule/MySwapsPanel";
+import SwapRequestDialog from "@/components/staff-schedule/SwapRequestDialog";
+import AutoScheduleDialog from "@/components/staff-schedule/AutoScheduleDialog";
+import LeaveApprovalPanel from "@/components/staff-schedule/LeaveApprovalPanel";
+import BidsReviewPanel from "@/components/staff-schedule/BidsReviewPanel";
+import SwapsViewPanel from "@/components/staff-schedule/SwapsViewPanel";
+import AuditLogsPanel from "@/components/staff-schedule/AuditLogsPanel";
+import GeofenceConfigPanel from "@/components/staff-schedule/GeofenceConfigPanel";
+import TemplateManagementPanel from "@/components/staff-schedule/TemplateManagementPanel";
 
 const FILTERS = [
   { value: "all", label: "Tất cả" },
@@ -92,9 +106,22 @@ export default function StaffSchedulesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
+  const [zoneFilter, setZoneFilter] = useState("");
+  const [shiftFilter, setShiftFilter] = useState("");
 
   const [showManagement, setShowManagement] = useState(false);
   const [assignDialog, setAssignDialog] = useState<{ date: string; shiftId: string; shiftName: string } | null>(null);
+  const [showAvailability, setShowAvailability] = useState(false);
+  const [showSwapRequest, setShowSwapRequest] = useState(false);
+  const [swapRefreshKey, setSwapRefreshKey] = useState(0);
+  const [showLeaveApproval, setShowLeaveApproval] = useState(false);
+  const [showBidsReview, setShowBidsReview] = useState(false);
+  const [showSwapsView, setShowSwapsView] = useState(false);
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
+  const [showGeofence, setShowGeofence] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
+  const [autoLoading, setAutoLoading] = useState(false);
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
   const from = toDateInput(days[0]);
@@ -117,8 +144,16 @@ export default function StaffSchedulesPage() {
         setShifts(shiftResult.filter((s) => s.isActive));
         setAssignments(assignmentResult.items);
       } else {
-        const result = await api.getMySchedules({ from, to });
+        const [result, staffResult, shiftResult, zoneResult] = await Promise.all([
+          api.getMySchedules({ from, to }),
+          api.getScheduleStaffOptions(),
+          api.getScheduleShifts(),
+          api.getScheduleZones(),
+        ]);
         setAssignments(result.items);
+        setStaff(staffResult.filter((s) => s.role === "admin" || s.role === "staff"));
+        setShifts(shiftResult.filter((s) => s.isActive));
+        setZones(zoneResult.filter((z) => z.isActive));
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -130,13 +165,21 @@ export default function StaffSchedulesPage() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const shiftList = useMemo(() => {
-    const list = isAdmin
-      ? shifts
-      : Array.from(new Set(assignments.map((a) => a.shiftId)))
-          .map((id) => assignments.find((a) => a.shiftId === id)?.shift)
-          .filter(Boolean) as StaffShift[];
-    return [...list].sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
-  }, [shifts, assignments, isAdmin]);
+    return [...shifts].sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+  }, [shifts]);
+
+  const filteredAssignments = useMemo(() => {
+    return assignments.filter((a) => {
+      if (zoneFilter && a.zoneId !== zoneFilter) return false;
+      if (shiftFilter && a.shiftId !== shiftFilter) return false;
+      return true;
+    });
+  }, [assignments, zoneFilter, shiftFilter]);
+
+  const filteredShifts = useMemo(() => {
+    if (!shiftFilter) return shiftList;
+    return shiftList.filter((s) => s.id === shiftFilter);
+  }, [shiftList, shiftFilter]);
 
   const weekStats = useMemo(() => {
     const total = assignments.filter((a) => a.status !== "cancelled").length;
@@ -159,15 +202,17 @@ export default function StaffSchedulesPage() {
     catch (err) { setError(getErrorMessage(err)); }
   };
 
-  const handleAutoSchedule = async () => {
+  const handleAutoSchedule = async (autoFrom: string, autoTo: string) => {
+    setAutoLoading(true);
     setError(null);
     try {
-      const result = await api.autoSchedule({ from, to });
+      const result = await api.autoSchedule({ from: autoFrom, to: autoTo });
       const count = result.proposed?.length || 0;
-      if (count === 0) { setError("Không có đề xuất lịch mới"); return; }
+      if (count === 0) { setError("Không có đề xuất lịch mới"); setAutoLoading(false); return; }
       for (const item of result.proposed) { await api.createScheduleAssignment(item); }
       await loadData();
     } catch (err) { setError(getErrorMessage(err)); }
+    setAutoLoading(false);
   };
 
   if (!isStaff) {
@@ -247,13 +292,57 @@ export default function StaffSchedulesPage() {
           {isAdmin && (
             <>
               <Tooltip title="Gợi ý lịch tự động">
-                <IconButton onClick={handleAutoSchedule} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+                <IconButton onClick={() => setShowAutoSchedule(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
                   <AutoAwesomeIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Quản lý ca/khu vực">
                 <IconButton onClick={() => setShowManagement(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
                   <SettingsIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Duyệt đơn nghỉ">
+                <IconButton onClick={() => setShowLeaveApproval(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+                  <LeaveIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Duyệt đăng ký ca">
+                <IconButton onClick={() => setShowBidsReview(true)} size="small" sx={{ color: "#10b981", border: "1px solid rgba(16,185,129,0.3)", "&:hover": { bgcolor: "rgba(16,185,129,0.1)" } }}>
+                  <ActiveIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Đổi ca chờ xử lý">
+                <IconButton onClick={() => setShowSwapsView(true)} size="small" sx={{ color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)", "&:hover": { bgcolor: "rgba(59,130,246,0.1)" } }}>
+                  <GroupIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Mẫu lịch">
+                <IconButton onClick={() => setShowTemplates(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+                  <TotalIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Geofence">
+                <IconButton onClick={() => setShowGeofence(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+                  <MapIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Nhật ký">
+                <IconButton onClick={() => setShowAuditLogs(true)} size="small" sx={{ color: "#6b7280", border: "1px solid rgba(107,114,128,0.3)", "&:hover": { bgcolor: "rgba(107,114,128,0.1)" } }}>
+                  <HistoryIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+          {!isAdmin && (
+            <>
+              <Tooltip title="Xin nghỉ">
+                <IconButton onClick={() => setShowAvailability(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+                  <TodayIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Đổi ca">
+                <IconButton onClick={() => setShowSwapRequest(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+                  <GroupIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             </>
@@ -344,6 +433,50 @@ export default function StaffSchedulesPage() {
               <ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>
             ))}
           </ToggleButtonGroup>
+
+          {/* Lọc theo Khu vực */}
+          <select
+            value={zoneFilter}
+            onChange={(e) => setZoneFilter(e.target.value)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: "20px",
+              border: "1px solid rgba(165,180,252,0.3)",
+              backgroundColor: "transparent",
+              color: "#a5b4fc",
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              outline: "none",
+            }}
+          >
+            <option value="" style={{ backgroundColor: "#1e1b4b", color: "#a5b4fc" }}>Tất cả khu vực</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id} style={{ backgroundColor: "#1e1b4b", color: "#a5b4fc" }}>{z.zoneName}</option>
+            ))}
+          </select>
+
+          {/* Lọc theo Ca */}
+          <select
+            value={shiftFilter}
+            onChange={(e) => setShiftFilter(e.target.value)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: "20px",
+              border: "1px solid rgba(165,180,252,0.3)",
+              backgroundColor: "transparent",
+              color: "#a5b4fc",
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              outline: "none",
+            }}
+          >
+            <option value="" style={{ backgroundColor: "#1e1b4b", color: "#a5b4fc" }}>Tất cả ca trực</option>
+            {shiftList.map((s) => (
+              <option key={s.id} value={s.id} style={{ backgroundColor: "#1e1b4b", color: "#a5b4fc" }}>{s.name}</option>
+            ))}
+          </select>
         </Stack>
       </Paper>
 
@@ -365,8 +498,8 @@ export default function StaffSchedulesPage() {
         <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
           <TimetableGrid
             days={days}
-            shifts={shiftList}
-            assignments={assignments}
+            shifts={filteredShifts}
+            assignments={filteredAssignments}
             filter={filter}
             isAdmin={isAdmin}
             onCellClick={isAdmin ? handleCellClick : undefined}
@@ -391,6 +524,9 @@ export default function StaffSchedulesPage() {
         existingAssignments={assignments.filter(
           (a) => a.shiftId === assignDialog?.shiftId && a.workDate === assignDialog?.date && a.status !== "cancelled"
         )}
+        dayAssignments={assignments.filter(
+          (a) => a.workDate === assignDialog?.date && a.status !== "cancelled"
+        )}
         onClose={() => setAssignDialog(null)}
         onAssigned={() => { setAssignDialog(null); loadData(); }}
       />
@@ -402,6 +538,39 @@ export default function StaffSchedulesPage() {
         shifts={shiftList}
         onUpdate={loadData}
       />
+
+      <AvailabilityDialog
+        open={showAvailability}
+        onClose={() => setShowAvailability(false)}
+        onSubmitted={() => { setShowAvailability(false); loadData(); }}
+      />
+
+      <SwapRequestDialog
+        open={showSwapRequest}
+        onClose={() => setShowSwapRequest(false)}
+        onSubmitted={() => { setShowSwapRequest(false); setSwapRefreshKey((k) => k + 1); loadData(); }}
+        myAssignments={assignments}
+        allStaff={staff}
+      />
+
+      {/* ── Staff Panels (non-admin) ── */}
+      {!isAdmin && (
+        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, borderColor: "divider" }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
+            Đổi ca chờ xử lý
+          </Typography>
+          <MySwapsPanel refreshKey={swapRefreshKey} />
+        </Paper>
+      )}
+
+      {/* ── Admin Panels ── */}
+      <LeaveApprovalPanel open={showLeaveApproval} onClose={() => setShowLeaveApproval(false)} onUpdated={loadData} />
+      <BidsReviewPanel open={showBidsReview} onClose={() => setShowBidsReview(false)} onUpdated={loadData} />
+      <SwapsViewPanel open={showSwapsView} onClose={() => setShowSwapsView(false)} />
+      <AuditLogsPanel open={showAuditLogs} onClose={() => setShowAuditLogs(false)} />
+      <GeofenceConfigPanel open={showGeofence} onClose={() => setShowGeofence(false)} zones={zones} onUpdated={loadData} />
+      <TemplateManagementPanel open={showTemplates} onClose={() => setShowTemplates(false)} zones={zones} shifts={shifts} staff={staff} onUpdated={loadData} />
+      <AutoScheduleDialog open={showAutoSchedule} onClose={() => setShowAutoSchedule(false)} onConfirm={handleAutoSchedule} loading={autoLoading} />
     </Stack>
   );
 }

@@ -31,7 +31,7 @@ export default function AssignmentCard({ assignment, onDelete }: AssignmentCardP
   const [hover, setHover] = useState(false);
   const status = getStatus(assignment);
   const style = STATUS_STYLES[status];
-  const displayName = assignment.staff?.fullName || assignment.staff?.email || assignment.staffId;
+  const displayName = assignment.staff?.fullName || assignment.staff?.email || "Nhân viên";
   const zoneName = assignment.zone?.zoneName || "";
 
   return (

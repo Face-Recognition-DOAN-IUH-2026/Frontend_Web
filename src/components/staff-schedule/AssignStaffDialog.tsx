@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api-client";
 import type { ScheduleStaff, StaffShift, LibraryZone, StaffScheduleAssignment } from "@/lib/types";
 
@@ -13,17 +13,37 @@ interface AssignStaffDialogProps {
   zones: LibraryZone[];
   staff: ScheduleStaff[];
   existingAssignments: StaffScheduleAssignment[];
+  dayAssignments: StaffScheduleAssignment[];
   onClose: () => void;
   onAssigned: () => void;
 }
 
 export default function AssignStaffDialog({
-  open, date, shiftId, shiftName, shifts, zones, staff, existingAssignments, onClose, onAssigned,
+  open,
+  date,
+  shiftId,
+  shiftName,
+  shifts,
+  zones,
+  staff,
+  existingAssignments,
+  dayAssignments,
+  onClose,
+  onAssigned,
 }: AssignStaffDialogProps) {
   const [zoneId, setZoneId] = useState("");
   const [staffId, setStaffId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [approvedLeaves, setApprovedLeaves] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      api.getScheduleAvailability({ status: "approved" })
+        .then(setApprovedLeaves)
+        .catch((err) => console.error("Failed to load approved leaves", err));
+    }
+  }, [open]);
 
   const shift = useMemo(() => shifts.find((s) => s.id === shiftId), [shifts, shiftId]);
 
@@ -60,6 +80,30 @@ export default function AssignStaffDialog({
     } finally {
       setSaving(false);
     }
+  };
+
+  const getStaffLabel = (s: ScheduleStaff) => {
+    const isLeave = approvedLeaves.some(
+      (l) => l.staffId === s.id && date >= l.dateFrom && date <= l.dateTo
+    );
+    const existAsg = dayAssignments.find((a) => a.staffId === s.id);
+    if (isLeave) {
+      return `${s.fullName || s.email} (⚠️ Xin nghỉ phép)`;
+    }
+    if (existAsg) {
+      const existShift = shifts.find((sh) => sh.id === existAsg.shiftId);
+      const newStart = shift?.startTime?.slice(0, 5);
+      const newEnd = shift?.endTime?.slice(0, 5);
+      const existStart = existShift?.startTime?.slice(0, 5);
+      const existEnd = existShift?.endTime?.slice(0, 5);
+      const isOverlap = newStart && newEnd && existStart && existEnd && (newStart < existEnd && newEnd > existStart);
+      
+      if (isOverlap) {
+        return `${s.fullName || s.email} (⚠️ Trùng ca: ${existShift?.name || existAsg.shiftId})`;
+      }
+      return `${s.fullName || s.email} (Đã có ca: ${existShift?.name || existAsg.shiftId})`;
+    }
+    return s.fullName || s.email;
   };
 
   if (!open) return null;
@@ -110,7 +154,7 @@ export default function AssignStaffDialog({
             >
               <option value="">Chọn nhân viên</option>
               {availableStaff.map((s) => (
-                <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
+                <option key={s.id} value={s.id}>{getStaffLabel(s)}</option>
               ))}
               {availableStaff.length === 0 && (
                 <option disabled>Tất cả nhân viên đã được xếp</option>
