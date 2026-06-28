@@ -119,7 +119,7 @@ export default function ScheduleManagementPanel({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 flex justify-end" style={{ zIndex: 1300 }}>
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-surface w-80 h-full shadow-xl border-l border-border flex flex-col animate-slide-in">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
