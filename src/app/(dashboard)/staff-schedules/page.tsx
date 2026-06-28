@@ -51,6 +51,7 @@ import SwapsViewPanel from "@/components/staff-schedule/SwapsViewPanel";
 import AuditLogsPanel from "@/components/staff-schedule/AuditLogsPanel";
 import GeofenceConfigPanel from "@/components/staff-schedule/GeofenceConfigPanel";
 import TemplateManagementPanel from "@/components/staff-schedule/TemplateManagementPanel";
+import DeleteWeekDialog from "@/components/staff-schedule/DeleteWeekDialog";
 
 const FILTERS = [
   { value: "all", label: "Tất cả" },
@@ -122,6 +123,7 @@ export default function StaffSchedulesPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAutoSchedule, setShowAutoSchedule] = useState(false);
   const [autoLoading, setAutoLoading] = useState(false);
+  const [showDeleteWeek, setShowDeleteWeek] = useState(false);
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
   const from = toDateInput(days[0]);
@@ -329,6 +331,17 @@ export default function StaffSchedulesPage() {
               <Tooltip title="Nhật ký">
                 <IconButton onClick={() => setShowAuditLogs(true)} size="small" sx={{ color: "#6b7280", border: "1px solid rgba(107,114,128,0.3)", "&:hover": { bgcolor: "rgba(107,114,128,0.1)" } }}>
                   <HistoryIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Xóa lịch tuần này">
+                <IconButton
+                  onClick={() => setShowDeleteWeek(true)}
+                  size="small"
+                  sx={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.35)", "&:hover": { bgcolor: "rgba(239,68,68,0.1)" } }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
                 </IconButton>
               </Tooltip>
             </>
@@ -571,6 +584,13 @@ export default function StaffSchedulesPage() {
       <GeofenceConfigPanel open={showGeofence} onClose={() => setShowGeofence(false)} zones={zones} onUpdated={loadData} />
       <TemplateManagementPanel open={showTemplates} onClose={() => setShowTemplates(false)} zones={zones} shifts={shifts} staff={staff} onUpdated={loadData} />
       <AutoScheduleDialog open={showAutoSchedule} onClose={() => setShowAutoSchedule(false)} onConfirm={handleAutoSchedule} loading={autoLoading} />
+      <DeleteWeekDialog
+        open={showDeleteWeek}
+        onClose={() => setShowDeleteWeek(false)}
+        weekFrom={from}
+        weekTo={to}
+        onDeleted={loadData}
+      />
     </Stack>
   );
 }

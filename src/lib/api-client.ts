@@ -1195,6 +1195,12 @@ class ApiClient {
     return response.data;
   }
 
+  async deleteWeekScheduleAssignments(from: string, to: string, notify: boolean): Promise<{ cancelled: number; skipped: number; message: string }> {
+    const response = await this.client.delete("/api/schedules/assignments/week", { data: { from, to, notify } });
+    return response.data;
+  }
+
+
   async getAiCommandCenterSummary(): Promise<AiCommandCenterSummary> {
     const response = await this.client.get<AiCommandCenterSummary>("/api/ai/command-center/summary");
     return response.data;
