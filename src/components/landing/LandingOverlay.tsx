@@ -53,20 +53,6 @@ export default function LandingOverlay() {
             </div>
             <span className="text-base font-bold text-white font-display">Thư Viện</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-colors"
-            >
-              Đăng nhập
-            </Link>
-            <Link
-              href="/register"
-              className="px-4 py-2 text-sm font-medium bg-[#1A73E8] text-white rounded-lg hover:bg-[#1557B0] transition-colors"
-            >
-              Đăng ký
-            </Link>
-          </div>
         </div>
       </header>
 
