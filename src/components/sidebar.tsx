@@ -48,6 +48,7 @@ const libraryItems = [
   { href: "/active", label: "Đang hiện diện", icon: BookIcon },
   { href: "/gate", label: "Cổng ra vào", icon: DoorIcon },
   { href: "/history", label: "Lịch sử ra vào", icon: HistoryIcon },
+  { href: "/library/vr-tour", label: "Tham quan 3D", icon: MapIcon },
 ];
 
 const circulationItems = [
