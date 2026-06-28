@@ -209,7 +209,7 @@ export default function StaffSchedulesPage() {
       const result = await api.autoSchedule({ from: autoFrom, to: autoTo });
       const count = result.proposed?.length || 0;
       if (count === 0) { setError("Không có đề xuất lịch mới"); setAutoLoading(false); return; }
-      for (const item of result.proposed) { await api.createScheduleAssignment(item); }
+      await api.createScheduleAssignmentsBulk(result.proposed);
       await loadData();
     } catch (err) { setError(getErrorMessage(err)); }
     setAutoLoading(false);

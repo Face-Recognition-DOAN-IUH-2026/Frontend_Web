@@ -996,6 +996,11 @@ class ApiClient {
     return response.data;
   }
 
+  async createScheduleAssignmentsBulk(data: Array<{ staffId: string; shiftId: string; zoneId: string; workDate: string; note?: string | null }>): Promise<StaffScheduleAssignment[]> {
+    const response = await this.client.post<StaffScheduleAssignment[]>("/api/schedules/assignments/bulk", data);
+    return response.data;
+  }
+
   async moveScheduleAssignment(id: string, data: Partial<StaffScheduleAssignment>): Promise<StaffScheduleAssignment> {
     const response = await this.client.post<StaffScheduleAssignment>(`/api/schedules/assignments/${id}/move`, data);
     return response.data;
