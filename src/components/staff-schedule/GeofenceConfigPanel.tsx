@@ -44,14 +44,20 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
 
   const handleSet = async () => {
     if (!zoneId || !lat || !lng) { setError("Vui lòng nhập đầy đủ thông tin"); return; }
+    const latVal = parseFloat(lat);
+    const lngVal = parseFloat(lng);
+    const radiusVal = parseInt(radius) || 100;
+    if (isNaN(latVal) || latVal < -90 || latVal > 90) { setError("Vĩ độ phải từ -90 đến 90"); return; }
+    if (isNaN(lngVal) || lngVal < -180 || lngVal > 180) { setError("Kinh độ phải từ -180 đến 180"); return; }
+    if (radiusVal < 10 || radiusVal > 10000) { setError("Bán kính phải từ 10m đến 10,000m"); return; }
     setSaving(true);
     setError(null);
     try {
       await api.setGeofenceConfig({
         zoneId,
-        latitude: parseFloat(lat),
-        longitude: parseFloat(lng),
-        radiusMeters: parseInt(radius) || 100,
+        latitude: latVal,
+        longitude: lngVal,
+        radiusMeters: radiusVal,
       });
       setZoneId(""); setLat(""); setLng(""); setRadius("100");
       await loadData();

@@ -980,12 +980,13 @@ class ApiClient {
     return response.data;
   }
 
-  async getScheduleAssignments(params?: { from?: string; to?: string; staffId?: string; zoneId?: string; status?: string }): Promise<ScheduleAssignmentList> {
+  async getScheduleAssignments(params?: { from?: string; to?: string; staffId?: string; zoneId?: string; shiftId?: string; status?: string }): Promise<ScheduleAssignmentList> {
     const query: any = {};
     if (params?.from) query.from = params.from;
     if (params?.to) query.to = params.to;
     if (params?.staffId) query.staff_id = params.staffId;
     if (params?.zoneId) query.zone_id = params.zoneId;
+    if (params?.shiftId) query.shift_id = params.shiftId;
     if (params?.status) query.status = params.status;
     const response = await this.client.get<ScheduleAssignmentList>("/api/schedules/assignments", { params: query });
     return response.data;
@@ -1156,12 +1157,13 @@ class ApiClient {
   }
 
   async getAuditLogs(params?: {
-    page?: number; limit?: number; action?: string; entityType?: string;
+    page?: number; limit?: number; category?: string; action?: string; entityType?: string;
     actorId?: string; fromDate?: string; toDate?: string; search?: string;
   }): Promise<{ items: any[]; total: number; page: number; limit: number; totalPages: number }> {
     const query: any = {};
     if (params?.page) query.page = params.page;
     if (params?.limit) query.limit = params.limit;
+    if (params?.category) query.category = params.category;
     if (params?.action) query.action = params.action;
     if (params?.entityType) query.entityType = params.entityType;
     if (params?.actorId) query.actorId = params.actorId;

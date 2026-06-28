@@ -41,7 +41,6 @@ import TimetableLegend from "@/components/staff-schedule/TimetableLegend";
 import AssignStaffDialog from "@/components/staff-schedule/AssignStaffDialog";
 import ScheduleManagementPanel from "@/components/staff-schedule/ScheduleManagementPanel";
 import AvailabilityDialog from "@/components/staff-schedule/AvailabilityDialog";
-import OpenShiftsPanel from "@/components/staff-schedule/OpenShiftsPanel";
 import MySwapsPanel from "@/components/staff-schedule/MySwapsPanel";
 import SwapRequestDialog from "@/components/staff-schedule/SwapRequestDialog";
 import AutoScheduleDialog from "@/components/staff-schedule/AutoScheduleDialog";
@@ -123,6 +122,9 @@ export default function StaffSchedulesPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAutoSchedule, setShowAutoSchedule] = useState(false);
   const [autoLoading, setAutoLoading] = useState(false);
+  const [autoStep, setAutoStep] = useState<"select" | "preview">("select");
+  const [autoProposals, setAutoProposals] = useState<any[]>([]);
+  const [autoSkipped, setAutoSkipped] = useState(0);
   const [showDeleteWeek, setShowDeleteWeek] = useState(false);
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -185,7 +187,8 @@ export default function StaffSchedulesPage() {
 
   const weekStats = useMemo(() => {
     const total = assignments.filter((a) => a.status !== "cancelled").length;
-    const active = assignments.filter((a) => a.status === "in_progress").length;
+    const today = new Date().toISOString().slice(0, 10);
+    const active = assignments.filter((a) => a.status !== "cancelled" && a.workDate === today).length;
     return { total, active };
   }, [assignments]);
 
@@ -210,9 +213,21 @@ export default function StaffSchedulesPage() {
     try {
       const result = await api.autoSchedule({ from: autoFrom, to: autoTo });
       const count = result.proposed?.length || 0;
-      if (count === 0) { setError("Không có đề xuất lịch mới"); setAutoLoading(false); return; }
-      await api.createScheduleAssignmentsBulk(result.proposed);
+      if (count === 0) { setAutoProposals([]); setAutoSkipped(result.skipped || 0); setAutoStep("preview"); setAutoLoading(false); return; }
+      setAutoProposals(result.proposed);
+      setAutoSkipped(result.skipped || 0);
+      setAutoStep("preview");
+    } catch (err) { setError(getErrorMessage(err)); }
+    setAutoLoading(false);
+  };
+
+  const handleAutoScheduleConfirm = async () => {
+    setAutoLoading(true);
+    try {
+      await api.createScheduleAssignmentsBulk(autoProposals);
       await loadData();
+      setShowAutoSchedule(false);
+      setAutoStep("select");
     } catch (err) { setError(getErrorMessage(err)); }
     setAutoLoading(false);
   };
@@ -572,7 +587,7 @@ export default function StaffSchedulesPage() {
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
             Đổi ca chờ xử lý
           </Typography>
-          <MySwapsPanel refreshKey={swapRefreshKey} />
+          <MySwapsPanel refreshKey={swapRefreshKey} onError={(msg) => setError(msg)} />
         </Paper>
       )}
 
@@ -583,7 +598,16 @@ export default function StaffSchedulesPage() {
       <AuditLogsPanel open={showAuditLogs} onClose={() => setShowAuditLogs(false)} />
       <GeofenceConfigPanel open={showGeofence} onClose={() => setShowGeofence(false)} zones={zones} onUpdated={loadData} />
       <TemplateManagementPanel open={showTemplates} onClose={() => setShowTemplates(false)} zones={zones} shifts={shifts} staff={staff} onUpdated={loadData} />
-      <AutoScheduleDialog open={showAutoSchedule} onClose={() => setShowAutoSchedule(false)} onConfirm={handleAutoSchedule} loading={autoLoading} />
+      <AutoScheduleDialog
+        open={showAutoSchedule}
+        onClose={() => { setShowAutoSchedule(false); setAutoStep("select"); }}
+        onConfirm={handleAutoSchedule}
+        onConfirmFinal={handleAutoScheduleConfirm}
+        loading={autoLoading}
+        step={autoStep}
+        proposals={autoProposals}
+        skippedCount={autoSkipped}
+      />
       <DeleteWeekDialog
         open={showDeleteWeek}
         onClose={() => setShowDeleteWeek(false)}

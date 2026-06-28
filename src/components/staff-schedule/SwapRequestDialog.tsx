@@ -65,7 +65,11 @@ export default function SwapRequestDialog({
       setLoadingAssignments(true);
       try {
         const result = await api.getScheduleAssignments({ staffId: targetStaffId });
-        setTargetAssignments(result.items.filter(a => a.status === "scheduled" || a.status === "confirmed"));
+        const selected = myAssignments.find((a) => a.id === selectedAssignment);
+        const filtered = result.items.filter(
+          (a) => (a.status === "scheduled" || a.status === "confirmed") && a.workDate === selected?.workDate
+        );
+        setTargetAssignments(filtered);
       } catch (err) {
         console.error("Failed to load target assignments", err);
       } finally {
@@ -73,12 +77,20 @@ export default function SwapRequestDialog({
       }
     };
     fetchTargetAssignments();
-  }, [targetStaffId]);
+  }, [targetStaffId, selectedAssignment]);
 
   const handleSubmit = async () => {
     if (!selectedAssignment || !targetStaffId) {
       setError("Vui lòng chọn ca muốn đổi và nhân viên mục tiêu");
       return;
+    }
+    if (targetAssignmentId) {
+      const targetAsg = targetAssignments.find((a) => a.id === targetAssignmentId);
+      const myAsg = myAssignments.find((a) => a.id === selectedAssignment);
+      if (targetAsg && myAsg && targetAsg.shiftId === myAsg.shiftId) {
+        setError("Hai ca đổi phải khác nhau (cùng khung giờ)");
+        return;
+      }
     }
     setLoading(true);
     setError(null);
