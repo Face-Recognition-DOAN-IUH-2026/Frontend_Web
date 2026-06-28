@@ -27,7 +27,7 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
-  const [dayOfWeek, setDayOfWeek] = useState("1");
+  const [selectedDays, setSelectedDays] = useState<number[]>([1]);
   const [shiftId, setShiftId] = useState("");
   const [zoneId, setZoneId] = useState("");
   const [staffId, setStaffId] = useState("");
@@ -51,23 +51,26 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
   }, [open]);
 
   const handleCreate = async () => {
-    if (!name.trim() || !shiftId || !zoneId || !staffId) {
-      setError("Vui lòng nhập đầy đủ thông tin");
+    if (!name.trim() || !shiftId || !zoneId || !staffId || selectedDays.length === 0) {
+      setError("Vui lòng điền tên mẫu, chọn ca trực, khu vực, nhân viên và ít nhất 1 ngày trong tuần");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      await api.createScheduleTemplate({
-        name: name.trim(),
-        dayOfWeek: parseInt(dayOfWeek),
-        shiftId,
-        zoneId,
-        staffId,
-        validFrom: validFrom || undefined,
-        validTo: validTo || undefined,
-      });
+      for (const day of selectedDays) {
+        await api.createScheduleTemplate({
+          name: name.trim(),
+          dayOfWeek: day,
+          shiftId,
+          zoneId,
+          staffId,
+          validFrom: validFrom || undefined,
+          validTo: validTo || undefined,
+        });
+      }
       setName(""); setShiftId(""); setZoneId(""); setStaffId(""); setValidFrom(""); setValidTo("");
+      setSelectedDays([1]);
       await loadData();
       onUpdated();
     } catch (err) {
@@ -120,15 +123,31 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
               className="w-full px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary placeholder:text-text-3/50"
               placeholder="Tên mẫu (vd: Ca sáng T2-T6)"
             />
-            <select
-              value={dayOfWeek}
-              onChange={(e) => setDayOfWeek(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-            >
-              {DAYS.map((d, i) => (
-                <option key={i} value={i}>{d}</option>
-              ))}
-            </select>
+            <div className="space-y-1">
+              <div className="flex gap-1 justify-between">
+                {DAYS.map((d, i) => {
+                  const selected = selectedDays.includes(i);
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDays(prev =>
+                          prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]
+                        );
+                      }}
+                      className={`flex-1 py-1 rounded text-[11px] font-semibold border transition text-center ${
+                        selected
+                          ? "bg-primary border-primary text-bg"
+                          : "bg-surface-2 border-border text-text-2 hover:bg-surface-3"
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <select
               value={shiftId}
               onChange={(e) => setShiftId(e.target.value)}
