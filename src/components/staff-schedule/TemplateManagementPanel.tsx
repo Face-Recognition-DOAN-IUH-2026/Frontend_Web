@@ -88,7 +88,10 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
     }
   };
 
-  const getStaffName = (id: string) => staff.find((s) => s.id === id)?.fullName || "Nhân viên";
+  const getStaffName = (id: string) => {
+    const s = staff.find((x) => x.id === id);
+    return s?.fullName || s?.email || "Nhân viên";
+  };
   const getShiftName = (id: string) => shifts.find((s) => s.id === id)?.name || "Ca";
   const getZoneName = (id: string) => zones.find((z) => z.id === id)?.zoneName || "Khu vực";
 
@@ -153,7 +156,7 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
             >
               <option value="">Chọn nhân viên</option>
               {staff.map((s) => (
-                <option key={s.id} value={s.id}>{s.fullName}</option>
+                <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
               ))}
             </select>
             <div className="flex gap-2">

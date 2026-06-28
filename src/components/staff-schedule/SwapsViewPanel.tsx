@@ -52,7 +52,10 @@ export default function SwapsViewPanel({ open, onClose }: Props) {
     if (open) loadData();
   }, [open, filter]);
 
-  const getStaffName = (id: string) => staff.find((s) => s.id === id)?.fullName || "Nhân viên";
+  const getStaffName = (id: string) => {
+    const s = staff.find((x) => x.id === id);
+    return s?.fullName || s?.email || "Nhân viên";
+  };
 
   const isStale = (swap: ShiftSwap) => {
     const workDate = swap.requesterAssignment?.workDate;
