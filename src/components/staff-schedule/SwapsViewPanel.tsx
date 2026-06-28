@@ -28,6 +28,7 @@ export default function SwapsViewPanel({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("pending");
+  const [respondingId, setRespondingId] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -51,6 +52,19 @@ export default function SwapsViewPanel({ open, onClose }: Props) {
   useEffect(() => {
     if (open) loadData();
   }, [open, filter]);
+
+  const handleRespond = async (id: string, action: "accepted" | "rejected") => {
+    if (!confirm(action === "accepted" ? "Chấp nhận yêu cầu đổi ca?" : "Từ chối yêu cầu đổi ca?")) return;
+    setRespondingId(id);
+    try {
+      await api.respondSwap(id, { action });
+      await loadData();
+    } catch (err) {
+      setError(getApiError(err));
+    } finally {
+      setRespondingId(null);
+    }
+  };
 
   const getStaffName = (id: string) => {
     const s = staff.find((x) => x.id === id);
@@ -146,6 +160,24 @@ export default function SwapsViewPanel({ open, onClose }: Props) {
                 )}
                 {swap.responseNote && (
                   <div className="text-[11px] text-text-3 italic">Phản hồi: {swap.responseNote}</div>
+                )}
+                {swap.status === "pending" && !stale && (
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => handleRespond(swap.id, "accepted")}
+                      disabled={respondingId === swap.id}
+                      className="flex-1 py-1.5 rounded-md text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
+                    >
+                      {respondingId === swap.id ? "..." : "Chấp nhận"}
+                    </button>
+                    <button
+                      onClick={() => handleRespond(swap.id, "rejected")}
+                      disabled={respondingId === swap.id}
+                      className="flex-1 py-1.5 rounded-md text-xs font-medium text-white bg-red-500 hover:bg-red-600 transition disabled:opacity-50"
+                    >
+                      {respondingId === swap.id ? "..." : "Từ chối"}
+                    </button>
+                  </div>
                 )}
               </div>
             );

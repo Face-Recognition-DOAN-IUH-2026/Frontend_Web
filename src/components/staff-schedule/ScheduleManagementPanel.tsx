@@ -47,6 +47,11 @@ export default function ScheduleManagementPanel({
   };
 
   const handleDeleteZone = async (id: string) => {
+    try {
+      const assignments = await api.getScheduleAssignments({ zoneId: id });
+      const active = assignments.items.filter((a: any) => a.status === "scheduled" || a.status === "confirmed");
+      if (active.length > 0 && !confirm(`Có ${active.length} ca trực đang chờ xử lý sử dụng khu vực này. Vẫn xóa?`)) return;
+    } catch {}
     if (!confirm("Xóa khu vực này?")) return;
     setSaving(true);
     try {
@@ -79,6 +84,11 @@ export default function ScheduleManagementPanel({
   };
 
   const handleDeleteShift = async (id: string) => {
+    try {
+      const assignments = await api.getScheduleAssignments({ shiftId: id });
+      const active = assignments.items.filter((a: any) => a.status === "scheduled" || a.status === "confirmed");
+      if (active.length > 0 && !confirm(`Có ${active.length} ca trực đang chờ xử lý sử dụng ca này. Vẫn xóa?`)) return;
+    } catch {}
     if (!confirm("Xóa ca trực này?")) return;
     setSaving(true);
     try {

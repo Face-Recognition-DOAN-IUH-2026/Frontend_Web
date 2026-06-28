@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import api, { getErrorMessage } from "@/lib/api-client";
+import type { StaffAvailabilityRequest } from "@/lib/types";
 
 interface AvailabilityDialogProps {
   open: boolean;
@@ -25,6 +26,18 @@ export default function AvailabilityDialog({ open, onClose, onSubmitted }: Avail
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [myRequests, setMyRequests] = useState<StaffAvailabilityRequest[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      api.getScheduleAvailability()
+        .then((all) => setMyRequests(all.filter((r) => r.status === "pending" || r.status === "approved")))
+        .catch(() => {});
+    }
+  }, [open]);
+
+  const hasOverlap = (from: string, to: string) =>
+    myRequests.some((r) => r.dateFrom <= to && r.dateTo >= from);
 
   const handleSubmit = async () => {
     if (!dateFrom || !dateTo) {
@@ -33,6 +46,10 @@ export default function AvailabilityDialog({ open, onClose, onSubmitted }: Avail
     }
     if (dateTo < dateFrom) {
       setError("Ngày kết thúc phải sau ngày bắt đầu");
+      return;
+    }
+    if (hasOverlap(dateFrom, dateTo)) {
+      setError("Khoảng ngày trùng với đơn nghỉ phép đã gửi trước đó");
       return;
     }
     setLoading(true);

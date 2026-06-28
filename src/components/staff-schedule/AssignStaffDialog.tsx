@@ -68,6 +68,29 @@ export default function AssignStaffDialog({
       setError("Vui lòng chọn khu vực và nhân viên");
       return;
     }
+    const selectedStaff = staff.find((s) => s.id === staffId);
+    if (selectedStaff) {
+      const isLeave = approvedLeaves.some(
+        (l) => l.staffId === staffId && date >= l.dateFrom && date <= l.dateTo
+      );
+      if (isLeave) {
+        setError(`${selectedStaff.fullName || selectedStaff.email} đang trong thời gian nghỉ phép`);
+        return;
+      }
+      const existAsg = dayAssignments.find((a) => a.staffId === staffId);
+      if (existAsg) {
+        const existShift = shifts.find((sh) => sh.id === existAsg.shiftId);
+        const newStart = shift?.startTime?.slice(0, 5);
+        const newEnd = shift?.endTime?.slice(0, 5);
+        const existStart = existShift?.startTime?.slice(0, 5);
+        const existEnd = existShift?.endTime?.slice(0, 5);
+        const isOverlap = newStart && newEnd && existStart && existEnd && (newStart < existEnd && newEnd > existStart);
+        if (isOverlap) {
+          setError(`${selectedStaff.fullName || selectedStaff.email} đã có ca ${existShift?.name || existAsg.shiftId} trùng giờ`);
+          return;
+        }
+      }
+    }
     setSaving(true);
     setError(null);
     try {

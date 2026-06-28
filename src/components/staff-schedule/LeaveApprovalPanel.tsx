@@ -52,6 +52,7 @@ export default function LeaveApprovalPanel({ open, onClose, onUpdated }: Props) 
   }, [open, filter]);
 
   const handleApprove = async (id: string) => {
+    if (!confirm("Duyệt đơn nghỉ phép này?")) return;
     try {
       await api.approveScheduleAvailability(id);
       await loadData();
@@ -62,6 +63,7 @@ export default function LeaveApprovalPanel({ open, onClose, onUpdated }: Props) 
   };
 
   const handleReject = async (id: string) => {
+    if (!confirm("Từ chối đơn nghỉ phép này?")) return;
     try {
       await api.rejectScheduleAvailability(id);
       await loadData();

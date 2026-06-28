@@ -55,6 +55,13 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
       setError("Vui lòng điền tên mẫu, chọn ca trực, khu vực, nhân viên và ít nhất 1 ngày trong tuần");
       return;
     }
+    const duplicate = selectedDays.some((day) =>
+      templates.some((t) => t.shiftId === shiftId && t.zoneId === zoneId && t.dayOfWeek === day && t.staffId === staffId)
+    );
+    if (duplicate) {
+      setError("Nhân viên này đã có ca trực trong khung giờ/khu vực này vào ngày đã chọn");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
