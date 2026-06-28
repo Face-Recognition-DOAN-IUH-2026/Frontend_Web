@@ -178,21 +178,78 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
                 <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
               ))}
             </select>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                value={validFrom}
-                onChange={(e) => setValidFrom(e.target.value)}
-                className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-                placeholder="Từ ngày"
-              />
-              <input
-                type="date"
-                value={validTo}
-                onChange={(e) => setValidTo(e.target.value)}
-                className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-                placeholder="Đến ngày"
-              />
+            <div className="space-y-1.5 pt-1">
+              <label className="text-[11px] font-medium text-text-3 block">Thời hạn áp dụng</label>
+              <div className="flex gap-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValidFrom("");
+                    setValidTo("");
+                  }}
+                  className={`px-2 py-0.5 rounded text-[10px] border transition ${
+                    !validFrom && !validTo
+                      ? "bg-primary/10 border-primary text-primary"
+                      : "bg-surface-2 border-border text-text-2 hover:bg-surface-3"
+                  }`}
+                >
+                  Vô thời hạn (Tất cả)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const y = now.getFullYear();
+                    const m = now.getMonth();
+                    const first = new Date(y, m, 1);
+                    const last = new Date(y, m + 1, 0);
+                    setValidFrom(first.toISOString().split("T")[0]);
+                    setValidTo(last.toISOString().split("T")[0]);
+                  }}
+                  className={`px-2 py-0.5 rounded text-[10px] border transition ${
+                    validFrom && validTo && validFrom.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`)
+                      ? "bg-primary/10 border-primary text-primary"
+                      : "bg-surface-2 border-border text-text-2 hover:bg-surface-3"
+                  }`}
+                >
+                  Tháng này
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const y = now.getFullYear();
+                    const m = now.getMonth();
+                    const first = new Date(y, m + 1, 1);
+                    const last = new Date(y, m + 2, 0);
+                    setValidFrom(first.toISOString().split("T")[0]);
+                    setValidTo(last.toISOString().split("T")[0]);
+                  }}
+                  className={`px-2 py-0.5 rounded text-[10px] border transition ${
+                    validFrom && validTo && validFrom.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 2).padStart(2, '0')}`)
+                      ? "bg-primary/10 border-primary text-primary"
+                      : "bg-surface-2 border-border text-text-2 hover:bg-surface-3"
+                  }`}
+                >
+                  Tháng sau
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={validFrom}
+                  onChange={(e) => setValidFrom(e.target.value)}
+                  className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-[11px] text-text focus:outline-none focus:border-primary"
+                  placeholder="Từ ngày"
+                />
+                <input
+                  type="date"
+                  value={validTo}
+                  onChange={(e) => setValidTo(e.target.value)}
+                  className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-[11px] text-text focus:outline-none focus:border-primary"
+                  placeholder="Đến ngày"
+                />
+              </div>
             </div>
             <button
               onClick={handleCreate}
@@ -218,7 +275,7 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
                   </div>
                   <div className="text-[10px] text-text-3">
                     {getStaffName(t.staffId)}
-                    {t.validFrom && ` (${t.validFrom} → ${t.validTo || "..."})`}
+                    {t.validFrom ? ` (${t.validFrom} → ${t.validTo || "..."})` : " (Vô thời hạn)"}
                   </div>
                 </div>
                 <button
