@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import api from '@/lib/api-client';
 
 export interface CommandCenterSummary {
   operational_score: number;
@@ -69,20 +70,12 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
         }));
 
         try {
-          const response = await fetch('/api/ai/command-center/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: message }),
-          });
-
-          if (!response.ok) throw new Error('Chat request failed');
-
-          const data = await response.json();
+          const data = await api.askAiCommandCenter(message);
 
           const assistantMessage: ChatMessage = {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
-            content: data.answer || data.message || 'Xin lỗi, tôi không thể trả lời lúc này.',
+            content: data.answer || 'Xin lỗi, tôi không thể trả lời lúc này.',
             timestamp: Date.now(),
           };
 

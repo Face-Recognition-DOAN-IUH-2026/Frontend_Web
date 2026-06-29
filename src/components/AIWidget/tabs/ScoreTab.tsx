@@ -5,6 +5,7 @@ import { Box, Typography, Button, CircularProgress, Stack } from "@mui/material"
 import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import AIScoreCard from "../cards/AIScoreCard";
 import { useAIWidgetStore } from "../store/useAIWidgetStore";
+import api from "@/lib/api-client";
 
 export default function ScoreTab() {
   const { lastSummary, updateSummary } = useAIWidgetStore();
@@ -13,11 +14,16 @@ export default function ScoreTab() {
   const handleRefresh = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/ai/command-center/summary");
-      if (response.ok) {
-        const data = await response.json();
-        updateSummary(data);
-      }
+      const raw = await api.getAiCommandCenterSummary();
+      updateSummary({
+        operational_score: raw.operational_score,
+        active_patrons: raw.snapshot.active_patrons,
+        overdue_borrows: raw.snapshot.overdue_borrows,
+        scheduled_staff_today: raw.snapshot.scheduled_staff_today,
+        today_entries: raw.snapshot.today_entries,
+        today_exits: raw.snapshot.today_exits,
+        generated_at: raw.generated_at,
+      });
     } catch {
     } finally {
       setLoading(false);

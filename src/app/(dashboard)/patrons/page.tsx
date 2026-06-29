@@ -17,6 +17,7 @@ import {
   Drawer,
   IconButton,
   InputAdornment,
+  LinearProgress,
   MenuItem,
   Paper,
   Snackbar,
@@ -24,6 +25,7 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
   Stepper,
   Step,
@@ -43,7 +45,9 @@ import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import UpdateIcon from "@mui/icons-material/UpdateOutlined";
+import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
+import BadgeIcon from "@mui/icons-material/BadgeOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { fadeInUp, shimmer, successPop } from "@/lib/animations";
@@ -373,221 +377,174 @@ export default function PatronsPage() {
   const expiredCount = patrons.filter((p) => p.status === "expired" || p.status === "inactive").length;
   const faceCount    = patrons.filter((p) => p.has_face).length;
 
-  const FILTERS: { value: FilterValue; label: string; dot?: string }[] = [
+  const STAT_GRADIENT = {
+    total: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+    active: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+    expired: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+    face: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+  };
+
+  const FILTERS: { value: FilterValue; label: string }[] = [
     { value: "all",      label: "Tất cả" },
-    { value: "active",   label: "Hoạt động",        dot: "bg-emerald-400" },
-    { value: "inactive", label: "Tạm khóa",          dot: "bg-amber-400" },
-    { value: "expired",  label: "Hết hạn",            dot: "bg-red-400" },
-    { value: "has_face", label: "Có khuôn mặt",      dot: "bg-blue-400" },
+    { value: "active",   label: "Hoạt động" },
+    { value: "inactive", label: "Tạm khóa" },
+    { value: "expired",  label: "Hết hạn" },
+    { value: "has_face", label: "Có khuôn mặt" },
     { value: "no_face",  label: "Chưa có khuôn mặt" },
-    { value: "deleted",  label: "Đã xóa",             dot: "bg-slate-500" },
+    { value: "deleted",  label: "Đã xóa" },
+  ];
+
+  const statItems = [
+    { label: "Tổng độc giả", value: patrons.length, gradient: STAT_GRADIENT.total, icon: PeopleIcon, pct: 100 },
+    { label: "Hoạt động", value: activeCount, gradient: STAT_GRADIENT.active, icon: PersonIcon, pct: patrons.length ? Math.round((activeCount / patrons.length) * 100) : 0 },
+    { label: "Hết hạn / Khóa", value: expiredCount, gradient: STAT_GRADIENT.expired, icon: UpdateIcon, pct: patrons.length ? Math.round((expiredCount / patrons.length) * 100) : 0 },
+    { label: "Có khuôn mặt", value: faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((faceCount / patrons.length) * 100) : 0 },
   ];
 
   return (
-    <div className="space-y-6 p-1">
-
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">Quản lý Độc giả</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            {patrons.length} độc giả · {activeCount} đang hoạt động · {faceCount} đã đăng ký khuôn mặt
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={load}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 border border-white/10 transition-all"
-          >
-            <RefreshIcon sx={{ fontSize: 16 }} />
-            Tải lại
-          </button>
-          <button
-            onClick={() => { setCreateScan(true); setShowCreate(true); }}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/20 transition-all"
-          >
-            <AddIcon sx={{ fontSize: 16 }} />
+    <Stack spacing={3}>
+      {/* Gradient Header */}
+      <Box
+        sx={{
+          p: 3, borderRadius: 3,
+          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+          border: "1px solid", borderColor: "rgba(99,102,241,0.3)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexWrap: "wrap", gap: 2, position: "relative", overflow: "hidden",
+        }}
+      >
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <PeopleIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          </Avatar>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Quản lý Độc giả</Typography>
+            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+              {patrons.length} độc giả · {activeCount} đang hoạt động · {faceCount} đã đăng ký khuôn mặt
+            </Typography>
+          </Box>
+        </Stack>
+        <Stack direction="row" spacing={1} sx={{ zIndex: 1, flexWrap: "wrap" }}>
+          <Tooltip title="Tải lại">
+            <IconButton onClick={load} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCreateScan(true); setShowCreate(true); }}
+            sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", boxShadow: "0 4px 14px rgba(99,102,241,0.4)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}>
             Thêm độc giả
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Box>
 
-      {/* ── Stats mini ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Tổng độc giả",     value: patrons.length, color: "text-indigo-400",  bg: "bg-indigo-500/10 border-indigo-500/20" },
-          { label: "Hoạt động",         value: activeCount,    color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-          { label: "Hết hạn / Khóa",   value: expiredCount,   color: "text-amber-400",   bg: "bg-amber-500/10 border-amber-500/20" },
-          { label: "Có khuôn mặt",      value: faceCount,      color: "text-blue-400",    bg: "bg-blue-500/10 border-blue-500/20" },
-        ].map((s) => (
-          <div key={s.label} className={`rounded-2xl border p-4 backdrop-blur-sm ${s.bg}`}>
-            <p className="text-xs text-slate-500 mb-1">{s.label}</p>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-          </div>
+      {/* Stat Cards */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
+        {statItems.map((item, idx) => (
+          <Paper key={item.label} variant="outlined"
+            sx={{ borderRadius: 3, position: "relative", overflow: "hidden", p: 2.5, transition: "all 0.25s ease", animation: `${fadeInUp} 0.5s ease-out`, animationDelay: `${idx * 0.07}s`, animationFillMode: "both", "&:hover": { transform: "translateY(-2px)", boxShadow: 4 } }}>
+            <Box sx={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: item.gradient, opacity: 0.12, pointerEvents: "none" }} />
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 1.5 }}>
+              <Avatar sx={{ background: item.gradient, width: 44, height: 44 }}><item.icon sx={{ color: "#fff", fontSize: 22 }} /></Avatar>
+              <Typography variant="caption" sx={{ fontWeight: 600, textTransform: "uppercase", color: "text.secondary", letterSpacing: 0.5 }}>{item.label}</Typography>
+            </Stack>
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>{item.value}</Typography>
+            <LinearProgress variant="determinate" value={item.pct} sx={{ height: 3, borderRadius: 2, bgcolor: "rgba(99,102,241,0.08)", "& .MuiLinearProgress-bar": { background: item.gradient, borderRadius: 2 } }} />
+          </Paper>
         ))}
-      </div>
+      </Box>
 
-      {/* ── Search + Filter ── */}
-      <div className="rounded-2xl border border-white/10 bg-slate-800/60 backdrop-blur-sm p-4 space-y-3">
-        {/* Search */}
-        <div className="relative">
-          <SearchIcon sx={{ fontSize: 18 }} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && load()}
-            placeholder="Tìm theo tên, MSSV, mã thẻ..."
-            className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-          />
-        </div>
-        {/* Filter pills */}
-        <div className="flex flex-wrap gap-2">
-          {FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                filter === f.value
-                  ? "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20"
-                  : "bg-slate-700/40 border-slate-600/40 text-slate-400 hover:text-slate-200 hover:border-slate-500"
-              }`}
-            >
-              {f.dot && <span className={`h-1.5 w-1.5 rounded-full ${f.dot}`} />}
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Search + Filter */}
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
+        <Stack spacing={1.5}>
+          <TextField value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load()}
+            placeholder="Tìm theo tên, MSSV, mã thẻ..." size="small" fullWidth
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper" } }}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }} />
+          <ToggleButtonGroup value={filter} onChange={(_, v) => { if (v) setFilter(v); }} size="small" exclusive
+            sx={{ display: "flex", flexWrap: "wrap", gap: 0.75,
+              "& .MuiToggleButton-root": { border: "1px solid", borderColor: "divider", borderRadius: "20px !important", px: 1.5, py: 0.5, fontSize: "0.75rem", fontWeight: 600, textTransform: "none", color: "text.secondary",
+                "&.Mui-selected": { bgcolor: "primary.main", color: "#fff", "&:hover": { bgcolor: "primary.dark" } } } }}>
+            {FILTERS.map((f) => (<ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>))}
+          </ToggleButtonGroup>
+        </Stack>
+      </Paper>
 
-      {/* ── Card Grid ── */}
+      {/* Card Grid */}
       {loading && filtered.length === 0 ? (
-        <div className="flex justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
-        </div>
+        <Box sx={{ py: 10, display: "grid", placeItems: "center" }}>
+          <CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
+        </Box>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <PersonIcon sx={{ fontSize: 56 }} className="text-slate-600 mb-3" />
-          <p className="text-slate-400 font-medium">Không tìm thấy độc giả nào</p>
-          <button
-            onClick={() => { setQuery(""); setFilter("all"); }}
-            className="mt-3 px-4 py-2 text-sm rounded-xl text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/10 transition-all"
-          >
-            Xóa bộ lọc
-          </button>
-        </div>
+        <Paper variant="outlined" sx={{ py: 10, display: "flex", flexDirection: "column", alignItems: "center", borderRadius: 3, borderColor: "divider" }}>
+          <PersonIcon sx={{ fontSize: 56, color: "action.disabled", mb: 2 }} />
+          <Typography variant="h6" color="text.secondary">Không tìm thấy độc giả nào</Typography>
+          <Button size="small" sx={{ mt: 1.5, textTransform: "none" }} onClick={() => { setQuery(""); setFilter("all"); }}>Xóa bộ lọc</Button>
+        </Paper>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((patron) => {
-            const isExpired   = new Date(patron.membership_expiry) < new Date();
-            const isSoonExp   = !isExpired && (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000;
-            const expiryColor = isExpired ? "text-red-400" : isSoonExp ? "text-amber-400" : "text-slate-500";
-
-            const statusCls =
-              patron.status === "active"   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
-              patron.status === "inactive" ? "bg-amber-500/10 border-amber-500/20 text-amber-400" :
-              patron.status === "deleted"  ? "bg-red-500/10 border-red-500/20 text-red-400" :
-                                             "bg-slate-500/10 border-slate-500/20 text-slate-400";
-
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }, gap: 2 }}>
+          {filtered.map((patron, idx) => {
+            const isExpired = new Date(patron.membership_expiry) < new Date();
+            const isSoonExp = !isExpired && (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000;
             return (
-              <div
-                key={patron.id}
+              <Paper key={patron.id} variant="outlined"
                 onClick={() => router.push(`/patrons/${patron.id}`)}
-                className="group relative rounded-2xl border border-white/10 bg-slate-800/60 backdrop-blur-sm p-5 cursor-pointer hover:border-indigo-500/40 hover:bg-slate-800/80 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-200"
-              >
-                {/* Top row */}
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {/* Avatar */}
-                    <div className="h-11 w-11 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md shadow-indigo-500/30">
+                sx={{ borderRadius: 3, p: 0, cursor: "pointer", transition: "all 0.25s ease", overflow: "hidden",
+                  animation: `${fadeInUp} 0.4s ease-out`, animationDelay: `${idx * 0.05}s`, animationFillMode: "both",
+                  "&:hover": { transform: "translateY(-2px)", boxShadow: 4, borderColor: "primary.main" } }}>
+                <Box sx={{ height: 4, background: patron.status === "active" ? STAT_GRADIENT.active : patron.status === "expired" ? STAT_GRADIENT.expired : "linear-gradient(135deg, #64748b 0%, #475569 100%)" }} />
+                <Box sx={{ p: 2.5 }}>
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", mb: 2 }}>
+                    <Avatar sx={{ width: 44, height: 44, bgcolor: patron.status === "active" ? "rgba(16,185,129,0.15)" : patron.status === "expired" ? "rgba(245,158,11,0.15)" : "rgba(100,116,139,0.15)", color: patron.status === "active" ? "success.main" : patron.status === "expired" ? "warning.main" : "text.secondary", fontWeight: 700, fontSize: 16 }}>
                       {initials(patron.full_name)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-100 truncate leading-tight">{patron.full_name}</p>
-                      <p className="text-xs font-mono text-slate-500 mt-0.5">{patron.student_code}</p>
-                    </div>
-                  </div>
-                  <span className={`flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${statusCls}`}>
-                    {statusLabel(patron.status)}
-                  </span>
-                </div>
-
-                {/* Info row */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 text-xs">
-                  {patron.course && (
-                    <span className="text-slate-500 flex items-center gap-1">
-                      <SchoolIcon sx={{ fontSize: 12 }} />
-                      {patron.course}
-                    </span>
-                  )}
-                  <span className={`flex items-center gap-1 ${patron.has_face ? "text-blue-400" : "text-slate-600"}`}>
-                    <FaceIcon sx={{ fontSize: 12 }} />
-                    {patron.has_face ? "Đã có khuôn mặt" : "Chưa có"}
-                  </span>
-                  <span className={`flex items-center gap-1 ${expiryColor}`}>
-                    Hạn: {patron.membership_expiry}
-                    {isExpired ? " · Hết hạn" : isSoonExp ? " · Sắp hết" : ""}
-                  </span>
-                </div>
-
-                {/* Action row */}
-                <div
-                  className="flex items-center justify-end gap-1 pt-3 border-t border-white/5"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {patron.status === "deleted" ? (
-                    <>
-                      <button
-                        onClick={() => { setRestoreTarget(patron); setRestoreConfirmText(""); }}
-                        className="px-3 py-1.5 text-xs rounded-lg text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 transition-all font-medium"
-                      >
-                        Khôi phục
-                      </button>
-                      <button
-                        onClick={() => { setDeleteTarget(patron); setDeleteConfirmText(""); }}
-                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-all"
-                        title="Xóa vĩnh viễn"
-                      >
-                        <DeleteIcon sx={{ fontSize: 16 }} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => openEdit(patron)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-all"
-                        title="Chỉnh sửa"
-                      >
-                        <EditIcon sx={{ fontSize: 16 }} />
-                      </button>
-                      <button
-                        onClick={() => { setRenewTarget(patron); setRenewMonths(12); }}
-                        className="p-1.5 rounded-lg text-emerald-500 hover:bg-emerald-500/10 transition-all"
-                        title="Gia hạn thẻ"
-                      >
-                        <UpdateIcon sx={{ fontSize: 16 }} />
-                      </button>
-                      <button
-                        onClick={() => { setDeleteTarget(patron); setDeleteConfirmText(""); }}
-                        className="p-1.5 rounded-lg text-red-500 hover:bg-red-500/10 transition-all"
-                        title="Xóa"
-                      >
-                        <DeleteIcon sx={{ fontSize: 16 }} />
-                      </button>
-                      <button
-                        onClick={() => router.push(`/patrons/${patron.id}`)}
-                        className="p-1.5 rounded-lg text-indigo-400 hover:bg-indigo-500/10 transition-all"
-                        title="Xem chi tiết"
-                      >
-                        <ChevronRightIcon sx={{ fontSize: 16 }} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{patron.full_name}</Typography>
+                      <Typography variant="caption" sx={{ fontFamily: "monospace", color: "text.secondary" }}>{patron.student_code}</Typography>
+                    </Box>
+                    <Chip label={statusLabel(patron.status)} color={statusColor(patron.status)} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.7rem", height: 24 }} />
+                  </Stack>
+                  <Stack spacing={0.75} sx={{ mb: 2 }}>
+                    {patron.course && (
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                        <SchoolIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                        <Typography variant="caption" color="text.secondary">{patron.course}</Typography>
+                      </Stack>
+                    )}
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <FaceIcon sx={{ fontSize: 14, color: patron.has_face ? "primary.main" : "action.disabled" }} />
+                      <Typography variant="caption" color={patron.has_face ? "primary.main" : "text.secondary"}>
+                        {patron.has_face ? "Đã đăng ký khuôn mặt" : "Chưa có khuôn mặt"}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <BadgeIcon sx={{ fontSize: 14, color: isExpired ? "error.main" : isSoonExp ? "warning.main" : "text.secondary" }} />
+                      <Typography variant="caption" color={isExpired ? "error.main" : isSoonExp ? "warning.main" : "text.secondary"}>
+                        Hạn thẻ: {patron.membership_expiry}{isExpired ? " — Hết hạn" : isSoonExp ? " — Sắp hết hạn" : ""}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                  <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end", pt: 1.5, borderTop: 1, borderColor: "divider" }} onClick={(e) => e.stopPropagation()}>
+                    {patron.status === "deleted" ? (
+                      <>
+                        <Button size="small" variant="outlined" color="success" onClick={() => { setRestoreTarget(patron); setRestoreConfirmText(""); }} sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.75rem" }}>Khôi phục</Button>
+                        <IconButton size="small" color="error" onClick={() => { setDeleteTarget(patron); setDeleteConfirmText(""); }} title="Xóa vĩnh viễn"><DeleteIcon fontSize="small" /></IconButton>
+                      </>
+                    ) : (
+                      <>
+                        <Tooltip title="Chỉnh sửa"><IconButton size="small" onClick={() => openEdit(patron)} sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}><EditIcon fontSize="small" /></IconButton></Tooltip>
+                        <Tooltip title="Gia hạn thẻ"><IconButton size="small" onClick={() => { setRenewTarget(patron); setRenewMonths(12); }} sx={{ color: "text.secondary", "&:hover": { color: "success.main" } }}><UpdateIcon fontSize="small" /></IconButton></Tooltip>
+                        <Tooltip title="Xóa"><IconButton size="small" onClick={() => { setDeleteTarget(patron); setDeleteConfirmText(""); }} sx={{ color: "text.secondary", "&:hover": { color: "error.main" } }}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                        <Tooltip title="Xem chi tiết"><IconButton size="small" onClick={() => router.push(`/patrons/${patron.id}`)} sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}><ChevronRightIcon fontSize="small" /></IconButton></Tooltip>
+                      </>
+                    )}
+                  </Stack>
+                </Box>
+              </Paper>
             );
           })}
-        </div>
+        </Box>
       )}
 
       {/* ─── CREATE DIALOG (full-screen split-pane) ─── */}
@@ -924,6 +881,6 @@ export default function PatronsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Stack>
   );
 }

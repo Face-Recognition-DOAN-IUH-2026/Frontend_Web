@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import type { PaletteMode } from "@mui/material";
+import createCache from "@emotion/cache";
+import { CacheProvider } from "@emotion/react";
 
 type ColorModePreference = "auto" | "light" | "dark";
 type ReducedMotionPreference = "reduce" | "no-preference" | "unknown";
@@ -217,6 +219,9 @@ export function MuiThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] = useState<ColorModePreference>("auto");
   const [systemPrefersDark, setSystemPrefersDark] = useState(() => getSystemPreference());
   const [reducedMotion, setReducedMotion] = useState<ReducedMotionPreference>("unknown");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("themeMode") as ColorModePreference | null;
@@ -282,12 +287,16 @@ export function MuiThemeProvider({ children }: { children: React.ReactNode }) {
 
   const theme = useMemo(() => buildTheme(effectiveMode, reducedMotion), [effectiveMode, reducedMotion]);
 
+  const emotionCache = useMemo(() => createCache({ key: "mui", prepend: true }), []);
+
   return (
-    <ColorModeContext.Provider value={value}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        {children}
-      </ThemeProvider>
-    </ColorModeContext.Provider>
+    <CacheProvider value={emotionCache}>
+      <ColorModeContext.Provider value={value}>
+        <ThemeProvider theme={theme}>
+          {mounted && <CssBaseline />}
+          {children}
+        </ThemeProvider>
+      </ColorModeContext.Provider>
+    </CacheProvider>
   );
 }

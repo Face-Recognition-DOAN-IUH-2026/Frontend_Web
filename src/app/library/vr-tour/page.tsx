@@ -3,7 +3,6 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 
-// Import VRViewer with SSR disabled since it uses WebGL/window objects
 const VRViewer = dynamic(() => import('@/components/vr/VRViewer'), {
   ssr: false,
   loading: () => (
