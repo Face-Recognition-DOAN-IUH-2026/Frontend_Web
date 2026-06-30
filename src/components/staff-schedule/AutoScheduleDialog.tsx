@@ -23,6 +23,11 @@ function toDateInput(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function formatDisplayDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 function getMonday(d: Date): Date {
   const date = new Date(d);
   const day = date.getDay();
@@ -122,9 +127,10 @@ interface Props {
   step: "select" | "preview";
   proposals: ProposedItem[];
   skippedCount: number;
+  actualRange?: { from: string; to: string } | null;
 }
 
-export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirmFinal, loading, step, proposals, skippedCount }: Props) {
+export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirmFinal, loading, step, proposals, skippedCount, actualRange }: Props) {
   const [selected, setSelected] = useState<number | null>(0);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -227,6 +233,11 @@ export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirm
               </div>
             ) : (
               <>
+                {actualRange && (
+                  <div className="text-[11px] text-text-3 text-center py-1 px-2 rounded bg-white/[0.03] border border-white/5">
+                    Đề xuất từ <span className="text-emerald-400 font-medium">{formatDisplayDate(actualRange.from)}</span> — <span className="text-emerald-400 font-medium">{formatDisplayDate(actualRange.to)}</span>
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <div className="flex-1 text-center p-2 rounded-lg bg-emerald-500/10">
                     <div className="text-lg font-bold text-emerald-400">{proposals.length}</div>

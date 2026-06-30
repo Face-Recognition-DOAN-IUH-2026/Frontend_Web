@@ -943,6 +943,11 @@ class ApiClient {
     return response.data;
   }
 
+  async updateBook(bookId: string, data: Record<string, any>): Promise<BookWithStats> {
+    const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}`, data);
+    return response.data;
+  }
+
   async bulkDeleteBooks(bookIds: string[]): Promise<{ deleted: number; errors: string[]; success: boolean }> {
     const response = await this.client.post<{ deleted: number; errors: string[]; success: boolean }>("/api/borrow/books/delete", { book_ids: bookIds });
     return response.data;
@@ -1103,7 +1108,7 @@ class ApiClient {
     return response.data;
   }
 
-  async autoSchedule(data: { from: string; to: string }): Promise<{ proposed: Array<{ staffId: string; shiftId: string; zoneId: string; workDate: string; note: string }>; skipped: number; total: number }> {
+  async autoSchedule(data: { from: string; to: string }): Promise<{ proposed: Array<{ staffId: string; shiftId: string; zoneId: string; workDate: string; note: string }>; skipped: number; total: number; actualFrom?: string; actualTo?: string }> {
     const response = await this.client.post<any>("/api/schedules/auto-schedule", data);
     return response.data;
   }

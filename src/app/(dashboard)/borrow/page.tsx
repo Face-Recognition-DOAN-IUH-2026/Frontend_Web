@@ -34,7 +34,7 @@ import { fadeInUp, slideInRight } from "@/lib/animations";
 import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 
 const MAX_BORROW_BOOKS = 3;
-const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.13:8080/video";
+const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.6:8080/video";
 const BORROW_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
 
 export default function BorrowPage() {
