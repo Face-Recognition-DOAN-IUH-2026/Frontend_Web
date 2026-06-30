@@ -137,17 +137,27 @@ export default function BidsReviewPanel({ open, onClose, onUpdated }: Props) {
               <div key={bid.id} className="rounded-lg border border-border bg-surface-2 p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-text">{getStaffName(bid.staffId)}</span>
-                  <span
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                    style={{ backgroundColor: `${status.color}20`, color: status.color }}
-                  >
-                    {status.label}
-                  </span>
-                  {stale && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">
-                      Quá hạn
+                  <div className="flex items-center gap-1">
+                    {bid.reviewedBy === "system" && bid.status === "approved" ? (
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: "#6366f120", color: "#6366f1" }}
+                      >
+                        Tự động duyệt
+                      </span>
+                    ) : null}
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: `${status.color}20`, color: status.color }}
+                    >
+                      {status.label}
                     </span>
-                  )}
+                    {stale ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">
+                        Quá hạn
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 {asg && (
                   <div className="text-[11px] text-text-2">
@@ -158,6 +168,12 @@ export default function BidsReviewPanel({ open, onClose, onUpdated }: Props) {
                 {bid.note && (
                   <div className="text-[11px] text-text-3 italic">Ghi chú: {bid.note}</div>
                 )}
+                <div className="text-[10px] text-text-3 space-y-0.5">
+                  <div>Tạo: {new Date(bid.createdAt).toLocaleString("vi-VN")}</div>
+                  {bid.reviewedAt ? (
+                    <div>{bid.status === "approved" ? "Duyệt" : "Từ chối"}: {new Date(bid.reviewedAt).toLocaleString("vi-VN")}{bid.reviewedBy && bid.reviewedBy !== "system" ? ` bởi ${getStaffName(bid.reviewedBy)}` : null}</div>
+                  ) : null}
+                </div>
                 {bid.status === "pending" && !stale && (
                   <div className="flex gap-2 pt-1">
                     <button

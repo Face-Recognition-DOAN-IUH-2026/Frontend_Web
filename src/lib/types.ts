@@ -47,7 +47,20 @@ export interface UserPublic {
   has_face?: boolean;
   avatar_url?: string | null;
   phone?: string | null;
+  permanent_address?: string | null;
   permanentAddress?: string | null;
+  student_code?: string | null;
+  class_name?: string | null;
+  course?: string | null;
+  identity_number?: string | null;
+  card_number?: string | null;
+  issue_date?: string | null;
+  membership_expiry?: string | null;
+  suspended_reason?: string | null;
+  current_status?: string | null;
+  created_at?: string | null;
+  last_entry_at?: string | null;
+  last_entry_camera?: string | null;
 }
 
 export interface RefreshRequest {
@@ -544,6 +557,7 @@ export interface StaffShift {
   startTime: string;
   endTime: string;
   minStaff: number;
+  maxStaff: number | null;
   isActive: boolean;
 }
 
@@ -570,6 +584,8 @@ export interface StaffAttendance {
   checkOutAt: string | null;
   status: string;
   method: string;
+  invalidatedReason: string | null;
+  deletedAt: string | null;
 }
 
 export interface StaffAvailabilityRequest {
@@ -611,7 +627,7 @@ export interface ShiftBid {
 export interface ShiftSwap {
   id: string;
   requesterStaffId: string;
-  targetStaffId: string;
+  targetStaffId: string | null;
   requesterAssignmentId: string;
   targetAssignmentId: string | null;
   reason: string | null;
@@ -623,6 +639,32 @@ export interface ShiftSwap {
   target: ScheduleStaff | null;
   requesterAssignment: StaffScheduleAssignment | null;
   targetAssignment: StaffScheduleAssignment | null;
+}
+
+export interface GeofenceConfig {
+  id: string;
+  zoneId: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  addressHint: string | null;
+  allowedWifiSsids: string[] | null;
+  isActive: boolean;
+  zone?: LibraryZone | null;
+}
+
+export interface ManualCheckInRequest {
+  id: string;
+  scheduleId: string;
+  staffId: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  status: string;
+  method: string;
+  invalidatedReason: string | null;
+  deletedAt: string | null;
+  schedule?: StaffScheduleAssignment | null;
+  staff?: ScheduleStaff | null;
 }
 
 // === AI Command Center ===

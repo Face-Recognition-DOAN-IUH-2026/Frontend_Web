@@ -6,6 +6,7 @@ import type { StaffScheduleAssignment } from "@/lib/types";
 interface AssignmentCardProps {
   assignment: StaffScheduleAssignment;
   onDelete?: (id: string) => void;
+  understaffed?: boolean;
 }
 
 const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; label: string }> = {
@@ -13,6 +14,7 @@ const STATUS_STYLES: Record<string, { bg: string; border: string; text: string; 
   active: { bg: "bg-success/10", border: "border-success/30", text: "text-success", label: "Đang trực" },
   future: { bg: "bg-primary/10", border: "border-primary/20", text: "text-primary-dark", label: "Sắp tới" },
   today: { bg: "bg-warning/10", border: "border-warning/30", text: "text-warning", label: "Hôm nay" },
+  understaffed: { bg: "bg-orange-500/10", border: "border-orange-400/40", text: "text-orange-600", label: "Thiếu người" },
 };
 
 function getStatus(assignment: StaffScheduleAssignment): keyof typeof STATUS_STYLES {
@@ -27,9 +29,10 @@ function getStatus(assignment: StaffScheduleAssignment): keyof typeof STATUS_STY
   return "today";
 }
 
-export default function AssignmentCard({ assignment, onDelete }: AssignmentCardProps) {
+export default function AssignmentCard({ assignment, onDelete, understaffed }: AssignmentCardProps) {
   const [hover, setHover] = useState(false);
-  const status = getStatus(assignment);
+  const baseStatus = getStatus(assignment);
+  const status = understaffed ? "understaffed" : baseStatus;
   const style = STATUS_STYLES[status];
   const displayName = assignment.staff?.fullName || assignment.staff?.email || "Nhân viên";
   const zoneName = assignment.zone?.zoneName || "";

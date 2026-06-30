@@ -7,6 +7,7 @@ import type { ShiftSwap, ScheduleStaff } from "@/lib/types";
 interface Props {
   open: boolean;
   onClose: () => void;
+  onUpdated?: () => void;
 }
 
 function getApiError(err: any): string {
@@ -22,7 +23,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   expired: { label: "Hết hạn", color: "#6b7280" },
 };
 
-export default function SwapsViewPanel({ open, onClose }: Props) {
+export default function SwapsViewPanel({ open, onClose, onUpdated }: Props) {
   const [swaps, setSwaps] = useState<ShiftSwap[]>([]);
   const [staff, setStaff] = useState<ScheduleStaff[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,6 +60,7 @@ export default function SwapsViewPanel({ open, onClose }: Props) {
     try {
       await api.respondSwap(id, { action });
       await loadData();
+      onUpdated?.();
     } catch (err) {
       setError(getApiError(err));
     } finally {
@@ -125,50 +127,67 @@ export default function SwapsViewPanel({ open, onClose }: Props) {
           {visibleSwaps.map((swap) => {
             const status = STATUS_LABELS[swap.status] || { label: swap.status, color: "#6b7280" };
             const stale = isStale(swap);
+            const isOpenSwap = !swap.targetStaffId;
             return (
               <div key={swap.id} className="rounded-lg border border-border bg-surface-2 p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-text">
-                    {getStaffName(swap.requesterStaffId)} → {getStaffName(swap.targetStaffId)}
+                    {getStaffName(swap.requesterStaffId)} → {isOpenSwap ? "Bất kỳ (mở)" : getStaffName(swap.targetStaffId!)}
                   </span>
-                  <span
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                    style={{ backgroundColor: `${status.color}20`, color: status.color }}
-                  >
-                    {status.label}
-                  </span>
-                  {stale && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">
-                      Quá hạn
+                  <div className="flex items-center gap-1">
+                    {isOpenSwap && swap.status === "pending" ? (
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: "#6366f120", color: "#6366f1" }}
+                      >
+                        Mở
+                      </span>
+                    ) : null}
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: `${status.color}20`, color: status.color }}
+                    >
+                      {status.label}
                     </span>
-                  )}
+                    {stale ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">
+                        Quá hạn
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="text-[11px] text-text-2 space-y-1">
                   <div>
                     <span className="font-medium">Yêu cầu:</span>{" "}
                     {swap.requesterAssignment?.shift?.name || "N/A"} — {swap.requesterAssignment?.workDate || ""}
                   </div>
-                  {swap.targetAssignment && (
+                  {swap.targetAssignment ? (
                     <div>
                       <span className="font-medium">Đối tượng:</span>{" "}
                       {swap.targetAssignment.shift?.name || "N/A"} — {swap.targetAssignment.workDate}
                     </div>
-                  )}
+                  ) : null}
                 </div>
-                {swap.reason && (
+                {swap.reason ? (
                   <div className="text-[11px] text-text-3 italic">Lý do: {swap.reason}</div>
-                )}
-                {swap.responseNote && (
+                ) : null}
+                {swap.responseNote ? (
                   <div className="text-[11px] text-text-3 italic">Phản hồi: {swap.responseNote}</div>
-                )}
-                {swap.status === "pending" && !stale && (
+                ) : null}
+                <div className="text-[10px] text-text-3 space-y-0.5">
+                  <div>Tạo: {new Date(swap.createdAt).toLocaleString("vi-VN")}</div>
+                  {swap.reviewedAt ? (
+                    <div>{swap.status === "accepted" ? "Chấp nhận" : "Từ chối"}: {new Date(swap.reviewedAt).toLocaleString("vi-VN")}</div>
+                  ) : null}
+                </div>
+                {swap.status === "pending" && !stale ? (
                   <div className="flex gap-2 pt-1">
                     <button
                       onClick={() => handleRespond(swap.id, "accepted")}
                       disabled={respondingId === swap.id}
                       className="flex-1 py-1.5 rounded-md text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
                     >
-                      {respondingId === swap.id ? "..." : "Chấp nhận"}
+                      {respondingId === swap.id ? "..." : isOpenSwap ? "Duyệt mở" : "Chấp nhận"}
                     </button>
                     <button
                       onClick={() => handleRespond(swap.id, "rejected")}
@@ -178,7 +197,7 @@ export default function SwapsViewPanel({ open, onClose }: Props) {
                       {respondingId === swap.id ? "..." : "Từ chối"}
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
             );
           })}

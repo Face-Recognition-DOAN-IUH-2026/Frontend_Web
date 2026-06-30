@@ -35,7 +35,7 @@ import LeaveIcon from "@mui/icons-material/BeachAccessOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { fadeInUp } from "@/lib/animations";
-import type { ScheduleStaff, LibraryZone, StaffShift, StaffScheduleAssignment } from "@/lib/types";
+import type { ScheduleStaff, LibraryZone, StaffShift, StaffScheduleAssignment, ManualCheckInRequest } from "@/lib/types";
 import TimetableGrid from "@/components/staff-schedule/TimetableGrid";
 import TimetableLegend from "@/components/staff-schedule/TimetableLegend";
 import AssignStaffDialog from "@/components/staff-schedule/AssignStaffDialog";
@@ -51,6 +51,7 @@ import AuditLogsPanel from "@/components/staff-schedule/AuditLogsPanel";
 import GeofenceConfigPanel from "@/components/staff-schedule/GeofenceConfigPanel";
 import TemplateManagementPanel from "@/components/staff-schedule/TemplateManagementPanel";
 import DeleteWeekDialog from "@/components/staff-schedule/DeleteWeekDialog";
+import ManualCheckInAdmin from "@/components/staff-schedule/ManualCheckInAdmin";
 
 const FILTERS = [
   { value: "all", label: "Tất cả" },
@@ -127,6 +128,10 @@ export default function StaffSchedulesPage() {
   const [autoSkipped, setAutoSkipped] = useState(0);
   const [autoActualRange, setAutoActualRange] = useState<{ from: string; to: string } | null>(null);
   const [showDeleteWeek, setShowDeleteWeek] = useState(false);
+  const [showManualCheckIn, setShowManualCheckIn] = useState(false);
+  const [pendingBidCount, setPendingBidCount] = useState(0);
+  const [pendingSwapCount, setPendingSwapCount] = useState(0);
+  const [pendingManualCount, setPendingManualCount] = useState(0);
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
   const from = toDateInput(days[0]);
@@ -168,6 +173,25 @@ export default function StaffSchedulesPage() {
   }, [from, isAdmin, isStaff, to]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const loadCounts = async () => {
+      try {
+        const [bids, swaps, manuals] = await Promise.all([
+          api.listAllBids({ status: "pending" }).catch(() => []),
+          api.listAllSwaps({ status: "pending" }).catch(() => []),
+          api.listManualCheckInRequests().catch(() => []),
+        ]);
+        setPendingBidCount(bids.length);
+        setPendingSwapCount(swaps.length);
+        setPendingManualCount(manuals.filter((m: ManualCheckInRequest) => m.status === "pending_manual").length);
+      } catch {}
+    };
+    loadCounts();
+    const interval = setInterval(loadCounts, 30000);
+    return () => clearInterval(interval);
+  }, [isAdmin, loading]);
 
   const shiftList = useMemo(() => {
     return [...shifts].sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
@@ -326,13 +350,23 @@ export default function StaffSchedulesPage() {
                 </IconButton>
               </Tooltip>
               <Tooltip title="Duyệt đăng ký ca">
-                <IconButton onClick={() => setShowBidsReview(true)} size="small" sx={{ color: "#10b981", border: "1px solid rgba(16,185,129,0.3)", "&:hover": { bgcolor: "rgba(16,185,129,0.1)" } }}>
+                <IconButton onClick={() => setShowBidsReview(true)} size="small" sx={{ color: "#10b981", border: "1px solid rgba(16,185,129,0.3)", "&:hover": { bgcolor: "rgba(16,185,129,0.1)" }, position: "relative" }}>
                   <ActiveIcon fontSize="small" />
+                  {pendingBidCount > 0 ? (
+                    <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingBidCount > 9 ? "9+" : pendingBidCount}</Typography>
+                    </Box>
+                  ) : null}
                 </IconButton>
               </Tooltip>
               <Tooltip title="Đổi ca chờ xử lý">
-                <IconButton onClick={() => setShowSwapsView(true)} size="small" sx={{ color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)", "&:hover": { bgcolor: "rgba(59,130,246,0.1)" } }}>
+                <IconButton onClick={() => setShowSwapsView(true)} size="small" sx={{ color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)", "&:hover": { bgcolor: "rgba(59,130,246,0.1)" }, position: "relative" }}>
                   <GroupIcon fontSize="small" />
+                  {pendingSwapCount > 0 ? (
+                    <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingSwapCount > 9 ? "9+" : pendingSwapCount}</Typography>
+                    </Box>
+                  ) : null}
                 </IconButton>
               </Tooltip>
               <Tooltip title="Mẫu lịch">
@@ -343,6 +377,18 @@ export default function StaffSchedulesPage() {
               <Tooltip title="Geofence">
                 <IconButton onClick={() => setShowGeofence(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
                   <MapIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Check-in thủ công">
+                <IconButton onClick={() => setShowManualCheckIn(true)} size="small" sx={{ color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.3)", "&:hover": { bgcolor: "rgba(139,92,246,0.1)" }, position: "relative" }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  {pendingManualCount > 0 ? (
+                    <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingManualCount > 9 ? "9+" : pendingManualCount}</Typography>
+                    </Box>
+                  ) : null}
                 </IconButton>
               </Tooltip>
               <Tooltip title="Nhật ký">
@@ -596,7 +642,7 @@ export default function StaffSchedulesPage() {
       {/* ── Admin Panels ── */}
       <LeaveApprovalPanel open={showLeaveApproval} onClose={() => setShowLeaveApproval(false)} onUpdated={loadData} />
       <BidsReviewPanel open={showBidsReview} onClose={() => setShowBidsReview(false)} onUpdated={loadData} />
-      <SwapsViewPanel open={showSwapsView} onClose={() => setShowSwapsView(false)} />
+      <SwapsViewPanel open={showSwapsView} onClose={() => setShowSwapsView(false)} onUpdated={loadData} />
       <AuditLogsPanel open={showAuditLogs} onClose={() => setShowAuditLogs(false)} />
       <GeofenceConfigPanel open={showGeofence} onClose={() => setShowGeofence(false)} zones={zones} onUpdated={loadData} />
       <TemplateManagementPanel open={showTemplates} onClose={() => setShowTemplates(false)} zones={zones} shifts={shifts} staff={staff} onUpdated={loadData} />
@@ -610,6 +656,11 @@ export default function StaffSchedulesPage() {
         proposals={autoProposals}
         skippedCount={autoSkipped}
         actualRange={autoActualRange}
+      />
+      <ManualCheckInAdmin
+        open={showManualCheckIn}
+        onClose={() => setShowManualCheckIn(false)}
+        onUpdated={() => { loadData(); }}
       />
       <DeleteWeekDialog
         open={showDeleteWeek}
