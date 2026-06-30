@@ -21,7 +21,6 @@ import {
   IconButton,
   InputAdornment,
   Paper,
-  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -45,7 +44,8 @@ import AccountBoxOutlinedIcon from "@mui/icons-material/AccountBoxOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import SupervisorAccountOutlinedIcon from "@mui/icons-material/SupervisorAccountOutlined";
-import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import EmptyState from "@/components/ui/EmptyState";
+import SearchField from "@/components/ui/SearchField";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
@@ -53,26 +53,14 @@ import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { fadeInUp, shimmer } from "@/lib/animations";
+import { initials, roleLabel, statusLabel, statusColor } from "@/lib/utils";
+import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 import type { UserPublic } from "@/lib/types";
-
-function roleLabel(role: string) {
-  if (role === "admin") return "Quản trị";
-  if (role === "staff") return "Nhân viên";
-  if (role === "patron") return "Độc giả";
-  return role;
-}
 
 function roleChipColor(role: string): "warning" | "primary" | "default" | "success" {
   if (role === "admin") return "warning";
   if (role === "staff") return "primary";
   return "default";
-}
-
-function initials(name: string) {
-  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 const STAT_GRADIENT: Record<string, string> = {
@@ -288,21 +276,11 @@ export default function AdminPage() {
           spacing={1.5}
           sx={{ px: 2.5, py: 2, borderBottom: 1, borderColor: "divider", alignItems: { sm: "center" } }}
         >
-          <TextField
-            size="small"
-            placeholder="Tìm theo email, họ tên..."
+          <SearchField
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ flex: 1, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchOutlinedIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              },
-            }}
+            onChange={setSearch}
+            placeholder="Tìm theo email, họ tên..."
+            sx={{ flex: 1 }}
           />
           <ToggleButtonGroup
             value={roleFilter}
@@ -354,10 +332,10 @@ export default function AdminPage() {
               ) : filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4}>
-                    <Stack sx={{ py: 6, alignItems: "center", gap: 1 }}>
-                      <GroupsOutlinedIcon sx={{ fontSize: 48, color: "text.disabled" }} />
-                      <Typography color="text.secondary">Không tìm thấy người dùng nào</Typography>
-                    </Stack>
+                    <EmptyState
+                      icon={<GroupsOutlinedIcon />}
+                      title="Không tìm thấy người dùng nào"
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -550,7 +528,7 @@ export default function AdminPage() {
         </Box>
       </Drawer>
 
-      <Snackbar open={Boolean(notice)} autoHideDuration={3000} onClose={() => setNotice("")} message={notice} />
+      <NoticeSnackbar open={Boolean(notice)} message={notice} severity="success" onClose={() => setNotice("")} />
     </Stack>
   );
 }

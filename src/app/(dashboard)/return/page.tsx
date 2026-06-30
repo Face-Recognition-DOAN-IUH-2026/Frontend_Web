@@ -17,14 +17,12 @@ import {
   Divider,
   Grid,
   IconButton,
-  InputAdornment,
   LinearProgress,
   List,
   MenuItem,
   Paper,
   Select,
   Slide,
-  Snackbar,
   Stack,
   TextField,
   ToggleButton,
@@ -41,10 +39,11 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import ReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
-import SearchIcon from "@mui/icons-material/SearchOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { fadeInUp, slideInRight, successPop } from "@/lib/animations";
+import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import SearchField from "@/components/ui/SearchField";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
 
 const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.13:8080/video";
@@ -405,19 +404,7 @@ export default function ReturnPage() {
           {/* Search & Filter */}
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
             <Stack spacing={2}>
-              <TextField
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm theo MSSV hoặc tên..."
-                fullWidth
-                size="small"
-                slotProps={{
-                  input: {
-                    startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
-                  },
-                }}
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
-              />
+              <SearchField value={search} onChange={setSearch} placeholder="Tìm theo MSSV hoặc tên..." />
 
               <ToggleButtonGroup exclusive fullWidth size="small" value={filter} onChange={(_, value) => value && setFilter(value)}
                 sx={{ "& .MuiToggleButton-root": { px: 2, py: 0.6, borderRadius: "20px!important", textTransform: "none", fontWeight: 600, fontSize: "0.78rem", border: "1px solid", borderColor: "divider" } }}>
@@ -775,19 +762,9 @@ export default function ReturnPage() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
-        {snackbar ? (
-          <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)} sx={{ animation: `${slideInRight} 0.3s ease-out`, boxShadow: 4 }}>
-            {snackbar.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <NoticeSnackbar open={!!snackbar} message={snackbar?.message || ""} severity={snackbar?.severity || "success"} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
 
-      <Snackbar open={!!scanToast} autoHideDuration={2000} onClose={() => setScanToast("")} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
-        <Alert severity="success" onClose={() => setScanToast("")} sx={{ animation: `${successPop} 0.3s ease-out`, boxShadow: 4 }}>
-            {scanToast}
-          </Alert>
-      </Snackbar>
+      <NoticeSnackbar open={!!scanToast} message={scanToast} severity="success" onClose={() => setScanToast("")} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
     </Box>
   );
 }

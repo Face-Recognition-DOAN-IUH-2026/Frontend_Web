@@ -379,7 +379,7 @@ export default function BookDetailPage() {
                       overflow: "hidden",
                     }}
                   >
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8, color: "common.white" }}>
                       {book.description}
                     </Typography>
                     {isLongDescription && (
@@ -390,7 +390,7 @@ export default function BookDetailPage() {
                           left: 0,
                           right: 0,
                           height: 60,
-                          background: descExpanded ? "transparent" : "linear-gradient(transparent, #1a1a1a)",
+                          background: descExpanded ? "transparent" : `linear-gradient(transparent, ${theme.palette.grey[900]})`,
                           display: "flex",
                           alignItems: "flex-end",
                           justifyContent: "center",

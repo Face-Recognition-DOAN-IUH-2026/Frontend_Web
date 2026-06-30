@@ -111,14 +111,14 @@ function Topbar({ user }: { user: any }) {
             </IconButton>
           </Tooltip>
           <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", pl: 1.5, borderLeft: `1px solid ${theme.palette.divider}` }}>
-            <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", color: "primary.contrastText" }}>
+            <Avatar sx={{ width: 34, height: 34, flexShrink: 0, bgcolor: "primary.main", color: "primary.contrastText" }}>
               <UserIcon fontSize="small" />
             </Avatar>
-            <Box sx={{ display: { xs: "none", sm: "block" }, minWidth: 0 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+            <Box sx={{ display: { xs: "none", sm: "block" }, minWidth: 0, maxWidth: 160 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user?.full_name || "Admin"}
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ textTransform: "capitalize" }}>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: "capitalize", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user?.role || "staff"}
               </Typography>
             </Box>

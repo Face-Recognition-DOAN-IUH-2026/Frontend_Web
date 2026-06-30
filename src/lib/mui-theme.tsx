@@ -55,34 +55,34 @@ function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
         contrastText: "#FFFFFF",
       },
       secondary: {
-        main: dark ? "#69C58A" : "#226B42",
+        main: dark ? "#4A8C5C" : "#226B42",
         contrastText: dark ? "#08140D" : "#FFFFFF",
       },
       success: {
-        main: dark ? "#69C58A" : "#226B42",
+        main: dark ? "#4A8C5C" : "#226B42",
         contrastText: dark ? "#08140D" : "#FFFFFF",
       },
       warning: {
-        main: dark ? "#E4BC62" : "#9A620F",
+        main: dark ? "#C49A3C" : "#9A620F",
         contrastText: dark ? "#171003" : "#FFFFFF",
       },
       error: {
-        main: dark ? "#FF8A8A" : "#B42318",
+        main: dark ? "#C84E4E" : "#B42318",
         contrastText: dark ? "#250707" : "#FFFFFF",
       },
       info: {
-        main: dark ? "#8CC7FF" : "#175CD3",
+        main: dark ? "#5B9BD5" : "#175CD3",
         contrastText: dark ? "#061421" : "#FFFFFF",
       },
       background: {
         default: dark ? "#0D111B" : "#F6F8FB",
-        paper: dark ? "#171C29" : "#FFFFFF",
+        paper: dark ? "#1C2030" : "#FFFFFF",
       },
       text: {
-        primary: dark ? "#F7F2E8" : "#101828",
-        secondary: dark ? "#D8CEC0" : "#344054",
+        primary: dark ? "#EDE2DF" : "#101828",
+        secondary: dark ? "#B8B0A4" : "#344054",
       },
-      divider: dark ? "#3A4358" : "#D0D7E2",
+      divider: dark ? "#2E3345" : "#D0D7E2",
     },
     shape: {
       borderRadius: 8,
