@@ -16,11 +16,9 @@ import {
   DialogTitle,
   Drawer,
   IconButton,
-  InputAdornment,
   LinearProgress,
   MenuItem,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   ToggleButton,
@@ -43,7 +41,6 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import SearchIcon from "@mui/icons-material/Search";
 import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
@@ -51,6 +48,9 @@ import BadgeIcon from "@mui/icons-material/BadgeOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { fadeInUp, shimmer, successPop } from "@/lib/animations";
+import { initials, statusLabel, statusColor } from "@/lib/utils";
+import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import SearchField from "@/components/ui/SearchField";
 import type { CaptureAngle } from "@/components/MultiAngleCapture";
 import MultiAngleCapture from "@/components/MultiAngleCapture";
 import StudentCardScanner, { type ScannedCardData } from "@/components/StudentCardScanner";
@@ -80,29 +80,6 @@ function emptyCreateForm(): PatronCreate {
     email: "",
     phone: "",
   };
-}
-
-function statusLabel(status: string) {
-  if (status === "active") return "Hoạt động";
-  if (status === "inactive") return "Tạm khóa";
-  if (status === "expired") return "Hết hạn";
-  if (status === "deleted") return "Đã xóa";
-  return status;
-}
-
-function statusColor(status: string) {
-  if (status === "active") return "success" as const;
-  if (status === "inactive") return "warning" as const;
-  if (status === "expired") return "error" as const;
-  if (status === "deleted") return "error" as const;
-  return "default" as const;
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
 }
 
 export default function PatronsPage() {
@@ -421,10 +398,7 @@ export default function PatronsPage() {
       {/* Search + Filter */}
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
         <Stack spacing={1.5}>
-          <TextField value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load()}
-            placeholder="Tìm theo tên, MSSV, mã thẻ..." size="small" fullWidth
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper" } }}
-            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }} />
+          <SearchField value={query} onChange={setQuery} placeholder="Tìm theo tên, MSSV, mã thẻ..." />
           <ToggleButtonGroup value={filter} onChange={(_, v) => { if (v) setFilter(v); }} size="small" exclusive
             sx={{ display: "flex", flexWrap: "wrap", gap: 0.75,
               "& .MuiToggleButton-root": { border: "1px solid", borderColor: "divider", borderRadius: "20px !important", px: 1.5, py: 0.5, fontSize: "0.75rem", fontWeight: 600, textTransform: "none", color: "text.secondary",
@@ -810,9 +784,12 @@ export default function PatronsPage() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={!!notice} autoHideDuration={4000} onClose={() => setNotice(null)} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
-        {notice ? <Alert onClose={() => setNotice(null)} severity={notice.severity} sx={{ width: "100%" }}>{notice.message}</Alert> : undefined}
-      </Snackbar>
+      <NoticeSnackbar
+        open={!!notice}
+        message={notice?.message || ""}
+        severity={notice?.severity || "success"}
+        onClose={() => setNotice(null)}
+      />
     </Stack>
   );
 }

@@ -20,7 +20,6 @@ import {
   LinearProgress,
   MenuItem,
   Paper,
-  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -44,6 +43,7 @@ import UpdateOutlinedIcon from "@mui/icons-material/UpdateOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import MultiAngleCapture from "@/components/MultiAngleCapture";
 import { fadeInUp, shimmer, slideInRight } from "@/lib/animations";
+import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
 import type { CaptureAngle } from "@/components/MultiAngleCapture";
 
@@ -635,7 +635,7 @@ export default function PatronDetailPage() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={Boolean(notice)} autoHideDuration={3000} onClose={() => setNotice("")} message={notice} />
+      <NoticeSnackbar open={Boolean(notice)} message={notice || ""} severity="success" onClose={() => setNotice("")} />
     </Stack>
   );
 }

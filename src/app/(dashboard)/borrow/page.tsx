@@ -14,7 +14,6 @@ import {
   LinearProgress,
   Paper,
   Slide,
-  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -32,6 +31,7 @@ import BorrowIPCameraDialog from "@/components/BorrowIPCameraDialog";
 import BookRecommendations from "@/components/BookRecommendations";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { fadeInUp, slideInRight } from "@/lib/animations";
+import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 
 const MAX_BORROW_BOOKS = 3;
 const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.13:8080/video";
@@ -439,13 +439,13 @@ export default function BorrowPage() {
         onSuccess={handleScanSuccess}
       />
 
-      <Snackbar open={!!snackbar} autoHideDuration={3200} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
-        {snackbar ? (
-          <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)} sx={{ animation: `${slideInRight} 0.3s ease-out`, boxShadow: 4 }}>
-            {snackbar.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <NoticeSnackbar
+        open={!!snackbar}
+        message={snackbar?.message || ""}
+        severity={snackbar?.severity || "success"}
+        onClose={() => setSnackbar(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      />
     </Box>
   );
 }

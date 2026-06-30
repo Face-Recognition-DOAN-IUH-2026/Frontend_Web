@@ -171,14 +171,16 @@ export default function Sidebar() {
           {isAdmin ? <NavSection title="Quản trị" items={adminItems} /> : null}
         </Stack>
         <Divider />
-<Stack direction="row" spacing={1.25} sx={{ alignItems: "center", p: 1.5 }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", p: 1.5 }}>
           <ButtonBase
             onClick={() => router.push('/profile')}
             sx={{
               borderRadius: 2,
               px: 1,
               py: 0.5,
-              width: "100%",
+              flex: 1,
+              minWidth: 0,
+              justifyContent: "flex-start",
               "&:hover": { bgcolor: "action.hover" },
             }}
           >
@@ -187,6 +189,7 @@ export default function Sidebar() {
               sx={{
                 width: 38,
                 height: 38,
+                flexShrink: 0,
                 bgcolor: "primary.main",
                 color: "primary.contrastText",
                 fontWeight: 900,
@@ -194,16 +197,16 @@ export default function Sidebar() {
             >
               {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
             </Avatar>
-            <Box sx={{ minWidth: 0, flex: 1, textAlign: "left", ml: 0.75 }}>
-              <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>
+            <Box sx={{ minWidth: 0, flex: 1, textAlign: "left", ml: 0.75, overflow: "hidden" }}>
+              <Typography variant="body2" sx={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis" }}>
                 {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
                 {role === "admin" ? "Quản trị viên" : "Nhân viên"}
               </Typography>
             </Box>
           </ButtonBase>
-          <IconButton onClick={logout} title="Đăng xuất" color="error" size="small">
+          <IconButton onClick={logout} title="Đăng xuất" color="error" size="small" sx={{ flexShrink: 0 }}>
             <LogoutIcon fontSize="small" />
           </IconButton>
         </Stack>

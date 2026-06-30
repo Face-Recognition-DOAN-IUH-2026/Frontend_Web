@@ -1,37 +1,48 @@
-import { ButtonHTMLAttributes, forwardRef } from "react";
+import { Box, Stack, Typography } from "@mui/material";
+import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
+import { ReactNode } from "react";
 
 interface EmptyStateProps {
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   title: string;
   description?: string;
-  action?: {
-    label: string;
-    onClick: () => void;
-    variant?: "primary" | "secondary" | "ghost";
-  };
-  className?: string;
+  action?: ReactNode;
 }
 
-export function EmptyState({ icon, title, description, action, className = "" }: EmptyStateProps) {
+export default function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className={`flex flex-col items-center justify-center py-12 px-6 text-center ${className}`}>
-      {icon && (
-        <div className="w-14 h-14 rounded-xl bg-surface-2 flex items-center justify-center text-text-3 mb-4">
-          {icon}
-        </div>
-      )}
-      <h3 className="text-heading-md text-text mb-1">{title}</h3>
+    <Stack
+      spacing={1.5}
+      sx={{
+        alignItems: "center",
+        justifyContent: "center",
+        py: 8,
+        px: 3,
+        textAlign: "center",
+      }}
+    >
+      <Box
+        sx={{
+          width: 56,
+          height: 56,
+          borderRadius: 2,
+          bgcolor: "action.hover",
+          display: "grid",
+          placeItems: "center",
+          color: "text.secondary",
+        }}
+      >
+        {icon || <InboxOutlinedIcon fontSize="large" />}
+      </Box>
+      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        {title}
+      </Typography>
       {description && (
-        <p className="text-body-sm text-text-3 max-w-sm mb-4">{description}</p>
+        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 360 }}>
+          {description}
+        </Typography>
       )}
-      {action && (
-        <button
-          onClick={action.onClick}
-          className={`btn-${action.variant || "primary"}`}
-        >
-          {action.label}
-        </button>
-      )}
-    </div>
+      {action}
+    </Stack>
   );
 }

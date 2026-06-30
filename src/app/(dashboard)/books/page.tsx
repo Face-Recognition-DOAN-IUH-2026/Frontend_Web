@@ -20,7 +20,6 @@ import {
   InputAdornment,
   LinearProgress,
   Paper,
-  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -52,6 +51,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
+import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 import IsbnScannerDialog from "@/components/IsbnScannerDialog";
 import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
 
@@ -848,9 +848,7 @@ export default function BooksPage() {
       </Dialog>
 
       {/* Snackbar */}
-      <Snackbar open={!!notice} autoHideDuration={3500} onClose={() => setNotice(null)}>
-        {notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert> : undefined}
-      </Snackbar>
+      <NoticeSnackbar open={!!notice} message={notice?.message || ""} severity={notice?.severity || "success"} onClose={() => setNotice(null)} />
 
       {/* ISBN Scanner Dialog */}
       <IsbnScannerDialog

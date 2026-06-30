@@ -16,7 +16,6 @@ import {
   IconButton,
   InputAdornment,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -34,6 +33,7 @@ import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
+import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 import type { ActivePatron, CameraEvent } from "@/lib/types";
 
 const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);
@@ -547,13 +547,7 @@ export default function ActivePage() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={!!snackbar} autoHideDuration={3000} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
-        {snackbar ? (
-          <Alert severity={snackbar.severity} onClose={() => setSnackbar(null)}>
-            {snackbar.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      <NoticeSnackbar open={!!snackbar} message={snackbar?.message || ""} severity={snackbar?.severity || "success"} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
     </Stack>
   );
 }
