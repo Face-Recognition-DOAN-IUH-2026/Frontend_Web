@@ -36,6 +36,8 @@ export default function AssignStaffDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [approvedLeaves, setApprovedLeaves] = useState<any[]>([]);
+  const [forceSave, setForceSave] = useState(false);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -61,6 +63,33 @@ export default function AssignStaffDialog({
     setZoneId("");
     setStaffId("");
     setError(null);
+    setForceSave(false);
+    setWarnings([]);
+  };
+
+  const gatherWarnings = (): string[] => {
+    const w: string[] = [];
+    const selectedStaff = staff.find((s) => s.id === staffId);
+    if (!selectedStaff) return w;
+    const isLeave = approvedLeaves.some(
+      (l) => l.staffId === staffId && date >= l.dateFrom && date <= l.dateTo
+    );
+    if (isLeave) {
+      w.push(`${selectedStaff.fullName || selectedStaff.email} đang trong thời gian nghỉ phép`);
+    }
+    const existAsg = dayAssignments.find((a) => a.staffId === staffId);
+    if (existAsg) {
+      const existShift = shifts.find((sh) => sh.id === existAsg.shiftId);
+      const newStart = shift?.startTime?.slice(0, 5);
+      const newEnd = shift?.endTime?.slice(0, 5);
+      const existStart = existShift?.startTime?.slice(0, 5);
+      const existEnd = existShift?.endTime?.slice(0, 5);
+      const isOverlap = newStart && newEnd && existStart && existEnd && (newStart < existEnd && newEnd > existStart);
+      if (isOverlap) {
+        w.push(`${selectedStaff.fullName || selectedStaff.email} đã có ca ${existShift?.name || existAsg.shiftId} trùng giờ`);
+      }
+    }
+    return w;
   };
 
   const handleAssign = async () => {
@@ -68,33 +97,18 @@ export default function AssignStaffDialog({
       setError("Vui lòng chọn khu vực và nhân viên");
       return;
     }
-    const selectedStaff = staff.find((s) => s.id === staffId);
-    if (selectedStaff) {
-      const isLeave = approvedLeaves.some(
-        (l) => l.staffId === staffId && date >= l.dateFrom && date <= l.dateTo
-      );
-      if (isLeave) {
-        setError(`${selectedStaff.fullName || selectedStaff.email} đang trong thời gian nghỉ phép`);
-        return;
-      }
-      const existAsg = dayAssignments.find((a) => a.staffId === staffId);
-      if (existAsg) {
-        const existShift = shifts.find((sh) => sh.id === existAsg.shiftId);
-        const newStart = shift?.startTime?.slice(0, 5);
-        const newEnd = shift?.endTime?.slice(0, 5);
-        const existStart = existShift?.startTime?.slice(0, 5);
-        const existEnd = existShift?.endTime?.slice(0, 5);
-        const isOverlap = newStart && newEnd && existStart && existEnd && (newStart < existEnd && newEnd > existStart);
-        if (isOverlap) {
-          setError(`${selectedStaff.fullName || selectedStaff.email} đã có ca ${existShift?.name || existAsg.shiftId} trùng giờ`);
-          return;
-        }
-      }
+    const w = gatherWarnings();
+    if (w.length > 0 && !forceSave) {
+      setWarnings(w);
+      return;
     }
     setSaving(true);
     setError(null);
+    setWarnings([]);
     try {
-      await api.createScheduleAssignment({ staffId, shiftId, zoneId, workDate: date });
+      const params: any = { staffId, shiftId, zoneId, workDate: date };
+      if (forceSave && w.length > 0) params.force = true;
+      await api.createScheduleAssignment(params);
       reset();
       onAssigned();
     } catch (err: any) {
@@ -189,6 +203,25 @@ export default function AssignStaffDialog({
         {error && (
           <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-2.5 py-1.5">
             {error}
+          </div>
+        )}
+
+        {warnings.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs text-amber-600 bg-amber-500/10 border border-amber-400/20 rounded-md px-2.5 py-1.5 space-y-1">
+              {warnings.map((w, i) => (
+                <div key={i}>⚠ {w}</div>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs text-text-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={forceSave}
+                onChange={(e) => setForceSave(e.target.checked)}
+                className="accent-primary w-3.5 h-3.5"
+              />
+              Vẫn xếp ca bất chấp cảnh báo
+            </label>
           </div>
         )}
 

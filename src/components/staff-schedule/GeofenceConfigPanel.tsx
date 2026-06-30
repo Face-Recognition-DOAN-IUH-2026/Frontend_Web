@@ -24,6 +24,7 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [radius, setRadius] = useState("100");
+  const [wifiSsids, setWifiSsids] = useState("");
   const [saving, setSaving] = useState(false);
 
   const loadData = async () => {
@@ -58,8 +59,9 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
         latitude: latVal,
         longitude: lngVal,
         radiusMeters: radiusVal,
+        allowedWifiSsids: wifiSsids.trim() ? wifiSsids.split(",").map(s => s.trim()).filter(Boolean) : null,
       });
-      setZoneId(""); setLat(""); setLng(""); setRadius("100");
+      setZoneId(""); setLat(""); setLng(""); setRadius("100"); setWifiSsids("");
       await loadData();
       onUpdated();
     } catch (err) {
@@ -147,6 +149,12 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
                 {saving ? "..." : "Lưu"}
               </button>
             </div>
+            <input
+              value={wifiSsids}
+              onChange={(e) => setWifiSsids(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
+              placeholder="WiFi SSID (phẩy ngăn cách, vd: IUH-Lib, IUH-Staff)"
+            />
           </div>
 
           <div className="space-y-2 pt-2 border-t border-border">
@@ -161,6 +169,7 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
                   <div className="text-xs font-medium text-text">{cfg.zone?.zoneName || "Khu vực"}</div>
                   <div className="text-[10px] text-text-3">
                     {cfg.latitude}, {cfg.longitude} &middot; {cfg.radiusMeters}m
+                    {cfg.allowedWifiSsids?.length ? ` · WiFi: ${cfg.allowedWifiSsids.join(", ")}` : null}
                   </div>
                 </div>
                 <button

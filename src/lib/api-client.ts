@@ -44,6 +44,8 @@ import type {
   OpenShift,
   ShiftBid,
   ShiftSwap,
+  ManualCheckInRequest,
+  GeofenceConfig,
   AiCommandCenterSummary,
   AiInsight,
   AiInsightExplanation,
@@ -1119,7 +1121,7 @@ class ApiClient {
     return response.data;
   }
 
-  async setGeofenceConfig(data: { zoneId: string; latitude: number; longitude: number; radiusMeters?: number; addressHint?: string | null }): Promise<any> {
+  async setGeofenceConfig(data: { zoneId: string; latitude: number; longitude: number; radiusMeters?: number; addressHint?: string | null; allowedWifiSsids?: string[] | null }): Promise<any> {
     const response = await this.client.put("/api/schedules/geofence", data);
     return response.data;
   }
@@ -1231,6 +1233,35 @@ class ApiClient {
 
   async deleteWeekScheduleAssignments(from: string, to: string, notify: boolean): Promise<{ cancelled: number; skipped: number; message: string }> {
     const response = await this.client.delete("/api/schedules/assignments/week", { data: { from, to, notify } });
+    return response.data;
+  }
+
+  async requestManualCheckIn(assignmentId: string, note: string): Promise<any> {
+    const response = await this.client.post("/api/schedules/attendance/manual-checkin", { assignmentId, note });
+    return response.data;
+  }
+
+  async listManualCheckInRequests(status?: string): Promise<ManualCheckInRequest[]> {
+    const params: Record<string, string> = {};
+    if (status) params.status = status;
+    const response = await this.client.get<ManualCheckInRequest[]>("/api/schedules/attendance/manual-checkin-requests", { params });
+    return response.data;
+  }
+
+  async approveManualCheckIn(attendanceId: string, checkInAt?: string): Promise<any> {
+    const body: Record<string, string> = {};
+    if (checkInAt) body.checkInAt = checkInAt;
+    const response = await this.client.put(`/api/schedules/attendance/${attendanceId}/approve-manual`, body);
+    return response.data;
+  }
+
+  async rejectManualCheckIn(attendanceId: string, reason: string): Promise<any> {
+    const response = await this.client.put(`/api/schedules/attendance/${attendanceId}/reject-manual`, { reason });
+    return response.data;
+  }
+
+  async claimOpenSwap(swapId: string): Promise<ShiftSwap> {
+    const response = await this.client.post<ShiftSwap>(`/api/schedules/swaps/${swapId}/claim`);
     return response.data;
   }
 

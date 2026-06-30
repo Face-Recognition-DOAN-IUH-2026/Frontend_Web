@@ -5,6 +5,7 @@ const ITEMS = [
   { color: "bg-success/40 border-success", label: "Đang trực" },
   { color: "bg-primary/40 border-primary-dim", label: "Sắp tới" },
   { color: "bg-warning/40 border-warning", label: "Hôm nay" },
+  { color: "bg-orange-400/40 border-orange-400", label: "Thiếu người" },
   { color: "bg-error/40 border-error", label: "Tạm ngưng" },
 ];
 

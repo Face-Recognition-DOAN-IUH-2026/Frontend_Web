@@ -1,6 +1,6 @@
 "use client";
 
-import type { StaffScheduleAssignment } from "@/lib/types";
+import type { StaffScheduleAssignment, StaffShift } from "@/lib/types";
 import AssignmentCard from "./AssignmentCard";
 
 interface TimetableCellProps {
@@ -10,17 +10,25 @@ interface TimetableCellProps {
   isAdmin?: boolean;
   onCellClick?: (date: string, shiftId: string) => void;
   onDeleteAssignment?: (id: string) => void;
+  shift?: StaffShift | null;
+}
+
+function isUnderstaffed(assignments: StaffScheduleAssignment[], shift?: StaffShift | null): boolean {
+  if (!shift?.minStaff) return false;
+  const activeCount = assignments.filter(a => a.status !== "cancelled" && a.status !== "completed").length;
+  return activeCount < shift.minStaff;
 }
 
 export default function TimetableCell({
-  assignments, date, shiftId, isAdmin, onCellClick, onDeleteAssignment,
+  assignments, date, shiftId, isAdmin, onCellClick, onDeleteAssignment, shift,
 }: TimetableCellProps) {
+  const under = isUnderstaffed(assignments, shift);
   if (!isAdmin || !date || !shiftId || !onCellClick) {
     if (assignments.length === 0) return null;
     return (
       <div className="flex flex-col gap-1">
         {assignments.map((a) => (
-          <AssignmentCard key={a.id} assignment={a} />
+          <AssignmentCard key={a.id} assignment={a} understaffed={under} />
         ))}
       </div>
     );
@@ -29,7 +37,7 @@ export default function TimetableCell({
   return (
     <div className="flex flex-col gap-1">
       {assignments.map((a) => (
-        <AssignmentCard key={a.id} assignment={a} onDelete={onDeleteAssignment} />
+        <AssignmentCard key={a.id} assignment={a} onDelete={onDeleteAssignment} understaffed={under} />
       ))}
       <button
         onClick={() => onCellClick(date, shiftId)}

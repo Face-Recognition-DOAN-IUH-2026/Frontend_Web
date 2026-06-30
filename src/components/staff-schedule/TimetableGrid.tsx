@@ -125,6 +125,7 @@ return (
                   isAdmin={isAdmin}
                   onCellClick={onCellClick}
                   onDeleteAssignment={onDeleteAssignment}
+                  shift={shift}
                 />
               </div>
             );
