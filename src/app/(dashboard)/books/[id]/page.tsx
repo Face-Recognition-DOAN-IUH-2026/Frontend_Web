@@ -530,8 +530,8 @@ export default function BookDetailPage() {
 
         {/* Edit Book Dialog */}
         <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
-          <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Chinh sua thong tin sach</Typography>
+          <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700 }}>
+            Chinh sua thong tin sach
             <IconButton onClick={() => setEditOpen(false)} size="small"><CloseIcon /></IconButton>
           </DialogTitle>
           <DialogContent dividers sx={{ pt: 2 }}>
