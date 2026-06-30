@@ -943,6 +943,11 @@ class ApiClient {
     return response.data;
   }
 
+  async updateBook(bookId: string, data: Record<string, any>): Promise<BookWithStats> {
+    const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}`, data);
+    return response.data;
+  }
+
   async bulkDeleteBooks(bookIds: string[]): Promise<{ deleted: number; errors: string[]; success: boolean }> {
     const response = await this.client.post<{ deleted: number; errors: string[]; success: boolean }>("/api/borrow/books/delete", { book_ids: bookIds });
     return response.data;

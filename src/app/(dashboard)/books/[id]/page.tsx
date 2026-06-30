@@ -21,7 +21,9 @@ import {
   Link,
   Paper,
   Skeleton,
+  Snackbar,
   Stack,
+  TextField,
   Tooltip,
   Typography,
   useTheme,
@@ -100,6 +102,10 @@ export default function BookDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [show3D, setShow3D] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const [editSnackbar, setEditSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
 
   useEffect(() => {
     if (!bookId) return;
@@ -107,6 +113,52 @@ export default function BookDetailPage() {
     setError(null);
     api.getBookById(bookId).then(setBook).catch((err) => setError(getErrorMessage(err))).finally(() => setLoading(false));
   }, [bookId]);
+
+  const openEdit = () => {
+    if (!book) return;
+    setEditForm({
+      title: book.title || "",
+      subtitle: book.subtitle || "",
+      author: book.author || "",
+      publisher: book.publisher || "",
+      published_date: book.published_date || "",
+      description: book.description || "",
+      page_count: book.page_count ?? "",
+      categories: book.categories || "",
+      average_rating: book.average_rating ?? "",
+      language: book.language || "",
+      shelf_location: book.shelf_location || "",
+      cover_url: book.cover_url || "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditChange = (field: string, value: any) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditSave = async () => {
+    if (!book || !editForm.title?.trim()) return;
+    setEditSaving(true);
+    try {
+      const payload: Record<string, any> = {};
+      for (const [k, v] of Object.entries(editForm)) {
+        if (k === "page_count" || k === "average_rating") {
+          payload[k] = v === "" || v === null ? null : Number(v);
+        } else {
+          payload[k] = v || null;
+        }
+      }
+      const updated = await api.updateBook(book.id, payload);
+      setBook(updated);
+      setEditOpen(false);
+      setEditSnackbar({ open: true, message: "Da cap nhat sach thanh cong", severity: "success" });
+    } catch (err: any) {
+      setEditSnackbar({ open: true, message: err?.response?.data?.error || "Cap nhat that bai", severity: "error" });
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -448,15 +500,15 @@ export default function BookDetailPage() {
                 >
                   Mượn sách
                 </Button>
-                <Tooltip title="Chỉnh sửa số lượng">
+                <Tooltip title="Chinh sua thong tin sach">
                   <Button
                     variant="outlined"
                     size="large"
                     startIcon={<EditIcon />}
-                    onClick={() => router.push("/books")}
+                    onClick={openEdit}
                     sx={{ py: 1.5 }}
                   >
-                    Sửa
+                    Sua
                   </Button>
                 </Tooltip>
               </Stack>
@@ -475,6 +527,46 @@ export default function BookDetailPage() {
             {show3D && <Book3DViewer coverUrl={book.cover_url || ""} />}
           </DialogContent>
         </Dialog>
+
+        {/* Edit Book Dialog */}
+        <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
+          <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Chinh sua thong tin sach</Typography>
+            <IconButton onClick={() => setEditOpen(false)} size="small"><CloseIcon /></IconButton>
+          </DialogTitle>
+          <DialogContent dividers sx={{ pt: 2 }}>
+            <Stack spacing={2.5}>
+              <TextField label="Tieu de" required fullWidth value={editForm.title || ""} onChange={(e) => handleEditChange("title", e.target.value)} />
+              <TextField label="Phu de" fullWidth value={editForm.subtitle || ""} onChange={(e) => handleEditChange("subtitle", e.target.value)} />
+              <TextField label="Tac gia" fullWidth value={editForm.author || ""} onChange={(e) => handleEditChange("author", e.target.value)} />
+              <TextField label="Nha xuat ban" fullWidth value={editForm.publisher || ""} onChange={(e) => handleEditChange("publisher", e.target.value)} />
+              <TextField label="Ngay xuat ban" fullWidth value={editForm.published_date || ""} onChange={(e) => handleEditChange("published_date", e.target.value)} placeholder="VD: 2024-01-01" />
+              <TextField label="Mo ta" fullWidth multiline minRows={4} value={editForm.description || ""} onChange={(e) => handleEditChange("description", e.target.value)} />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField label="So trang" type="number" fullWidth value={editForm.page_count ?? ""} onChange={(e) => handleEditChange("page_count", e.target.value)} />
+                <TextField label="Danh muc" fullWidth value={editForm.categories || ""} onChange={(e) => handleEditChange("categories", e.target.value)} />
+                <TextField label="Danh gia (0-5)" type="number" fullWidth value={editForm.average_rating ?? ""} onChange={(e) => handleEditChange("average_rating", e.target.value)} />
+              </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField label="Ngon ngu" fullWidth value={editForm.language || ""} onChange={(e) => handleEditChange("language", e.target.value)} />
+                <TextField label="Vi tri ke" fullWidth value={editForm.shelf_location || ""} onChange={(e) => handleEditChange("shelf_location", e.target.value)} />
+              </Stack>
+              <TextField label="URL anh bia" fullWidth value={editForm.cover_url || ""} onChange={(e) => handleEditChange("cover_url", e.target.value)} placeholder="https://..." />
+            </Stack>
+          </DialogContent>
+          <Box sx={{ px: 3, py: 2, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
+            <Button onClick={() => setEditOpen(false)} disabled={editSaving}>Huy</Button>
+            <Button variant="contained" onClick={handleEditSave} disabled={editSaving || !editForm.title?.trim()} startIcon={editSaving ? <CircularProgress size={16} /> : null}>
+              {editSaving ? "Dang luu..." : "Luu thay doi"}
+            </Button>
+          </Box>
+        </Dialog>
+
+        <Snackbar open={editSnackbar.open} autoHideDuration={3000} onClose={() => setEditSnackbar((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "right" }}>
+          <Alert severity={editSnackbar.severity} variant="filled" onClose={() => setEditSnackbar((s) => ({ ...s, open: false }))}>
+            {editSnackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </Box>
   );
