@@ -129,6 +129,7 @@ export default function BookDetailPage() {
       language: book.language || "",
       shelf_location: book.shelf_location || "",
       cover_url: book.cover_url || "",
+      quantity: book.total_copies ?? 0,
     });
     setEditOpen(true);
   };
@@ -141,20 +142,25 @@ export default function BookDetailPage() {
     if (!book || !editForm.title?.trim()) return;
     setEditSaving(true);
     try {
-      const payload: Record<string, any> = {};
+      const quantity = editForm.quantity === "" || editForm.quantity === null ? null : Number(editForm.quantity);
+      const metadataPayload: Record<string, any> = {};
       for (const [k, v] of Object.entries(editForm)) {
+        if (k === "quantity") continue;
         if (k === "page_count" || k === "average_rating") {
-          payload[k] = v === "" || v === null ? null : Number(v);
+          metadataPayload[k] = v === "" || v === null ? null : Number(v);
         } else {
-          payload[k] = v || null;
+          metadataPayload[k] = v || null;
         }
       }
-      const updated = await api.updateBook(book.id, payload);
+      let updated = await api.updateBook(book.id, metadataPayload);
+      if (quantity !== null && quantity !== book.total_copies) {
+        updated = await api.updateBookQuantity(book.id, quantity);
+      }
       setBook(updated);
       setEditOpen(false);
-      setEditSnackbar({ open: true, message: "Da cap nhat sach thanh cong", severity: "success" });
+      setEditSnackbar({ open: true, message: "Cập nhật sách thành công", severity: "success" });
     } catch (err: any) {
-      setEditSnackbar({ open: true, message: err?.response?.data?.error || "Cap nhat that bai", severity: "error" });
+      setEditSnackbar({ open: true, message: err?.response?.data?.error || "Cập nhật sách thất bại", severity: "error" });
     } finally {
       setEditSaving(false);
     }
@@ -500,7 +506,7 @@ export default function BookDetailPage() {
                 >
                   Mượn sách
                 </Button>
-                <Tooltip title="Chinh sua thong tin sach">
+                <Tooltip title="Chỉnh sửa thông tin sách">
                   <Button
                     variant="outlined"
                     size="large"
@@ -531,33 +537,36 @@ export default function BookDetailPage() {
         {/* Edit Book Dialog */}
         <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
           <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700 }}>
-            Chinh sua thong tin sach
+            Chỉnh sửa thông tin sách
             <IconButton onClick={() => setEditOpen(false)} size="small"><CloseIcon /></IconButton>
           </DialogTitle>
           <DialogContent dividers sx={{ pt: 2 }}>
             <Stack spacing={2.5}>
-              <TextField label="Tieu de" required fullWidth value={editForm.title || ""} onChange={(e) => handleEditChange("title", e.target.value)} />
-              <TextField label="Phu de" fullWidth value={editForm.subtitle || ""} onChange={(e) => handleEditChange("subtitle", e.target.value)} />
-              <TextField label="Tac gia" fullWidth value={editForm.author || ""} onChange={(e) => handleEditChange("author", e.target.value)} />
-              <TextField label="Nha xuat ban" fullWidth value={editForm.publisher || ""} onChange={(e) => handleEditChange("publisher", e.target.value)} />
-              <TextField label="Ngay xuat ban" fullWidth value={editForm.published_date || ""} onChange={(e) => handleEditChange("published_date", e.target.value)} placeholder="VD: 2024-01-01" />
-              <TextField label="Mo ta" fullWidth multiline minRows={4} value={editForm.description || ""} onChange={(e) => handleEditChange("description", e.target.value)} />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField label="So trang" type="number" fullWidth value={editForm.page_count ?? ""} onChange={(e) => handleEditChange("page_count", e.target.value)} />
-                <TextField label="Danh muc" fullWidth value={editForm.categories || ""} onChange={(e) => handleEditChange("categories", e.target.value)} />
-                <TextField label="Danh gia (0-5)" type="number" fullWidth value={editForm.average_rating ?? ""} onChange={(e) => handleEditChange("average_rating", e.target.value)} />
+                <TextField label="Tiêu đề" required fullWidth value={editForm.title || ""} onChange={(e) => handleEditChange("title", e.target.value)} />
+                <TextField label="Số lượng tồn kho" type="number" fullWidth value={editForm.quantity ?? 0} onChange={(e) => handleEditChange("quantity", e.target.value)} />
+              </Stack>
+              <TextField label="Phụ đề" fullWidth value={editForm.subtitle || ""} onChange={(e) => handleEditChange("subtitle", e.target.value)} />
+              <TextField label="Tác giả" fullWidth value={editForm.author || ""} onChange={(e) => handleEditChange("author", e.target.value)} />
+              <TextField label="Nhà xuất bản" fullWidth value={editForm.publisher || ""} onChange={(e) => handleEditChange("publisher", e.target.value)} />
+              <TextField label="Ngày xuất bản" fullWidth value={editForm.published_date || ""} onChange={(e) => handleEditChange("published_date", e.target.value)} placeholder="VD: 2024-01-01" />
+              <TextField label="Mô tả" fullWidth multiline minRows={4} value={editForm.description || ""} onChange={(e) => handleEditChange("description", e.target.value)} />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField label="Số trang" type="number" fullWidth value={editForm.page_count ?? ""} onChange={(e) => handleEditChange("page_count", e.target.value)} />
+                <TextField label="Danh mục" fullWidth value={editForm.categories || ""} onChange={(e) => handleEditChange("categories", e.target.value)} />
+                <TextField label="Đánh giá (0-5)" type="number" fullWidth value={editForm.average_rating ?? ""} onChange={(e) => handleEditChange("average_rating", e.target.value)} />
               </Stack>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField label="Ngon ngu" fullWidth value={editForm.language || ""} onChange={(e) => handleEditChange("language", e.target.value)} />
-                <TextField label="Vi tri ke" fullWidth value={editForm.shelf_location || ""} onChange={(e) => handleEditChange("shelf_location", e.target.value)} />
+                <TextField label="Ngôn ngữ" fullWidth value={editForm.language || ""} onChange={(e) => handleEditChange("language", e.target.value)} />
+                <TextField label="Vị trí kệ" fullWidth value={editForm.shelf_location || ""} onChange={(e) => handleEditChange("shelf_location", e.target.value)} />
               </Stack>
-              <TextField label="URL anh bia" fullWidth value={editForm.cover_url || ""} onChange={(e) => handleEditChange("cover_url", e.target.value)} placeholder="https://..." />
+              <TextField label="URL ảnh bìa" fullWidth value={editForm.cover_url || ""} onChange={(e) => handleEditChange("cover_url", e.target.value)} placeholder="https://..." />
             </Stack>
           </DialogContent>
           <Box sx={{ px: 3, py: 2, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
-            <Button onClick={() => setEditOpen(false)} disabled={editSaving}>Huy</Button>
+            <Button onClick={() => setEditOpen(false)} disabled={editSaving}>Hủy</Button>
             <Button variant="contained" onClick={handleEditSave} disabled={editSaving || !editForm.title?.trim()} startIcon={editSaving ? <CircularProgress size={16} /> : null}>
-              {editSaving ? "Dang luu..." : "Luu thay doi"}
+              {editSaving ? "Đang lưu..." : "Lưu"}
             </Button>
           </Box>
         </Dialog>
