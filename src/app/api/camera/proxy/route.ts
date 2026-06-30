@@ -1,11 +1,5 @@
 import { NextRequest } from "next/server";
 
-const ALLOWED_HOSTS = [
-  "192.168.1.13",
-  "192.168.1.240",
-  "192.168.1.113",
-];
-
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get("url");
   if (!url) {
@@ -21,10 +15,6 @@ export async function GET(request: NextRequest) {
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
     return new Response("Protocol not allowed", { status: 403 });
-  }
-
-  if (!ALLOWED_HOSTS.includes(parsed.hostname)) {
-    return new Response("Host not allowed", { status: 403 });
   }
 
   try {
