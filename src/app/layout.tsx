@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth-context";
 import { MuiThemeProvider } from "@/lib/mui-theme";
-import { ToastProvider } from "@/components/ui/Toast";
 import ClientLayout from "@/components/ClientLayout";
 import "./globals.css";
 
@@ -19,11 +18,9 @@ export default function RootLayout({
     <html lang="vi" className="dark" suppressHydrationWarning>
       <body suppressHydrationWarning className="bg-bg text-text">
         <MuiThemeProvider>
-          <AuthProvider>
-            <ToastProvider>
-              <ClientLayout>{children}</ClientLayout>
-            </ToastProvider>
-          </AuthProvider>
+      <AuthProvider>
+        <ClientLayout>{children}</ClientLayout>
+      </AuthProvider>
         </MuiThemeProvider>
       </body>
     </html>

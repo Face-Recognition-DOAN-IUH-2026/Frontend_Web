@@ -9,18 +9,12 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Drawer,
   Card,
   CardActionArea,
   Divider,
   Grid,
   IconButton,
-  InputAdornment,
-  Paper,
   Stack,
   Table,
   TableBody,
@@ -33,7 +27,6 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   alpha,
-  LinearProgress,
 } from "@mui/material";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
@@ -44,17 +37,20 @@ import AccountBoxOutlinedIcon from "@mui/icons-material/AccountBoxOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import SupervisorAccountOutlinedIcon from "@mui/icons-material/SupervisorAccountOutlined";
-import EmptyState from "@/components/ui/EmptyState";
-import SearchField from "@/components/ui/SearchField";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
-
+import EmptyState from "@/components/ui/EmptyState";
+import SearchField from "@/components/ui/SearchField";
+import PageHeader from "@/components/ui/PageHeader";
+import MuiStatCard from "@/components/ui/MuiStatCard";
+import DashboardCard from "@/components/ui/DashboardCard";
+import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { fadeInUp, shimmer } from "@/lib/animations";
 import { initials, roleLabel, statusLabel, statusColor } from "@/lib/utils";
-import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 import type { UserPublic } from "@/lib/types";
 
 function roleChipColor(role: string): "warning" | "primary" | "default" | "success" {
@@ -82,7 +78,6 @@ export default function AdminPage() {
   const [createError, setCreateError] = useState("");
   const [notice, setNotice] = useState("");
 
-  // Search & filter
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "staff" | "patron">("all");
 
@@ -148,61 +143,26 @@ export default function AdminPage() {
   const patronCount = users.filter((u) => u.role === "patron").length;
   const faceCount   = users.filter((u) => u.has_face).length;
 
-  const stats = [
-    { key: "total",  label: "Tổng người dùng",  value: total,       icon: <GroupsOutlinedIcon sx={{ fontSize: 28 }} />,                          pct: 100 },
-    { key: "admin",  label: "Quản trị viên",     value: adminCount,  icon: <AdminPanelSettingsOutlinedIcon sx={{ fontSize: 28 }} />,              pct: total ? (adminCount / total) * 100 : 0 },
-    { key: "staff",  label: "Nhân viên",          value: staffCount,  icon: <PersonOutlineOutlinedIcon sx={{ fontSize: 28 }} />,                   pct: total ? (staffCount / total) * 100 : 0 },
-    { key: "patron", label: "Độc giả",            value: patronCount, icon: <AccountBoxOutlinedIcon sx={{ fontSize: 28 }} />,                      pct: total ? (patronCount / total) * 100 : 0 },
-    { key: "face",   label: "Đã có khuôn mặt",   value: faceCount,   icon: <FaceRetouchingNaturalOutlinedIcon sx={{ fontSize: 28 }} />,           pct: total ? (faceCount / total) * 100 : 0 },
+  const STATS: { key: string; label: string; value: number; icon: any; gradient: string; pct: number }[] = [
+    { key: "total",  label: "Tổng người dùng",  value: total,       icon: GroupsOutlinedIcon,                    gradient: STAT_GRADIENT.total,  pct: 100 },
+    { key: "admin",  label: "Quản trị viên",    value: adminCount,  icon: AdminPanelSettingsOutlinedIcon,         gradient: STAT_GRADIENT.admin,  pct: total ? (adminCount / total) * 100 : 0 },
+    { key: "staff",  label: "Nhân viên",         value: staffCount,  icon: PersonOutlineOutlinedIcon,              gradient: STAT_GRADIENT.staff,  pct: total ? (staffCount / total) * 100 : 0 },
+    { key: "patron", label: "Độc giả",           value: patronCount, icon: AccountBoxOutlinedIcon,                 gradient: STAT_GRADIENT.patron, pct: total ? (patronCount / total) * 100 : 0 },
+    { key: "face",   label: "Đã có khuôn mặt",  value: faceCount,   icon: FaceRetouchingNaturalOutlinedIcon,     gradient: STAT_GRADIENT.face,   pct: total ? (faceCount / total) * 100 : 0 },
   ];
+
+  const statBadges = `${total} người dùng · ${adminCount} admin · ${staffCount} nhân viên · ${patronCount} độc giả · ${faceCount} đã có khuôn mặt`;
 
   return (
     <Stack spacing={3}>
-      {/* ── Header ── */}
-      <Box
-        sx={{
-          p: 3,
-          borderRadius: 3,
-          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
-          border: "1px solid",
-          borderColor: "rgba(99,102,241,0.3)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {/* Decorative circles */}
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
-
-        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-            <AdminPanelSettingsOutlinedIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
-          </Avatar>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>
-              Quản trị người dùng
-            </Typography>
-            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
-              Tạo tài khoản admin/staff và theo dõi trạng thái sinh trắc học.
-            </Typography>
-          </Box>
-        </Stack>
-
-        <Stack direction="row" spacing={1.5} sx={{ zIndex: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshOutlinedIcon />}
-            onClick={load}
-            size="small"
-            sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" }, borderRadius: 2 }}
-          >
-            Tải lại
-          </Button>
+      <PageHeader
+        title="Quản trị người dùng"
+        subtitle="Tạo tài khoản admin/staff và theo dõi trạng thái sinh trắc học."
+        icon={AdminPanelSettingsOutlinedIcon}
+        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
+        statBadges={statBadges}
+        onRefresh={load}
+        actions={
           <Button
             variant="contained"
             startIcon={<AddOutlinedIcon />}
@@ -211,66 +171,25 @@ export default function AdminPage() {
           >
             Thêm người dùng
           </Button>
-        </Stack>
-      </Box>
+        }
+      />
 
-      {/* ── Stat Cards ── */}
       <Grid container spacing={2}>
-        {stats.map((s, idx) => (
-          <Grid key={s.key} size={{ xs: 12, sm: 6, md: 4, lg: 2.4 } as any}
-            sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationDelay: `${idx * 0.07}s`, animationFillMode: "both" }}
-          >
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2.5,
-                borderRadius: 3,
-                position: "relative",
-                overflow: "hidden",
-                borderColor: "divider",
-                transition: "transform 0.2s, box-shadow 0.2s",
-                "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
-              }}
-            >
-              <Box
-                sx={{
-                  position: "absolute", top: 0, right: 0,
-                  width: 80, height: 80,
-                  background: STAT_GRADIENT[s.key],
-                  opacity: 0.12,
-                  borderRadius: "0 12px 0 80px",
-                }}
-              />
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                <Avatar sx={{ background: STAT_GRADIENT[s.key], width: 44, height: 44, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
-                  {s.icon}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    {s.label}
-                  </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-                    {s.value}
-                  </Typography>
-                </Box>
-              </Stack>
-              <LinearProgress
-                variant="determinate"
-                value={s.pct}
-                sx={{
-                  mt: 1.5, height: 3, borderRadius: 2,
-                  bgcolor: "action.hover",
-                  "& .MuiLinearProgress-bar": { background: STAT_GRADIENT[s.key], borderRadius: 2 },
-                }}
-              />
-            </Paper>
+        {STATS.map((s, idx) => (
+          <Grid key={s.key} size={{ xs: 12, sm: 6, md: 4, lg: 2.4 } as any}>
+            <MuiStatCard
+              label={s.label}
+              value={s.value}
+              icon={s.icon}
+              gradient={s.gradient}
+              pct={s.pct}
+              index={idx}
+            />
           </Grid>
         ))}
       </Grid>
 
-      {/* ── Table card ── */}
-      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
-        {/* Table toolbar */}
+      <DashboardCard title="" noPadding>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
@@ -339,7 +258,7 @@ export default function AdminPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((item) => (
+                filtered.map((item, idx) => (
                   <TableRow
                     key={item.id}
                     hover
@@ -349,6 +268,7 @@ export default function AdminPage() {
                       transition: "background 0.15s",
                       "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.04) },
                       "&:last-child td": { border: 0 },
+                      ...staggerSx(idx),
                     }}
                   >
                     <TableCell>
@@ -369,17 +289,17 @@ export default function AdminPage() {
                             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                           }}
                         >
-                          {!item.avatar_url && initials(item.full_name || item.email)}
+                          {!item.avatar_url ? initials(item.full_name || item.email) : null}
                         </Avatar>
                         <Box sx={{ minWidth: 0 }}>
                           <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }} noWrap>
                             {item.email}
                           </Typography>
-                          {item.full_name && (
+                          {item.full_name ? (
                             <Typography variant="caption" color="text.secondary" noWrap>
                               {item.full_name}
                             </Typography>
-                          )}
+                          ) : null}
                         </Box>
                       </Stack>
                     </TableCell>
@@ -421,9 +341,8 @@ export default function AdminPage() {
             </TableBody>
           </Table>
         </TableContainer>
-      </Paper>
+      </DashboardCard>
 
-      {/* ── Create Drawer ── */}
       <Drawer
         anchor="right"
         open={showCreate}
@@ -446,7 +365,7 @@ export default function AdminPage() {
 
         <Box sx={{ p: 3, flex: 1, overflowY: "auto" }}>
           <Stack spacing={4}>
-            {createError && <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert>}
+            {createError ? <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert> : null}
 
             <Box>
               <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>

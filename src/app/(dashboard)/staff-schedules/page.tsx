@@ -3,22 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
-  Chip,
-  CircularProgress,
   IconButton,
-  LinearProgress,
   Paper,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
   Typography,
-  alpha,
 } from "@mui/material";
-import CalendarIcon from "@mui/icons-material/CalendarTodayOutlined";
 import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
 import TodayIcon from "@mui/icons-material/TodayOutlined";
@@ -32,10 +26,16 @@ import StaffIcon from "@mui/icons-material/PersonOutlined";
 import MapIcon from "@mui/icons-material/PinDropOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import LeaveIcon from "@mui/icons-material/BeachAccessOutlined";
+import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
-import { fadeInUp } from "@/lib/animations";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
 import type { ScheduleStaff, LibraryZone, StaffShift, StaffScheduleAssignment, ManualCheckInRequest } from "@/lib/types";
+import PageHeader from "@/components/ui/PageHeader";
+import MuiStatCard from "@/components/ui/MuiStatCard";
+import DashboardCard from "@/components/ui/DashboardCard";
+import EmptyState from "@/components/ui/EmptyState";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import TimetableGrid from "@/components/staff-schedule/TimetableGrid";
 import TimetableLegend from "@/components/staff-schedule/TimetableLegend";
 import AssignStaffDialog from "@/components/staff-schedule/AssignStaffDialog";
@@ -65,6 +65,8 @@ const STAT_GRADIENT = {
   active: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
   staff: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
 };
+
+const HEADER_GRADIENT = "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)";
 
 function startOfWeek(date = new Date()) {
   const value = new Date(date);
@@ -260,229 +262,174 @@ export default function StaffSchedulesPage() {
 
   if (!isStaff) {
     return (
-      <Box sx={{ minHeight: 300, display: "grid", placeItems: "center" }}>
-        <Typography color="text.secondary">Bạn không có quyền xem trang này.</Typography>
-      </Box>
+      <EmptyState
+        icon={<ScheduleOutlined sx={{ fontSize: 32 }} />}
+        title="Không có quyền truy cập"
+        description="Bạn không có quyền xem trang này."
+      />
     );
   }
 
   const isCurrentWeek = toDateInput(days[0]) === toDateInput(getWeekDays(new Date())[0]);
 
-  return (
-    <Stack spacing={3}>
-      {/* ── Gradient Header ── */}
-      <Box
+  const headerActions = (
+    <>
+      <Tooltip title="Tuần trước">
+        <IconButton onClick={goPrevWeek} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+          <PrevIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Button
+        onClick={goToday}
+        size="small"
+        variant={isCurrentWeek ? "contained" : "outlined"}
+        startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
         sx={{
-          p: 3,
-          borderRadius: 3,
-          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
-          border: "1px solid",
-          borderColor: "rgba(99,102,241,0.3)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          position: "relative",
-          overflow: "hidden",
+          borderRadius: 2,
+          fontWeight: 700,
+          fontSize: "0.75rem",
+          ...(isCurrentWeek
+            ? { bgcolor: "#6366f1", "&:hover": { bgcolor: "#4f46e5" } }
+            : { color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }
+          ),
         }}
       >
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
-
-        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-            <CalendarIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
-          </Avatar>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>
-              Lịch trực theo tuần
-            </Typography>
-            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
-              {formatDateRange(days)}
-            </Typography>
-          </Box>
-        </Stack>
-
-        <Stack direction="row" spacing={1} sx={{ zIndex: 1, flexWrap: "wrap" }}>
-          <Tooltip title="Tuần trước">
-            <IconButton onClick={goPrevWeek} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <PrevIcon fontSize="small" />
+        Hôm nay
+      </Button>
+      <Tooltip title="Tuần sau">
+        <IconButton onClick={goNextWeek} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+          <NextIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      {isAdmin ? (
+        <>
+          <Tooltip title="Gợi ý lịch tự động">
+            <IconButton onClick={() => setShowAutoSchedule(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+              <AutoAwesomeIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Button
-            onClick={goToday}
-            size="small"
-            variant={isCurrentWeek ? "contained" : "outlined"}
-            startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
-            sx={{
-              borderRadius: 2,
-              fontWeight: 700,
-              fontSize: "0.75rem",
-              ...(isCurrentWeek
-                ? { bgcolor: "#6366f1", "&:hover": { bgcolor: "#4f46e5" } }
-                : { color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }
-              ),
-            }}
-          >
-            Hôm nay
-          </Button>
-          <Tooltip title="Tuần sau">
-            <IconButton onClick={goNextWeek} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <NextIcon fontSize="small" />
+          <Tooltip title="Quản lý ca/khu vực">
+            <IconButton onClick={() => setShowManagement(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <SettingsIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          {isAdmin && (
-            <>
-              <Tooltip title="Gợi ý lịch tự động">
-                <IconButton onClick={() => setShowAutoSchedule(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
-                  <AutoAwesomeIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Quản lý ca/khu vực">
-                <IconButton onClick={() => setShowManagement(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-                  <SettingsIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Duyệt đơn nghỉ">
-                <IconButton onClick={() => setShowLeaveApproval(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
-                  <LeaveIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Duyệt đăng ký ca">
-                <IconButton onClick={() => setShowBidsReview(true)} size="small" sx={{ color: "#10b981", border: "1px solid rgba(16,185,129,0.3)", "&:hover": { bgcolor: "rgba(16,185,129,0.1)" }, position: "relative" }}>
-                  <ActiveIcon fontSize="small" />
-                  {pendingBidCount > 0 ? (
-                    <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingBidCount > 9 ? "9+" : pendingBidCount}</Typography>
-                    </Box>
-                  ) : null}
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Đổi ca chờ xử lý">
-                <IconButton onClick={() => setShowSwapsView(true)} size="small" sx={{ color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)", "&:hover": { bgcolor: "rgba(59,130,246,0.1)" }, position: "relative" }}>
-                  <GroupIcon fontSize="small" />
-                  {pendingSwapCount > 0 ? (
-                    <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingSwapCount > 9 ? "9+" : pendingSwapCount}</Typography>
-                    </Box>
-                  ) : null}
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Mẫu lịch">
-                <IconButton onClick={() => setShowTemplates(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-                  <TotalIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Geofence">
-                <IconButton onClick={() => setShowGeofence(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
-                  <MapIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Check-in thủ công">
-                <IconButton onClick={() => setShowManualCheckIn(true)} size="small" sx={{ color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.3)", "&:hover": { bgcolor: "rgba(139,92,246,0.1)" }, position: "relative" }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                  {pendingManualCount > 0 ? (
-                    <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingManualCount > 9 ? "9+" : pendingManualCount}</Typography>
-                    </Box>
-                  ) : null}
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Nhật ký">
-                <IconButton onClick={() => setShowAuditLogs(true)} size="small" sx={{ color: "#6b7280", border: "1px solid rgba(107,114,128,0.3)", "&:hover": { bgcolor: "rgba(107,114,128,0.1)" } }}>
-                  <HistoryIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Xóa lịch tuần này">
-                <IconButton
-                  onClick={() => setShowDeleteWeek(true)}
-                  size="small"
-                  sx={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.35)", "&:hover": { bgcolor: "rgba(239,68,68,0.1)" } }}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-          {!isAdmin && (
-            <>
-              <Tooltip title="Xin nghỉ">
-                <IconButton onClick={() => setShowAvailability(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
-                  <TodayIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Đổi ca">
-                <IconButton onClick={() => setShowSwapRequest(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-                  <GroupIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-          <Tooltip title="In lịch">
-            <IconButton onClick={() => window.print()} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <PrintIcon fontSize="small" />
+          <Tooltip title="Duyệt đơn nghỉ">
+            <IconButton onClick={() => setShowLeaveApproval(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+              <LeaveIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-        </Stack>
-      </Box>
+          <Tooltip title="Duyệt đăng ký ca">
+            <IconButton onClick={() => setShowBidsReview(true)} size="small" sx={{ color: "#10b981", border: "1px solid rgba(16,185,129,0.3)", "&:hover": { bgcolor: "rgba(16,185,129,0.1)" }, position: "relative" }}>
+              <ActiveIcon fontSize="small" />
+              {pendingBidCount > 0 ? (
+                <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingBidCount > 9 ? "9+" : pendingBidCount}</Typography>
+                </Box>
+              ) : null}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Đổi ca chờ xử lý">
+            <IconButton onClick={() => setShowSwapsView(true)} size="small" sx={{ color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)", "&:hover": { bgcolor: "rgba(59,130,246,0.1)" }, position: "relative" }}>
+              <GroupIcon fontSize="small" />
+              {pendingSwapCount > 0 ? (
+                <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingSwapCount > 9 ? "9+" : pendingSwapCount}</Typography>
+                </Box>
+              ) : null}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Mẫu lịch">
+            <IconButton onClick={() => setShowTemplates(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <TotalIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Geofence">
+            <IconButton onClick={() => setShowGeofence(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+              <MapIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Check-in thủ công">
+            <IconButton onClick={() => setShowManualCheckIn(true)} size="small" sx={{ color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.3)", "&:hover": { bgcolor: "rgba(139,92,246,0.1)" }, position: "relative" }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              {pendingManualCount > 0 ? (
+                <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingManualCount > 9 ? "9+" : pendingManualCount}</Typography>
+                </Box>
+              ) : null}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Nhật ký">
+            <IconButton onClick={() => setShowAuditLogs(true)} size="small" sx={{ color: "#6b7280", border: "1px solid rgba(107,114,128,0.3)", "&:hover": { bgcolor: "rgba(107,114,128,0.1)" } }}>
+              <HistoryIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Xóa lịch tuần này">
+            <IconButton
+              onClick={() => setShowDeleteWeek(true)}
+              size="small"
+              sx={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.35)", "&:hover": { bgcolor: "rgba(239,68,68,0.1)" } }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </IconButton>
+          </Tooltip>
+        </>
+      ) : (
+        <>
+          <Tooltip title="Xin nghỉ">
+            <IconButton onClick={() => setShowAvailability(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+              <TodayIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Đổi ca">
+            <IconButton onClick={() => setShowSwapRequest(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+              <GroupIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </>
+      )}
+      <Tooltip title="In lịch">
+        <IconButton onClick={() => window.print()} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+          <PrintIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </>
+  );
 
-      {/* ── Stat Cards ── */}
+  return (
+    <Stack spacing={3}>
+      <PageHeader
+        title="Lịch trực theo tuần"
+        icon={ScheduleOutlined}
+        gradient={HEADER_GRADIENT}
+        statBadges={formatDateRange(days)}
+        onRefresh={loadData}
+        actions={headerActions}
+      />
+
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
         {[
-          { key: "total", label: "Tổng ca tuần", value: weekStats.total, icon: <TotalIcon sx={{ fontSize: 22 }} />, gradient: STAT_GRADIENT.total, pct: 100 },
-          { key: "active", label: "Đang trực", value: weekStats.active, icon: <ActiveIcon sx={{ fontSize: 22 }} />, gradient: STAT_GRADIENT.active, pct: weekStats.total ? (weekStats.active / weekStats.total) * 100 : 0 },
-          { key: "staff", label: "Nhân viên", value: staff.length, icon: <StaffIcon sx={{ fontSize: 22 }} />, gradient: STAT_GRADIENT.staff, pct: 100 },
+          { key: "total", label: "Tổng ca tuần", value: weekStats.total, icon: TotalIcon, gradient: STAT_GRADIENT.total, pct: 100 },
+          { key: "active", label: "Đang trực", value: weekStats.active, icon: ActiveIcon, gradient: STAT_GRADIENT.active, pct: weekStats.total ? (weekStats.active / weekStats.total) * 100 : 0 },
+          { key: "staff", label: "Nhân viên", value: staff.length, icon: StaffIcon, gradient: STAT_GRADIENT.staff, pct: 100 },
         ].map((s, idx) => (
-          <Paper
-            key={s.key}
-            variant="outlined"
-            sx={{
-              p: 2.5,
-              borderRadius: 3,
-              position: "relative",
-              overflow: "hidden",
-              borderColor: "divider",
-              transition: "transform 0.2s, box-shadow 0.2s",
-              animation: `${fadeInUp} 0.4s ease-out`,
-              animationDelay: `${idx * 0.07}s`,
-              animationFillMode: "both",
-              "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
-            }}
-          >
-            <Box sx={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: s.gradient, opacity: 0.12, borderRadius: "0 12px 0 80px" }} />
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-              <Avatar sx={{ background: s.gradient, width: 44, height: 44, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
-                {s.icon}
-              </Avatar>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                  {s.label}
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-                  {s.value}
-                </Typography>
-              </Box>
-            </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={s.pct}
-              sx={{
-                mt: 1.5, height: 3, borderRadius: 2,
-                bgcolor: "action.hover",
-                "& .MuiLinearProgress-bar": { background: s.gradient, borderRadius: 2 },
-              }}
+          <Box key={s.key} sx={staggerSx(idx)}>
+            <MuiStatCard
+              label={s.label}
+              value={s.value}
+              icon={s.icon}
+              gradient={s.gradient}
+              pct={s.pct}
+              index={idx}
             />
-          </Paper>
+          </Box>
         ))}
       </Box>
 
-      {/* ── Filter Chips ── */}
-      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, borderColor: "divider" }}>
+      <DashboardCard>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 1, textTransform: "uppercase", letterSpacing: 0.5, fontSize: "0.7rem" }}>
             Bộ lọc:
@@ -490,7 +437,7 @@ export default function StaffSchedulesPage() {
           <ToggleButtonGroup
             value={filter}
             exclusive
-            onChange={(_, v) => v && setFilter(v)}
+            onChange={(_, v) => v ? setFilter(v) : undefined}
             size="small"
             sx={{
               "& .MuiToggleButton-root": {
@@ -510,7 +457,6 @@ export default function StaffSchedulesPage() {
             ))}
           </ToggleButtonGroup>
 
-          {/* Lọc theo Khu vực */}
           <select
             value={zoneFilter}
             onChange={(e) => setZoneFilter(e.target.value)}
@@ -532,7 +478,6 @@ export default function StaffSchedulesPage() {
             ))}
           </select>
 
-          {/* Lọc theo Ca */}
           <select
             value={shiftFilter}
             onChange={(e) => setShiftFilter(e.target.value)}
@@ -554,24 +499,16 @@ export default function StaffSchedulesPage() {
             ))}
           </select>
         </Stack>
-      </Paper>
+      </DashboardCard>
 
-      {error && (
+      {error ? (
         <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>
           {error}
         </Alert>
-      )}
+      ) : null}
 
-      {/* ── Timetable Grid ── */}
-      {loading ? (
-        <Box sx={{ minHeight: 300, display: "grid", placeItems: "center" }}>
-          <Stack spacing={2} sx={{ alignItems: "center" }}>
-            <CircularProgress sx={{ animation: `${fadeInUp} 0.3s ease-out` }} />
-            <Typography variant="body2" color="text.secondary">Đang tải lịch trực...</Typography>
-          </Stack>
-        </Box>
-      ) : (
-        <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
+      <LoadingOverlay loading={loading} message="Đang tải lịch trực...">
+        <DashboardCard noPadding>
           <TimetableGrid
             days={days}
             shifts={filteredShifts}
@@ -581,13 +518,12 @@ export default function StaffSchedulesPage() {
             onCellClick={isAdmin ? handleCellClick : undefined}
             onDeleteAssignment={isAdmin ? handleDeleteAssignment : undefined}
           />
-        </Paper>
-      )}
+        </DashboardCard>
+      </LoadingOverlay>
 
-      {/* ── Legend ── */}
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
+      <DashboardCard>
         <TimetableLegend />
-      </Paper>
+      </DashboardCard>
 
       <AssignStaffDialog
         open={!!assignDialog}
@@ -629,17 +565,12 @@ export default function StaffSchedulesPage() {
         allStaff={staff}
       />
 
-      {/* ── Staff Panels (non-admin) ── */}
-      {!isAdmin && (
-        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, borderColor: "divider" }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
-            Đổi ca chờ xử lý
-          </Typography>
+      {!isAdmin ? (
+        <DashboardCard title="Đổi ca chờ xử lý">
           <MySwapsPanel refreshKey={swapRefreshKey} onError={(msg) => setError(msg)} />
-        </Paper>
-      )}
+        </DashboardCard>
+      ) : null}
 
-      {/* ── Admin Panels ── */}
       <LeaveApprovalPanel open={showLeaveApproval} onClose={() => setShowLeaveApproval(false)} onUpdated={loadData} />
       <BidsReviewPanel open={showBidsReview} onClose={() => setShowBidsReview(false)} onUpdated={loadData} />
       <SwapsViewPanel open={showSwapsView} onClose={() => setShowSwapsView(false)} onUpdated={loadData} />

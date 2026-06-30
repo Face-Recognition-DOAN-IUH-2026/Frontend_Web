@@ -3,16 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Chip,
-  CircularProgress,
   Grid,
   InputAdornment,
   LinearProgress,
   MenuItem,
-  Paper,
   Stack,
   Switch,
   Table,
@@ -25,8 +22,6 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
-import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
@@ -43,8 +38,14 @@ import {
   YAxis,
 } from "recharts";
 import api from "@/lib/api-client";
-import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
+import { successPop } from "@/lib/animations";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
 import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
+import PageHeader from "@/components/ui/PageHeader";
+import DashboardCard from "@/components/ui/DashboardCard";
+import MuiStatCard from "@/components/ui/MuiStatCard";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import EmptyState from "@/components/ui/EmptyState";
 
 const PAGE_SIZES = [20, 50, 100];
 
@@ -188,51 +189,21 @@ export default function HistoryPage() {
 
   return (
     <Stack spacing={3}>
-      <Box
-        sx={{
-          p: 3,
-          borderRadius: 3,
-          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
-          border: "1px solid",
-          borderColor: "rgba(99,102,241,0.3)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+      <PageHeader
+        title="Lịch sử mượn trả"
+        icon={HistoryOutlinedIcon}
+        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
+        statBadges={`${live ? "Live · " : ""}Tổng: ${total}`}
+        onRefresh={load}
+        actions={
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Chip icon={<SensorsOutlinedIcon />} label={live ? "Live đang bật" : "Live đang tắt"} sx={{ bgcolor: live ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.08)", color: live ? "#6ee7b7" : "#a5b4fc", border: "1px solid", borderColor: live ? "rgba(16,185,129,0.3)" : "rgba(165,180,252,0.3)", fontWeight: 600 }} />
+            <Chip label={`Tổng: ${total}`} sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "#e0e7ff", border: "1px solid rgba(165,180,252,0.3)", fontWeight: 600 }} />
+          </Stack>
+        }
+      />
 
-        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-            <HistoryOutlinedIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
-          </Avatar>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Lịch sử ra/vào</Typography>
-            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
-              Tra cứu log theo độc giả, trạng thái, thời gian và theo dõi live từ camera
-            </Typography>
-          </Box>
-        </Stack>
-
-        <Stack direction="row" spacing={1} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Chip icon={<SensorsOutlinedIcon />} label={live ? "Live đang bật" : "Live đang tắt"} sx={{ bgcolor: live ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.08)", color: live ? "#6ee7b7" : "#a5b4fc", border: "1px solid", borderColor: live ? "rgba(16,185,129,0.3)" : "rgba(165,180,252,0.3)", fontWeight: 600 }} />
-          <Chip label={`Tổng: ${total}`} sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "#e0e7ff", border: "1px solid rgba(165,180,252,0.3)", fontWeight: 600 }} />
-        </Stack>
-      </Box>
-
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", mb: 2 }}>
-          <FilterAltOutlinedIcon color="disabled" />
-          <Typography variant="h6" sx={{ fontWeight: 850 }}>
-            Bộ lọc
-          </Typography>
-        </Stack>
-
+      <DashboardCard title="Bộ lọc">
         <Grid container spacing={1.5} sx={{ alignItems: "center" }}>
           <Grid size={{ xs: 12, md: 3 }}>
             <TextField
@@ -240,7 +211,7 @@ export default function HistoryPage() {
               placeholder="MSSV hoặc tên..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" && handleFilter()}
+              onKeyDown={(event) => event.key === "Enter" ? handleFilter() : undefined}
               fullWidth
               size="small"
               slotProps={{
@@ -311,197 +282,154 @@ export default function HistoryPage() {
             </Stack>
           </Grid>
         </Grid>
-      </Paper>
+      </DashboardCard>
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 8 }}>
-          <Paper variant="outlined" sx={{ p: 2.5, height: "100%", animation: `${fadeInUp} 0.4s ease-out` }}>
-            <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", mb: 2 }}>
-              <BarChartOutlinedIcon color="disabled" />
-              <Typography variant="h6" sx={{ fontWeight: 850 }}>
-                Tần suất ra/vào theo ngày
-              </Typography>
-            </Stack>
-
-            {freqLoading ? (
-              <Stack sx={{ height: 260, alignItems: "center", justifyContent: "center" }}>
-                <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
-              </Stack>
-            ) : frequency.length === 0 ? (
-              <Alert severity="info">Chưa có dữ liệu tần suất trong khoảng thời gian đã chọn.</Alert>
-            ) : (
-              <Box sx={{ height: 270 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={frequency} margin={{ top: 8, right: 20, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                    <XAxis
-                      dataKey="date"
-                      fontSize={12}
-                      tick={{ fill: theme.palette.text.secondary }}
-                      tickFormatter={(value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
-                    />
-                    <YAxis allowDecimals={false} fontSize={12} tick={{ fill: theme.palette.text.secondary }} />
-                    <Tooltip
-                      cursor={{ fill: theme.palette.action.hover }}
-                      contentStyle={{
-                        background: theme.palette.background.paper,
-                        border: `1px solid ${theme.palette.divider}`,
-                        borderRadius: 8,
-                        color: theme.palette.text.primary,
-                      }}
-                      labelFormatter={(value) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", {
-                        weekday: "long",
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      })}
-                    />
-                    <Legend />
-                    <Bar dataKey="entry" fill={theme.palette.success.main} name="Vào" radius={[5, 5, 0, 0]} />
-                    <Bar dataKey="exit" fill={theme.palette.warning.main} name="Ra" radius={[5, 5, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Box>
-            )}
-          </Paper>
+          <DashboardCard title="Tần suất ra/vào theo ngày">
+            <LoadingOverlay loading={freqLoading} message="Đang tải biểu đồ...">
+              {frequency.length === 0 ? (
+                <Alert severity="info">Chưa có dữ liệu tần suất trong khoảng thời gian đã chọn.</Alert>
+              ) : (
+                <Box sx={{ height: 270 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={frequency} margin={{ top: 8, right: 20, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                      <XAxis
+                        dataKey="date"
+                        fontSize={12}
+                        tick={{ fill: theme.palette.text.secondary }}
+                        tickFormatter={(value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                      />
+                      <YAxis allowDecimals={false} fontSize={12} tick={{ fill: theme.palette.text.secondary }} />
+                      <Tooltip
+                        cursor={{ fill: theme.palette.action.hover }}
+                        contentStyle={{
+                          background: theme.palette.background.paper,
+                          border: `1px solid ${theme.palette.divider}`,
+                          borderRadius: 8,
+                          color: theme.palette.text.primary,
+                        }}
+                        labelFormatter={(value) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      />
+                      <Legend />
+                      <Bar dataKey="entry" fill={theme.palette.success.main} name="Vào" radius={[5, 5, 0, 0]} />
+                      <Bar dataKey="exit" fill={theme.palette.warning.main} name="Ra" radius={[5, 5, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+              )}
+            </LoadingOverlay>
+          </DashboardCard>
         </Grid>
 
         <Grid size={{ xs: 12, md: 4 }}>
           <Stack spacing={2} sx={{ height: "100%" }}>
-            <Paper variant="outlined" sx={{
-              p: 2.5, borderRadius: 3, position: "relative", overflow: "hidden", borderColor: "divider",
-              transition: "transform 0.2s, box-shadow 0.2s",
-              animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0s", animationFillMode: "both",
-              "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
-            }}>
-              <Box sx={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", opacity: 0.12, borderRadius: "0 12px 0 80px" }} />
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                <Avatar sx={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", width: 44, height: 44, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
-                  <LoginOutlinedIcon />
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Lượt vào trong biểu đồ</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{entryTotal}</Typography>
-                </Box>
-              </Stack>
-              <LinearProgress variant="determinate" value={100} sx={{ mt: 1.5, height: 3, borderRadius: 2, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", borderRadius: 2 } }} />
-            </Paper>
-            <Paper variant="outlined" sx={{
-              p: 2.5, borderRadius: 3, position: "relative", overflow: "hidden", borderColor: "divider",
-              transition: "transform 0.2s, box-shadow 0.2s",
-              animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0.07s", animationFillMode: "both",
-              "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
-            }}>
-              <Box sx={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)", opacity: 0.12, borderRadius: "0 12px 0 80px" }} />
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                <Avatar sx={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)", width: 44, height: 44, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
-                  <LogoutOutlinedIcon />
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Lượt ra trong biểu đồ</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{exitTotal}</Typography>
-                </Box>
-              </Stack>
-              <LinearProgress variant="determinate" value={100} sx={{ mt: 1.5, height: 3, borderRadius: 2, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)", borderRadius: 2 } }} />
-            </Paper>
+            <MuiStatCard
+              label="Lượt vào trong biểu đồ"
+              value={entryTotal}
+              icon={LoginOutlinedIcon}
+              gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)"
+              pct={100}
+              index={0}
+            />
+            <MuiStatCard
+              label="Lượt ra trong biểu đồ"
+              value={exitTotal}
+              icon={LogoutOutlinedIcon}
+              gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+              pct={100}
+              index={1}
+            />
           </Stack>
         </Grid>
       </Grid>
 
-      <Paper variant="outlined" sx={{ overflow: "hidden", animation: `${fadeInUp} 0.4s ease-out` }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ p: 2, alignItems: { md: "center" }, justifyContent: "space-between" }}>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 850 }}>
-              Nhật ký truy cập
-            </Typography>
-            <Typography color="text.secondary" variant="body2">
-              Trang {currentPage} / {totalPages}
-            </Typography>
-          </Box>
-          {error && <Alert severity="error" sx={{ py: 0 }}>{error}</Alert>}
-        </Stack>
+      <DashboardCard
+        title="Nhật ký truy cập"
+        subtitle={`Trang ${currentPage} / ${totalPages}`}
+        noPadding
+      >
+        {error ? <Alert severity="error" sx={{ mx: 2.5, mt: 2 }}>{error}</Alert> : null}
 
-        <TableContainer>
-          <Table size="small" sx={{ minWidth: 980 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Thời gian</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Độc giả</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>MSSV</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Loại</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Phương thức</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Cổng</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Độ tin cậy</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Kết quả</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading && logs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8}>
-                    <Stack sx={{ py: 6, alignItems: "center" }}>
-                      <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ) : logs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8}>
-                    <Alert severity="info">Không có dữ liệu lịch sử phù hợp.</Alert>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                logs.map((log, idx) => {
-                  const confidence = log.confidence == null ? null : Math.round(log.confidence * 100);
-                  const statusColor = getStatusColor(log.status);
-                  return (
-                    <TableRow key={log.id} hover sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.03}s`, animationFillMode: "both" }}>
-                      <TableCell sx={{ whiteSpace: "nowrap", fontFamily: "monospace", color: "text.secondary" }}>
-                        {new Date(log.access_time).toLocaleString("vi-VN")}
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>{log.patron_name || "-"}</TableCell>
-                      <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{log.student_code || "-"}</TableCell>
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          color={log.access_type === "entry" ? "success" : "warning"}
-                          label={log.access_type === "entry" ? "Vào" : "Ra"}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ color: "text.secondary" }}>{log.verify_method}</TableCell>
-                      <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>
-                        {CAMERA_LABELS[log.camera_id] || log.camera_id}
-                      </TableCell>
-                      <TableCell sx={{ minWidth: 150 }}>
-                        {confidence == null ? (
-                          <Typography color="text.secondary">-</Typography>
-                        ) : (
-                          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={confidence}
-                              color={confidence >= 80 ? "success" : confidence >= 60 ? "warning" : "error"}
-                              sx={{ width: 80, height: 7, borderRadius: 99 }}
-                            />
-                            <Typography variant="caption" color="text.secondary">{confidence}%</Typography>
-                          </Stack>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip size="small" color={statusColor} label={getStatusLabel(log.status)} sx={{ animation: log.status === "success" || log.status === "granted" ? `${successPop} 0.35s ease-out` : undefined }} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <LoadingOverlay loading={loading && logs.length === 0} message="Đang tải lịch sử...">
+          {logs.length === 0 && !loading ? (
+            <EmptyState
+              title="Không có dữ liệu lịch sử phù hợp"
+            />
+          ) : (
+            <TableContainer>
+              <Table size="small" sx={{ minWidth: 980 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Thời gian</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Độc giả</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>MSSV</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Loại</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Phương thức</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Cổng</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Độ tin cậy</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Kết quả</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {logs.map((log, idx) => {
+                    const confidence = log.confidence == null ? null : Math.round(log.confidence * 100);
+                    const statusColor = getStatusColor(log.status);
+                    return (
+                      <TableRow key={log.id} hover sx={staggerSx(idx, 0.03)}>
+                        <TableCell sx={{ whiteSpace: "nowrap", fontFamily: "monospace", color: "text.secondary" }}>
+                          {new Date(log.access_time).toLocaleString("vi-VN")}
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>{log.patron_name || "-"}</TableCell>
+                        <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{log.student_code || "-"}</TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            color={log.access_type === "entry" ? "success" : "warning"}
+                            label={log.access_type === "entry" ? "Vào" : "Ra"}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ color: "text.secondary" }}>{log.verify_method}</TableCell>
+                        <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>
+                          {CAMERA_LABELS[log.camera_id] || log.camera_id}
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 150 }}>
+                          {confidence == null ? (
+                            <Typography color="text.secondary">-</Typography>
+                          ) : (
+                            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={confidence}
+                                color={confidence >= 80 ? "success" : confidence >= 60 ? "warning" : "error"}
+                                sx={{ width: 80, height: 7, borderRadius: 99 }}
+                              />
+                              <Typography variant="caption" color="text.secondary">{confidence}%</Typography>
+                            </Stack>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Chip size="small" color={statusColor} label={getStatusLabel(log.status)} sx={log.status === "success" || log.status === "granted" ? { animation: `${successPop} 0.35s ease-out` } : {}} />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </LoadingOverlay>
 
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
-          sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}`, alignItems: { sm: "center" }, justifyContent: "space-between" }}
+          sx={{ px: 2.5, pb: 2, pt: 1.5, borderTop: `1px solid ${theme.palette.divider}`, alignItems: { sm: "center" }, justifyContent: "space-between" }}
         >
           <TextField
             select
@@ -534,7 +462,7 @@ export default function HistoryPage() {
             </Button>
           </Stack>
         </Stack>
-      </Paper>
+      </DashboardCard>
     </Stack>
   );
 }

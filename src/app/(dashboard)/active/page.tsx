@@ -6,8 +6,6 @@ import {
   Avatar,
   Box,
   Button,
-  Chip,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,25 +13,28 @@ import {
   Grid,
   IconButton,
   InputAdornment,
-  Paper,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import DoorFrontOutlinedIcon from "@mui/icons-material/DoorFrontOutlined";
 import ExitToAppOutlinedIcon from "@mui/icons-material/ExitToAppOutlined";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
-import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
-import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
 import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import PageHeader from "@/components/ui/PageHeader";
+import DashboardCard from "@/components/ui/DashboardCard";
+import MuiStatCard from "@/components/ui/MuiStatCard";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import EmptyState from "@/components/ui/EmptyState";
 import type { ActivePatron, CameraEvent } from "@/lib/types";
 
 const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);
@@ -79,6 +80,12 @@ function initials(name?: string) {
 function normalizeQuery(value: string) {
   return value.trim().toLowerCase();
 }
+
+const STAT_CARDS = [
+  { key: "entry_gate", label: "Cổng vào", icon: DoorFrontOutlinedIcon, gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
+  { key: "exit_gate", label: "Cổng ra", icon: ExitToAppOutlinedIcon, gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" },
+  { key: "kiosk", label: "Kiosk", icon: TerminalOutlinedIcon, gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" },
+] as const;
 
 export default function ActivePage() {
   const [patrons, setPatrons] = useState<ActivePatron[]>([]);
@@ -211,79 +218,39 @@ export default function ActivePage() {
 
   return (
     <Stack spacing={3}>
-      {/* Gradient Header */}
-      <Box
-        sx={{
-          p: 3,
-          borderRadius: 3,
-          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
-          border: "1px solid",
-          borderColor: "rgba(99,102,241,0.3)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
-
-        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-            <GroupsOutlinedIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
-          </Avatar>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Độc giả đang có mặt</Typography>
-            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
-              {patrons.length} độc giả đang ở trong thư viện — cập nhật {lastUpdate.toLocaleTimeString("vi-VN")}
-            </Typography>
-          </Box>
-        </Stack>
-
-        <Stack direction="row" spacing={1} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-            <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: error ? "error.main" : sseConnected ? "#6ee7b7" : "#fcd34d", animation: sseConnected ? "pulse 2s ease-in-out infinite" : undefined }} />
-            <Typography variant="caption" sx={{ color: "rgba(199,210,254,0.7)" }}>
-              {error ? "Lỗi" : sseConnected ? "Live" : "Polling"}
-            </Typography>
-          </Stack>
-          <Tooltip title="Làm mới">
-            <IconButton onClick={load} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <RefreshOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Box>
-
-      {/* Camera Stat Cards */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
-        {[
-          { key: "entry_gate", label: "Cổng vào", icon: <DoorFrontOutlinedIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
-          { key: "exit_gate", label: "Cổng ra", icon: <ExitToAppOutlinedIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" },
-          { key: "kiosk", label: "Kiosk", icon: <TerminalOutlinedIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" },
-        ].map((cam, idx) => (
-          <Paper key={cam.key} variant="outlined" sx={{
-            p: 2, borderRadius: 3, position: "relative", overflow: "hidden", borderColor: "divider",
-            transition: "transform 0.2s, box-shadow 0.2s",
-            animation: `${fadeInUp} 0.4s ease-out`, animationDelay: `${idx * 0.07}s`, animationFillMode: "both",
-            "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
-          }}>
-            <Box sx={{ position: "absolute", top: 0, right: 0, width: 60, height: 60, background: cam.gradient, opacity: 0.12, borderRadius: "0 12px 0 60px" }} />
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <Avatar sx={{ background: cam.gradient, width: 40, height: 40, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>{cam.icon}</Avatar>
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{cam.label}</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>{cameraCounts[cam.key] || 0}</Typography>
-              </Box>
+      <PageHeader
+        title="Mượn đang hoạt động"
+        icon={AssignmentOutlinedIcon}
+        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
+        statBadges={`${patrons.length} độc giả đang ở trong thư viện — cập nhật ${lastUpdate.toLocaleTimeString("vi-VN")}`}
+        onRefresh={load}
+        actions={
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: error ? "error.main" : sseConnected ? "#6ee7b7" : "#fcd34d", animation: sseConnected ? "pulse 2s ease-in-out infinite" : undefined }} />
+              <Typography variant="caption" sx={{ color: "rgba(199,210,254,0.7)" }}>
+                {error ? "Lỗi" : sseConnected ? "Live" : "Polling"}
+              </Typography>
             </Stack>
-          </Paper>
-        ))}
-      </Box>
+          </Stack>
+        }
+      />
 
-      {stalePatrons.length > 0 && (
+      <Grid container spacing={2}>
+        {STAT_CARDS.map((cam, idx) => (
+          <Grid key={cam.key} size={{ xs: 12, sm: 4 }}>
+            <MuiStatCard
+              label={cam.label}
+              value={cameraCounts[cam.key] || 0}
+              icon={cam.icon}
+              gradient={cam.gradient}
+              index={idx}
+            />
+          </Grid>
+        ))}
+      </Grid>
+
+      {stalePatrons.length > 0 ? (
         <Alert severity="warning" sx={{ borderRadius: 2 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
             {stalePatrons.length} độc giả ở trong thư viện quá 8 giờ
@@ -292,98 +259,42 @@ export default function ActivePage() {
             Có thể gate không detect exit. Kiểm tra và sử dụng nút &ldquo;Đánh dấu đã ra&rdquo; nếu cần.
           </Typography>
         </Alert>
-      )}
+      ) : null}
 
-      {/* Patron list */}
-      <Paper variant="outlined" sx={{ borderRadius: 3 }}>
-        <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
-          {/* Search bar */}
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", mb: 2.5 }}
-          >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                Độc giả
-              </Typography>
-              <Typography color="text.secondary" variant="body2">
-                {filtered.length} kết quả
-              </Typography>
-            </Box>
-            <TextField
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo tên hoặc MSSV..."
-              size="small"
-              sx={{ width: { xs: "100%", sm: 320 }, "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchOutlinedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
+      <DashboardCard
+        title="Độc giả"
+        subtitle={`${filtered.length} kết quả`}
+        actions={
+          <TextField
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm theo tên hoặc MSSV..."
+            size="small"
+            sx={{ width: { xs: "100%", sm: 320 }, "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchOutlinedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+        }
+      >
+        <LoadingOverlay loading={loading && patrons.length === 0} message="Đang tải...">
+          {patrons.length === 0 && !loading ? (
+            <EmptyState
+              icon={<Box sx={{ width: 64, height: 64, borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "rgba(0,0,0,0.04)", color: "text.disabled", mb: 1 }}><MenuBookOutlinedIcon sx={{ fontSize: 32 }} /></Box>}
+              title="Thư viện đang yên tĩnh"
+              description="Chưa có độc giả nào trong thư viện. Danh sách sẽ tự động cập nhật khi có lượt vào hợp lệ."
             />
-          </Stack>
-
-          {/* Content states */}
-          {loading && patrons.length === 0 ? (
-            <Stack sx={{ minHeight: 300, alignItems: "center", justifyContent: "center", gap: 2 }}>
-              <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
-              <Typography variant="body2" color="text.secondary">
-                Đang tải...
-              </Typography>
-            </Stack>
-          ) : patrons.length === 0 ? (
-            <Stack
-              sx={{
-                minHeight: 300,
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1.5,
-                py: 6,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 3,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  bgcolor: "rgba(0,0,0,0.04)",
-                  color: "text.disabled",
-                  mb: 1,
-                }}
-              >
-                <MenuBookOutlinedIcon sx={{ fontSize: 32 }} />
-              </Box>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: "text.secondary" }}>
-                Thư viện đang yên tĩnh
-              </Typography>
-              <Typography variant="body2" color="text.disabled" sx={{ textAlign: "center", maxWidth: 360 }}>
-                Chưa có độc giả nào trong thư viện. Danh sách sẽ tự động cập nhật khi có lượt vào hợp lệ.
-              </Typography>
-            </Stack>
-          ) : filtered.length === 0 ? (
-            <Stack
-              sx={{
-                minHeight: 200,
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1.5,
-                py: 4,
-              }}
-            >
-              <SearchOutlinedIcon sx={{ fontSize: 36, color: "text.disabled" }} />
-              <Typography variant="body1" color="text.secondary">
-                Không tìm thấy độc giả &ldquo;{search}&rdquo;
-              </Typography>
-            </Stack>
+          ) : filtered.length === 0 && patrons.length > 0 ? (
+            <EmptyState
+              icon={<SearchOutlinedIcon sx={{ fontSize: 36, color: "text.disabled" }} />}
+              title={`Không tìm thấy độc giả "${search}"`}
+            />
           ) : (
             <Grid container spacing={1.5}>
               {filtered.map((patron, idx) => {
@@ -397,13 +308,14 @@ export default function ActivePage() {
                       ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
                       : "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)";
                 return (
-                  <Grid key={patron.id} size={{ xs: 12, xl: 6 }} sx={{ animation: `${fadeInUp} 0.35s ease-out`, animationDelay: `${idx * 0.05}s`, animationFillMode: "both" }}>
-                    <Paper
-                      variant="outlined"
+                  <Grid key={patron.id} size={{ xs: 12, xl: 6 }} sx={staggerSx(idx, 0.05)}>
+                    <Box
                       sx={{
                         borderRadius: 2,
                         overflow: "hidden",
                         position: "relative",
+                        border: "1px solid",
+                        borderColor: "divider",
                         transition: "transform 0.2s, box-shadow 0.2s",
                         "&:hover": {
                           transform: "translateY(-1px)",
@@ -411,7 +323,6 @@ export default function ActivePage() {
                         },
                       }}
                     >
-                      {/* Duration accent bar */}
                       <Box
                         sx={{
                           position: "absolute",
@@ -457,7 +368,7 @@ export default function ActivePage() {
                                 </Typography>
                               </Box>
                               <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexShrink: 0 }}>
-                                {percent != null && (
+                                {percent != null ? (
                                   <Tooltip title={`Độ chính xác: ${percent}%`}>
                                     <Box
                                       sx={{
@@ -469,7 +380,7 @@ export default function ActivePage() {
                                       }}
                                     />
                                   </Tooltip>
-                                )}
+                                ) : null}
                                 <Box
                                   sx={{
                                     px: 1,
@@ -520,16 +431,16 @@ export default function ActivePage() {
                           </Tooltip>
                         </Stack>
                       </Box>
-                    </Paper>
+                    </Box>
                   </Grid>
                 );
               })}
             </Grid>
           )}
-        </Box>
-      </Paper>
+        </LoadingOverlay>
+      </DashboardCard>
 
-      <Dialog open={!!exitPatron} onClose={() => !exiting && setExitPatron(null)} maxWidth="xs" fullWidth>
+      <Dialog open={!!exitPatron} onClose={() => exiting ? undefined : setExitPatron(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 900 }}>Xác nhận đánh dấu đã ra?</DialogTitle>
         <DialogContent>
           <Typography>

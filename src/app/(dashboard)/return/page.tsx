@@ -14,7 +14,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Divider,
   Grid,
   IconButton,
   LinearProgress,
@@ -24,10 +23,8 @@ import {
   Select,
   Slide,
   Stack,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
@@ -37,11 +34,15 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import ReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import { fadeInUp, slideInRight, successPop } from "@/lib/animations";
+import { slideInRight } from "@/lib/animations";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
+import PageHeader from "@/components/ui/PageHeader";
+import DashboardCard from "@/components/ui/DashboardCard";
+import EmptyState from "@/components/ui/EmptyState";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 import SearchField from "@/components/ui/SearchField";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
@@ -315,66 +316,38 @@ export default function ReturnPage() {
     return () => { active = false; stopReader(); };
   }, []);
 
+  const statBadges = `${totals.borrowers} độc giả | ${totals.books} sách đang mượn | ${totals.overdue} quá hạn`;
+
+  const headerActions = selectedStudentCode ? (
+    <Button variant="outlined" size="small" onClick={() => { setSelectedStudentCode(null); setDetail(null); }}
+      sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }}>
+      Hủy chọn
+    </Button>
+  ) : null;
+
+  const statCards = [
+    { key: "borrowers", label: "Độc giả", value: totals.borrowers, icon: <UsersIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", pct: 100 },
+    { key: "books", label: "Sách đang mượn", value: totals.books, icon: <BookIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", pct: 100 },
+    { key: "overdue", label: "Quá hạn", value: totals.overdue, icon: <AlertIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)", pct: totals.books ? (totals.overdue / totals.books) * 100 : 0 },
+  ];
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, height: "calc(100vh - 120px)" }}>
-      {/* Gradient Header */}
-      <Box
-        sx={{
-          p: 3,
-          borderRadius: 3,
-          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
-          border: "1px solid",
-          borderColor: "rgba(99,102,241,0.3)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+    <Stack spacing={3}>
+      <PageHeader
+        title="Trả sách"
+        icon={ReturnIcon}
+        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
+        statBadges={statBadges}
+        onRefresh={loadBorrowers}
+        actions={headerActions}
+      />
 
-        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-            <ReturnIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
-          </Avatar>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Trả sách</Typography>
-            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
-              {totals.borrowers} độc giả | {totals.books} sách đang mượn | {totals.overdue} quá hạn
-            </Typography>
-          </Box>
-        </Stack>
-
-        <Stack direction="row" spacing={1} sx={{ zIndex: 1 }}>
-          {selectedStudentCode && (
-            <Button variant="outlined" size="small" onClick={() => { setSelectedStudentCode(null); setDetail(null); }}
-              sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }}>
-              Hủy chọn
-            </Button>
-          )}
-          <Tooltip title="Tải lại">
-            <IconButton onClick={loadBorrowers} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Box>
-
-      {/* Stat Cards */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
-        {[
-          { key: "borrowers", label: "Độc giả", value: totals.borrowers, icon: <UsersIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", pct: 100 },
-          { key: "books", label: "Sách đang mượn", value: totals.books, icon: <BookIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", pct: 100 },
-          { key: "overdue", label: "Quá hạn", value: totals.overdue, icon: <AlertIcon sx={{ fontSize: 22 }} />, gradient: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)", pct: totals.books ? (totals.overdue / totals.books) * 100 : 0 },
-        ].map((s, idx) => (
+        {statCards.map((s, idx) => (
           <Paper key={s.key} variant="outlined" sx={{
             p: 2.5, borderRadius: 3, position: "relative", overflow: "hidden", borderColor: "divider",
             transition: "transform 0.2s, box-shadow 0.2s",
-            animation: `${fadeInUp} 0.4s ease-out`, animationDelay: `${idx * 0.07}s`, animationFillMode: "both",
+            ...staggerSx(idx),
             "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
           }}>
             <Box sx={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: s.gradient, opacity: 0.12, borderRadius: "0 12px 0 80px" }} />
@@ -399,10 +372,9 @@ export default function ReturnPage() {
         </Slide>
       ) : null}
 
-      <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
+      <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {/* Search & Filter */}
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
+          <DashboardCard>
             <Stack spacing={2}>
               <SearchField value={search} onChange={setSearch} placeholder="Tìm theo MSSV hoặc tên..." />
 
@@ -413,20 +385,19 @@ export default function ReturnPage() {
                 <ToggleButton value="active">Đúng hạn</ToggleButton>
               </ToggleButtonGroup>
             </Stack>
-          </Paper>
+          </DashboardCard>
 
-          {/* Borrower List */}
           {loadingBorrowers ? (
-            <Paper variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, borderColor: "divider", p: 4 }}>
-              <CircularProgress />
-            </Paper>
+            <DashboardCard>
+              <LoadingOverlay loading message="Đang tải danh sách độc giả..." />
+            </DashboardCard>
           ) : filteredBorrowers.length === 0 ? (
-            <Paper variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, borderColor: "divider", p: 4 }}>
-              <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary" }}>
-                <UsersIcon sx={{ fontSize: 48, opacity: 0.3 }} />
-                <Typography>Không tìm thấy độc giả phù hợp</Typography>
-              </Stack>
-            </Paper>
+            <DashboardCard>
+              <EmptyState
+                icon={<UsersIcon sx={{ fontSize: 48, opacity: 0.3 }} />}
+                title="Không tìm thấy độc giả phù hợp"
+              />
+            </DashboardCard>
           ) : (
             <List disablePadding sx={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
               {filteredBorrowers.map((borrower, idx) => {
@@ -446,9 +417,7 @@ export default function ReturnPage() {
                       borderColor: selected ? "primary.main" : "divider",
                       bgcolor: selected ? "action.selected" : undefined,
                       transition: "all .15s",
-                      animation: `${fadeInUp} 0.3s ease-out`,
-                      animationDelay: `${idx * 0.04}s`,
-                      animationFillMode: "both",
+                      ...staggerSx(idx, 0.04),
                       "&:hover": { borderColor: "primary.light", transform: "translateY(-1px)", boxShadow: 2 },
                     }}
                   >
@@ -480,158 +449,112 @@ export default function ReturnPage() {
             </List>
           )}
 
-          {/* Selected Borrower Card */}
           {selectedBorrower ? (
-            <Paper
-              variant="outlined"
-              sx={{
-                flex: "0 0 auto",
-                borderRadius: 3,
-                borderLeft: 4,
-                borderLeftColor: selectedBorrower.overdue_count > 0 ? "error.main" : "success.main",
-                borderColor: "divider",
-                animation: `${fadeInUp} 0.3s ease-out`,
-              }}
+            <DashboardCard
+              title={borrowerName(selectedBorrower)}
+              subtitle={selectedBorrower.patron.student_code}
+              actions={<Chip size="small" color="success" label="Đang mượn" icon={<CheckCircleIcon />} />}
             >
-              <Box sx={{ p: 2 }}>
-                <Stack spacing={2}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Avatar sx={{ width: 48, height: 48, bgcolor: "primary.main" }}>
-                      {selectedBorrower.patron.full_name?.[0]?.toUpperCase() || "?"}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 900 }} noWrap>
-                        {borrowerName(selectedBorrower)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {selectedBorrower.patron.student_code}
-                      </Typography>
-                    </Box>
-                    <Chip size="small" color="success" label="Đang mượn" icon={<CheckCircleIcon />} />
-                  </Box>
-
-                  <Divider />
-
-                  <Stack spacing={1}>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
-                      <Chip size="small" color="primary" label={`${selectedBorrower.total_borrowed} sách`} />
-                      {selectedBorrower.overdue_count > 0 && (
-                        <Chip size="small" color="error" label={`${selectedBorrower.overdue_count} quá hạn`} />
-                      )}
-                    </Stack>
-
-                    {selectedBorrower.overdue_count > 0 && (
-                      <Alert severity="error" sx={{ py: 0.5 }}>
-                        <AlertIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        Có {selectedBorrower.overdue_count} cuốn sách quá hạn
-                      </Alert>
-                    )}
-
-                    <Button
-                      variant="contained"
-                      size="large"
-                      fullWidth
-                      startIcon={<QrCodeScannerIcon />}
-                      onClick={() => setScannerOpen(true)}
-                      sx={{ animation: `${fadeInUp} 0.3s ease-out` }}
-                    >
-                      Quét mã vạch trả sách
-                    </Button>
-                  </Stack>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                  <Chip size="small" color="primary" label={`${selectedBorrower.total_borrowed} sách`} />
+                  {selectedBorrower.overdue_count > 0 ? (
+                    <Chip size="small" color="error" label={`${selectedBorrower.overdue_count} quá hạn`} />
+                  ) : null}
                 </Stack>
-              </Box>
-            </Paper>
+
+                {selectedBorrower.overdue_count > 0 ? (
+                  <Alert severity="error" sx={{ py: 0.5 }}>
+                    <AlertIcon fontSize="small" sx={{ mr: 0.5 }} />
+                    Có {selectedBorrower.overdue_count} cuốn sách quá hạn
+                  </Alert>
+                ) : null}
+
+                <Button
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  startIcon={<QrCodeScannerIcon />}
+                  onClick={() => setScannerOpen(true)}
+                >
+                  Quét mã vạch trả sách
+                </Button>
+              </Stack>
+            </DashboardCard>
           ) : null}
         </Grid>
 
-        {/* Right Column - Books to Return */}
         <Grid size={{ xs: 12, md: 7, lg: 8 }} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {selectedBorrower ? (
-            <Paper variant="outlined" sx={{ flex: 1, display: "flex", flexDirection: "column", borderRadius: 3, borderColor: "divider" }}>
-              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 1, md: 2 }, overflow: "auto" }}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
-                  <BookIcon color="primary" />
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
-                    Sách cần trả
-                  </Typography>
-                  {detail && (
-                    <Chip size="small" label={`${detail.total} cuốn`} sx={{ ml: "auto" }} />
-                  )}
-                </Stack>
-
-                {loadingDetail ? (
-                  <Stack sx={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                    <CircularProgress />
-                  </Stack>
-                ) : !detail || detail.records.length === 0 ? (
-                  <Stack sx={{ flex: 1, alignItems: "center", justifyContent: "center" }} spacing={1}>
-                    <CheckCircleIcon sx={{ fontSize: 48, color: "success.main" }} />
-                    <Typography color="success.main" sx={{ fontWeight: 900 }}>Độc giả đã trả hết sách</Typography>
-                  </Stack>
-                ) : (
-                  <Stack spacing={1.5}>
-                    {detail.records.map((record, idx) => (
-                      <Paper key={record.id} variant="outlined" sx={{
-                        p: 1.5,
-                        borderRadius: 3,
-                        borderLeft: isOverdue(record) ? 4 : 0,
-                        borderLeftColor: "error.main",
-                        animation: `${slideInRight} 0.3s ease-out`,
-                        animationDelay: `${idx * 0.05}s`,
-                        animationFillMode: "both",
-                      }}>
-                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                          {record.book?.cover_url ? (
-                            <Box component="img" src={record.book.cover_url} alt={record.book.title} sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }} />
-                          ) : (
-                            <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
-                              <BookIcon />
-                            </Avatar>
-                          )}
-                          <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>{record.book?.title || record.book_id}</Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>{record.book?.author || "-"}</Typography>
-                            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
-                              <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>{record.book?.isbn}</Typography>
-                              {dueChip(record)}
-                            </Stack>
-                            <Typography variant="caption" color="text.secondary">
-                              Mượn: {formatDate(record.borrow_at)} | Hạn: {formatDate(record.due_at)}
-                            </Typography>
+            <DashboardCard
+              title="Sách cần trả"
+              actions={detail ? <Chip size="small" label={`${detail.total} cuốn`} /> : null}
+            >
+              {loadingDetail ? (
+                <LoadingOverlay loading message="Đang tải danh sách sách..." />
+              ) : !detail || detail.records.length === 0 ? (
+                <EmptyState
+                  icon={<CheckCircleIcon sx={{ fontSize: 48, color: "success.main" }} />}
+                  title="Độc giả đã trả hết sách"
+                />
+              ) : (
+                <Stack spacing={1.5}>
+                  {detail.records.map((record, idx) => (
+                    <Paper key={record.id} variant="outlined" sx={{
+                      p: 1.5,
+                      borderRadius: 3,
+                      borderLeft: isOverdue(record) ? 4 : 0,
+                      borderLeftColor: "error.main",
+                      ...staggerSx(idx, 0.05),
+                    }}>
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                        {record.book?.cover_url ? (
+                          <Box component="img" src={record.book.cover_url} alt={record.book.title} sx={{ width: 40, height: 56, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }} />
+                        ) : (
+                          <Avatar variant="rounded" sx={{ width: 40, height: 56, bgcolor: "background.default", flexShrink: 0 }}>
+                            <BookIcon />
+                          </Avatar>
+                        )}
+                        <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>{record.book?.title || record.book_id}</Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap>{record.book?.author || "-"}</Typography>
+                          <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
+                            <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>{record.book?.isbn}</Typography>
+                            {dueChip(record)}
                           </Stack>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            startIcon={<CheckCircleIcon />}
-                            disabled={!!returningId}
-                            onClick={() => setConfirmRecord(record)}
-                            sx={{ flexShrink: 0 }}
-                          >
-                            Trả
-                          </Button>
+                          <Typography variant="caption" color="text.secondary">
+                            Mượn: {formatDate(record.borrow_at)} | Hạn: {formatDate(record.due_at)}
+                          </Typography>
                         </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
-                )}
-              </Box>
-            </Paper>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          startIcon={<CheckCircleIcon />}
+                          disabled={!!returningId}
+                          onClick={() => setConfirmRecord(record)}
+                          sx={{ flexShrink: 0 }}
+                        >
+                          Trả
+                        </Button>
+                      </Stack>
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
+            </DashboardCard>
           ) : (
-            <Paper variant="outlined" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, borderColor: "divider" }}>
-              <Stack spacing={1} sx={{ alignItems: "center", color: "text.secondary", p: 4 }}>
-                <UsersIcon sx={{ fontSize: 72, opacity: 0.3 }} />
-                <Typography variant="body1" sx={{ fontWeight: 900 }}>Chọn độc giả để xem sách cần trả</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
-                  Chọn một độc giả từ danh sách bên trái
-                </Typography>
-              </Stack>
-            </Paper>
+            <DashboardCard>
+              <EmptyState
+                icon={<UsersIcon sx={{ fontSize: 72, opacity: 0.3 }} />}
+                title="Chọn độc giả để xem sách cần trả"
+                description="Chọn một độc giả từ danh sách bên trái"
+              />
+            </DashboardCard>
           )}
         </Grid>
       </Grid>
 
-      {/* Scanner Dialog */}
       <Dialog open={scannerOpen} onClose={batchReturning ? undefined : () => setScannerOpen(false)} fullWidth maxWidth="xl">
         <DialogTitle>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
@@ -639,9 +562,9 @@ export default function ReturnPage() {
               <QrCodeScannerIcon color="primary" />
               <Typography variant="h6" sx={{ fontWeight: 900 }}>Quét mã vạch trả sách (IP Camera)</Typography>
             </Stack>
-            {!batchReturning && (
+            {!batchReturning ? (
               <IconButton size="small" onClick={() => setScannerOpen(false)}><CloseIcon fontSize="small" /></IconButton>
-            )}
+            ) : null}
           </Stack>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -656,12 +579,12 @@ export default function ReturnPage() {
                 ) : (
                   <>
                     <Box component="img" ref={imgRef} src={BORROW_CAM_URL} onLoad={() => setImgReady(true)} onError={() => setCameraError("Không thể kết nối IP Camera")} alt="IP Camera" sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                    {!imgReady && !cameraError && (
+                    {!imgReady && !cameraError ? (
                       <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
                         <CircularProgress size={28} color="inherit" />
                         <Typography variant="body2">Đang kết nối camera...</Typography>
                       </Stack>
-                    )}
+                    ) : null}
                     <Box sx={{ position: "absolute", top: 8, left: 8, px: 1, py: 0.5, bgcolor: "rgba(0,0,0,.6)", borderRadius: 0.5 }}>
                       <Typography variant="caption" sx={{ color: "common.white", fontSize: 11 }}>IP Camera</Typography>
                     </Box>
@@ -695,13 +618,13 @@ export default function ReturnPage() {
                       )}
                       <Stack spacing={0.3} sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" sx={{ fontWeight: 900 }} noWrap>{item.record.book?.title || item.record.book_id}</Typography>
-                        {item.record.book?.author && (
+                        {item.record.book?.author ? (
                           <Typography variant="caption" color="text.secondary" noWrap>{item.record.book.author}</Typography>
-                        )}
+                        ) : null}
                         <Typography variant="caption" sx={{ fontFamily: "monospace", color: "primary.main" }}>{item.isbn}</Typography>
                         <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
                           {dueChip(item.record)}
-                          {item.condition && <Chip size="small" variant="outlined" label={item.condition} />}
+                          {item.condition ? <Chip size="small" variant="outlined" label={item.condition} /> : null}
                         </Stack>
                         <Select value={item.condition} onChange={(e) => updateCondition(item.isbn, e.target.value)} displayEmpty fullWidth size="small" sx={{ mt: 0.5 }}>
                           <MenuItem value="">Tình trạng (tuỳ chọn)</MenuItem>
@@ -734,7 +657,6 @@ export default function ReturnPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Confirm Dialog */}
       <Dialog open={!!confirmRecord} onClose={() => { setConfirmRecord(null); setCondition(""); }}>
         <DialogTitle>Xác nhận trả sách</DialogTitle>
         <DialogContent>
@@ -765,6 +687,6 @@ export default function ReturnPage() {
       <NoticeSnackbar open={!!snackbar} message={snackbar?.message || ""} severity={snackbar?.severity || "success"} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
 
       <NoticeSnackbar open={!!scanToast} message={scanToast} severity="success" onClose={() => setScanToast("")} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
-    </Box>
+    </Stack>
   );
 }

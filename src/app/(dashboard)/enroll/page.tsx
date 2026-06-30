@@ -1,26 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
-  Divider,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Alert, Button, Chip, Divider, Stack, Typography } from "@mui/material";
+import FaceOutlinedIcon from "@mui/icons-material/FaceOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
-import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import { shimmer } from "@/lib/animations";
 import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
+import PageHeader from "@/components/ui/PageHeader";
+import DashboardCard from "@/components/ui/DashboardCard";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import EmptyState from "@/components/ui/EmptyState";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 export default function EnrollPage() {
   const [consent, setConsent] = useState(false);
@@ -89,21 +81,24 @@ export default function EnrollPage() {
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 920, mx: "auto" }}>
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-          <FaceRetouchingNaturalOutlinedIcon color="primary" />
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 850 }}>Đăng ký khuôn mặt</Typography>
-            <Typography color="text.secondary">Chụp đủ 4 góc để hệ thống tạo hồ sơ nhận diện ổn định hơn.</Typography>
-          </Box>
-        </Stack>
-      </Paper>
+      <Box sx={staggerSx(0)}>
+        <PageHeader
+          title="Đăng ký khuôn mặt"
+          subtitle="Chụp đủ 4 góc để hệ thống tạo hồ sơ nhận diện ổn định hơn."
+          icon={FaceOutlinedIcon}
+          gradient="linear-gradient(135deg, #312e81 0%, #4338ca 50%, #6366f1 100%)"
+        />
+      </Box>
 
-      {error && <Alert icon={<ErrorOutlineOutlinedIcon />} severity="error">{error}</Alert>}
+      {error ? (
+        <Box sx={staggerSx(1)}>
+          <Alert icon={<ErrorOutlineOutlinedIcon />} severity="error">{error}</Alert>
+        </Box>
+      ) : null}
 
       {result ? (
-        <Card variant="outlined">
-          <CardContent>
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
             <Stack spacing={2.5}>
               <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                 {success ? <CheckCircleOutlineOutlinedIcon color="success" sx={{ fontSize: 44 }} /> : <ErrorOutlineOutlinedIcon color="error" sx={{ fontSize: 44 }} />}
@@ -117,7 +112,7 @@ export default function EnrollPage() {
                 </Box>
               </Stack>
 
-              {result.results && (
+              {result.results ? (
                 <>
                   <Divider />
                   <Stack spacing={1}>
@@ -130,25 +125,27 @@ export default function EnrollPage() {
                     ))}
                   </Stack>
                 </>
-              )}
+              ) : null}
 
               <Button variant="contained" startIcon={<RestartAltOutlinedIcon />} onClick={handleReset} sx={{ alignSelf: "flex-start" }}>
                 {success ? "Đăng ký thêm" : "Thử lại"}
               </Button>
             </Stack>
-          </CardContent>
-        </Card>
+          </DashboardCard>
+        </Box>
       ) : jobId ? (
-        <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
-          <CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
-          <Typography variant="h6" sx={{ mt: 2, fontWeight: 800 }}>Đang xử lý...</Typography>
-          <Typography color="text.secondary" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>Job ID: {jobId}</Typography>
-        </Paper>
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
+            <LoadingOverlay loading message={jobId ? `Đang xử lý... (Job ID: ${jobId})` : undefined} />
+          </DashboardCard>
+        </Box>
       ) : (
-        <Paper variant="outlined" sx={{ p: 2.5 }}>
-          <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleFilesReady} />
-          {isLoading && <Alert severity="info" sx={{ mt: 2 }}>Đang gửi dữ liệu đăng ký...</Alert>}
-        </Paper>
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
+            <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleFilesReady} />
+            {isLoading ? <Alert severity="info" sx={{ mt: 2 }}>Đang gửi dữ liệu đăng ký...</Alert> : null}
+          </DashboardCard>
+        </Box>
       )}
     </Stack>
   );
