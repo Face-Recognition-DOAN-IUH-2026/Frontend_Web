@@ -125,6 +125,7 @@ export default function StaffSchedulesPage() {
   const [autoStep, setAutoStep] = useState<"select" | "preview">("select");
   const [autoProposals, setAutoProposals] = useState<any[]>([]);
   const [autoSkipped, setAutoSkipped] = useState(0);
+  const [autoActualRange, setAutoActualRange] = useState<{ from: string; to: string } | null>(null);
   const [showDeleteWeek, setShowDeleteWeek] = useState(false);
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -213,6 +214,7 @@ export default function StaffSchedulesPage() {
     try {
       const result = await api.autoSchedule({ from: autoFrom, to: autoTo });
       const count = result.proposed?.length || 0;
+      setAutoActualRange(result.actualFrom && result.actualTo ? { from: result.actualFrom, to: result.actualTo } : null);
       if (count === 0) { setAutoProposals([]); setAutoSkipped(result.skipped || 0); setAutoStep("preview"); setAutoLoading(false); return; }
       setAutoProposals(result.proposed);
       setAutoSkipped(result.skipped || 0);
@@ -607,6 +609,7 @@ export default function StaffSchedulesPage() {
         step={autoStep}
         proposals={autoProposals}
         skippedCount={autoSkipped}
+        actualRange={autoActualRange}
       />
       <DeleteWeekDialog
         open={showDeleteWeek}

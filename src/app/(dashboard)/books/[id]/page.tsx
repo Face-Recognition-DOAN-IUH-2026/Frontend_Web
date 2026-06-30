@@ -27,6 +27,9 @@ import {
   Tooltip,
   Typography,
   useTheme,
+  Dialog,
+  DialogContent,
+  DialogTitle
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBackOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
@@ -46,7 +49,6 @@ import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import api from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
 import Book3DViewer from "@/components/Book3DViewer";
-import { Dialog, DialogContent, DialogTitle } from "@mui/material";
 
 function StatCard({ label, value, color, icon }: { label: string; value: number; color: "info" | "success" | "warning"; icon: React.ReactNode }) {
   return (
@@ -102,9 +104,12 @@ export default function BookDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [show3D, setShow3D] = useState(false);
+  
+  // States cho Form cập nhật
   const [editOpen, setEditOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
   const [editSnackbar, setEditSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
 
   useEffect(() => {
@@ -116,6 +121,7 @@ export default function BookDetailPage() {
 
   const openEdit = () => {
     if (!book) return;
+    setEditErrors({});
     setEditForm({
       title: book.title || "",
       subtitle: book.subtitle || "",
@@ -134,16 +140,56 @@ export default function BookDetailPage() {
     setEditOpen(true);
   };
 
+  const validateEditForm = () => {
+    const errors: Record<string, string> = {};
+
+    if (!editForm.title?.trim()) {
+      errors.title = "Tiêu đề không được để trống";
+    }
+
+    if (editForm.quantity === "" || editForm.quantity === null || Number(editForm.quantity) < 0) {
+      errors.quantity = "Số lượng phải là số từ 0 trở lên";
+    }
+
+    if (editForm.page_count !== "" && editForm.page_count !== null && Number(editForm.page_count) < 0) {
+      errors.page_count = "Số trang không được âm";
+    }
+
+    if (editForm.average_rating !== "" && editForm.average_rating !== null) {
+      const rating = Number(editForm.average_rating);
+      if (rating < 0 || rating > 5) {
+        errors.average_rating = "Đánh giá phải nằm trong khoảng 0 đến 5";
+      }
+    }
+
+    if (editForm.cover_url?.trim()) {
+      try {
+        new URL(editForm.cover_url);
+      } catch {
+        errors.cover_url = "URL hình ảnh không hợp lệ (cần bắt đầu bằng http:// hoặc https://)";
+      }
+    }
+
+    setEditErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleEditChange = (field: string, value: any) => {
     setEditForm((prev) => ({ ...prev, [field]: value }));
+    if (editErrors[field]) {
+      setEditErrors((prev) => ({ ...prev, [field]: "" }));
+    }
   };
 
   const handleEditSave = async () => {
-    if (!book || !editForm.title?.trim()) return;
+    if (!validateEditForm()) return;
+    if (!book) return;
+    
     setEditSaving(true);
     try {
       const quantity = editForm.quantity === "" || editForm.quantity === null ? null : Number(editForm.quantity);
       const metadataPayload: Record<string, any> = {};
+      
       for (const [k, v] of Object.entries(editForm)) {
         if (k === "quantity") continue;
         if (k === "page_count" || k === "average_rating") {
@@ -152,10 +198,13 @@ export default function BookDetailPage() {
           metadataPayload[k] = v || null;
         }
       }
+      
       let updated = await api.updateBook(book.id, metadataPayload);
+      
       if (quantity !== null && quantity !== book.total_copies) {
         updated = await api.updateBookQuantity(book.id, quantity);
       }
+      
       setBook(updated);
       setEditOpen(false);
       setEditSnackbar({ open: true, message: "Cập nhật sách thành công", severity: "success" });
@@ -514,7 +563,7 @@ export default function BookDetailPage() {
                     onClick={openEdit}
                     sx={{ py: 1.5 }}
                   >
-                    Sua
+                    Sửa
                   </Button>
                 </Tooltip>
               </Stack>
@@ -543,29 +592,117 @@ export default function BookDetailPage() {
           <DialogContent dividers sx={{ pt: 2 }}>
             <Stack spacing={2.5}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField label="Tiêu đề" required fullWidth value={editForm.title || ""} onChange={(e) => handleEditChange("title", e.target.value)} />
-                <TextField label="Số lượng tồn kho" type="number" fullWidth value={editForm.quantity ?? 0} onChange={(e) => handleEditChange("quantity", e.target.value)} />
+                <TextField 
+                  label="Tiêu đề" 
+                  required 
+                  fullWidth 
+                  value={editForm.title || ""} 
+                  onChange={(e) => handleEditChange("title", e.target.value)}
+                  error={!!editErrors.title}
+                  helperText={editErrors.title}
+                />
+                <TextField 
+                  label="Số lượng tồn kho" 
+                  type="number" 
+                  fullWidth 
+                  value={editForm.quantity ?? 0} 
+                  onChange={(e) => handleEditChange("quantity", e.target.value)}
+                  error={!!editErrors.quantity}
+                  helperText={editErrors.quantity}
+                />
               </Stack>
-              <TextField label="Phụ đề" fullWidth value={editForm.subtitle || ""} onChange={(e) => handleEditChange("subtitle", e.target.value)} />
-              <TextField label="Tác giả" fullWidth value={editForm.author || ""} onChange={(e) => handleEditChange("author", e.target.value)} />
-              <TextField label="Nhà xuất bản" fullWidth value={editForm.publisher || ""} onChange={(e) => handleEditChange("publisher", e.target.value)} />
-              <TextField label="Ngày xuất bản" fullWidth value={editForm.published_date || ""} onChange={(e) => handleEditChange("published_date", e.target.value)} placeholder="VD: 2024-01-01" />
-              <TextField label="Mô tả" fullWidth multiline minRows={4} value={editForm.description || ""} onChange={(e) => handleEditChange("description", e.target.value)} />
+              <TextField 
+                label="Phụ đề" 
+                fullWidth 
+                value={editForm.subtitle || ""} 
+                onChange={(e) => handleEditChange("subtitle", e.target.value)} 
+              />
+              <TextField 
+                label="Tác giả" 
+                fullWidth 
+                value={editForm.author || ""} 
+                onChange={(e) => handleEditChange("author", e.target.value)} 
+              />
+              <TextField 
+                label="Nhà xuất bản" 
+                fullWidth 
+                value={editForm.publisher || ""} 
+                onChange={(e) => handleEditChange("publisher", e.target.value)} 
+              />
+              <TextField 
+                label="Ngày xuất bản" 
+                fullWidth 
+                value={editForm.published_date || ""} 
+                onChange={(e) => handleEditChange("published_date", e.target.value)} 
+                placeholder="VD: 2024-01-01" 
+              />
+              <TextField 
+                label="Mô tả" 
+                fullWidth 
+                multiline 
+                minRows={4} 
+                value={editForm.description || ""} 
+                onChange={(e) => handleEditChange("description", e.target.value)} 
+              />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField label="Số trang" type="number" fullWidth value={editForm.page_count ?? ""} onChange={(e) => handleEditChange("page_count", e.target.value)} />
-                <TextField label="Danh mục" fullWidth value={editForm.categories || ""} onChange={(e) => handleEditChange("categories", e.target.value)} />
-                <TextField label="Đánh giá (0-5)" type="number" fullWidth value={editForm.average_rating ?? ""} onChange={(e) => handleEditChange("average_rating", e.target.value)} />
+                <TextField 
+                  label="Số trang" 
+                  type="number" 
+                  fullWidth 
+                  value={editForm.page_count ?? ""} 
+                  onChange={(e) => handleEditChange("page_count", e.target.value)}
+                  error={!!editErrors.page_count}
+                  helperText={editErrors.page_count}
+                />
+                <TextField 
+                  label="Danh mục" 
+                  fullWidth 
+                  value={editForm.categories || ""} 
+                  onChange={(e) => handleEditChange("categories", e.target.value)} 
+                />
+                <TextField 
+                  label="Đánh giá (0-5)" 
+                  type="number" 
+                  fullWidth 
+                  value={editForm.average_rating ?? ""} 
+                  onChange={(e) => handleEditChange("average_rating", e.target.value)}
+                  error={!!editErrors.average_rating}
+                  helperText={editErrors.average_rating}
+                />
               </Stack>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField label="Ngôn ngữ" fullWidth value={editForm.language || ""} onChange={(e) => handleEditChange("language", e.target.value)} />
-                <TextField label="Vị trí kệ" fullWidth value={editForm.shelf_location || ""} onChange={(e) => handleEditChange("shelf_location", e.target.value)} />
+                <TextField 
+                  label="Ngôn ngữ" 
+                  fullWidth 
+                  value={editForm.language || ""} 
+                  onChange={(e) => handleEditChange("language", e.target.value)} 
+                />
+                <TextField 
+                  label="Vị trí kệ" 
+                  fullWidth 
+                  value={editForm.shelf_location || ""} 
+                  onChange={(e) => handleEditChange("shelf_location", e.target.value)} 
+                />
               </Stack>
-              <TextField label="URL ảnh bìa" fullWidth value={editForm.cover_url || ""} onChange={(e) => handleEditChange("cover_url", e.target.value)} placeholder="https://..." />
+              <TextField 
+                label="URL ảnh bìa" 
+                fullWidth 
+                value={editForm.cover_url || ""} 
+                onChange={(e) => handleEditChange("cover_url", e.target.value)} 
+                placeholder="https://..."
+                error={!!editErrors.cover_url}
+                helperText={editErrors.cover_url}
+              />
             </Stack>
           </DialogContent>
           <Box sx={{ px: 3, py: 2, display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
             <Button onClick={() => setEditOpen(false)} disabled={editSaving}>Hủy</Button>
-            <Button variant="contained" onClick={handleEditSave} disabled={editSaving || !editForm.title?.trim()} startIcon={editSaving ? <CircularProgress size={16} /> : null}>
+            <Button 
+              variant="contained" 
+              onClick={handleEditSave} 
+              disabled={editSaving || !editForm.title?.trim()} 
+              startIcon={editSaving ? <CircularProgress size={16} /> : null}
+            >
               {editSaving ? "Đang lưu..." : "Lưu"}
             </Button>
           </Box>

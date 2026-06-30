@@ -1108,7 +1108,7 @@ class ApiClient {
     return response.data;
   }
 
-  async autoSchedule(data: { from: string; to: string }): Promise<{ proposed: Array<{ staffId: string; shiftId: string; zoneId: string; workDate: string; note: string }>; skipped: number; total: number }> {
+  async autoSchedule(data: { from: string; to: string }): Promise<{ proposed: Array<{ staffId: string; shiftId: string; zoneId: string; workDate: string; note: string }>; skipped: number; total: number; actualFrom?: string; actualTo?: string }> {
     const response = await this.client.post<any>("/api/schedules/auto-schedule", data);
     return response.data;
   }
