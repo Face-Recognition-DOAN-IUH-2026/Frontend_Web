@@ -50,6 +50,10 @@ export default function LoginPage() {
   const [cameraReady, setCameraReady] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotStep, setForgotStep] = useState<1 | 2 | 3 | 4>(1);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -188,12 +192,20 @@ export default function LoginPage() {
   const handlePasswordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
+    setResendMessage("");
+    setUnverifiedEmail("");
     setIsLoading(true);
     try {
       await login(email, password);
       window.location.href = "/dashboard";
     } catch (err: any) {
-      setError(getErrorMessage(err) || "Đăng nhập thất bại.");
+      const msg = getErrorMessage(err) || "Đăng nhập thất bại.";
+      if (msg.toLowerCase().includes("xac thuc email") || msg.toLowerCase().includes("unverified")) {
+        setUnverifiedEmail(email);
+        setError("");
+      } else {
+        setError(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -282,6 +294,21 @@ export default function LoginPage() {
     setShowForgotPassword(false);
   };
 
+  const handleResendVerification = async () => {
+    if (!unverifiedEmail) return;
+    setResendLoading(true);
+    setResendMessage("");
+    try {
+      await api.resendVerification(unverifiedEmail);
+      setResendMessage("Đã gửi mã xác thực mới. Vui lòng kiểm tra email.");
+    } catch (err: any) {
+      setResendMessage("");
+      setError(getErrorMessage(err) || "Không thể gửi mã xác thực.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   return (
     <>
       <LoginBackground3D />
@@ -322,6 +349,40 @@ export default function LoginPage() {
 
           {error && <Alert severity="error">{error}</Alert>}
 
+          {unverifiedEmail && (
+            <Alert
+              severity="warning"
+              action={
+                <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={resendLoading}
+                    onClick={handleResendVerification}
+                  >
+                    {resendLoading ? "Đang gửi..." : "Gửi lại mã"}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => router.push("/verify-email")}
+                  >
+                    Đổi email
+                  </Button>
+                </Stack>
+              }
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Tài khoản chưa xác thực email
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Kiểm tra email <strong>{unverifiedEmail}</strong> để lấy mã OTP.
+              </Typography>
+            </Alert>
+          )}
+
+          {resendMessage && <Alert severity="success">{resendMessage}</Alert>}
+
           {success ? (
             <Alert icon={<CheckCircleOutlineOutlinedIcon />} severity="success">
               Đăng nhập thành công. Đang chuyển hướng...
@@ -356,6 +417,25 @@ export default function LoginPage() {
                     }}
                   >
                     Quên mật khẩu?
+                  </Box>
+                </Typography>
+                <Typography variant="body2" sx={{ textAlign: "center" }}>
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => router.push("/verify-email")}
+                    sx={{
+                      border: "none",
+                      bgcolor: "transparent",
+                      color: "primary.main",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      fontSize: "0.875rem",
+                      textDecoration: "underline",
+                      "&:hover": { color: "primary.dark" },
+                    }}
+                  >
+                    Xác thực email?
                   </Box>
                 </Typography>
               </Stack>

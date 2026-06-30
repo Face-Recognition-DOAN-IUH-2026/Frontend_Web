@@ -135,12 +135,6 @@ export default function PatronsPage() {
 
   const [notice, setNotice] = useState<Notice>(null);
 
-  const [showOtp, setShowOtp] = useState(false);
-  const [otpEmail, setOtpEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpError, setOtpError] = useState("");
-  const [otpSubmitting, setOtpSubmitting] = useState(false);
-
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
 
   // Auto-calculate issue_date and membership_expiry based on course or student_code
@@ -236,16 +230,9 @@ export default function PatronsPage() {
     setCreateError("");
     try {
       await api.createPatron(createForm);
-      if (createForm.email) {
-        setOtpEmail(createForm.email);
-        setOtpCode("");
-        setOtpError("");
-        setShowOtp(true);
-      } else {
-        closeCreate();
-        await load();
-        showNotice("success", "Đã tạo độc giả mới");
-      }
+      closeCreate();
+      await load();
+      showNotice("success", "Đã tạo độc giả mới");
     } catch (err: any) {
       if (err?.response?.status === 409) setCreateError("MSSV hoặc mã thẻ đã tồn tại");
       else setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
@@ -260,38 +247,14 @@ export default function PatronsPage() {
     try {
       const newPatron = await api.createPatron(createForm);
       await api.enrollPatronFaceBatch(newPatron.id, files);
-      if (createForm.email) {
-        setOtpEmail(createForm.email);
-        setOtpCode("");
-        setOtpError("");
-        setShowOtp(true);
-      } else {
-        closeCreate();
-        await load();
-        showNotice("success", "Đã tạo độc giả và đăng ký khuôn mặt");
-      }
+      closeCreate();
+      await load();
+      showNotice("success", "Đã tạo độc giả và đăng ký khuôn mặt");
     } catch (err: any) {
       if (err?.response?.status === 409) setCreateError("MSSV hoặc mã thẻ đã tồn tại");
       else setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otpCode) return;
-    setOtpSubmitting(true);
-    setOtpError("");
-    try {
-      await api.verifyEmail({ email: otpEmail, code: otpCode });
-      setShowOtp(false);
-      closeCreate();
-      showNotice("success", "Đã tạo độc giả và xác thực email thành công!");
-      await load();
-    } catch (err: any) {
-      setOtpError(err?.response?.data?.detail || "Mã OTP không hợp lệ hoặc đã hết hạn.");
-    } finally {
-      setOtpSubmitting(false);
     }
   };
 
@@ -850,37 +813,6 @@ export default function PatronsPage() {
       <Snackbar open={!!notice} autoHideDuration={4000} onClose={() => setNotice(null)} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
         {notice ? <Alert onClose={() => setNotice(null)} severity={notice.severity} sx={{ width: "100%" }}>{notice.message}</Alert> : undefined}
       </Snackbar>
-
-      {/* ─── OTP DIALOG ─── */}
-      <Dialog open={showOtp} onClose={() => {}}>
-        <DialogTitle>Xác thực Email</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Mã OTP đã được gửi đến <b>{otpEmail}</b>. Vui lòng nhập mã để kích hoạt tài khoản.
-            </Typography>
-            <TextField 
-              label="Mã OTP" 
-              value={otpCode} 
-              onChange={(e) => { setOtpCode(e.target.value); setOtpError(""); }} 
-              fullWidth 
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} 
-            />
-            {otpError && <Alert severity="error">{otpError}</Alert>}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => { 
-            setShowOtp(false); 
-            closeCreate();
-            showNotice("warning", "Đã tạo độc giả (chưa xác thực email).");
-            load(); 
-          }} color="inherit">Để sau</Button>
-          <Button variant="contained" onClick={handleVerifyOtp} disabled={otpSubmitting || !otpCode}>
-            {otpSubmitting ? <CircularProgress size={18} /> : "Xác nhận"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Stack>
   );
 }
