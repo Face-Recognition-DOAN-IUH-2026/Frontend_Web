@@ -1625,48 +1625,6 @@ export default function Error({
 }
 </file>
 
-<file path="src/app/library/vr-tour/page.tsx">
-'use client';
-
-import React from 'react';
-import dynamic from 'next/dynamic';
-
-const VRViewer = dynamic(() => import('@/components/vr/VRViewer'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-screen h-screen bg-slate-950 flex flex-col items-center justify-center">
-      <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4" />
-      <h2 className="text-white text-lg font-bold">Đang tải không gian tham quan 3D...</h2>
-      <p className="text-slate-400 text-sm mt-2">Vui lòng chờ trong giây lát</p>
-    </div>
-  ),
-});
-
-export default function VRTourPage() {
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="w-screen h-screen bg-slate-950 flex flex-col items-center justify-center">
-        <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4" />
-        <h2 className="text-white text-lg font-bold">Đang tải không gian tham quan 3D...</h2>
-        <p className="text-slate-400 text-sm mt-2">Vui lòng chờ trong giây lát</p>
-      </div>
-    );
-  }
-
-  return (
-    <main className="w-screen h-screen overflow-hidden bg-black">
-      <VRViewer />
-    </main>
-  );
-}
-</file>
-
 <file path="src/components/AIWidget/AIWidget.tsx">
 "use client";
 
@@ -2456,62 +2414,6 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 }
 </file>
 
-<file path="src/components/AIWidget/tabs/ScoreTab.tsx">
-"use client";
-
-import React, { useState } from "react";
-import { Box, Typography, Button, CircularProgress, Stack } from "@mui/material";
-import RefreshIcon from "@mui/icons-material/RefreshOutlined";
-import AIScoreCard from "../cards/AIScoreCard";
-import { useAIWidgetStore } from "../store/useAIWidgetStore";
-import api from "@/lib/api-client";
-
-export default function ScoreTab() {
-  const { lastSummary, updateSummary } = useAIWidgetStore();
-  const [loading, setLoading] = useState(false);
-
-  const handleRefresh = async () => {
-    setLoading(true);
-    try {
-      const raw = await api.getAiCommandCenterSummary();
-      updateSummary({
-        operational_score: raw.operational_score,
-        active_patrons: raw.snapshot.active_patrons,
-        overdue_borrows: raw.snapshot.overdue_borrows,
-        scheduled_staff_today: raw.snapshot.scheduled_staff_today,
-        today_entries: raw.snapshot.today_entries,
-        today_exits: raw.snapshot.today_exits,
-        generated_at: raw.generated_at,
-      });
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Box sx={{ p: 2 }}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1 }}>
-          Tình trạng hệ thống
-        </Typography>
-        <Button
-          size="small"
-          startIcon={loading ? <CircularProgress size={14} /> : <RefreshIcon />}
-          onClick={handleRefresh}
-          disabled={loading}
-          sx={{ fontSize: "0.75rem" }}
-        >
-          Refresh
-        </Button>
-      </Stack>
-
-      <AIScoreCard />
-    </Box>
-  );
-}
-</file>
-
 <file path="src/components/Book3DViewer.tsx">
 "use client";
 
@@ -2753,27 +2655,6 @@ export function parseBookCard(text: string): { before: string; bookData: BookCar
   } catch {
     return { before: text, bookData: null, after: "" };
   }
-}
-</file>
-
-<file path="src/components/ClientLayout.tsx">
-"use client";
-
-import { usePathname } from "next/navigation";
-import AIWidget from "@/components/AIWidget";
-
-const PUBLIC_PAGES = ["/library/vr-tour"];
-
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const showChatbot = !PUBLIC_PAGES.includes(pathname);
-
-  return (
-    <>
-      {children}
-      {showChatbot && <AIWidget />}
-    </>
-  );
 }
 </file>
 
@@ -8718,119 +8599,102 @@ export async function GET(request: NextRequest) {
 }
 </file>
 
-<file path="src/components/AIWidget/store/useAIWidgetStore.ts">
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import api from '@/lib/api-client';
+<file path="src/app/library/vr-tour/page.tsx">
+'use client';
 
-export interface CommandCenterSummary {
-  operational_score: number;
-  active_patrons: number;
-  overdue_borrows: number;
-  scheduled_staff_today: number;
-  today_entries: number;
-  today_exits: number;
-  generated_at: string;
+import React from 'react';
+import dynamic from 'next/dynamic';
+
+const VRViewer = dynamic(() => import('@/components/vr/VRViewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-screen h-screen bg-slate-950 flex flex-col items-center justify-center">
+      <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4" />
+      <h2 className="text-white text-lg font-bold">Đang tải không gian tham quan 3D...</h2>
+      <p className="text-slate-400 text-sm mt-2">Vui lòng chờ trong giây lát</p>
+    </div>
+  ),
+});
+
+export default function VRTourPage() {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="w-screen h-screen bg-slate-950 flex flex-col items-center justify-center">
+        <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4" />
+        <h2 className="text-white text-lg font-bold">Đang tải không gian tham quan 3D...</h2>
+        <p className="text-slate-400 text-sm mt-2">Vui lòng chờ trong giây lát</p>
+      </div>
+    );
+  }
+
+  return (
+    <main className="w-screen h-screen overflow-hidden bg-black">
+      <VRViewer />
+    </main>
+  );
 }
+</file>
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-}
+<file path="src/components/AIWidget/tabs/ScoreTab.tsx">
+"use client";
 
-interface AIWidgetStore {
-  isOpen: boolean;
-  isMinimized: boolean;
-  activeTab: 'score' | 'chat' | 'actions';
-  lastSummary: CommandCenterSummary | null;
-  messages: ChatMessage[];
-  isLoadingChat: boolean;
+import React, { useState } from "react";
+import { Box, Typography, Button, CircularProgress, Stack } from "@mui/material";
+import RefreshIcon from "@mui/icons-material/RefreshOutlined";
+import AIScoreCard from "../cards/AIScoreCard";
+import { useAIWidgetStore } from "../store/useAIWidgetStore";
+import api from "@/lib/api-client";
 
-  open: () => void;
-  close: () => void;
-  toggle: () => void;
-  minimize: () => void;
-  setActiveTab: (tab: 'score' | 'chat' | 'actions') => void;
-  updateSummary: (summary: CommandCenterSummary) => void;
-  sendMessage: (message: string) => Promise<void>;
-  clearMessages: () => void;
-}
+export default function ScoreTab() {
+  const { lastSummary, updateSummary } = useAIWidgetStore();
+  const [loading, setLoading] = useState(false);
 
-export const useAIWidgetStore = create<AIWidgetStore>()(
-  persist(
-    (set, get) => ({
-      isOpen: false,
-      isMinimized: false,
-      activeTab: 'score',
-      lastSummary: null,
-      messages: [],
-      isLoadingChat: false,
-
-      open: () => set({ isOpen: true }),
-      close: () => set({ isOpen: false }),
-      toggle: () => set((state) => ({ isOpen: !state.isOpen })),
-      minimize: () => set((state) => ({ isMinimized: !state.isMinimized })),
-
-      setActiveTab: (tab) => set({ activeTab: tab }),
-
-      updateSummary: (summary) => set({ lastSummary: summary }),
-
-      sendMessage: async (message: string) => {
-        const userMessage: ChatMessage = {
-          id: `user-${Date.now()}`,
-          role: 'user',
-          content: message,
-          timestamp: Date.now(),
-        };
-
-        set((state) => ({
-          messages: [...state.messages, userMessage],
-          isLoadingChat: true,
-        }));
-
-        try {
-          const data = await api.askAiCommandCenter(message);
-
-          const assistantMessage: ChatMessage = {
-            id: `assistant-${Date.now()}`,
-            role: 'assistant',
-            content: data.answer || 'Xin lỗi, tôi không thể trả lời lúc này.',
-            timestamp: Date.now(),
-          };
-
-          set((state) => ({
-            messages: [...state.messages, assistantMessage],
-            isLoadingChat: false,
-          }));
-        } catch {
-          const errorMessage: ChatMessage = {
-            id: `error-${Date.now()}`,
-            role: 'assistant',
-            content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
-            timestamp: Date.now(),
-          };
-
-          set((state) => ({
-            messages: [...state.messages, errorMessage],
-            isLoadingChat: false,
-          }));
-        }
-      },
-
-      clearMessages: () => set({ messages: [] }),
-    }),
-    {
-      name: 'ai-widget-storage',
-      partialize: (state) => ({
-        isMinimized: state.isMinimized,
-        activeTab: state.activeTab,
-        messages: state.messages,
-      }),
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+      const raw = await api.getAiCommandCenterSummary();
+      updateSummary({
+        operational_score: raw.operational_score,
+        active_patrons: raw.snapshot.active_patrons,
+        overdue_borrows: raw.snapshot.overdue_borrows,
+        scheduled_staff_today: raw.snapshot.scheduled_staff_today,
+        today_entries: raw.snapshot.today_entries,
+        today_exits: raw.snapshot.today_exits,
+        generated_at: raw.generated_at,
+      });
+    } catch {
+    } finally {
+      setLoading(false);
     }
-  )
-);
+  };
+
+  return (
+    <Box sx={{ p: 2 }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1 }}>
+          Tình trạng hệ thống
+        </Typography>
+        <Button
+          size="small"
+          startIcon={loading ? <CircularProgress size={14} /> : <RefreshIcon />}
+          onClick={handleRefresh}
+          disabled={loading}
+          sx={{ fontSize: "0.75rem" }}
+        >
+          Refresh
+        </Button>
+      </Stack>
+
+      <AIScoreCard />
+    </Box>
+  );
+}
 </file>
 
 <file path="src/components/BookRecommendations.tsx">
@@ -9382,6 +9246,27 @@ export default function BorrowIPCameraDialog({
           <Button onClick={() => setLookupError(null)} variant="contained">Đóng</Button>
         </DialogActions>
       </Dialog>
+    </>
+  );
+}
+</file>
+
+<file path="src/components/ClientLayout.tsx">
+"use client";
+
+import { usePathname } from "next/navigation";
+import AIWidget from "@/components/AIWidget";
+
+const PUBLIC_PAGES = ["/library/vr-tour"];
+
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const showChatbot = !PUBLIC_PAGES.includes(pathname);
+
+  return (
+    <>
+      {children}
+      {showChatbot && <AIWidget />}
     </>
   );
 }
@@ -10956,69 +10841,6 @@ export default function NotificationDropdown({ anchorEl, open, onClose }: Notifi
 }
 </file>
 
-<file path="src/middleware.ts">
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { jwtVerify } from "jose";
-
-const publicPaths = ["/login", "/register", "/", "/library/vr-tour"];
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || ""
-);
-
-export async function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-
-  if (publicPaths.includes(path)) {
-    return NextResponse.next();
-  }
-
-  const token = request.cookies.get("access_token")?.value;
-  if (!token) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", path);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET, {
-      algorithms: ["HS256"],
-      issuer: process.env.JWT_ISSUER || undefined,
-      audience: process.env.JWT_AUDIENCE || undefined,
-    });
-
-    const role =
-      (payload.roles as string[])?.[0] ||
-      (payload.role as string) ||
-      null;
-    if (role !== "admin" && role !== "staff") {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("reason", "staff-only");
-      const response = NextResponse.redirect(loginUrl);
-      response.cookies.delete("access_token");
-      return response;
-    }
-
-    return NextResponse.next();
-  } catch (err: any) {
-    const loginUrl = new URL("/login", request.url);
-    if (err.code === "ERR_JWT_EXPIRED") {
-      loginUrl.searchParams.set("reason", "token-expired");
-    } else {
-      loginUrl.searchParams.set("reason", "invalid-token");
-    }
-    const response = NextResponse.redirect(loginUrl);
-    response.cookies.delete("access_token");
-    return response;
-  }
-}
-
-export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|VRLIB/).*)"],
-};
-</file>
-
 <file path="tsconfig.json">
 {
   "compilerOptions": {
@@ -12345,6 +12167,121 @@ export default function HomePage() {
     </div>
   );
 }
+</file>
+
+<file path="src/components/AIWidget/store/useAIWidgetStore.ts">
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import api from '@/lib/api-client';
+
+export interface CommandCenterSummary {
+  operational_score: number;
+  active_patrons: number;
+  overdue_borrows: number;
+  scheduled_staff_today: number;
+  today_entries: number;
+  today_exits: number;
+  generated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+interface AIWidgetStore {
+  isOpen: boolean;
+  isMinimized: boolean;
+  activeTab: 'score' | 'chat' | 'actions';
+  lastSummary: CommandCenterSummary | null;
+  messages: ChatMessage[];
+  isLoadingChat: boolean;
+
+  open: () => void;
+  close: () => void;
+  toggle: () => void;
+  minimize: () => void;
+  setActiveTab: (tab: 'score' | 'chat' | 'actions') => void;
+  updateSummary: (summary: CommandCenterSummary) => void;
+  sendMessage: (message: string) => Promise<void>;
+  clearMessages: () => void;
+}
+
+export const useAIWidgetStore = create<AIWidgetStore>()(
+  persist(
+    (set, get) => ({
+      isOpen: false,
+      isMinimized: false,
+      activeTab: 'score',
+      lastSummary: null,
+      messages: [],
+      isLoadingChat: false,
+
+      open: () => set({ isOpen: true }),
+      close: () => set({ isOpen: false }),
+      toggle: () => set((state) => ({ isOpen: !state.isOpen })),
+      minimize: () => set((state) => ({ isMinimized: !state.isMinimized })),
+
+      setActiveTab: (tab) => set({ activeTab: tab }),
+
+      updateSummary: (summary) => set({ lastSummary: summary }),
+
+      sendMessage: async (message: string) => {
+        const userMessage: ChatMessage = {
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content: message,
+          timestamp: Date.now(),
+        };
+
+        set((state) => ({
+          messages: [...state.messages, userMessage],
+          isLoadingChat: true,
+        }));
+
+        try {
+          const data = await api.askAiCommandCenter(message);
+
+          const assistantMessage: ChatMessage = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: data.answer || 'Xin lỗi, tôi không thể trả lời lúc này.',
+            timestamp: Date.now(),
+          };
+
+          set((state) => ({
+            messages: [...state.messages, assistantMessage],
+            isLoadingChat: false,
+          }));
+        } catch {
+          const errorMessage: ChatMessage = {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+            timestamp: Date.now(),
+          };
+
+          set((state) => ({
+            messages: [...state.messages, errorMessage],
+            isLoadingChat: false,
+          }));
+        }
+      },
+
+      clearMessages: () => set({ messages: [] }),
+    }),
+    {
+      name: 'ai-widget-storage',
+      partialize: (state) => ({
+        isMinimized: state.isMinimized,
+        activeTab: state.activeTab,
+        messages: state.messages,
+      }),
+    }
+  )
+);
 </file>
 
 <file path="src/components/BorrowScannerDialog.tsx">
@@ -15193,309 +15130,67 @@ return (
 }
 </file>
 
-<file path="src/lib/mui-theme.tsx">
-"use client";
+<file path="src/middleware.ts">
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { jwtVerify } from "jose";
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
-import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
-import type { PaletteMode } from "@mui/material";
-import createCache from "@emotion/cache";
-import { CacheProvider } from "@emotion/react";
+const publicPaths = ["/login", "/register", "/", "/library/vr-tour"];
 
-type ColorModePreference = "auto" | "light" | "dark";
-type ReducedMotionPreference = "reduce" | "no-preference" | "unknown";
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || ""
+);
 
-type ColorModeContextValue = {
-  mode: PaletteMode;
-  effectiveMode: PaletteMode;
-  preference: ColorModePreference;
-  reducedMotion: ReducedMotionPreference;
-  toggleMode: () => void;
-  setMode: (mode: ColorModePreference) => void;
-};
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
 
-const ColorModeContext = createContext<ColorModeContextValue>({
-  mode: "dark",
-  effectiveMode: "dark",
-  preference: "auto",
-  reducedMotion: "unknown",
-  toggleMode: () => {},
-  setMode: () => {},
-});
+  if (publicPaths.includes(path)) {
+    return NextResponse.next();
+  }
 
-export function useColorMode() {
-  return useContext(ColorModeContext);
-}
+  const token = request.cookies.get("access_token")?.value;
+  if (!token) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", path);
+    return NextResponse.redirect(loginUrl);
+  }
 
-function getSystemPreference(): boolean {
-  if (typeof window === "undefined") return true;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function getReducedMotionPreference(): ReducedMotionPreference {
-  if (typeof window === "undefined") return "unknown";
-  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-  return mq.matches ? "reduce" : "no-preference";
-}
-
-function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
-  const dark = mode === "dark";
-  const shouldReduceMotion = reducedMotion === "reduce";
-  const transitionDuration = shouldReduceMotion ? 0 : 200;
-
-  return createTheme({
-    palette: {
-      mode,
-      primary: {
-        main: "#1A73E8",
-        contrastText: "#FFFFFF",
-      },
-      secondary: {
-        main: dark ? "#69C58A" : "#226B42",
-        contrastText: dark ? "#08140D" : "#FFFFFF",
-      },
-      success: {
-        main: dark ? "#69C58A" : "#226B42",
-        contrastText: dark ? "#08140D" : "#FFFFFF",
-      },
-      warning: {
-        main: dark ? "#E4BC62" : "#9A620F",
-        contrastText: dark ? "#171003" : "#FFFFFF",
-      },
-      error: {
-        main: dark ? "#FF8A8A" : "#B42318",
-        contrastText: dark ? "#250707" : "#FFFFFF",
-      },
-      info: {
-        main: dark ? "#8CC7FF" : "#175CD3",
-        contrastText: dark ? "#061421" : "#FFFFFF",
-      },
-      background: {
-        default: dark ? "#0D111B" : "#F6F8FB",
-        paper: dark ? "#171C29" : "#FFFFFF",
-      },
-      text: {
-        primary: dark ? "#F7F2E8" : "#101828",
-        secondary: dark ? "#D8CEC0" : "#344054",
-      },
-      divider: dark ? "#3A4358" : "#D0D7E2",
-    },
-    shape: {
-      borderRadius: 8,
-    },
-    typography: {
-      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
-      h1: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 700 },
-      h2: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 700 },
-      h3: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
-      h4: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
-      h5: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
-      h6: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
-      button: { fontWeight: 700, textTransform: "none" },
-    },
-    transitions: {
-      duration: {
-        shortest: shouldReduceMotion ? 0 : 150,
-        shorter: shouldReduceMotion ? 0 : 200,
-        short: shouldReduceMotion ? 0 : 250,
-        standard: shouldReduceMotion ? 0 : 300,
-        complex: shouldReduceMotion ? 0 : 375,
-        enteringScreen: shouldReduceMotion ? 0 : 225,
-        leavingScreen: shouldReduceMotion ? 0 : 195,
-      },
-    },
-    components: {
-      MuiCssBaseline: {
-        styleOverrides: {
-          body: {
-            backgroundColor: dark ? "#12151E" : "#F5F7FA",
-          },
-        },
-      },
-      MuiPaper: {
-        styleOverrides: {
-          root: {
-            backgroundImage: "none",
-          },
-        },
-      },
-      MuiButton: {
-        defaultProps: {
-          disableElevation: true,
-        },
-        styleOverrides: {
-          root: {
-            borderRadius: 8,
-            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1), 
-                        box-shadow ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
-                        transform ${shouldReduceMotion ? 0 : 100}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-            "&:active": {
-              transform: shouldReduceMotion ? "none" : "scale(0.97)",
-            },
-          },
-        },
-      },
-      MuiCard: {
-        styleOverrides: {
-          root: {
-            borderRadius: 8,
-            transition: `box-shadow ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
-                        background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-          },
-        },
-      },
-      MuiChip: {
-        styleOverrides: {
-          root: {
-            borderRadius: 8,
-            fontWeight: 700,
-            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
-                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-          },
-        },
-      },
-      MuiListItemButton: {
-        styleOverrides: {
-          root: {
-            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
-                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-          },
-        },
-      },
-      MuiTooltip: {
-        styleOverrides: {
-          tooltip: {
-            transition: `opacity ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-          },
-        },
-      },
-      MuiIconButton: {
-        styleOverrides: {
-          root: {
-            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
-                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
-                        transform ${shouldReduceMotion ? 0 : 100}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-            "&:active": {
-              transform: shouldReduceMotion ? "none" : "scale(0.9)",
-            },
-          },
-        },
-      },
-      MuiDrawer: {
-        styleOverrides: {
-          paper: {
-            transition: `width ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
-                         background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-          },
-        },
-      },
-      MuiDialog: {
-        styleOverrides: {
-          paper: {
-            transition: `transform ${shouldReduceMotion ? 0 : 300}ms cubic-bezier(0.4, 0, 0.2, 1),
-                         opacity ${shouldReduceMotion ? 0 : 300}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-          },
-        },
-      },
-      MuiSnackbar: {
-        styleOverrides: {
-          root: {
-            transition: `transform ${shouldReduceMotion ? 0 : 200}ms cubic-bezier(0.4, 0, 0.2, 1),
-                         opacity ${shouldReduceMotion ? 0 : 200}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-          },
-        },
-      },
-    },
-  });
-}
-
-const CYCLE_ORDER: ColorModePreference[] = ["auto", "light", "dark"];
-
-export function MuiThemeProvider({ children }: { children: React.ReactNode }) {
-  const [preference, setPreferenceState] = useState<ColorModePreference>("auto");
-  const [systemPrefersDark, setSystemPrefersDark] = useState(() => getSystemPreference());
-  const [reducedMotion, setReducedMotion] = useState<ReducedMotionPreference>("unknown");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("themeMode") as ColorModePreference | null;
-    if (stored && CYCLE_ORDER.includes(stored)) {
-      setPreferenceState(stored);
-    }
-  }, []);
-
-  useEffect(() => {
-    const darkMq = window.matchMedia("(prefers-color-scheme: dark)");
-    const motionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-    setReducedMotion(getReducedMotionPreference());
-
-    const handleDarkChange = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
-    const handleMotionChange = (e: MediaQueryListEvent) => {
-      setReducedMotion(e.matches ? "reduce" : "no-preference");
-    };
-
-    darkMq.addEventListener("change", handleDarkChange);
-    motionMq.addEventListener("change", handleMotionChange);
-
-    return () => {
-      darkMq.removeEventListener("change", handleDarkChange);
-      motionMq.removeEventListener("change", handleMotionChange);
-    };
-  }, []);
-
-  const effectiveMode = useMemo(() => {
-    if (preference === "auto") {
-      return systemPrefersDark ? "dark" : "light";
-    }
-    return preference;
-  }, [preference, systemPrefersDark]);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", effectiveMode === "dark");
-    document.documentElement.classList.toggle("light", effectiveMode === "light");
-  }, [effectiveMode]);
-
-  const toggleMode = useCallback(() => {
-    setPreferenceState((current) => {
-      const idx = CYCLE_ORDER.indexOf(current);
-      const next = CYCLE_ORDER[(idx + 1) % CYCLE_ORDER.length];
-      window.localStorage.setItem("themeMode", next);
-      return next;
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET, {
+      algorithms: ["HS256"],
+      issuer: process.env.JWT_ISSUER || undefined,
+      audience: process.env.JWT_AUDIENCE || undefined,
     });
-  }, []);
 
-  const setMode = useCallback((mode: ColorModePreference) => {
-    window.localStorage.setItem("themeMode", mode);
-    setPreferenceState(mode);
-  }, []);
+    const role =
+      (payload.roles as string[])?.[0] ||
+      (payload.role as string) ||
+      null;
+    if (role !== "admin" && role !== "staff") {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("reason", "staff-only");
+      const response = NextResponse.redirect(loginUrl);
+      response.cookies.delete("access_token");
+      return response;
+    }
 
-  const value = useMemo<ColorModeContextValue>(() => ({
-    mode: effectiveMode,
-    effectiveMode,
-    preference,
-    reducedMotion,
-    toggleMode,
-    setMode,
-  }), [effectiveMode, preference, reducedMotion, toggleMode, setMode]);
-
-  const theme = useMemo(() => buildTheme(effectiveMode, reducedMotion), [effectiveMode, reducedMotion]);
-
-  const emotionCache = useMemo(() => createCache({ key: "mui", prepend: true }), []);
-
-  return (
-    <CacheProvider value={emotionCache}>
-      <ColorModeContext.Provider value={value}>
-        <ThemeProvider theme={theme}>
-          {mounted && <CssBaseline />}
-          {children}
-        </ThemeProvider>
-      </ColorModeContext.Provider>
-    </CacheProvider>
-  );
+    return NextResponse.next();
+  } catch (err: any) {
+    const loginUrl = new URL("/login", request.url);
+    if (err.code === "ERR_JWT_EXPIRED") {
+      loginUrl.searchParams.set("reason", "token-expired");
+    } else {
+      loginUrl.searchParams.set("reason", "invalid-token");
+    }
+    const response = NextResponse.redirect(loginUrl);
+    response.cookies.delete("access_token");
+    return response;
+  }
 }
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|VRLIB/).*)"],
+};
 </file>
 
 <file path="src/app/(dashboard)/identify/page.tsx">
@@ -16833,6 +16528,311 @@ function InfoRow({ label, value }: { label: string; value: string }) {
         {value || "—"}
       </Typography>
     </Stack>
+  );
+}
+</file>
+
+<file path="src/lib/mui-theme.tsx">
+"use client";
+
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
+import type { PaletteMode } from "@mui/material";
+import createCache from "@emotion/cache";
+import { CacheProvider } from "@emotion/react";
+
+type ColorModePreference = "auto" | "light" | "dark";
+type ReducedMotionPreference = "reduce" | "no-preference" | "unknown";
+
+type ColorModeContextValue = {
+  mode: PaletteMode;
+  effectiveMode: PaletteMode;
+  preference: ColorModePreference;
+  reducedMotion: ReducedMotionPreference;
+  toggleMode: () => void;
+  setMode: (mode: ColorModePreference) => void;
+};
+
+const ColorModeContext = createContext<ColorModeContextValue>({
+  mode: "dark",
+  effectiveMode: "dark",
+  preference: "auto",
+  reducedMotion: "unknown",
+  toggleMode: () => {},
+  setMode: () => {},
+});
+
+export function useColorMode() {
+  return useContext(ColorModeContext);
+}
+
+function getSystemPreference(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+function getReducedMotionPreference(): ReducedMotionPreference {
+  if (typeof window === "undefined") return "unknown";
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  return mq.matches ? "reduce" : "no-preference";
+}
+
+function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
+  const dark = mode === "dark";
+  const shouldReduceMotion = reducedMotion === "reduce";
+  const transitionDuration = shouldReduceMotion ? 0 : 200;
+
+  return createTheme({
+    palette: {
+      mode,
+      primary: {
+        main: "#1A73E8",
+        contrastText: "#FFFFFF",
+      },
+      secondary: {
+        main: dark ? "#69C58A" : "#226B42",
+        contrastText: dark ? "#08140D" : "#FFFFFF",
+      },
+      success: {
+        main: dark ? "#69C58A" : "#226B42",
+        contrastText: dark ? "#08140D" : "#FFFFFF",
+      },
+      warning: {
+        main: dark ? "#E4BC62" : "#9A620F",
+        contrastText: dark ? "#171003" : "#FFFFFF",
+      },
+      error: {
+        main: dark ? "#FF8A8A" : "#B42318",
+        contrastText: dark ? "#250707" : "#FFFFFF",
+      },
+      info: {
+        main: dark ? "#8CC7FF" : "#175CD3",
+        contrastText: dark ? "#061421" : "#FFFFFF",
+      },
+      background: {
+        default: dark ? "#0D111B" : "#F6F8FB",
+        paper: dark ? "#171C29" : "#FFFFFF",
+      },
+      text: {
+        primary: dark ? "#F7F2E8" : "#101828",
+        secondary: dark ? "#D8CEC0" : "#344054",
+      },
+      divider: dark ? "#3A4358" : "#D0D7E2",
+    },
+    shape: {
+      borderRadius: 8,
+    },
+    typography: {
+      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+      h1: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 700 },
+      h2: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 700 },
+      h3: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
+      h4: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
+      h5: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
+      h6: { fontFamily: "Outfit, Inter, sans-serif", fontWeight: 600 },
+      button: { fontWeight: 700, textTransform: "none" },
+    },
+    transitions: {
+      duration: {
+        shortest: shouldReduceMotion ? 0 : 150,
+        shorter: shouldReduceMotion ? 0 : 200,
+        short: shouldReduceMotion ? 0 : 250,
+        standard: shouldReduceMotion ? 0 : 300,
+        complex: shouldReduceMotion ? 0 : 375,
+        enteringScreen: shouldReduceMotion ? 0 : 225,
+        leavingScreen: shouldReduceMotion ? 0 : 195,
+      },
+    },
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            backgroundColor: dark ? "#12151E" : "#F5F7FA",
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            backgroundImage: "none",
+          },
+        },
+      },
+      MuiButton: {
+        defaultProps: {
+          disableElevation: true,
+        },
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1), 
+                        box-shadow ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        transform ${shouldReduceMotion ? 0 : 100}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+            "&:active": {
+              transform: shouldReduceMotion ? "none" : "scale(0.97)",
+            },
+          },
+        },
+      },
+      MuiCard: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+            transition: `box-shadow ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+            fontWeight: 700,
+            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiListItemButton: {
+        styleOverrides: {
+          root: {
+            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: {
+            transition: `opacity ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            transition: `background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                        transform ${shouldReduceMotion ? 0 : 100}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+            "&:active": {
+              transform: shouldReduceMotion ? "none" : "scale(0.9)",
+            },
+          },
+        },
+      },
+      MuiDrawer: {
+        styleOverrides: {
+          paper: {
+            transition: `width ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1),
+                         background-color ${transitionDuration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: {
+          paper: {
+            transition: `transform ${shouldReduceMotion ? 0 : 300}ms cubic-bezier(0.4, 0, 0.2, 1),
+                         opacity ${shouldReduceMotion ? 0 : 300}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+      MuiSnackbar: {
+        styleOverrides: {
+          root: {
+            transition: `transform ${shouldReduceMotion ? 0 : 200}ms cubic-bezier(0.4, 0, 0.2, 1),
+                         opacity ${shouldReduceMotion ? 0 : 200}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          },
+        },
+      },
+    },
+  });
+}
+
+const CYCLE_ORDER: ColorModePreference[] = ["auto", "light", "dark"];
+
+export function MuiThemeProvider({ children }: { children: React.ReactNode }) {
+  const [preference, setPreferenceState] = useState<ColorModePreference>("auto");
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => getSystemPreference());
+  const [reducedMotion, setReducedMotion] = useState<ReducedMotionPreference>("unknown");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("themeMode") as ColorModePreference | null;
+    if (stored && CYCLE_ORDER.includes(stored)) {
+      setPreferenceState(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    const darkMq = window.matchMedia("(prefers-color-scheme: dark)");
+    const motionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    setReducedMotion(getReducedMotionPreference());
+
+    const handleDarkChange = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      setReducedMotion(e.matches ? "reduce" : "no-preference");
+    };
+
+    darkMq.addEventListener("change", handleDarkChange);
+    motionMq.addEventListener("change", handleMotionChange);
+
+    return () => {
+      darkMq.removeEventListener("change", handleDarkChange);
+      motionMq.removeEventListener("change", handleMotionChange);
+    };
+  }, []);
+
+  const effectiveMode = useMemo(() => {
+    if (preference === "auto") {
+      return systemPrefersDark ? "dark" : "light";
+    }
+    return preference;
+  }, [preference, systemPrefersDark]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", effectiveMode === "dark");
+    document.documentElement.classList.toggle("light", effectiveMode === "light");
+  }, [effectiveMode]);
+
+  const toggleMode = useCallback(() => {
+    setPreferenceState((current) => {
+      const idx = CYCLE_ORDER.indexOf(current);
+      const next = CYCLE_ORDER[(idx + 1) % CYCLE_ORDER.length];
+      window.localStorage.setItem("themeMode", next);
+      return next;
+    });
+  }, []);
+
+  const setMode = useCallback((mode: ColorModePreference) => {
+    window.localStorage.setItem("themeMode", mode);
+    setPreferenceState(mode);
+  }, []);
+
+  const value = useMemo<ColorModeContextValue>(() => ({
+    mode: effectiveMode,
+    effectiveMode,
+    preference,
+    reducedMotion,
+    toggleMode,
+    setMode,
+  }), [effectiveMode, preference, reducedMotion, toggleMode, setMode]);
+
+  const theme = useMemo(() => buildTheme(effectiveMode, reducedMotion), [effectiveMode, reducedMotion]);
+
+  const emotionCache = useMemo(() => createCache({ key: "mui", prepend: true }), []);
+
+  return (
+    <CacheProvider value={emotionCache}>
+      <ColorModeContext.Provider value={value}>
+        <ThemeProvider theme={theme}>
+          {mounted && <CssBaseline />}
+          {children}
+        </ThemeProvider>
+      </ColorModeContext.Provider>
+    </CacheProvider>
   );
 }
 </file>

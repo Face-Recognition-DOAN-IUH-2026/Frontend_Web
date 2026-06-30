@@ -292,6 +292,33 @@ class ApiClient {
     }
   }
 
+  async resendVerification(email: string): Promise<void> {
+    try {
+      await this.client.post("/auth/resend-verification", { email });
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      await this.client.post("/api/auth/resend-verification", { email });
+    }
+  }
+
+  async requestEmailCorrection(data: { current_email: string; new_email: string }): Promise<void> {
+    try {
+      await this.client.post("/auth/correct-email/request-otp", data);
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      await this.client.post("/api/auth/correct-email/request-otp", data);
+    }
+  }
+
+  async verifyEmailCorrection(data: { current_email: string; new_email: string; code: string }): Promise<void> {
+    try {
+      await this.client.post("/auth/correct-email/verify", data);
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+      await this.client.post("/api/auth/correct-email/verify", data);
+    }
+  }
+
   async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
     try {
       const response = await this.client.post<TokenResponse>("/auth/refresh", { refresh_token: refreshToken });

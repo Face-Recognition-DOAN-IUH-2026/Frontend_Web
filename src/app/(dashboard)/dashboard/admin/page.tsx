@@ -94,12 +94,6 @@ export default function AdminPage() {
   const [createError, setCreateError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const [showOtp, setShowOtp] = useState(false);
-  const [otpEmail, setOtpEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpError, setOtpError] = useState("");
-  const [otpSubmitting, setOtpSubmitting] = useState(false);
-
   // Search & filter
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "staff" | "patron">("all");
@@ -142,31 +136,13 @@ export default function AdminPage() {
     }
     try {
       setCreateError("");
-      await api.register(createForm);
-      setOtpEmail(createForm.email);
-      setOtpCode("");
-      setOtpError("");
+      await api.register({ ...createForm, skip_verification: true } as any);
       setShowCreate(false);
-      setShowOtp(true);
-    } catch (err: any) {
-      setCreateError(err?.response?.data?.detail || "Tạo người dùng thất bại.");
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otpCode) return;
-    setOtpSubmitting(true);
-    setOtpError("");
-    try {
-      await api.verifyEmail({ email: otpEmail, code: otpCode });
-      setShowOtp(false);
       setCreateForm({ email: "", password: "", role: "staff" });
-      setNotice("Xác thực email và kích hoạt tài khoản thành công!");
+      setNotice("Tạo người dùng thành công. Tài khoản đã active.");
       load();
     } catch (err: any) {
-      setOtpError(err?.response?.data?.detail || "Mã OTP không hợp lệ hoặc đã hết hạn.");
-    } finally {
-      setOtpSubmitting(false);
+      setCreateError(err?.response?.data?.detail || "Tạo người dùng thất bại.");
     }
   };
 
@@ -575,40 +551,6 @@ export default function AdminPage() {
       </Drawer>
 
       <Snackbar open={Boolean(notice)} autoHideDuration={3000} onClose={() => setNotice("")} message={notice} />
-
-      {/* OTP Dialog */}
-      <Dialog open={showOtp} onClose={() => {}} sx={{ "& .MuiPaper-root": { borderRadius: 3, minWidth: 380 } }}>
-        <DialogTitle sx={{ fontWeight: 800 }}>Xác thực Email</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Alert severity="info" sx={{ borderRadius: 2 }}>
-              Mã OTP đã được gửi đến <b>{otpEmail}</b>. Vui lòng nhập mã để kích hoạt tài khoản.
-            </Alert>
-            <TextField
-              label="Mã OTP"
-              value={otpCode}
-              onChange={(e) => { setOtpCode(e.target.value); setOtpError(""); }}
-              fullWidth
-              slotProps={{
-                htmlInput: {
-                  maxLength: 6,
-                  style: { textAlign: "center", fontSize: "1.5rem", letterSpacing: "0.4em", fontFamily: "monospace" }
-                }
-              }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-            {otpError && <Alert severity="error" sx={{ borderRadius: 2 }}>{otpError}</Alert>}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={() => { setShowOtp(false); setCreateForm({ email: "", password: "", role: "staff" }); setNotice("Đã tạo người dùng mới (chưa xác thực)."); load(); }} color="inherit">
-            Để sau
-          </Button>
-          <Button variant="contained" onClick={handleVerifyOtp} disabled={otpSubmitting || !otpCode} sx={{ borderRadius: 2, minWidth: 100 }}>
-            {otpSubmitting ? <CircularProgress size={18} color="inherit" /> : "Xác nhận"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Stack>
   );
 }
