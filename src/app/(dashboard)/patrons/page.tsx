@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
-  alpha,
   Avatar,
   Box,
   Button,
@@ -16,7 +15,6 @@ import {
   DialogTitle,
   Drawer,
   IconButton,
-  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -28,27 +26,26 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Card,
-  CardContent,
-  Divider,
-  Grid,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
 import BadgeIcon from "@mui/icons-material/BadgeOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import { fadeInUp, shimmer, successPop } from "@/lib/animations";
 import { initials, statusLabel, statusColor } from "@/lib/utils";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
+import PageHeader from "@/components/ui/PageHeader";
+import DashboardCard from "@/components/ui/DashboardCard";
+import MuiStatCard from "@/components/ui/MuiStatCard";
+import EmptyState from "@/components/ui/EmptyState";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 import SearchField from "@/components/ui/SearchField";
 import type { CaptureAngle } from "@/components/MultiAngleCapture";
@@ -114,28 +111,25 @@ export default function PatronsPage() {
 
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
 
-  // Auto-calculate issue_date and membership_expiry based on course or student_code
   useEffect(() => {
     if (createStep === "form") {
       let startYear = 0;
       let endYear = 0;
       
       const courseStr = (createForm.course || "").toString();
-      // Try to find YYYY format like "2021-2025" or just "2021"
       const years = courseStr.match(/\b(20\d{2})\b/g);
       
       if (years && years.length > 0) {
         startYear = parseInt(years[0]);
-        endYear = years.length > 1 ? parseInt(years[1]) : startYear + 4; // Default to 4 years
+        endYear = years.length > 1 ? parseInt(years[1]) : startYear + 4;
       } else if (createForm.student_code && createForm.student_code.match(/^(1[0-9]|2[0-9])/)) {
-        // Fallback: extract from IUH student code (e.g. 21xxxxx -> 2021)
         const prefix = parseInt(createForm.student_code.substring(0, 2));
         startYear = 2000 + prefix;
         endYear = startYear + 4;
       }
       
       if (startYear > 0 && endYear > 0) {
-        const newIssue = `${startYear}-09-01`; // Usually starts Sept 1st
+        const newIssue = `${startYear}-09-01`;
         const newExpiry = `${endYear}-09-01`;
         
         setCreateForm(prev => {
@@ -312,7 +306,6 @@ export default function PatronsPage() {
     }
   };
 
-  // ── stat counts ──
   const activeCount  = patrons.filter((p) => p.status === "active").length;
   const expiredCount = patrons.filter((p) => p.status === "expired" || p.status === "inactive").length;
   const faceCount    = patrons.filter((p) => p.has_face).length;
@@ -341,63 +334,40 @@ export default function PatronsPage() {
     { label: "Có khuôn mặt", value: faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((faceCount / patrons.length) * 100) : 0 },
   ];
 
+  const statBadges = `${patrons.length} độc giả · ${activeCount} đang hoạt động · ${faceCount} đã đăng ký khuôn mặt`;
+
   return (
     <Stack spacing={3}>
-      {/* Gradient Header */}
-      <Box
-        sx={{
-          p: 3, borderRadius: 3,
-          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
-          border: "1px solid", borderColor: "rgba(99,102,241,0.3)",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexWrap: "wrap", gap: 2, position: "relative", overflow: "hidden",
-        }}
-      >
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
-        <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-            <PeopleIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
-          </Avatar>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Quản lý Độc giả</Typography>
-            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
-              {patrons.length} độc giả · {activeCount} đang hoạt động · {faceCount} đã đăng ký khuôn mặt
-            </Typography>
-          </Box>
-        </Stack>
-        <Stack direction="row" spacing={1} sx={{ zIndex: 1, flexWrap: "wrap" }}>
-          <Tooltip title="Tải lại">
-            <IconButton onClick={load} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+      <PageHeader
+        title="Quản lý Độc giả"
+        icon={PeopleIcon}
+        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
+        statBadges={statBadges}
+        onRefresh={load}
+        actions={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCreateScan(true); setShowCreate(true); }}
             sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", boxShadow: "0 4px 14px rgba(99,102,241,0.4)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}>
             Thêm độc giả
           </Button>
-        </Stack>
-      </Box>
+        }
+      />
 
-      {/* Stat Cards */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
         {statItems.map((item, idx) => (
-          <Paper key={item.label} variant="outlined"
-            sx={{ borderRadius: 3, position: "relative", overflow: "hidden", p: 2.5, transition: "all 0.25s ease", animation: `${fadeInUp} 0.5s ease-out`, animationDelay: `${idx * 0.07}s`, animationFillMode: "both", "&:hover": { transform: "translateY(-2px)", boxShadow: 4 } }}>
-            <Box sx={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: item.gradient, opacity: 0.12, pointerEvents: "none" }} />
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 1.5 }}>
-              <Avatar sx={{ background: item.gradient, width: 44, height: 44 }}><item.icon sx={{ color: "#fff", fontSize: 22 }} /></Avatar>
-              <Typography variant="caption" sx={{ fontWeight: 600, textTransform: "uppercase", color: "text.secondary", letterSpacing: 0.5 }}>{item.label}</Typography>
-            </Stack>
-            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>{item.value}</Typography>
-            <LinearProgress variant="determinate" value={item.pct} sx={{ height: 3, borderRadius: 2, bgcolor: "rgba(99,102,241,0.08)", "& .MuiLinearProgress-bar": { background: item.gradient, borderRadius: 2 } }} />
-          </Paper>
+          <MuiStatCard
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            icon={item.icon}
+            gradient={item.gradient}
+            pct={item.pct}
+            index={idx}
+          />
         ))}
       </Box>
 
-      {/* Search + Filter */}
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, borderColor: "divider" }}>
-        <Stack spacing={1.5}>
+      <DashboardCard noPadding>
+        <Stack spacing={1.5} sx={{ p: 2 }}>
           <SearchField value={query} onChange={setQuery} placeholder="Tìm theo tên, MSSV, mã thẻ..." />
           <ToggleButtonGroup value={filter} onChange={(_, v) => { if (v) setFilter(v); }} size="small" exclusive
             sx={{ display: "flex", flexWrap: "wrap", gap: 0.75,
@@ -406,19 +376,16 @@ export default function PatronsPage() {
             {FILTERS.map((f) => (<ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>))}
           </ToggleButtonGroup>
         </Stack>
-      </Paper>
+      </DashboardCard>
 
-      {/* Card Grid */}
       {loading && filtered.length === 0 ? (
-        <Box sx={{ py: 10, display: "grid", placeItems: "center" }}>
-          <CircularProgress sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
-        </Box>
+        <LoadingOverlay loading message="Đang tải danh sách độc giả..." />
       ) : filtered.length === 0 ? (
-        <Paper variant="outlined" sx={{ py: 10, display: "flex", flexDirection: "column", alignItems: "center", borderRadius: 3, borderColor: "divider" }}>
-          <PersonIcon sx={{ fontSize: 56, color: "action.disabled", mb: 2 }} />
-          <Typography variant="h6" color="text.secondary">Không tìm thấy độc giả nào</Typography>
-          <Button size="small" sx={{ mt: 1.5, textTransform: "none" }} onClick={() => { setQuery(""); setFilter("all"); }}>Xóa bộ lọc</Button>
-        </Paper>
+        <EmptyState
+          icon={<PersonIcon sx={{ fontSize: 32 }} />}
+          title="Không tìm thấy độc giả nào"
+          action={<Button size="small" sx={{ textTransform: "none" }} onClick={() => { setQuery(""); setFilter("all"); }}>Xóa bộ lọc</Button>}
+        />
       ) : (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }, gap: 2 }}>
           {filtered.map((patron, idx) => {
@@ -428,7 +395,7 @@ export default function PatronsPage() {
               <Paper key={patron.id} variant="outlined"
                 onClick={() => router.push(`/patrons/${patron.id}`)}
                 sx={{ borderRadius: 3, p: 0, cursor: "pointer", transition: "all 0.25s ease", overflow: "hidden",
-                  animation: `${fadeInUp} 0.4s ease-out`, animationDelay: `${idx * 0.05}s`, animationFillMode: "both",
+                  ...staggerSx(idx, 0.05),
                   "&:hover": { transform: "translateY(-2px)", boxShadow: 4, borderColor: "primary.main" } }}>
                 <Box sx={{ height: 4, background: patron.status === "active" ? STAT_GRADIENT.active : patron.status === "expired" ? STAT_GRADIENT.expired : "linear-gradient(135deg, #64748b 0%, #475569 100%)" }} />
                 <Box sx={{ p: 2.5 }}>
@@ -443,12 +410,12 @@ export default function PatronsPage() {
                     <Chip label={statusLabel(patron.status)} color={statusColor(patron.status)} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.7rem", height: 24 }} />
                   </Stack>
                   <Stack spacing={0.75} sx={{ mb: 2 }}>
-                    {patron.course && (
+                    {patron.course ? (
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                         <SchoolIcon sx={{ fontSize: 14, color: "text.secondary" }} />
                         <Typography variant="caption" color="text.secondary">{patron.course}</Typography>
                       </Stack>
-                    )}
+                    ) : null}
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                       <FaceIcon sx={{ fontSize: 14, color: patron.has_face ? "primary.main" : "action.disabled" }} />
                       <Typography variant="caption" color={patron.has_face ? "primary.main" : "text.secondary"}>
@@ -484,22 +451,17 @@ export default function PatronsPage() {
         </Box>
       )}
 
-      {/* ─── CREATE DIALOG (full-screen split-pane) ─── */}
       <Dialog open={showCreate} onClose={closeCreate} fullScreen>
         <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
-          {/* Header */}
           <Box sx={{ px: 3, py: 2, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: 1, borderColor: "divider", bgcolor: "background.paper" }}>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>Cấp phát thẻ độc giả mới</Typography>
             <IconButton onClick={closeCreate} sx={{ bgcolor: "action.hover" }}><CloseIcon /></IconButton>
           </Box>
           
-          {/* Body */}
           <Box sx={{ flex: 1, display: "flex", overflow: "hidden" }}>
-            {/* Left side: Live Preview */}
             <Box sx={{ flex: 1, bgcolor: "grey.50", display: { xs: "none", md: "flex" }, alignItems: "center", justifyContent: "center", p: 4, borderRight: 1, borderColor: "divider", position: "relative" }}>
               <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.4, backgroundImage: "radial-gradient(#1976d2 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
               
-              {/* Virtual ID Card */}
               <Box sx={{ 
                 width: 420, 
                 aspectRatio: "1.586", 
@@ -535,7 +497,6 @@ export default function PatronsPage() {
               </Box>
             </Box>
 
-            {/* Right side: Stepper and Form */}
             <Box sx={{ flex: { xs: 1, md: "0 0 500px" }, display: "flex", flexDirection: "column", bgcolor: "background.paper", boxShadow: "-4px 0 24px rgba(0,0,0,0.02)", zIndex: 2 }}>
               <Box sx={{ p: 4, borderBottom: 1, borderColor: "divider", bgcolor: "background.default" }}>
                 <Stepper activeStep={createStep === "scan" ? 0 : createStep === "form" ? 1 : 2} alternativeLabel>
@@ -545,7 +506,7 @@ export default function PatronsPage() {
                 </Stepper>
               </Box>
               <Box sx={{ flex: 1, overflowY: "auto", p: { xs: 3, md: 5 } }}>
-                {createStep === "scan" && (
+                {createStep === "scan" ? (
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Quét thẻ sinh viên</Typography>
@@ -560,10 +521,10 @@ export default function PatronsPage() {
                         ipCameraUrl={CARD_CAM_URL}
                       />
                     </Box>
-                    {createError && <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert>}
+                    {createError ? <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert> : null}
                   </Stack>
-                )}
-                {createStep === "form" && (
+                ) : null}
+                {createStep === "form" ? (
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Thông tin cá nhân</Typography>
@@ -593,10 +554,10 @@ export default function PatronsPage() {
                         <TextField label="Hạn thẻ" type="date" value={createForm.membership_expiry} onChange={(e) => setCreateForm({ ...createForm, membership_expiry: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} helperText={createForm.course ? "Tự động tính theo khóa" : ""} />
                       </Box>
                     </Stack>
-                    {createError && <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert>}
+                    {createError ? <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert> : null}
                   </Stack>
-                )}
-                {createStep === "face" && (
+                ) : null}
+                {createStep === "face" ? (
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Bảo mật khuôn mặt</Typography>
@@ -605,36 +566,35 @@ export default function PatronsPage() {
                     <Box sx={{ borderRadius: 3, overflow: "hidden", border: 1, borderColor: "divider", p: 2, bgcolor: "grey.50" }}>
                       <MultiAngleCapture consent={true} onFilesReady={handleFaceReady} />
                     </Box>
-                    {createError && <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert>}
+                    {createError ? <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert> : null}
                   </Stack>
-                )}
+                ) : null}
               </Box>
               
               <Box sx={{ p: { xs: 3, md: 4 }, borderTop: 1, borderColor: "divider", bgcolor: "background.default" }}>
-                {createStep === "scan" && (
+                {createStep === "scan" ? (
                   <Button variant="contained" fullWidth size="large" onClick={() => { setCreateScan(false); setCreateStep("form"); }} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Nhập thông tin thủ công</Button>
-                )}
-                {createStep === "form" && (
+                ) : null}
+                {createStep === "form" ? (
                   <Stack direction="row" spacing={2}>
                     <Button variant="outlined" fullWidth onClick={() => setCreateStep("scan")} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Quét lại thẻ</Button>
                     <Button variant="contained" fullWidth onClick={handleFormNext} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Tiếp tục</Button>
                   </Stack>
-                )}
-                {createStep === "face" && (
+                ) : null}
+                {createStep === "face" ? (
                   <Stack direction="row" spacing={2}>
                     <Button variant="outlined" fullWidth onClick={() => setCreateStep("form")} disabled={submitting} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Quay lại</Button>
                     <Button variant="contained" fullWidth onClick={handleSkipFace} disabled={submitting} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>
                       {submitting ? <CircularProgress size={24} color="inherit" /> : "Tạo (Bỏ qua Face)"}
                     </Button>
                   </Stack>
-                )}
+                ) : null}
               </Box>
             </Box>
           </Box>
         </Box>
       </Dialog>
 
-      {/* ─── EDIT DRAWER (slide panel) ─── */}
       <Drawer
         anchor="right"
         open={!!editTarget}
@@ -647,7 +607,7 @@ export default function PatronsPage() {
             <IconButton onClick={() => setEditTarget(null)}><CloseIcon /></IconButton>
           </Stack>
 
-          {editTarget && (
+          {editTarget ? (
             <Stack spacing={2.5} sx={{ flex: 1, overflow: "auto", px: 2.5, py: 2.5 }}>
               <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                 <Avatar sx={{ width: 48, height: 48, bgcolor: "primary.main", fontWeight: 700 }}>
@@ -675,7 +635,7 @@ export default function PatronsPage() {
                 <MenuItem value="expired">Hết hạn</MenuItem>
               </TextField>
             </Stack>
-          )}
+          ) : null}
 
           <Stack direction="row" spacing={1.5} sx={{ px: 2.5, py: 2, borderTop: 1, borderColor: "divider" }}>
             <Button fullWidth variant="outlined" onClick={() => setEditTarget(null)} disabled={editSaving}>Hủy</Button>
@@ -686,7 +646,6 @@ export default function PatronsPage() {
         </Box>
       </Drawer>
 
-      {/* ─── RENEW DIALOG ─── */}
       <Dialog open={!!renewTarget} onClose={() => { setRenewTarget(null); setRenewMonths(12); }}>
         <DialogTitle>Gia hạn thẻ độc giả</DialogTitle>
         <DialogContent>
@@ -726,7 +685,6 @@ export default function PatronsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* ─── DELETE CONFIRM ─── */}
       <Dialog open={!!deleteTarget} onClose={() => { setDeleteTarget(null); setDeleteConfirmText(""); }}>
         <DialogTitle>Xóa độc giả?</DialogTitle>
         <DialogContent>
@@ -755,7 +713,6 @@ export default function PatronsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* ─── RESTORE CONFIRM ─── */}
       <Dialog open={!!restoreTarget} onClose={() => { setRestoreTarget(null); setRestoreConfirmText(""); }}>
         <DialogTitle>Khôi phục độc giả?</DialogTitle>
         <DialogContent>

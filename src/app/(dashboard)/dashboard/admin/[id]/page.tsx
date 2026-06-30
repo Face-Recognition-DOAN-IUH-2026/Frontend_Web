@@ -7,8 +7,6 @@ import {
   Avatar,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -22,7 +20,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import MailIcon from "@mui/icons-material/MailOutlined";
 import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
@@ -30,6 +27,9 @@ import ShieldIcon from "@mui/icons-material/ShieldOutlined";
 import FingerprintIcon from "@mui/icons-material/FingerprintOutlined";
 import BadgeIcon from "@mui/icons-material/BadgeOutlined";
 import ErrorIcon from "@mui/icons-material/ErrorOutlineOutlined";
+import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
+import PageHeader from "@/components/ui/PageHeader";
+import DashboardCard from "@/components/ui/DashboardCard";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { initials, roleLabel, statusLabel, statusColor } from "@/lib/utils";
@@ -167,143 +167,120 @@ export default function UserDetailPage() {
 
   if (error && !user) {
     return (
-      <Box sx={{ p: 3, space: 2 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => router.push("/dashboard/admin")}
-          sx={{ mb: 2 }}
-        >
-          Quay lại danh sách
-        </Button>
+      <Stack spacing={2} sx={{ p: 3 }}>
+        <PageHeader
+          title="Chi tiết người dùng"
+          backHref="/dashboard/admin"
+        />
         <Alert severity="error" sx={{ borderRadius: 2 }}>
           {error}
         </Alert>
-      </Box>
+      </Stack>
     );
   }
 
-if (!user) return null;
+  if (!user) return null;
 
-const userInitials = initials(user.full_name || user.email);
-const avatarBg = user.status === "suspended" ? "warning.main" : user.role === "admin" ? "primary.main" : "secondary.main";
-const dateFmt = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString("vi-VN") : "—");
-const dtFmt = (v: string | null | undefined) => (v ? new Date(v).toLocaleString("vi-VN") : "—");
+  const userInitials = initials(user.full_name || user.email);
+  const avatarBg = user.status === "suspended" ? "warning.main" : user.role === "admin" ? "primary.main" : "secondary.main";
+  const dateFmt = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString("vi-VN") : "—");
+  const dtFmt = (v: string | null | undefined) => (v ? new Date(v).toLocaleString("vi-VN") : "—");
 
-return (
+  return (
     <Stack spacing={3}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        onClick={() => router.push("/dashboard/admin")}
-        sx={{ alignSelf: "flex-start", textTransform: "none" }}
-      >
-        Quay lại danh sách
-      </Button>
+      <PageHeader
+        title={user.full_name || "Chưa cập nhật"}
+        subtitle={`Email: ${user.email}`}
+        backHref="/dashboard/admin"
+        icon={AdminPanelSettingsOutlinedIcon}
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<EditIcon />}
+            onClick={openEdit}
+            sx={{ textTransform: "none", borderRadius: 2 }}
+          >
+            Sửa thông tin
+          </Button>
+        }
+      />
 
-      {error && (
+      {error ? (
         <Alert severity="error" icon={<ErrorIcon />} sx={{ borderRadius: 2 }}>
           {error}
         </Alert>
-      )}
+      ) : null}
 
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            Chi tiết người dùng
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Email: <Box component="span" sx={{ fontFamily: "monospace" }}>{user.email}</Box>
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          startIcon={<EditIcon />}
-          onClick={openEdit}
-          sx={{ textTransform: "none", borderRadius: 2 }}
-        >
-          Sửa thông tin
-        </Button>
-      </Box>
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <Stack spacing={3}>
+            <DashboardCard>
+              <Box sx={{ textAlign: "center" }}>
+                <Avatar
+                  sx={{
+                    width: 88,
+                    height: 88,
+                    bgcolor: avatarBg,
+                    color: "primary.contrastText",
+                    fontSize: 32,
+                    fontWeight: 900,
+                    mx: "auto",
+                    mb: 1.5,
+                  }}
+                  src={user.avatar_url || undefined}
+                >
+                  {userInitials}
+                </Avatar>
+                <Typography variant="h5" sx={{ fontWeight: 700, wordBreak: "break-word" }}>
+                  {user.full_name || "Chưa cập nhật"}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5, fontFamily: "monospace", fontSize: "0.8rem" }}
+                >
+                  {user.email}
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ justifyContent: "center", flexWrap: "wrap", mt: 1.5 }}>
+                  <Chip
+                    label={roleLabel(user.role)}
+                    color={user.role === "admin" ? "warning" : user.role === "staff" ? "primary" : "default"}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={statusLabel(user.status || "active")}
+                    color={statusColor(user.status || "active")}
+                    size="small"
+                  />
+                </Stack>
+                {user.has_face ? (
+                  <Chip
+                    icon={<FaceIcon sx={{ fontSize: 16 }} />}
+                    label="Face ID đã đăng ký"
+                    color="success"
+                    size="small"
+                    variant="outlined"
+                    sx={{ mt: 1.5 }}
+                  />
+                ) : null}
+                {user.suspended_reason ? (
+                  <Alert severity="warning" sx={{ mt: 2, textAlign: "left", borderRadius: 1.5 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                      Lý do khóa: {user.suspended_reason}
+                    </Typography>
+                  </Alert>
+                ) : null}
+              </Box>
+            </DashboardCard>
 
-    <Grid container spacing={3}>
-      <Grid size={{ xs: 12, lg: 4 }}>
-        <Stack spacing={3}>
-          <Card variant="outlined">
-            <CardContent sx={{ textAlign: "center" }}>
-              <Avatar
-                sx={{
-                  width: 88,
-                  height: 88,
-                  bgcolor: avatarBg,
-                  color: "primary.contrastText",
-                  fontSize: 32,
-                  fontWeight: 900,
-                  mx: "auto",
-                  mb: 1.5,
-                }}
-                src={user.avatar_url || undefined}
-              >
-                {userInitials}
-              </Avatar>
-              <Typography variant="h5" sx={{ fontWeight: 700, wordBreak: "break-word" }}>
-                {user.full_name || "Chưa cập nhật"}
-              </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 0.5, fontFamily: "monospace", fontSize: "0.8rem" }}
-              >
-                {user.email}
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ justifyContent: "center", flexWrap: "wrap", mt: 1.5 }}>
-                <Chip
-                  label={roleLabel(user.role)}
-                  color={user.role === "admin" ? "warning" : user.role === "staff" ? "primary" : "default"}
-                  size="small"
-                  variant="outlined"
-                />
-                <Chip
-                  label={statusLabel(user.status || "active")}
-                  color={statusColor(user.status || "active")}
-                  size="small"
-                />
-              </Stack>
-              {user.has_face && (
-                <Chip
-                  icon={<FaceIcon sx={{ fontSize: 16 }} />}
-                  label="Face ID đã đăng ký"
-                  color="success"
-                  size="small"
-                  variant="outlined"
-                  sx={{ mt: 1.5 }}
-                />
-              )}
-              {user.suspended_reason && (
-                <Alert severity="warning" sx={{ mt: 2, textAlign: "left", borderRadius: 1.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                    Lý do khóa: {user.suspended_reason}
-                  </Typography>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined">
-            <CardContent>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}
-              >
-                Định danh hệ thống
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 0.75, fontFamily: "monospace", wordBreak: "break-all" }}>
+            <DashboardCard title="Định danh hệ thống">
+              <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
                 {user.id}
               </Typography>
-            </CardContent>
-          </Card>
+            </DashboardCard>
 
-          <Card variant="outlined">
-            <CardContent>
+            <DashboardCard>
               <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                 <MailIcon fontSize="small" color="action" />
                 <Box>
@@ -315,21 +292,16 @@ return (
                   </Typography>
                 </Box>
               </Stack>
-            </CardContent>
-          </Card>
-        </Stack>
-      </Grid>
+            </DashboardCard>
+          </Stack>
+        </Grid>
 
-      <Grid size={{ xs: 12, lg: 8 }}>
-        <Stack spacing={3}>
-          <Card variant="outlined">
-            <CardContent>
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
-                <BadgeIcon fontSize="small" color="primary" />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Thông tin liên hệ
-                </Typography>
-              </Stack>
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <Stack spacing={3}>
+            <DashboardCard
+              title="Thông tin liên hệ"
+              actions={<BadgeIcon fontSize="small" color="primary" />}
+            >
               <Grid container spacing={2}>
                 {[
                   ["Số điện thoại", user.phone || "Chưa cập nhật"],
@@ -345,17 +317,12 @@ return (
                   </Grid>
                 ))}
               </Grid>
-            </CardContent>
-          </Card>
+            </DashboardCard>
 
-          <Card variant="outlined">
-            <CardContent>
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
-                <ShieldIcon fontSize="small" color="action" />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Thư viện
-                </Typography>
-              </Stack>
+            <DashboardCard
+              title="Thư viện"
+              actions={<ShieldIcon fontSize="small" color="action" />}
+            >
               <Grid container spacing={2}>
                 {[
                   ["Mã sinh viên", user.student_code || "Chưa cập nhật"],
@@ -371,17 +338,12 @@ return (
                   </Grid>
                 ))}
               </Grid>
-            </CardContent>
-          </Card>
+            </DashboardCard>
 
-          <Card variant="outlined">
-            <CardContent>
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 2 }}>
-                <FingerprintIcon fontSize="small" color="action" />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Hệ thống
-                </Typography>
-              </Stack>
+            <DashboardCard
+              title="Hệ thống"
+              actions={<FingerprintIcon fontSize="small" color="action" />}
+            >
               <Grid container spacing={2}>
                 {[
                   ["Ngày tạo", dtFmt(user.created_at)],
@@ -397,18 +359,16 @@ return (
                   </Grid>
                 ))}
               </Grid>
-            </CardContent>
-          </Card>
-        </Stack>
-      </Grid>
+            </DashboardCard>
+          </Stack>
+        </Grid>
       </Grid>
 
-      {/* EditDialog */}
       <Dialog open={editOpen} onClose={() => !saving && setEditOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Sửa thông tin người dùng</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2.5} sx={{ mt: 0.5 }}>
-            {editError && <Alert severity="error">{editError}</Alert>}
+            {editError ? <Alert severity="error">{editError}</Alert> : null}
 
             <TextField
               label="Họ và tên"
@@ -535,4 +495,3 @@ return (
     </Stack>
   );
 }
-

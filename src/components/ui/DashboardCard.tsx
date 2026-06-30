@@ -5,7 +5,7 @@ interface DashboardCardProps {
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   noPadding?: boolean;
 }
 

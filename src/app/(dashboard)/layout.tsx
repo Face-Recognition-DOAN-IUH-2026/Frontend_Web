@@ -157,7 +157,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <Topbar user={user} />
-        <Box component="main" sx={{ p: { xs: 2, md: 3 } }}>
+        <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 2, md: 3 } }}>
           {children}
         </Box>
       </Box>

@@ -1,31 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  Chip,
-  FormControlLabel,
-  LinearProgress,
-  Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-} from "@mui/material";
-import FaceOutlinedIcon from "@mui/icons-material/FaceOutlined";
+import { Alert, Box, Button, Checkbox, Chip, FormControlLabel, LinearProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
-import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
 import api, { getErrorMessage } from "@/lib/api-client";
-import { shimmer } from "@/lib/animations";
+import PageHeader from "@/components/ui/PageHeader";
+import DashboardCard from "@/components/ui/DashboardCard";
+import EmptyState from "@/components/ui/EmptyState";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 export default function IdentifyPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -69,47 +54,55 @@ export default function IdentifyPage() {
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 1040, mx: "auto" }}>
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-          <SearchOutlinedIcon color="primary" />
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 850 }}>Nhận diện khuôn mặt</Typography>
-            <Typography color="text.secondary">Tìm người dùng gần nhất trong kho khuôn mặt đã đăng ký.</Typography>
-          </Box>
-        </Stack>
-      </Paper>
+      <Box sx={staggerSx(0)}>
+        <PageHeader
+          title="Nhận diện khuôn mặt"
+          subtitle="Tìm người dùng gần nhất trong kho khuôn mặt đã đăng ký."
+          icon={FaceRetouchingNaturalOutlinedIcon}
+          gradient="linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #3b82f6 100%)"
+        />
+      </Box>
 
-      {error && <Alert severity="error">{error}</Alert>}
+      {error ? (
+        <Box sx={staggerSx(1)}>
+          <Alert severity="error">{error}</Alert>
+        </Box>
+      ) : null}
 
       {jobId ? (
-        <JobPoll
-          jobId={jobId}
-          onComplete={(result) => { setIsLoading(false); setJobId(null); setMatches(result?.matches || []); }}
-          onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
-        />
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
+            <JobPoll
+              jobId={jobId}
+              onComplete={(result) => { setIsLoading(false); setJobId(null); setMatches(result?.matches || []); }}
+              onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
+            />
+          </DashboardCard>
+        </Box>
       ) : matches ? (
-        <Stack spacing={2}>
-          <Paper variant="outlined" sx={{ p: 2.5 }}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ justifyContent: "space-between", alignItems: { md: "center" } }}>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                <FaceOutlinedIcon color="primary" />
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 850 }}>Tìm thấy {matches.length} kết quả</Typography>
-                  <Typography color="text.secondary">Kết quả được sắp xếp theo độ tin cậy giảm dần.</Typography>
-                </Box>
-              </Stack>
-              <Button startIcon={<RestartAltOutlinedIcon />} variant="outlined" onClick={reset}>Thử lại</Button>
-            </Stack>
-          </Paper>
+        <Stack spacing={2} sx={staggerSx(1)}>
+          <DashboardCard
+            title={`Tìm thấy ${matches.length} kết quả`}
+            subtitle="Kết quả được sắp xếp theo độ tin cậy giảm dần."
+            actions={<Button startIcon={<RestartAltOutlinedIcon />} variant="outlined" onClick={reset}>Thử lại</Button>}
+          />
 
-          {dataUrl && (
-            <Box component="img" src={dataUrl} alt="Ảnh đã chụp" sx={{ width: 160, height: 160, objectFit: "cover", borderRadius: 2, border: 1, borderColor: "divider", mx: "auto" }} />
-          )}
+          {dataUrl ? (
+            <DashboardCard noPadding>
+              <Box component="img" src={dataUrl} alt="Ảnh đã chụp" sx={{ width: 160, height: 160, objectFit: "cover", borderRadius: 2, border: 1, borderColor: "divider", mx: "auto" }} />
+            </DashboardCard>
+          ) : null}
 
           {matches.length === 0 ? (
-            <Alert severity="info">Không tìm thấy khuôn mặt phù hợp.</Alert>
+            <DashboardCard>
+              <EmptyState
+                icon={<FaceRetouchingNaturalOutlinedIcon />}
+                title="Không tìm thấy khuôn mặt phù hợp"
+                description="Không có kết quả nào khớp với khuôn mặt đã cung cấp."
+              />
+            </DashboardCard>
           ) : (
-            <Paper variant="outlined" sx={{ overflow: "hidden" }}>
+            <DashboardCard noPadding>
               <TableContainer>
                 <Table sx={{ minWidth: 820 }}>
                   <TableHead>
@@ -129,12 +122,7 @@ export default function IdentifyPage() {
                         <TableRow key={`${match.user_id}-${index}`} hover>
                           <TableCell sx={{ minWidth: 180 }}>
                             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={Math.min(percent, 100)}
-                                color={score > 0.6 ? "success" : score > 0.3 ? "warning" : "error"}
-                                sx={{ width: 90, height: 7, borderRadius: 99 }}
-                              />
+                              <LinearProgress variant="determinate" value={Math.min(percent, 100)} color={score > 0.6 ? "success" : score > 0.3 ? "warning" : "error"} sx={{ width: 90, height: 7, borderRadius: 99 }} />
                               <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{percent}%</Typography>
                             </Stack>
                           </TableCell>
@@ -148,24 +136,26 @@ export default function IdentifyPage() {
                   </TableBody>
                 </Table>
               </TableContainer>
-            </Paper>
+            </DashboardCard>
           )}
         </Stack>
       ) : (
-        <Paper variant="outlined" sx={{ p: 2.5 }}>
-          <Box component="form" onSubmit={handleSubmit}>
-            <Stack spacing={2.5}>
-              <CameraCapture onCapture={handleCapture} />
-              <FormControlLabel
-                control={<Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />}
-                label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện."
-              />
-              <Button type="submit" variant="contained" disabled={!imageFile || !consent || isLoading} fullWidth>
-                {isLoading ? "Đang gửi..." : "Nhận diện khuôn mặt"}
-              </Button>
-            </Stack>
-          </Box>
-        </Paper>
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={2.5}>
+                <CameraCapture onCapture={handleCapture} />
+                <FormControlLabel
+                  control={<Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />}
+                  label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện."
+                />
+                <Button type="submit" variant="contained" disabled={!imageFile || !consent || isLoading} fullWidth>
+                  {isLoading ? "Đang gửi..." : "Nhận diện khuôn mặt"}
+                </Button>
+              </Stack>
+            </Box>
+          </DashboardCard>
+        </Box>
       )}
     </Stack>
   );

@@ -1,26 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  LinearProgress,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
-import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
+import { Box, Alert, Button, Checkbox, FormControlLabel, LinearProgress, Stack, Typography } from "@mui/material";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import CameraCapture from "@/components/camera-capture";
 import JobPoll from "@/components/job-poll";
 import api, { getErrorMessage } from "@/lib/api-client";
-import { shimmer } from "@/lib/animations";
 import type { LivenessBreakdown } from "@/lib/types";
+import PageHeader from "@/components/ui/PageHeader";
+import DashboardCard from "@/components/ui/DashboardCard";
+import EmptyState from "@/components/ui/EmptyState";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 const breakdownLabels: Record<keyof LivenessBreakdown, string> = {
   lbp: "Kết cấu ảnh",
@@ -37,12 +29,7 @@ function BreakdownBar({ label, score }: { label: string; score: number }) {
   return (
     <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ alignItems: { sm: "center" } }}>
       <Typography variant="body2" color="text.secondary" sx={{ width: { sm: 150 }, flexShrink: 0 }}>{label}</Typography>
-      <LinearProgress
-        variant="determinate"
-        value={percent}
-        color={score >= 0.7 ? "success" : score >= 0.4 ? "warning" : "error"}
-        sx={{ flex: 1, height: 8, borderRadius: 99, minWidth: 120 }}
-      />
+      <LinearProgress variant="determinate" value={percent} color={score >= 0.7 ? "success" : score >= 0.4 ? "warning" : "error"} sx={{ flex: 1, height: 8, borderRadius: 99, minWidth: 120 }} />
       <Typography variant="caption" color="text.secondary" sx={{ width: 44, fontFamily: "monospace", textAlign: "right" }}>
         {percent}%
       </Typography>
@@ -56,7 +43,7 @@ function LivenessResultCard({ result }: { result: any }) {
   const breakdown: LivenessBreakdown | undefined = result.breakdown;
 
   return (
-    <Paper variant="outlined" sx={{ p: 3 }}>
+    <DashboardCard>
       <Stack spacing={2.5}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
           {isLive ? <VisibilityOutlinedIcon color="success" sx={{ fontSize: 48 }} /> : <VisibilityOffOutlinedIcon color="error" sx={{ fontSize: 48 }} />}
@@ -68,14 +55,9 @@ function LivenessResultCard({ result }: { result: any }) {
           </Box>
         </Stack>
 
-        <LinearProgress
-          variant="determinate"
-          value={Math.min(score * 100, 100)}
-          color={isLive ? "success" : "error"}
-          sx={{ height: 9, borderRadius: 99 }}
-        />
+        <LinearProgress variant="determinate" value={Math.min(score * 100, 100)} color={isLive ? "success" : "error"} sx={{ height: 9, borderRadius: 99 }} />
 
-        {breakdown && (
+        {breakdown ? (
           <Stack spacing={1.5}>
             <Typography variant="overline" color="text.secondary">Chi tiết kỹ thuật</Typography>
             {Object.entries(breakdownLabels).map(([key, label]) => {
@@ -84,9 +66,9 @@ function LivenessResultCard({ result }: { result: any }) {
               return <BreakdownBar key={key} label={label} score={value} />;
             })}
           </Stack>
-        )}
+        ) : null}
       </Stack>
-    </Paper>
+    </DashboardCard>
   );
 }
 
@@ -130,46 +112,55 @@ export default function LivenessPage() {
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 920, mx: "auto" }}>
-      <Paper variant="outlined" sx={{ p: 3 }}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-          <FaceRetouchingNaturalOutlinedIcon color="primary" />
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 850 }}>Kiểm tra liveness</Typography>
-            <Typography color="text.secondary">Đánh giá ảnh khuôn mặt thật hay ảnh giả mạo trước khi xử lý nhận diện.</Typography>
-          </Box>
-        </Stack>
-      </Paper>
+      <Box sx={staggerSx(0)}>
+        <PageHeader
+          title="Kiểm tra sống"
+          subtitle="Đánh giá ảnh khuôn mặt thật hay ảnh giả mạo trước khi xử lý nhận diện."
+          icon={VisibilityOutlinedIcon}
+          gradient="linear-gradient(135deg, #581c87 0%, #7c3aed 50%, #a78bfa 100%)"
+        />
+      </Box>
 
-      {error && <Alert severity="error">{error}</Alert>}
+      {error ? (
+        <Box sx={staggerSx(1)}>
+          <Alert severity="error">{error}</Alert>
+        </Box>
+      ) : null}
 
       {result ? (
-        <Stack spacing={2}>
+        <Stack spacing={2} sx={staggerSx(1)}>
           <LivenessResultCard result={result} />
           <Button startIcon={<RestartAltOutlinedIcon />} variant="outlined" onClick={reset} sx={{ alignSelf: "center" }}>
             Thử lại
           </Button>
         </Stack>
       ) : jobId ? (
-        <JobPoll
-          jobId={jobId}
-          onComplete={(value) => { setResult(value); setIsLoading(false); setJobId(null); }}
-          onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
-        />
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
+            <JobPoll
+              jobId={jobId}
+              onComplete={(value) => { setResult(value); setIsLoading(false); setJobId(null); }}
+              onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
+            />
+          </DashboardCard>
+        </Box>
       ) : (
-        <Paper variant="outlined" sx={{ p: 2.5 }}>
-          <Box component="form" onSubmit={handleSubmit}>
-            <Stack spacing={2.5}>
-              <CameraCapture onCapture={handleCapture} />
-              <FormControlLabel
-                control={<Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />}
-                label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để kiểm tra liveness."
-              />
-              <Button type="submit" variant="contained" disabled={!imageFile || !consent || isLoading} fullWidth>
-                {isLoading ? "Đang gửi..." : "Kiểm tra liveness"}
-              </Button>
-            </Stack>
-          </Box>
-        </Paper>
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={2.5}>
+                <CameraCapture onCapture={handleCapture} />
+                <FormControlLabel
+                  control={<Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />}
+                  label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để kiểm tra liveness."
+                />
+                <Button type="submit" variant="contained" disabled={!imageFile || !consent || isLoading} fullWidth>
+                  {isLoading ? "Đang gửi..." : "Kiểm tra liveness"}
+                </Button>
+              </Stack>
+            </Box>
+          </DashboardCard>
+        </Box>
       )}
     </Stack>
   );
