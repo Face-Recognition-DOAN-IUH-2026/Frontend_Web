@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -9,7 +9,6 @@ import {
   Box,
   Button,
   Chip,
-  Paper,
   Stack,
   Table,
   TableBody,
@@ -20,33 +19,25 @@ import {
   Typography,
 } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import BookIcon from "@mui/icons-material/MenuBookOutlined";
-import ClockIcon from "@mui/icons-material/ScheduleOutlined";
-import DashboardIcon from "@mui/icons-material/DashboardOutlined";
 import LoginIcon from "@mui/icons-material/LoginOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
-import PersonAddIcon from "@mui/icons-material/PersonAddAltOutlined";
-import SensorIcon from "@mui/icons-material/SensorsOutlined";
-import StatsIcon from "@mui/icons-material/InsertChartOutlined";
 import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
-import api from "@/lib/api-client";
+import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import { useAuth } from "@/lib/auth-context";
 import { slideInRight, successPop } from "@/lib/animations";
-import { staggerSx } from "@/lib/useStaggeredAnimation";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
 import MuiStatCard from "@/components/ui/MuiStatCard";
+import DashboardCard from "@/components/ui/DashboardCard";
 import EmptyState from "@/components/ui/EmptyState";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import GreetingBar from "@/components/dashboard/GreetingBar";
+import HourlyActivityChart from "@/components/dashboard/HourlyActivityChart";
+import CameraStatusGrid from "@/components/dashboard/CameraStatusGrid";
+import BorrowSummaryCard from "@/components/dashboard/BorrowSummaryCard";
+import TodayScheduleCard from "@/components/dashboard/TodayScheduleCard";
+import RecentNotificationsCard from "@/components/dashboard/RecentNotificationsCard";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import type { AccessLogPublic } from "@/lib/types";
-
-interface Stats {
-  total_patrons: number;
-  active_patrons: number;
-  today_entries: number;
-  today_exits: number;
-}
 
 function formatTime(value?: string) {
   if (!value) return "--:--";
@@ -68,69 +59,13 @@ function accessTypeChip(type?: string) {
 export default function DashboardPage() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [sseConnected, setSseConnected] = useState(false);
+  const data = useDashboardData();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.push("/login");
   }, [isLoading, isAuthenticated, router]);
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoadError("");
-      const [statsData, logsData] = await Promise.all([
-        api.getStats().catch(() => null),
-        api.getRecentLogs().catch(() => null),
-      ]);
-
-      if (statsData) {
-        setStats({
-          total_patrons: statsData.total_patrons || 0,
-          active_patrons: statsData.active_patrons || 0,
-          today_entries: statsData.today_entries || 0,
-          today_exits: statsData.today_exits || 0,
-        });
-        setSseConnected(true);
-      }
-
-      if (logsData?.items) setRecentLogs(logsData.items.slice(0, 8));
-    } catch {
-      setLoadError("Không thể tải dữ liệu tổng quan.");
-    } finally {
-      setLoadingData(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, fetchData]);
-
-  const role = user?.role || "staff";
-  const quickActions = useMemo(() => {
-    const adminActions = role === "admin"
-      ? [
-        { href: "/enroll", icon: <PersonAddIcon />, label: "Đăng ký khuôn mặt", description: "Tạo dữ liệu nhận diện", gradient: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)" },
-        { href: "/patrons", icon: <UsersIcon />, label: "Quản lý độc giả", description: "Tra cứu và cập nhật hồ sơ", gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" },
-        { href: "/return", icon: <BookIcon />, label: "Trả sách", description: "Xử lý sách đang mượn", gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" },
-        { href: "/stats", icon: <StatsIcon />, label: "Xem thống kê", description: "Theo dõi vận hành trong ngày", gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
-      ]
-      : [];
-    return [
-      ...adminActions,
-      { href: "/active", icon: <UserCheckIcon />, label: "Đang có mặt", description: "Danh sách trong thư viện", gradient: "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)" },
-      { href: "/history", icon: <ClockIcon />, label: "Lịch sử ra vào", description: "Nhật ký camera và kiosk", gradient: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)" },
-    ];
-  }, [role]);
-
-  const statBadges = stats
-    ? `${stats.total_patrons} độc giả · ${stats.active_patrons} có mặt · ${stats.today_entries} vào · ${stats.today_exits} ra${sseConnected ? " · Live" : ""}`
-    : sseConnected ? "Live" : undefined;
+  const stats = data.stats;
 
   if (isLoading || !isAuthenticated) {
     return <LoadingOverlay loading message="Đang tải..." />;
@@ -138,22 +73,12 @@ export default function DashboardPage() {
 
   return (
     <Stack spacing={3}>
-      {loadError ? <Alert severity="warning">{loadError}</Alert> : null}
+      {data.error ? <Alert severity="warning">{data.error}</Alert> : null}
 
-      <PageHeader
-        title={`Xin chào, ${user?.full_name || user?.email || "Admin"}`}
-        subtitle={`Tổng quan hệ thống thư viện — ${new Date().toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" })}`}
-        icon={DashboardIcon}
-        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
-        statBadges={statBadges}
-        onRefresh={fetchData}
-        actions={
-          <Chip
-            icon={<SensorIcon />}
-            label={sseConnected ? "Live" : "Auto-refresh"}
-            sx={{ bgcolor: "rgba(16,185,129,0.15)", color: "#6ee7b7", border: "1px solid rgba(16,185,129,0.3)", fontWeight: 600 }}
-          />
-        }
+      <GreetingBar
+        userName={user?.full_name || user?.email || "Admin"}
+        onRefresh={data.refresh}
+        liveConnected={!!stats}
       />
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
@@ -163,43 +88,29 @@ export default function DashboardPage() {
         <MuiStatCard label="Lượt ra hôm nay" value={stats?.today_exits ?? "—"} icon={LogoutIcon} gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" pct={100} index={3} />
       </Box>
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            lg: "1fr 1fr",
-          },
-          gap: 3,
-          minHeight: 320,
-          width: "100%",
-          overflow: "hidden",
-          alignItems: "start",
-        }}
-      >
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
+        <HourlyActivityChart logs={data.hourlyLogs} loading={data.loading} />
+        <CameraStatusGrid cameras={data.cameraStatuses} loading={data.loading} />
+      </Box>
+
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
+        <BorrowSummaryCard borrowStats={data.borrowStats} borrows={data.activeBorrows} loading={data.loading} />
+
         <DashboardCard
           title="Hoạt động gần đây"
           subtitle="Các lượt ra/vào mới nhất"
           actions={
-            <Button
-              component={Link}
-              href="/history"
-              endIcon={<ArrowForwardIcon />}
-              size="small"
-            >
+            <Button component={Link} href="/history" endIcon={<ArrowForwardIcon />} size="small">
               Xem tất cả
             </Button>
           }
           noPadding
         >
-          <LoadingOverlay loading={loadingData} message="Đang tải...">
-            {recentLogs.length === 0 ? (
-              <EmptyState
-                title="Chưa có hoạt động nào"
-                description="Các lượt ra/vào sẽ hiển thị ở đây"
-              />
+          <LoadingOverlay loading={data.loading} message="Đang tải...">
+            {data.recentLogs.length === 0 ? (
+              <EmptyState title="Chưa có hoạt động nào" description="Các lượt ra/vào sẽ hiển thị ở đây" />
             ) : (
-              <TableContainer sx={{ maxHeight: 280, overflowY: "auto" }}>
+              <TableContainer sx={{ maxHeight: 320, overflowY: "auto" }}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -210,7 +121,7 @@ export default function DashboardPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {recentLogs.map((log, idx) => (
+                    {data.recentLogs.map((log, idx) => (
                       <TableRow
                         key={log.id}
                         hover
@@ -220,18 +131,12 @@ export default function DashboardPage() {
                           animationFillMode: "both",
                         }}
                       >
-                        <TableCell sx={{ fontFamily: "monospace" }}>
-                          {formatTime(log.access_time)}
-                        </TableCell>
+                        <TableCell sx={{ fontFamily: "monospace" }}>{formatTime(log.access_time)}</TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontWeight: 800 }}>
                             {log.patron_name || "Không rõ tên"}
                           </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ fontFamily: "monospace" }}
-                          >
+                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
                             {log.student_code || log.patron_id || "---"}
                           </Typography>
                         </TableCell>
@@ -245,56 +150,12 @@ export default function DashboardPage() {
             )}
           </LoadingOverlay>
         </DashboardCard>
+      </Box>
 
-        <DashboardCard title="Thao tác nhanh">
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
-              gap: 1.5,
-            }}
-          >
-            {quickActions.map((action, idx) => (
-              <Paper
-                key={action.href}
-                variant="outlined"
-                component={Link}
-                href={action.href}
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  textDecoration: "none",
-                  borderColor: "divider",
-                  transition: "all 0.2s",
-                  ...staggerSx(idx, 0.06),
-                  "&:hover": {
-                    borderColor: "primary.main",
-                    bgcolor: "action.hover",
-                    transform: "translateY(-1px)",
-                    boxShadow: 2,
-                  },
-                }}
-              >
-                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                  <Avatar sx={{ background: action.gradient, width: 40, height: 40 }}>
-                    {action.icon}
-                  </Avatar>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
-                      {action.label}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap>
-                      {action.description}
-                    </Typography>
-                  </Box>
-                  <ArrowForwardIcon fontSize="small" color="action" />
-                </Stack>
-              </Paper>
-            ))}
-          </Box>
-        </DashboardCard>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
+        <TodayScheduleCard assignments={data.todaySchedule} loading={data.loading} />
+        <RecentNotificationsCard notifications={data.notifications} loading={data.loading} />
       </Box>
     </Stack>
   );
 }
-
