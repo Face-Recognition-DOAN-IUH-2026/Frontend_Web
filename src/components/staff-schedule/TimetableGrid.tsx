@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
+import { Box, Typography } from "@mui/material";
 import type { StaffScheduleAssignment, StaffShift } from "@/lib/types";
 import TimetableCell from "./TimetableCell";
 
@@ -12,6 +13,7 @@ interface TimetableGridProps {
   isAdmin?: boolean;
   onCellClick?: (date: string, shiftId: string) => void;
   onDeleteAssignment?: (id: string) => void;
+  onViewStaff?: (staffId: string) => void;
 }
 
 const DAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -35,7 +37,7 @@ function isToday(d: Date) {
 }
 
 export default function TimetableGrid({
-  days, shifts, assignments, filter, isAdmin, onCellClick, onDeleteAssignment,
+  days, shifts, assignments, filter, isAdmin, onCellClick, onDeleteAssignment, onViewStaff,
 }: TimetableGridProps) {
   const cellMap = useMemo(() => {
     const map: Record<string, StaffScheduleAssignment[]> = {};
@@ -62,77 +64,101 @@ export default function TimetableGrid({
   }, [assignments, filter]);
 
   const numCols = 7;
+  const colTemplate = `180px repeat(${numCols}, minmax(120px, 1fr))`;
 
-return (
-    <div className="w-full overflow-x-auto">
-    <div
-      className="dot-grid-bg rounded-lg"
-      style={{
-        display: "grid",
-        gridTemplateColumns: `180px repeat(${numCols}, minmax(120px, 1fr))`,
-        gap: "1px",
-        backgroundColor: "rgb(var(--color-border) / 1)",
-        border: "1px solid rgb(var(--color-border) / 1)",
-        minWidth: "fit-content",
-      }}
-    >
-      {/* Corner cell */}
-      <div className="bg-surface p-2 flex items-end">
-        <span className="text-[10px] font-medium text-text-3 uppercase tracking-wider">Ca / Ngày</span>
-      </div>
+  return (
+    <Box sx={{ width: "100%", overflowX: "auto" }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: colTemplate,
+          gap: "1px",
+          bgcolor: "divider",
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 1,
+          minWidth: "fit-content",
+        }}
+      >
+        <Box sx={{ bgcolor: "background.paper", p: 1, display: "flex", alignItems: "flex-end" }}>
+          <Typography variant="caption" sx={{ fontSize: "0.6rem", fontWeight: 600, color: "text.disabled", textTransform: "uppercase", letterSpacing: 1 }}>
+            Ca / Ngày
+          </Typography>
+        </Box>
 
-      {/* Day headers */}
-      {days.map((d, i) => (
-        <div
-          key={i}
-          className={`bg-surface p-2 text-center border-b border-border ${isToday(d) ? "bg-primary/[0.04]" : ""}`}
-        >
-          <div className={`text-xs font-bold ${isToday(d) ? "text-primary" : "text-text"}`}>
-            {DAY_LABELS[i]}
-          </div>
-          <div className={`text-[10px] mt-0.5 ${isToday(d) ? "text-primary-dim font-medium" : "text-text-3"}`}>
-            {formatDate(d)}
-          </div>
-        </div>
-      ))}
-
-      {/* Shift rows */}
-      {shifts.map((shift) => (
-        <Fragment key={shift.id}>
-          {/* Row label */}
-          <div
-            className="bg-primary/[0.06] p-2 flex flex-col justify-center border-b border-border"
+        {days.map((d, i) => (
+          <Box
+            key={i}
+            sx={{
+              bgcolor: "background.paper",
+              p: 1,
+              textAlign: "center",
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              ...(isToday(d) ? { bgcolor: "rgba(99,102,241,0.04)" } : {}),
+            }}
           >
-            <span className="text-xs font-semibold text-primary">{shift.name}</span>
-            <span className="text-[10px] text-text-3 mt-0.5">
-              {shift.startTime?.slice(0, 5)} &ndash; {shift.endTime?.slice(0, 5)}
-            </span>
-          </div>
+            <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.75rem", color: isToday(d) ? "primary.main" : "text.primary", display: "block" }}>
+              {DAY_LABELS[i]}
+            </Typography>
+            <Typography variant="caption" sx={{ fontSize: "0.625rem", mt: 0.25, display: "block", color: isToday(d) ? "primary.light" : "text.disabled", fontWeight: isToday(d) ? 600 : 400 }}>
+              {formatDate(d)}
+            </Typography>
+          </Box>
+        ))}
 
-          {/* Day cells */}
-          {days.map((d, di) => {
-            const dateStr = toDateInput(d);
-            const cellAssignments = cellMap[`${shift.id}:${dateStr}`] || [];
-            return (
-              <div
-                key={`${shift.id}-${di}`}
-                className={`bg-surface p-2 min-h-[64px] border-b border-border ${isToday(d) ? "bg-primary/[0.02]" : ""} group`}
-              >
-                <TimetableCell
-                  assignments={cellAssignments}
-                  date={dateStr}
-                  shiftId={shift.id}
-                  isAdmin={isAdmin}
-                  onCellClick={onCellClick}
-                  onDeleteAssignment={onDeleteAssignment}
-                  shift={shift}
-                />
-              </div>
-            );
-          })}
-        </Fragment>
-      ))}
-    </div>
-    </div>
+        {shifts.map((shift) => (
+          <Fragment key={shift.id}>
+            <Box
+              sx={{
+                bgcolor: "rgba(99,102,241,0.06)",
+                p: 1,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                borderBottom: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.75rem", color: "primary.main" }}>
+                {shift.name}
+              </Typography>
+              <Typography variant="caption" sx={{ fontSize: "0.625rem", mt: 0.25, color: "text.disabled" }}>
+                {shift.startTime?.slice(0, 5)} &ndash; {shift.endTime?.slice(0, 5)}
+              </Typography>
+            </Box>
+
+            {days.map((d, di) => {
+              const dateStr = toDateInput(d);
+              const cellAssignments = cellMap[`${shift.id}:${dateStr}`] || [];
+              return (
+                <Box
+                  key={`${shift.id}-${di}`}
+                  sx={{
+                    bgcolor: "background.paper",
+                    p: 1,
+                    minHeight: 64,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                    ...(isToday(d) ? { bgcolor: "rgba(99,102,241,0.02)" } : {}),
+                  }}
+                >
+                  <TimetableCell
+                    assignments={cellAssignments}
+                    date={dateStr}
+                    shiftId={shift.id}
+                    isAdmin={isAdmin}
+                    onCellClick={onCellClick}
+                    onDeleteAssignment={onDeleteAssignment}
+                    onViewStaff={onViewStaff}
+                    shift={shift}
+                  />
+                </Box>
+              );
+            })}
+          </Fragment>
+        ))}
+      </Box>
+    </Box>
   );
 }

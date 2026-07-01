@@ -74,8 +74,6 @@ function normalizeAccessLog(log: any): AccessLogPublic {
 function setStoredAccessToken(token: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem("access_token", token);
-  const isSecure = window.location.protocol === "https:";
-  document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict${isSecure ? "; secure" : ""}`;
 }
 
 function clearStoredAuth() {
@@ -83,7 +81,6 @@ function clearStoredAuth() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("user");
-  document.cookie = "access_token=; path=/; max-age=0";
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -110,23 +107,6 @@ function isTokenExpiringSoon(token: string, skewSeconds = 30): boolean {
   return Date.now() >= (exp - skewSeconds) * 1000;
 }
 
-function isNotFoundError(error: unknown): boolean {
-  return axios.isAxiosError(error) && error.response?.status === 404;
-}
-
-function isAuthEndpoint(url?: string): boolean {
-  if (!url) return false;
-  return [
-    "/auth/login",
-    "/api/auth/login",
-    "/auth/register",
-    "/api/auth/register",
-    "/auth/refresh",
-    "/api/auth/refresh",
-    "/api/patrons/login",
-    "/api/patrons/register",
-  ].some((path) => url.includes(path));
-}
 
 export function getErrorMessage(err: any): string {
   if (!err) return "Unknown error";
@@ -158,13 +138,14 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
+      withCredentials: true,
     });
 
     this.client.interceptors.request.use(
       async (config) => {
         if (typeof window !== "undefined") {
           let token = localStorage.getItem("access_token");
-          if (token && isTokenExpiringSoon(token) && !isAuthEndpoint(config.url)) {
+          if (token && isTokenExpiringSoon(token) && !config.url?.includes('/auth/')) {
             if (!this.refreshPromise) {
               this.refreshPromise = this.refreshToken();
             }
@@ -193,7 +174,7 @@ class ApiClient {
         }
         const originalRequest = error.config;
         if (status === 401 && originalRequest) {
-          if (isAuthEndpoint(originalRequest.url)) {
+          if (originalRequest.url?.includes('/auth/')) {
             return Promise.reject(error);
           }
           return this.handleUnauthorized(originalRequest);
@@ -233,19 +214,10 @@ class ApiClient {
     if (!refreshToken) return false;
 
     try {
-      let response;
-      try {
-        response = await axios.post<TokenResponse>(
-          `${API_BASE_URL}/auth/refresh`,
-          { refresh_token: refreshToken }
-        );
-      } catch (error) {
-        if (!isNotFoundError(error)) throw error;
-        response = await axios.post<TokenResponse>(
-          `${API_BASE_URL}/api/auth/refresh`,
-          { refresh_token: refreshToken }
-        );
-      }
+      const response = await axios.post<TokenResponse>(
+        `${API_BASE_URL}/api/auth/refresh`,
+        { refresh_token: refreshToken }
+      );
       const { access_token, refresh_token: newRefreshToken } = response.data;
       if (!access_token) return false;
       setStoredAccessToken(access_token);
@@ -260,72 +232,38 @@ class ApiClient {
 
   // === Auth (via face-recognition-api) ===
   async login(data: LoginRequest): Promise<TokenResponse> {
-    try {
-      const response = await this.client.post<TokenResponse>("/auth/login", data);
-      return response.data;
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-      const response = await this.client.post<TokenResponse>("/api/auth/login", data);
-      return response.data;
-    }
+    const response = await this.client.post<TokenResponse>("/api/auth/login", data);
+    return response.data;
   }
 
   async register(data: RegisterRequest): Promise<UserPublic> {
-    try {
-      const response = await this.client.post<UserPublic>("/auth/register", data);
-      return response.data;
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-      const response = await this.client.post<UserPublic>("/api/auth/register", data);
-      return response.data;
-    }
+    const response = await this.client.post<UserPublic>("/api/auth/register", data);
+    return response.data;
   }
 
   async verifyEmail(data: { email: string; code: string }): Promise<void> {
-    try {
-      await this.client.post("/auth/verify-email", data);
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-      await this.client.post("/api/auth/verify-email", data);
-    }
+    await this.client.post("/api/auth/verify-email", data);
   }
 
   async resendVerification(email: string): Promise<void> {
-    try {
-      await this.client.post("/auth/resend-verification", { email });
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-      await this.client.post("/api/auth/resend-verification", { email });
-    }
+    await this.client.post("/api/auth/resend-verification", { email });
   }
 
   async requestEmailCorrection(data: { current_email: string; new_email: string }): Promise<void> {
-    try {
-      await this.client.post("/auth/correct-email/request-otp", data);
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-      await this.client.post("/api/auth/correct-email/request-otp", data);
-    }
+    await this.client.post("/api/auth/correct-email/request-otp", data);
   }
 
   async verifyEmailCorrection(data: { current_email: string; new_email: string; code: string }): Promise<void> {
-    try {
-      await this.client.post("/auth/correct-email/verify", data);
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-      await this.client.post("/api/auth/correct-email/verify", data);
-    }
+    await this.client.post("/api/auth/correct-email/verify", data);
   }
 
   async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
-    try {
-      const response = await this.client.post<TokenResponse>("/auth/refresh", { refresh_token: refreshToken });
-      return response.data;
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-      const response = await this.client.post<TokenResponse>("/api/auth/refresh", { refresh_token: refreshToken });
-      return response.data;
-    }
+    const response = await this.client.post<TokenResponse>("/api/auth/refresh", { refresh_token: refreshToken });
+    return response.data;
+  }
+
+  async logout(): Promise<void> {
+    await this.client.post("/api/auth/logout");
   }
 
   async faceLogin(imageFile: File): Promise<TokenResponse> {
@@ -585,8 +523,7 @@ class ApiClient {
     onEvent: (event: CameraEvent) => void,
     onConnectionChange?: (connected: boolean) => void,
   ): () => void {
-    const token = localStorage.getItem("access_token") || "";
-    const es = new EventSource(`${API_BASE_URL}/api/access/events?token=${encodeURIComponent(token)}`);
+    const es = new EventSource(`${API_BASE_URL}/api/access/events`, { withCredentials: true });
     es.addEventListener("open", () => onConnectionChange?.(true));
     es.addEventListener("camera_event", (msg: MessageEvent) => {
       try {

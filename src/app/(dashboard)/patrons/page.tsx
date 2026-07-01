@@ -56,7 +56,9 @@ import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face" | "deleted";
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
-const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.6:8080/video";
+const _RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
+if (!_RAW_CAM_URL) throw new Error("NEXT_PUBLIC_BORROW_CAM_URL is not set");
+const RAW_CAM_URL: string = _RAW_CAM_URL;
 const CARD_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
 
 const defaultIssueDate = new Date().toISOString().split("T")[0];

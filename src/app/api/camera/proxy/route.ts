@@ -1,5 +1,15 @@
 import { NextRequest } from "next/server";
 
+const ALLOWED_HOSTS = (process.env.CAMERA_PROXY_ALLOWED_HOSTS || "")
+  .split(",")
+  .map((h) => h.trim())
+  .filter(Boolean);
+
+function isHostAllowed(hostname: string): boolean {
+  if (ALLOWED_HOSTS.length === 0) return false;
+  return ALLOWED_HOSTS.includes(hostname);
+}
+
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get("url");
   if (!url) {
@@ -15,6 +25,10 @@ export async function GET(request: NextRequest) {
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
     return new Response("Protocol not allowed", { status: 403 });
+  }
+
+  if (!isHostAllowed(parsed.hostname)) {
+    return new Response("Host not allowed", { status: 403 });
   }
 
   try {

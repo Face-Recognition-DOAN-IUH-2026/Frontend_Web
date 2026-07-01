@@ -1,24 +1,37 @@
 "use client";
 
+import { Box, Stack, Typography } from "@mui/material";
+
 const ITEMS = [
+  { bg: "rgba(255,255,255,0.04)",       border: "rgba(255,255,255,0.08)",  label: "Đã qua" },
+  { bg: "rgba(16,185,129,0.20)",        border: "rgba(16,185,129,0.5)",   label: "Đang trực" },
+  { bg: "rgba(99,102,241,0.20)",        border: "rgba(99,102,241,0.5)",    label: "Sắp tới" },
+  { bg: "rgba(245,158,11,0.20)",        border: "rgba(245,158,11,0.5)",   label: "Hôm nay" },
+  { bg: "rgba(251,146,60,0.20)",        border: "rgba(251,146,60,0.5)",   label: "Thiếu người" },
+  { bg: "rgba(239,68,68,0.20)",         border: "rgba(239,68,68,0.5)",    label: "Đã hủy" },
+  { bg: "rgba(99,102,241,0.10)",        border: "rgba(99,102,241,0.25)",  label: "Hoàn thành" },
   { color: "bg-surface-3 border-border-2", label: "Đã qua" },
   { color: "bg-success/40 border-success", label: "Đang trực" },
   { color: "bg-primary/40 border-primary-dim", label: "Sắp tới" },
   { color: "bg-warning/40 border-warning", label: "Hôm nay" },
   { color: "bg-orange-400/40 border-orange-400", label: "Thiếu người" },
   { color: "bg-error/40 border-error", label: "Tạm ngưng" },
+  { color: "bg-yellow-200/40 border-yellow-400", label: "Chờ xác nhận" },
+  { color: "bg-blue-200/40 border-blue-400", label: "Chờ admin xác nhận" },
 ];
 
 export default function TimetableLegend() {
   return (
-    <div className="flex items-center gap-4 pt-4 border-t border-border">
-      <span className="text-xs font-medium text-text-3 mr-1">Chú thích:</span>
+    <Stack direction="row" spacing={2} sx={{ pt: 3, borderTop: "1px solid", borderColor: "divider", alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
+      <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", mr: 0.5, textTransform: "uppercase", letterSpacing: 0.5, fontSize: "0.7rem" }}>
+        Chú thích:
+      </Typography>
       {ITEMS.map((item) => (
-        <div key={item.label} className="flex items-center gap-1.5">
-          <span className={`w-3 h-3 rounded-sm border ${item.color}`} />
-          <span className="text-xs text-text-3">{item.label}</span>
-        </div>
+        <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+          <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: item.bg, border: `1px solid ${item.border}` }} />
+          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>{item.label}</Typography>
+        </Box>
       ))}
-    </div>
+    </Stack>
   );
 }

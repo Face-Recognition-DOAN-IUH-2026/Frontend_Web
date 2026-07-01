@@ -1,33 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  IconButton,
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { useState } from "react";
+import { Alert, Box, Button, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
 import TodayIcon from "@mui/icons-material/TodayOutlined";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
-import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import ActiveIcon from "@mui/icons-material/CheckCircleOutlined";
 import TotalIcon from "@mui/icons-material/AssignmentOutlined";
 import StaffIcon from "@mui/icons-material/PersonOutlined";
 import MapIcon from "@mui/icons-material/PinDropOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
-import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-import type { ScheduleStaff, LibraryZone, StaffShift, StaffScheduleAssignment, ManualCheckInRequest } from "@/lib/types";
+import { useScheduleData, formatDateRange } from "@/hooks/useScheduleData";
+import { useScheduleFilters } from "@/hooks/useScheduleFilters";
+import { usePendingCounts } from "@/hooks/usePendingCounts";
+import { useAutoSchedule } from "@/hooks/useAutoSchedule";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type { StaffScheduleAssignment } from "@/lib/types";
 import PageHeader from "@/components/ui/PageHeader";
 import MuiStatCard from "@/components/ui/MuiStatCard";
 import DashboardCard from "@/components/ui/DashboardCard";
@@ -59,146 +53,34 @@ const STAT_GRADIENT = {
 
 const HEADER_GRADIENT = "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)";
 
-function startOfWeek(date = new Date()) {
-  const value = new Date(date);
-  const day = value.getDay() || 7;
-  value.setDate(value.getDate() - day + 1);
-  value.setHours(0, 0, 0, 0);
-  return value;
-}
-
-function getWeekDays(anchor: Date) {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(anchor);
-    d.setDate(anchor.getDate() + i);
-    return d;
-  });
-}
-
-function toDateInput(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function formatDateRange(days: Date[]) {
-  const from = days[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-  const to = days[6].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
-  return `${from} — ${to}`;
-}
-
 export default function StaffSchedulesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const isStaff = !!user;
-  const [weekStart, setWeekStart] = useState(startOfWeek);
-  const [staff, setStaff] = useState<ScheduleStaff[]>([]);
-  const [zones, setZones] = useState<LibraryZone[]>([]);
-  const [shifts, setShifts] = useState<StaffShift[]>([]);
-  const [assignments, setAssignments] = useState<StaffScheduleAssignment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>("all");
-  const [zoneFilter, setZoneFilter] = useState("");
-  const [shiftFilter, setShiftFilter] = useState("");
+
+  const {
+    staff, zones, shifts, assignments, loading, error, setError,
+    weekStart, days, from, to,
+    goPrevWeek, goNextWeek, goToday, loadData,
+  } = useScheduleData();
+
+  const {
+    filter, zoneFilter, shiftFilter,
+    setFilter, setZoneFilter, setShiftFilter,
+    shiftList, filteredAssignments, filteredShifts, weekStats,
+  } = useScheduleFilters(assignments, shifts, staff, zones);
+
+  const { pendingManualCount } = usePendingCounts(isAdmin, loading);
+
+  const auto = useAutoSchedule(loadData, setError);
 
   const [showManagement, setShowManagement] = useState(false);
   const [assignDialog, setAssignDialog] = useState<{ date: string; shiftId: string; shiftName: string } | null>(null);
   const [showAuditLogs, setShowAuditLogs] = useState(false);
   const [showGeofence, setShowGeofence] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
-  const [autoLoading, setAutoLoading] = useState(false);
-  const [autoStep, setAutoStep] = useState<"select" | "preview">("select");
-  const [autoProposals, setAutoProposals] = useState<any[]>([]);
-  const [autoSkipped, setAutoSkipped] = useState(0);
-  const [autoActualRange, setAutoActualRange] = useState<{ from: string; to: string } | null>(null);
   const [showDeleteWeek, setShowDeleteWeek] = useState(false);
   const [showManualCheckIn, setShowManualCheckIn] = useState(false);
-  const [pendingManualCount, setPendingManualCount] = useState(0);
-
-  const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
-  const from = toDateInput(days[0]);
-  const to = toDateInput(days[6]);
-
-  const loadData = useCallback(async () => {
-    if (!isStaff) return;
-    setLoading(true);
-    setError(null);
-    try {
-      if (isAdmin) {
-        const [staffResult, zoneResult, shiftResult, assignmentResult] = await Promise.all([
-          api.getScheduleStaffOptions(),
-          api.getScheduleZones(),
-          api.getScheduleShifts(),
-          api.getScheduleAssignments({ from, to }),
-        ]);
-        setStaff(staffResult.filter((s) => s.role === "admin" || s.role === "staff"));
-        setZones(zoneResult.filter((z) => z.isActive));
-        setShifts(shiftResult.filter((s) => s.isActive));
-        setAssignments(assignmentResult.items);
-      } else {
-        const [result, staffResult, shiftResult, zoneResult] = await Promise.all([
-          api.getMySchedules({ from, to }),
-          api.getScheduleStaffOptions(),
-          api.getScheduleShifts(),
-          api.getScheduleZones(),
-        ]);
-        setAssignments(result.items);
-        setStaff(staffResult.filter((s) => s.role === "admin" || s.role === "staff"));
-        setShifts(shiftResult.filter((s) => s.isActive));
-        setZones(zoneResult.filter((z) => z.isActive));
-      }
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [from, isAdmin, isStaff, to]);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    const loadCounts = async () => {
-      try {
-        const manuals = await api.listManualCheckInRequests().catch(() => []);
-        setPendingManualCount(manuals.filter((m: ManualCheckInRequest) => m.status === "pending_manual").length);
-      } catch {}
-    };
-    loadCounts();
-    const interval = setInterval(loadCounts, 30000);
-    return () => clearInterval(interval);
-  }, [isAdmin, loading]);
-
-  const shiftList = useMemo(() => {
-    return [...shifts].sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
-  }, [shifts]);
-
-  const filteredAssignments = useMemo(() => {
-    return assignments.filter((a) => {
-      if (zoneFilter && a.zoneId !== zoneFilter) return false;
-      if (shiftFilter && a.shiftId !== shiftFilter) return false;
-      return true;
-    });
-  }, [assignments, zoneFilter, shiftFilter]);
-
-  const filteredShifts = useMemo(() => {
-    if (!shiftFilter) return shiftList;
-    return shiftList.filter((s) => s.id === shiftFilter);
-  }, [shiftList, shiftFilter]);
-
-  const weekStats = useMemo(() => {
-    const total = assignments.filter((a) => a.status !== "cancelled").length;
-    const today = new Date().toISOString().slice(0, 10);
-    const active = assignments.filter((a) => a.status !== "cancelled" && a.workDate === today).length;
-    return { total, active };
-  }, [assignments]);
-
-  const goPrevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); };
-  const goNextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); };
-  const goToday = () => setWeekStart(startOfWeek());
 
   const handleCellClick = (date: string, shiftId: string) => {
     const shift = shifts.find((s) => s.id === shiftId);
@@ -206,35 +88,12 @@ export default function StaffSchedulesPage() {
   };
 
   const handleDeleteAssignment = async (id: string) => {
-    if (!confirm("Xóa ca trực này?")) return;
     try { await api.deleteScheduleAssignment(id); await loadData(); }
     catch (err) { setError(getErrorMessage(err)); }
   };
 
-  const handleAutoSchedule = async (autoFrom: string, autoTo: string) => {
-    setAutoLoading(true);
-    setError(null);
-    try {
-      const result = await api.autoSchedule({ from: autoFrom, to: autoTo });
-      const count = result.proposed?.length || 0;
-      setAutoActualRange(result.actualFrom && result.actualTo ? { from: result.actualFrom, to: result.actualTo } : null);
-      if (count === 0) { setAutoProposals([]); setAutoSkipped(result.skipped || 0); setAutoStep("preview"); setAutoLoading(false); return; }
-      setAutoProposals(result.proposed);
-      setAutoSkipped(result.skipped || 0);
-      setAutoStep("preview");
-    } catch (err) { setError(getErrorMessage(err)); }
-    setAutoLoading(false);
-  };
-
-  const handleAutoScheduleConfirm = async () => {
-    setAutoLoading(true);
-    try {
-      await api.createScheduleAssignmentsBulk(autoProposals);
-      await loadData();
-      setShowAutoSchedule(false);
-      setAutoStep("select");
-    } catch (err) { setError(getErrorMessage(err)); }
-    setAutoLoading(false);
+  const handleViewStaff = (_staffId: string) => {
+    // placeholder for staff detail navigation
   };
 
   if (!isStaff) {
@@ -247,7 +106,7 @@ export default function StaffSchedulesPage() {
     );
   }
 
-  const isCurrentWeek = toDateInput(days[0]) === toDateInput(getWeekDays(new Date())[0]);
+  const isCurrentWeek = from === (() => { const d = new Date(); const day = d.getDay() || 7; d.setDate(d.getDate() - day + 1); return d; })().toISOString().slice(0, 10);
 
   const headerActions = (
     <>
@@ -256,15 +115,8 @@ export default function StaffSchedulesPage() {
           <PrevIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      <Button
-        onClick={goToday}
-        size="small"
-        variant={isCurrentWeek ? "contained" : "outlined"}
-        startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
-        sx={{
-          borderRadius: 2,
-          fontWeight: 700,
-          fontSize: "0.75rem",
+      <Button onClick={goToday} size="small" variant={isCurrentWeek ? "contained" : "outlined"} startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
+        sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem",
           ...(isCurrentWeek
             ? { bgcolor: "#6366f1", "&:hover": { bgcolor: "#4f46e5" } }
             : { color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }
@@ -281,7 +133,7 @@ export default function StaffSchedulesPage() {
       {isAdmin && (
         <>
           <Tooltip title="Gợi ý lịch tự động">
-            <IconButton onClick={() => setShowAutoSchedule(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
+            <IconButton onClick={() => auto.setShowAutoSchedule(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
               <AutoAwesomeIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -353,109 +205,64 @@ export default function StaffSchedulesPage() {
         {[
           { key: "total", label: "Tổng ca tuần", value: weekStats.total, icon: TotalIcon, gradient: STAT_GRADIENT.total, pct: 100 },
           { key: "active", label: "Đang trực", value: weekStats.active, icon: ActiveIcon, gradient: STAT_GRADIENT.active, pct: weekStats.total ? (weekStats.active / weekStats.total) * 100 : 0 },
-          { key: "staff", label: "Nhân viên", value: staff.length, icon: StaffIcon, gradient: STAT_GRADIENT.staff, pct: 100 },
+          { key: "staff", label: "Nhân viên", value: weekStats.staffCount, icon: StaffIcon, gradient: STAT_GRADIENT.staff, pct: 100 },
         ].map((s, idx) => (
           <Box key={s.key} sx={staggerSx(idx)}>
-            <MuiStatCard
-              label={s.label}
-              value={s.value}
-              icon={s.icon}
-              gradient={s.gradient}
-              pct={s.pct}
-              index={idx}
-            />
+            <MuiStatCard label={s.label} value={s.value} icon={s.icon} gradient={s.gradient} pct={s.pct} index={idx} />
           </Box>
         ))}
       </Box>
 
       <DashboardCard>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 1, textTransform: "uppercase", letterSpacing: 0.5, fontSize: "0.7rem" }}>
             Bộ lọc:
           </Typography>
           <ToggleButtonGroup
-            value={filter}
-            exclusive
-            onChange={(_, v) => v ? setFilter(v) : undefined}
-            size="small"
-            sx={{
-              "& .MuiToggleButton-root": {
-                px: 2, py: 0.6,
-                borderRadius: "20px!important",
-                textTransform: "none",
-                fontWeight: 600,
-                fontSize: "0.78rem",
-                border: "1px solid",
-                borderColor: "divider",
-              },
-              gap: 0.5,
-            }}
+            value={filter} exclusive onChange={(_, v) => v ? setFilter(v) : undefined} size="small"
+            sx={{ "& .MuiToggleButton-root": { px: 2, py: 0.6, borderRadius: "20px!important", textTransform: "none", fontWeight: 600, fontSize: "0.78rem", border: "1px solid", borderColor: "divider" }, gap: 0.5 }}
           >
             {FILTERS.map((f) => (
               <ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>
             ))}
           </ToggleButtonGroup>
-
-          <select
-            value={zoneFilter}
+          <TextField
+            select size="small" label="Khu vực" value={zoneFilter}
             onChange={(e) => setZoneFilter(e.target.value)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "20px",
-              border: "1px solid rgba(165,180,252,0.3)",
-              backgroundColor: "transparent",
-              color: "#a5b4fc",
-              fontSize: "0.78rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              outline: "none",
-            }}
+            sx={{ minWidth: 160, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            slotProps={{ inputLabel: { shrink: true } }}
           >
-            <option value="" style={{ backgroundColor: "#1e1b4b", color: "#a5b4fc" }}>Tất cả khu vực</option>
+            <MenuItem value="">Tất cả khu vực</MenuItem>
             {zones.map((z) => (
-              <option key={z.id} value={z.id} style={{ backgroundColor: "#1e1b4b", color: "#a5b4fc" }}>{z.zoneName}</option>
+              <MenuItem key={z.id} value={z.id}>{z.zoneName}</MenuItem>
             ))}
-          </select>
-
-          <select
-            value={shiftFilter}
+          </TextField>
+          <TextField
+            select size="small" label="Ca trực" value={shiftFilter}
             onChange={(e) => setShiftFilter(e.target.value)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "20px",
-              border: "1px solid rgba(165,180,252,0.3)",
-              backgroundColor: "transparent",
-              color: "#a5b4fc",
-              fontSize: "0.78rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              outline: "none",
-            }}
+            sx={{ minWidth: 140, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            slotProps={{ inputLabel: { shrink: true } }}
           >
-            <option value="" style={{ backgroundColor: "#1e1b4b", color: "#a5b4fc" }}>Tất cả ca trực</option>
+            <MenuItem value="">Tất cả ca trực</MenuItem>
             {shiftList.map((s) => (
-              <option key={s.id} value={s.id} style={{ backgroundColor: "#1e1b4b", color: "#a5b4fc" }}>{s.name}</option>
+              <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
             ))}
-          </select>
+          </TextField>
         </Stack>
       </DashboardCard>
 
       {error ? (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>
-          {error}
-        </Alert>
+        <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>{error}</Alert>
       ) : null}
 
       <LoadingOverlay loading={loading} message="Đang tải lịch trực...">
         <DashboardCard noPadding>
           <TimetableGrid
-            days={days}
-            shifts={filteredShifts}
-            assignments={filteredAssignments}
-            filter={filter}
-            isAdmin={isAdmin}
+            days={days} shifts={filteredShifts} assignments={filteredAssignments}
+            filter={filter} isAdmin={isAdmin}
             onCellClick={isAdmin ? handleCellClick : undefined}
             onDeleteAssignment={isAdmin ? handleDeleteAssignment : undefined}
+            onViewStaff={isAdmin ? handleViewStaff : undefined}
           />
         </DashboardCard>
       </LoadingOverlay>
@@ -465,55 +272,31 @@ export default function StaffSchedulesPage() {
       </DashboardCard>
 
       <AssignStaffDialog
-        open={!!assignDialog}
-        date={assignDialog?.date || ""}
-        shiftId={assignDialog?.shiftId || ""}
-        shiftName={assignDialog?.shiftName || ""}
-        shifts={shiftList}
-        zones={zones}
-        staff={staff}
-        existingAssignments={assignments.filter(
-          (a) => a.shiftId === assignDialog?.shiftId && a.workDate === assignDialog?.date && a.status !== "cancelled"
-        )}
-        dayAssignments={assignments.filter(
-          (a) => a.workDate === assignDialog?.date && a.status !== "cancelled"
-        )}
+        open={!!assignDialog} date={assignDialog?.date || ""} shiftId={assignDialog?.shiftId || ""} shiftName={assignDialog?.shiftName || ""}
+        shifts={shiftList} zones={zones} staff={staff}
+        existingAssignments={assignments.filter((a) => a.shiftId === assignDialog?.shiftId && a.workDate === assignDialog?.date && a.status !== "cancelled")}
+        dayAssignments={assignments.filter((a) => a.workDate === assignDialog?.date && a.status !== "cancelled")}
         onClose={() => setAssignDialog(null)}
         onAssigned={() => { setAssignDialog(null); loadData(); }}
       />
 
-      <ScheduleManagementPanel
-        open={showManagement}
-        onClose={() => setShowManagement(false)}
-        zones={zones}
-        shifts={shiftList}
-        onUpdate={loadData}
-      />
-
+      <ScheduleManagementPanel open={showManagement} onClose={() => setShowManagement(false)} zones={zones} shifts={shiftList} onUpdate={loadData} />
       <AuditLogsPanel open={showAuditLogs} onClose={() => setShowAuditLogs(false)} />
       <GeofenceConfigPanel open={showGeofence} onClose={() => setShowGeofence(false)} zones={zones} onUpdated={loadData} />
       <TemplateManagementPanel open={showTemplates} onClose={() => setShowTemplates(false)} zones={zones} shifts={shifts} staff={staff} onUpdated={loadData} />
       <AutoScheduleDialog
-        open={showAutoSchedule}
-        onClose={() => { setShowAutoSchedule(false); setAutoStep("select"); }}
-        onConfirm={handleAutoSchedule}
-        onConfirmFinal={handleAutoScheduleConfirm}
-        loading={autoLoading}
-        step={autoStep}
-        proposals={autoProposals}
-        skippedCount={autoSkipped}
-        actualRange={autoActualRange}
+        open={auto.showAutoSchedule}
+        onClose={() => { auto.setShowAutoSchedule(false); }}
+        onConfirm={auto.handleAutoSchedule}
+        onConfirmFinal={auto.handleAutoScheduleConfirm}
+        loading={auto.autoLoading} step={auto.autoStep}
+        proposals={auto.autoProposals} skippedCount={auto.autoSkipped} actualRange={auto.autoActualRange}
       />
-      <ManualCheckInAdmin
-        open={showManualCheckIn}
-        onClose={() => setShowManualCheckIn(false)}
-        onUpdated={() => { loadData(); }}
-      />
+      <ManualCheckInAdmin open={showManualCheckIn} onClose={() => setShowManualCheckIn(false)} onUpdated={loadData} />
       <DeleteWeekDialog
-        open={showDeleteWeek}
-        onClose={() => setShowDeleteWeek(false)}
-        weekFrom={from}
-        weekTo={to}
+        open={showDeleteWeek} onClose={() => setShowDeleteWeek(false)}
+        weekFrom={from} weekTo={to}
+        affectedCount={assignments.filter(a => a.status !== "cancelled" && a.workDate >= from && a.workDate <= to).length}
         onDeleted={loadData}
       />
     </Stack>

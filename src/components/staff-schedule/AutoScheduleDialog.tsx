@@ -1,20 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Stack,
-  Typography,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, Stack, Typography, Box, Checkbox, IconButton, Tooltip,
 } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import DateRangeIcon from "@mui/icons-material/DateRange";
 import YearIcon from "@mui/icons-material/CalendarMonth";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
+import CloseIcon from "@mui/icons-material/Close";
 
 function toDateInput(date: Date): string {
   const y = date.getFullYear();
@@ -122,7 +118,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onConfirm: (from: string, to: string) => void;
-  onConfirmFinal: () => void;
+  onConfirmFinal: (selected: ProposedItem[]) => void;
   loading?: boolean;
   step: "select" | "preview";
   proposals: ProposedItem[];
@@ -135,7 +131,52 @@ export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirm
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [useCustom, setUseCustom] = useState(false);
+  const [checkedSet, setCheckedSet] = useState<Set<number>>(new Set());
   const options = getQuickOptions();
+
+  useEffect(() => {
+    if (step === "preview" && proposals.length > 0) {
+      const initial = new Set<number>();
+      for (let i = 0; i < Math.min(proposals.length, 50); i++) initial.add(i);
+      setCheckedSet(initial);
+    } else if (step === "select") {
+      setCheckedSet(new Set());
+    }
+  }, [step, proposals.length]);
+
+  const displayProposals = useMemo(() => proposals.slice(0, 50), [proposals]);
+
+  const allChecked = displayProposals.length > 0 && displayProposals.every((_, i) => checkedSet.has(i));
+  const selectedCount = useMemo(() => {
+    let count = 0;
+    for (let i = 0; i < displayProposals.length; i++) {
+      if (checkedSet.has(i)) count++;
+    }
+    for (let i = displayProposals.length; i < proposals.length; i++) {
+      count++;
+    }
+    return count;
+  }, [checkedSet, displayProposals.length, proposals.length]);
+
+  const toggleAll = () => {
+    if (allChecked) {
+      setCheckedSet(new Set());
+    } else {
+      const next = new Set<number>();
+      for (let i = 0; i < displayProposals.length; i++) next.add(i);
+      setCheckedSet(next);
+    }
+  };
+
+  const toggleRow = (idx: number) => {
+    const next = new Set(checkedSet);
+    if (next.has(idx)) {
+      next.delete(idx);
+    } else {
+      next.add(idx);
+    }
+    setCheckedSet(next);
+  };
 
   const handleSelectConfirm = () => {
     if (useCustom) {
@@ -146,136 +187,184 @@ export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirm
     }
   };
 
-  const dateRange = useCustom
-    ? { from: customFrom, to: customTo }
-    : selected !== null
-    ? { from: options[selected].from, to: options[selected].to }
-    : null;
+  const handleConfirmFinal = () => {
+    const selectedItems: ProposedItem[] = [];
+    for (let i = 0; i < proposals.length; i++) {
+      if (i < displayProposals.length) {
+        if (checkedSet.has(i)) selectedItems.push(proposals[i]);
+      } else {
+        selectedItems.push(proposals[i]);
+      }
+    }
+    onConfirmFinal(selectedItems);
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth={step === "preview" ? "md" : "sm"} fullWidth>
       <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1.5 }}>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(245,158,11,0.15)" }}>
+        <Box sx={{ width: 32, height: 32, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: step === "select" ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)" }}>
           {step === "select" ? <CalendarTodayIcon sx={{ fontSize: 18, color: "#f59e0b" }} /> : <CheckCircleIcon sx={{ fontSize: 18, color: "#10b981" }} />}
-        </div>
-        {step === "select" ? "Gợi ý lịch tự động" : `Xác nhận tạo ${proposals.length} ca`}
+        </Box>
+        {step === "select" ? "Gợi ý lịch tự động" : `Xác nhận tạo ${selectedCount} ca`}
       </DialogTitle>
       <DialogContent>
         {step === "select" ? (
           <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <div>
+            <Box>
               <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", mb: 1, display: "block" }}>
                 Chọn nhanh:
               </Typography>
-              <div className="grid grid-cols-3 gap-2">
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
                 {options.map((opt, i) => (
-                  <button
+                  <Box
                     key={i}
                     onClick={() => { setSelected(i); setUseCustom(false); }}
-                    className="flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all text-center"
-                    style={{
+                    sx={{
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, p: 1.5, borderRadius: 2,
+                      border: "2px solid",
                       borderColor: !useCustom && selected === i ? "#f59e0b" : "rgba(255,255,255,0.08)",
-                      background: !useCustom && selected === i ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
+                      bgcolor: !useCustom && selected === i ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
+                      cursor: "pointer", transition: "all 0.15s",
+                      "&:hover": { borderColor: "#f59e0b" },
                     }}
                   >
-                    <span style={{ color: !useCustom && selected === i ? "#f59e0b" : "#9ca3af" }}>
-                      {opt.icon}
-                    </span>
-                    <span className="text-xs font-semibold" style={{ color: !useCustom && selected === i ? "#f59e0b" : "#e5e7eb" }}>
+                    <Box sx={{ color: !useCustom && selected === i ? "#f59e0b" : "text.disabled" }}>{opt.icon}</Box>
+                    <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.7rem", color: !useCustom && selected === i ? "#f59e0b" : "text.primary" }}>
                       {opt.label}
-                    </span>
-                    <span className="text-[10px]" style={{ color: "#9ca3af" }}>
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>
                       {opt.sub}
-                    </span>
-                  </button>
+                    </Typography>
+                  </Box>
                 ))}
-              </div>
-            </div>
+              </Box>
+            </Box>
 
-            <div>
+            <Box>
               <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", mb: 1, display: "block" }}>
                 Hoặc chọn khoảng ngày:
               </Typography>
-              <div
-                className="flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all"
-                style={{
-                  borderColor: useCustom ? "#f59e0b" : "rgba(255,255,255,0.08)",
-                  background: useCustom ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
-                }}
+              <Box
                 onClick={() => { setUseCustom(true); setSelected(null); }}
+                sx={{
+                  display: "flex", alignItems: "center", gap: 1, p: 1.5, borderRadius: 2,
+                  border: "2px solid",
+                  borderColor: useCustom ? "#f59e0b" : "rgba(255,255,255,0.08)",
+                  bgcolor: useCustom ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
+                  cursor: "pointer", transition: "all 0.15s",
+                }}
               >
                 <input
-                  type="date"
-                  value={customFrom}
+                  type="date" value={customFrom}
                   onChange={(e) => { setCustomFrom(e.target.value); setUseCustom(true); setSelected(null); }}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex-1 text-xs px-2 py-1.5 bg-transparent border border-white/10 rounded-lg text-white"
+                  style={{ flex: 1, fontSize: "0.75rem", padding: "4px 8px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "white" }}
                 />
-                <span className="text-text-3 text-xs">—</span>
+                <Typography variant="caption" sx={{ color: "text.disabled" }}>—</Typography>
                 <input
-                  type="date"
-                  value={customTo}
+                  type="date" value={customTo}
                   onChange={(e) => { setCustomTo(e.target.value); setUseCustom(true); setSelected(null); }}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex-1 text-xs px-2 py-1.5 bg-transparent border border-white/10 rounded-lg text-white"
+                  style={{ flex: 1, fontSize: "0.75rem", padding: "4px 8px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "white" }}
                 />
-              </div>
-            </div>
+              </Box>
+            </Box>
           </Stack>
         ) : (
-          /* ── Preview Step ── */
           <Stack spacing={2} sx={{ mt: 1 }}>
             {proposals.length === 0 ? (
-              <div className="text-center py-6 text-text-3">
+              <Box sx={{ textAlign: "center", py: 3, color: "text.disabled" }}>
                 <AssignmentIndIcon sx={{ fontSize: 32, opacity: 0.3, mb: 1 }} />
-                <p className="text-xs italic">Không có đề xuất lịch mới</p>
-                <p className="text-[10px] text-text-3 mt-1">Tất cả ca đã đủ nhân viên</p>
-              </div>
+                <Typography variant="caption" sx={{ fontStyle: "italic", display: "block" }}>Không có đề xuất lịch mới</Typography>
+                <Typography variant="caption" sx={{ fontSize: "0.6rem", display: "block", mt: 0.5 }}>Tất cả ca đã đủ nhân viên</Typography>
+              </Box>
             ) : (
               <>
-                {actualRange && (
-                  <div className="text-[11px] text-text-3 text-center py-1 px-2 rounded bg-white/[0.03] border border-white/5">
-                    Đề xuất từ <span className="text-emerald-400 font-medium">{formatDisplayDate(actualRange.from)}</span> — <span className="text-emerald-400 font-medium">{formatDisplayDate(actualRange.to)}</span>
-                  </div>
-                )}
-                <div className="flex gap-3">
-                  <div className="flex-1 text-center p-2 rounded-lg bg-emerald-500/10">
-                    <div className="text-lg font-bold text-emerald-400">{proposals.length}</div>
-                    <div className="text-[10px] text-text-3">Ca sẽ tạo</div>
-                  </div>
-                  {skippedCount > 0 && (
-                    <div className="flex-1 text-center p-2 rounded-lg bg-amber-500/10">
-                      <div className="text-lg font-bold text-amber-400">{skippedCount}</div>
-                      <div className="text-[10px] text-text-3">Bỏ qua</div>
-                    </div>
-                  )}
-                </div>
+                {actualRange ? (
+                  <Box sx={{ fontSize: "0.7rem", color: "text.disabled", textAlign: "center", py: 0.5, px: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    Đề xuất từ <Box component="span" sx={{ color: "success.main", fontWeight: 600 }}>{formatDisplayDate(actualRange.from)}</Box> — <Box component="span" sx={{ color: "success.main", fontWeight: 600 }}>{formatDisplayDate(actualRange.to)}</Box>
+                  </Box>
+                ) : null}
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(16,185,129,0.1)" }}>
+                    <Typography variant="body1" sx={{ fontWeight: 700, color: "success.main" }}>{selectedCount}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>Ca đã chọn</Typography>
+                  </Box>
+                  {proposals.length - selectedCount > 0 ? (
+                    <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(245,158,11,0.1)" }}>
+                      <Typography variant="body1" sx={{ fontWeight: 700, color: "warning.main" }}>{proposals.length - selectedCount}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>Bỏ chọn</Typography>
+                    </Box>
+                  ) : null}
+                  {skippedCount > 0 ? (
+                    <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(245,158,11,0.1)" }}>
+                      <Typography variant="body1" sx={{ fontWeight: 700, color: "warning.main" }}>{skippedCount}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>Bỏ qua</Typography>
+                    </Box>
+                  ) : null}
+                </Box>
 
-                <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
-                  {proposals.slice(0, 50).map((p, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ background: "rgba(16,185,129,0.15)", color: "#10b981" }}>
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[11px] font-medium text-text truncate">
-                          {p.staffName || p.staffId.slice(0, 8)}
-                        </div>
-                        <div className="text-[10px] text-text-3">
-                          {p.shiftName || "Ca"} — {p.zoneName || "Zone"} — {p.workDate}
-                        </div>
-                      </div>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
-                        {p.note?.includes("template") ? "template" : p.note?.includes("preference") ? "sở thích" : "auto"}
-                      </span>
-                    </div>
-                  ))}
-                  {proposals.length > 50 && (
-                    <div className="text-center text-[10px] text-text-3 py-1">
-                      ... và {proposals.length - 50} ca nữa
-                    </div>
-                  )}
-                </div>
+                <Box sx={{ maxHeight: 280, overflowY: "auto", "&::-webkit-scrollbar": { width: 4 }, "&::-webkit-scrollbar-thumb": { bgcolor: "rgba(255,255,255,0.1)", borderRadius: 2 } }}>
+                  <Box
+                    onClick={toggleAll}
+                    sx={{
+                      display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 0.75, mb: 0.5,
+                      borderRadius: 1, cursor: "pointer",
+                      bgcolor: "rgba(255,255,255,0.03)", border: "1px solid", borderColor: "divider",
+                      "&:hover": { bgcolor: "rgba(99,102,241,0.05)" },
+                    }}
+                  >
+                    <Checkbox checked={allChecked} indeterminate={selectedCount > 0 && !allChecked} size="small" sx={{ p: 0.25 }} />
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", fontSize: "0.7rem" }}>
+                      {allChecked ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                    </Typography>
+                  </Box>
+
+                  {displayProposals.map((p, i) => {
+                    const checked = checkedSet.has(i);
+                    return (
+                      <Box
+                        key={i}
+                        onClick={() => toggleRow(i)}
+                        sx={{
+                          display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, mb: 0.5,
+                          borderRadius: 1, cursor: "pointer", transition: "background 0.1s",
+                          bgcolor: checked ? "rgba(16,185,129,0.05)" : "rgba(255,255,255,0.02)",
+                          border: "1px solid",
+                          borderColor: checked ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.05)",
+                          "&:hover": { bgcolor: checked ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.04)" },
+                        }}
+                      >
+                        <Checkbox checked={checked} size="small" sx={{ p: 0.25 }} />
+                        <Box sx={{
+                          width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.6rem", fontWeight: 700, bgcolor: "rgba(16,185,129,0.15)", color: "success.main", flexShrink: 0,
+                        }}>
+                          {i + 1}
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: "text.primary", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.7rem" }}>
+                            {p.staffName || p.staffId.slice(0, 8)}
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>
+                            {p.shiftName || "Ca"} — {p.zoneName || "Zone"} — {p.workDate}
+                          </Typography>
+                        </Box>
+                        <Box sx={{
+                          fontSize: "0.55rem", px: 0.75, py: 0.25, borderRadius: 0.5,
+                          bgcolor: "rgba(16,185,129,0.1)", color: "success.main", fontWeight: 600, flexShrink: 0,
+                        }}>
+                          {p.note?.includes("template") ? "template" : p.note?.includes("preference") ? "sở thích" : "auto"}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                  {proposals.length > 50 ? (
+                    <Typography variant="caption" sx={{ textAlign: "center", display: "block", color: "text.disabled", py: 0.5, fontSize: "0.6rem" }}>
+                      ... và {proposals.length - 50} ca nữa (tự động chọn)
+                    </Typography>
+                  ) : null}
+                </Box>
               </>
             )}
           </Stack>
@@ -290,24 +379,18 @@ export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirm
             onClick={handleSelectConfirm}
             variant="contained"
             disabled={useCustom ? !customFrom || !customTo : selected === null}
-            sx={{
-              textTransform: "none", fontWeight: 600,
-              bgcolor: "#f59e0b", "&:hover": { bgcolor: "#d97706" },
-            }}
+            sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#f59e0b", "&:hover": { bgcolor: "#d97706" } }}
           >
             Xem đề xuất
           </Button>
         ) : (
           <Button
-            onClick={onConfirmFinal}
+            onClick={handleConfirmFinal}
             variant="contained"
-            disabled={loading || proposals.length === 0}
-            sx={{
-              textTransform: "none", fontWeight: 600,
-              bgcolor: "#10b981", "&:hover": { bgcolor: "#059669" },
-            }}
+            disabled={loading || selectedCount === 0}
+            sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#10b981", "&:hover": { bgcolor: "#059669" } }}
           >
-            {loading ? "Đang tạo..." : `Xác nhận tạo ${proposals.length} ca`}
+            {loading ? "Đang tạo..." : `Xác nhận tạo ${selectedCount} ca`}
           </Button>
         )}
       </DialogActions>
