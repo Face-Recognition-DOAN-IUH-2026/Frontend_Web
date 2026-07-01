@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api-client";
+import type { StaffScheduleAssignment } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -21,6 +22,7 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, onDe
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ cancelled: number; skipped: number; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [affectedCount, setAffectedCount] = useState<number | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -32,6 +34,21 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, onDe
     const [y, m, day] = d.split("-");
     return `${day}/${m}/${y}`;
   };
+
+  const loadAffectedCount = useCallback(async () => {
+    if (!open || isPast) return;
+    try {
+      const result = await api.getScheduleAssignments({ from: effectiveFrom, to: weekTo });
+      const activeAssignments = result.items.filter(
+        (a: StaffScheduleAssignment) => a.status !== "cancelled" && a.status !== "completed"
+      );
+      setAffectedCount(activeAssignments.length);
+    } catch {
+      setAffectedCount(null);
+    }
+  }, [open, isPast, effectiveFrom, weekTo]);
+
+  useEffect(() => { loadAffectedCount(); }, [loadAffectedCount]);
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -51,6 +68,7 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, onDe
   const handleClose = () => {
     setResult(null);
     setError(null);
+    setAffectedCount(null);
     onClose();
   };
 
@@ -111,6 +129,16 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, onDe
                       : `${fmtDate(weekFrom)} → ${fmtDate(weekTo)}`
                     }
                   </p>
+                  {affectedCount !== null && affectedCount > 0 && (
+                    <div className="mt-2 p-2 rounded-md bg-error/5 border border-error/20">
+                      <p className="text-error font-semibold">
+                        {affectedCount} ca trực sẽ bị hủy
+                      </p>
+                      <p className="text-[11px] text-text-3 mt-1">
+                        Hành động này không thể hoàn tác.
+                      </p>
+                    </div>
+                  )}
                   <p className="text-[11px] text-text-3 pt-1">
                     Tất cả yêu cầu đăng ký ca (bids) và đổi ca (swaps) đang chờ duyệt liên quan cũng sẽ bị hủy tự động.
                   </p>
