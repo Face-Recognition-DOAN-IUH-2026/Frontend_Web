@@ -2,6 +2,18 @@
 
 import { useState } from "react";
 import { Alert, Box, Button, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  FormControl,
+  IconButton,
+  MenuItem,
+  Select,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
 import TodayIcon from "@mui/icons-material/TodayOutlined";
@@ -9,14 +21,19 @@ import PrintIcon from "@mui/icons-material/PrintOutlined";
 import ActiveIcon from "@mui/icons-material/CheckCircleOutlined";
 import TotalIcon from "@mui/icons-material/AssignmentOutlined";
 import StaffIcon from "@mui/icons-material/PersonOutlined";
+import GroupIcon from "@mui/icons-material/GroupsOutlined";
+import TotalIcon from "@mui/icons-material/AssignmentOutlined";
+import StaffIcon from "@mui/icons-material/PersonOutlined";
+import ActiveIcon from "@mui/icons-material/CheckCircleOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
-import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { useScheduleData, formatDateRange } from "@/hooks/useScheduleData";
 import { useScheduleFilters } from "@/hooks/useScheduleFilters";
 import { usePendingCounts } from "@/hooks/usePendingCounts";
 import { useAutoSchedule } from "@/hooks/useAutoSchedule";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type { StaffScheduleAssignment } from "@/lib/types";
 import PageHeader from "@/components/ui/PageHeader";
 import MuiStatCard from "@/components/ui/MuiStatCard";
 import DashboardCard from "@/components/ui/DashboardCard";
@@ -42,6 +59,13 @@ import OpenShiftsPanel from "@/components/staff-schedule/OpenShiftsPanel";
 import MyBidsPanel from "@/components/staff-schedule/MyBidsPanel";
 import MyAvailabilityPanel from "@/components/staff-schedule/MyAvailabilityPanel";
 import AdminActionMenu from "@/components/staff-schedule/AdminActionMenu";
+import AdminActionMenu from "@/components/staff-schedule/AdminActionMenu";
+import MyBidsPanel from "@/components/staff-schedule/MyBidsPanel";
+import MyAvailabilityPanel from "@/components/staff-schedule/MyAvailabilityPanel";
+import { useScheduleData } from "@/hooks/useScheduleData";
+import { useScheduleFilters } from "@/hooks/useScheduleFilters";
+import { usePendingCounts } from "@/hooks/usePendingCounts";
+import { useAutoSchedule } from "@/hooks/useAutoSchedule";
 
 const FILTERS = [
   { value: "all", label: "Tất cả" },
@@ -78,6 +102,16 @@ export default function StaffSchedulesPage() {
   const { pendingBidCount, pendingSwapCount, pendingManualCount } = usePendingCounts(isAdmin, loading);
 
   const auto = useAutoSchedule(loadData, setError);
+  const [weekStart, setWeekStart] = useState(startOfWeek);
+
+  const { assignments, staff, zones, shifts, loading, error, loadData, setError } =
+    useScheduleData(weekStart, isAdmin);
+  const { filter, setFilter, zoneFilter, setZoneFilter, shiftFilter, setShiftFilter,
+    filteredAssignments, filteredShifts, shiftList, weekStats } =
+    useScheduleFilters(assignments, shifts);
+  const { pendingBidCount, pendingSwapCount, pendingManualCount } =
+    usePendingCounts(isAdmin, loading);
+  const autoSchedule = useAutoSchedule(loadData);
 
   const [showManagement, setShowManagement] = useState(false);
   const [assignDialog, setAssignDialog] = useState<{ date: string; shiftId: string; shiftName: string } | null>(null);
@@ -92,6 +126,19 @@ export default function StaffSchedulesPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showDeleteWeek, setShowDeleteWeek] = useState(false);
   const [showManualCheckIn, setShowManualCheckIn] = useState(false);
+  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
+  const [showDeleteWeek, setShowDeleteWeek] = useState(false);
+  const [showManualCheckIn, setShowManualCheckIn] = useState(false);
+  const [showMyBids, setShowMyBids] = useState(false);
+  const [showMyAvailability, setShowMyAvailability] = useState(false);
+
+  const days = getWeekDays(weekStart);
+  const from = toDateInput(days[0]);
+  const to = toDateInput(days[6]);
+
+  const goPrevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); };
+  const goNextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); };
+  const goToday = () => setWeekStart(startOfWeek());
 
   const handleCellClick = (date: string, shiftId: string) => {
     const shift = shifts.find((s) => s.id === shiftId);
@@ -104,6 +151,19 @@ export default function StaffSchedulesPage() {
   };
 
   const handleViewStaff = (_staffId: string) => {
+  const handleAdminAction = (action: string) => {
+    switch (action) {
+      case "auto-schedule": setShowAutoSchedule(true); break;
+      case "management": setShowManagement(true); break;
+      case "templates": case "templates-config": setShowTemplates(true); break;
+      case "delete-week": setShowDeleteWeek(true); break;
+      case "leave-approval": setShowLeaveApproval(true); break;
+      case "bids-review": setShowBidsReview(true); break;
+      case "swaps-view": setShowSwapsView(true); break;
+      case "manual-checkin": setShowManualCheckIn(true); break;
+      case "geofence": setShowGeofence(true); break;
+      case "audit-logs": setShowAuditLogs(true); break;
+    }
   };
 
   if (!isStaff) {
@@ -155,6 +215,7 @@ export default function StaffSchedulesPage() {
           onManagement={() => setShowManagement(true)}
           onGeofence={() => setShowGeofence(true)}
           onAuditLogs={() => setShowAuditLogs(true)}
+          onAction={handleAdminAction}
         />
       ) : (
         <>
@@ -236,6 +297,33 @@ export default function StaffSchedulesPage() {
               <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
             ))}
           </TextField>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select
+              value={zoneFilter}
+              onChange={(e) => setZoneFilter(e.target.value)}
+              displayEmpty
+              sx={{ borderRadius: "20px", fontSize: "0.78rem", fontWeight: 600 }}
+            >
+              <MenuItem value="">Tất cả khu vực</MenuItem>
+              {zones.map((z) => (
+                <MenuItem key={z.id} value={z.id}>{z.zoneName}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select
+              value={shiftFilter}
+              onChange={(e) => setShiftFilter(e.target.value)}
+              displayEmpty
+              sx={{ borderRadius: "20px", fontSize: "0.78rem", fontWeight: 600 }}
+            >
+              <MenuItem value="">Tất cả ca trực</MenuItem>
+              {shiftList.map((s) => (
+                <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Stack>
       </DashboardCard>
 
@@ -274,6 +362,21 @@ export default function StaffSchedulesPage() {
             <MySwapsPanel refreshKey={swapRefreshKey} onError={(msg) => setError(msg)} />
           </DashboardCard>
         </>
+        <DashboardCard title="Đăng ký ca của tôi">
+          <MyBidsPanel onError={(msg) => setError(msg)} />
+        </DashboardCard>
+      ) : null}
+
+      {!isAdmin ? (
+        <DashboardCard title="Yêu cầu nghỉ phép">
+          <MyAvailabilityPanel onError={(msg) => setError(msg)} />
+        </DashboardCard>
+      ) : null}
+
+      {!isAdmin ? (
+        <DashboardCard title="Đổi ca chờ xử lý">
+          <MySwapsPanel refreshKey={swapRefreshKey} onError={(msg) => setError(msg)} />
+        </DashboardCard>
       ) : null}
 
       <AssignStaffDialog
@@ -287,6 +390,29 @@ export default function StaffSchedulesPage() {
       <ScheduleManagementPanel open={showManagement} onClose={() => setShowManagement(false)} zones={zones} shifts={shiftList} onUpdate={loadData} />
       <AvailabilityDialog open={showAvailability} onClose={() => setShowAvailability(false)} onSubmitted={() => { setShowAvailability(false); loadData(); }} />
       <SwapRequestDialog open={showSwapRequest} onClose={() => setShowSwapRequest(false)} onSubmitted={() => { setShowSwapRequest(false); setSwapRefreshKey((k) => k + 1); loadData(); }} myAssignments={assignments} allStaff={staff} />
+
+      <ScheduleManagementPanel
+        open={showManagement}
+        onClose={() => setShowManagement(false)}
+        zones={zones}
+        shifts={shiftList}
+        onUpdate={loadData}
+      />
+
+      <AvailabilityDialog
+        open={showAvailability}
+        onClose={() => setShowAvailability(false)}
+        onSubmitted={() => { setShowAvailability(false); loadData(); }}
+      />
+
+      <SwapRequestDialog
+        open={showSwapRequest}
+        onClose={() => setShowSwapRequest(false)}
+        onSubmitted={() => { setShowSwapRequest(false); setSwapRefreshKey((k) => k + 1); loadData(); }}
+        myAssignments={assignments}
+        allStaff={staff}
+      />
+
       <LeaveApprovalPanel open={showLeaveApproval} onClose={() => setShowLeaveApproval(false)} onUpdated={loadData} />
       <BidsReviewPanel open={showBidsReview} onClose={() => setShowBidsReview(false)} onUpdated={loadData} />
       <SwapsViewPanel open={showSwapsView} onClose={() => setShowSwapsView(false)} onUpdated={loadData} />
@@ -300,6 +426,20 @@ export default function StaffSchedulesPage() {
         onConfirmFinal={auto.handleAutoScheduleConfirm}
         loading={auto.autoLoading} step={auto.autoStep}
         proposals={auto.autoProposals} skippedCount={auto.autoSkipped} actualRange={auto.autoActualRange}
+        open={showAutoSchedule}
+        onClose={() => { setShowAutoSchedule(false); autoSchedule.resetAuto(); }}
+        onConfirm={autoSchedule.handleAutoSchedule}
+        onConfirmFinal={autoSchedule.handleAutoScheduleConfirm}
+        loading={autoSchedule.autoLoading}
+        step={autoSchedule.autoStep}
+        proposals={autoSchedule.autoProposals}
+        skippedCount={autoSchedule.autoSkipped}
+        actualRange={autoSchedule.autoActualRange}
+      />
+      <ManualCheckInAdmin
+        open={showManualCheckIn}
+        onClose={() => setShowManualCheckIn(false)}
+        onUpdated={() => { loadData(); }}
       />
       <ManualCheckInAdmin open={showManualCheckIn} onClose={() => setShowManualCheckIn(false)} onUpdated={loadData} />
       <DeleteWeekDialog

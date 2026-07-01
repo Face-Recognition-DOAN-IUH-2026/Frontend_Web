@@ -10,6 +10,14 @@ const ITEMS = [
   { bg: "rgba(251,146,60,0.20)",        border: "rgba(251,146,60,0.5)",   label: "Thiếu người" },
   { bg: "rgba(239,68,68,0.20)",         border: "rgba(239,68,68,0.5)",    label: "Đã hủy" },
   { bg: "rgba(99,102,241,0.10)",        border: "rgba(99,102,241,0.25)",  label: "Hoàn thành" },
+  { color: "bg-surface-3 border-border-2", label: "Đã qua" },
+  { color: "bg-success/40 border-success", label: "Đang trực" },
+  { color: "bg-primary/40 border-primary-dim", label: "Sắp tới" },
+  { color: "bg-warning/40 border-warning", label: "Hôm nay" },
+  { color: "bg-orange-400/40 border-orange-400", label: "Thiếu người" },
+  { color: "bg-error/40 border-error", label: "Tạm ngưng" },
+  { color: "bg-yellow-200/40 border-yellow-400", label: "Chờ xác nhận" },
+  { color: "bg-blue-200/40 border-blue-400", label: "Chờ admin xác nhận" },
 ];
 
 export default function TimetableLegend() {

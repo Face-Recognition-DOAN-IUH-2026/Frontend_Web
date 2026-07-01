@@ -22,6 +22,22 @@ export function getWeekDays(anchor: Date) {
 }
 
 export function toDateInput(date: Date) {
+import { useCallback, useEffect, useState } from "react";
+import api, { getErrorMessage } from "@/lib/api-client";
+import type { ScheduleStaff, LibraryZone, StaffShift, StaffScheduleAssignment } from "@/lib/types";
+
+interface UseScheduleDataReturn {
+  assignments: StaffScheduleAssignment[];
+  staff: ScheduleStaff[];
+  zones: LibraryZone[];
+  shifts: StaffShift[];
+  loading: boolean;
+  error: string | null;
+  loadData: () => Promise<void>;
+  setError: (msg: string | null) => void;
+}
+
+function toDateInput(date: Date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
@@ -57,6 +73,15 @@ export function useScheduleData(): ScheduleData {
   const isAdmin = user?.role === "admin";
   const isStaff = !!user;
   const [weekStart, setWeekStart] = useState(startOfWeek);
+function getWeekDays(anchor: Date) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(anchor);
+    d.setDate(anchor.getDate() + i);
+    return d;
+  });
+}
+
+export function useScheduleData(weekStart: Date, isAdmin: boolean): UseScheduleDataReturn {
   const [staff, setStaff] = useState<ScheduleStaff[]>([]);
   const [zones, setZones] = useState<LibraryZone[]>([]);
   const [shifts, setShifts] = useState<StaffShift[]>([]);
@@ -65,6 +90,7 @@ export function useScheduleData(): ScheduleData {
   const [error, setError] = useState<string | null>(null);
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
+  const days = getWeekDays(weekStart);
   const from = toDateInput(days[0]);
   const to = toDateInput(days[6]);
 
@@ -120,4 +146,9 @@ export function useScheduleData(): ScheduleData {
     weekStart, days, from, to,
     goPrevWeek, goNextWeek, goToday, loadData, setError,
   };
+  }, [from, isAdmin, to]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  return { assignments, staff, zones, shifts, loading, error, loadData, setError };
 }
