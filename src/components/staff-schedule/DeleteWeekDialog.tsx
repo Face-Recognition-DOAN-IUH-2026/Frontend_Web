@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Typography, Switch, Stack, Alert, Box,
 } from "@mui/material";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api-client";
 import type { StaffScheduleAssignment } from "@/lib/types";
 
@@ -35,27 +34,22 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ cancelled: number; skipped: number; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [affectedCount, setAffectedCount] = useState<number | null>(null);
+  const [fetchedAffectedCount, setFetchedAffectedCount] = useState<number | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
   const effectiveFrom = weekFrom < today ? today : weekFrom;
   const isPast = effectiveFrom > weekTo;
 
-  const fmtDate = (d: string) => {
-    const [y, m, day] = d.split("-");
-    return `${day}/${m}/${y}`;
-  };
-
   const loadAffectedCount = useCallback(async () => {
     if (!open || isPast) return;
     try {
-      const result = await api.getScheduleAssignments({ from: effectiveFrom, to: weekTo });
-      const activeAssignments = result.items.filter(
+      const res = await api.getScheduleAssignments({ from: effectiveFrom, to: weekTo });
+      const activeAssignments = res.items.filter(
         (a: StaffScheduleAssignment) => a.status !== "cancelled" && a.status !== "completed"
       );
-      setAffectedCount(activeAssignments.length);
+      setFetchedAffectedCount(activeAssignments.length);
     } catch {
-      setAffectedCount(null);
+      setFetchedAffectedCount(null);
     }
   }, [open, isPast, effectiveFrom, weekTo]);
 
@@ -79,9 +73,11 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
   const handleClose = () => {
     setResult(null);
     setError(null);
-    setAffectedCount(null);
+    setFetchedAffectedCount(null);
     onClose();
   };
+
+  const displayCount = affectedCount ?? fetchedAffectedCount;
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
@@ -128,9 +124,9 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
               </Typography>
             </Box>
 
-            {affectedCount !== undefined ? (
+            {displayCount !== undefined && displayCount !== null ? (
               <Alert severity="info" sx={{ borderRadius: 2 }}>
-                {affectedCount} ca trực sẽ bị ảnh hưởng trong khoảng thời gian này.
+                {displayCount} ca trực sẽ bị ảnh hưởng trong khoảng thời gian này.
               </Alert>
             ) : null}
 
@@ -156,84 +152,6 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
               <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>
             ) : null}
           </Stack>
-          <>
-            {/* Warning */}
-            {isPast ? (
-              <div className="rounded-lg bg-warning/10 border border-warning/20 px-3 py-2.5 text-xs text-warning">
-                ⚠ Toàn bộ lịch trong tuần này đã qua. Không có ca nào để hủy.
-              </div>
-            ) : (
-              <>
-                <div className="rounded-lg bg-surface-2 border border-border px-3 py-2.5 space-y-1 text-xs text-text-2">
-                  <p>Thao tác này sẽ <span className="text-error font-semibold">hủy toàn bộ ca trực</span> từ hôm nay đến cuối tuần:</p>
-                  <p className="font-medium text-text">
-                    {effectiveFrom === today && weekFrom < today
-                      ? `${fmtDate(today)} → ${fmtDate(weekTo)} (các ngày quá khứ đã bỏ qua)`
-                      : `${fmtDate(weekFrom)} → ${fmtDate(weekTo)}`
-                    }
-                  </p>
-                  {affectedCount !== null && affectedCount > 0 && (
-                    <div className="mt-2 p-2 rounded-md bg-error/5 border border-error/20">
-                      <p className="text-error font-semibold">
-                        {affectedCount} ca trực sẽ bị hủy
-                      </p>
-                      <p className="text-[11px] text-text-3 mt-1">
-                        Hành động này không thể hoàn tác.
-                      </p>
-                    </div>
-                  )}
-                  <p className="text-[11px] text-text-3 pt-1">
-                    Tất cả yêu cầu đăng ký ca (bids) và đổi ca (swaps) đang chờ duyệt liên quan cũng sẽ bị hủy tự động.
-                  </p>
-                </div>
-
-                {/* Notify toggle */}
-                <label className="flex items-center gap-2.5 cursor-pointer group">
-                  <div
-                    onClick={() => setNotify((v) => !v)}
-                    className={`w-9 h-5 rounded-full border-2 transition flex items-center px-0.5 ${
-                      notify ? "bg-primary border-primary" : "bg-surface-3 border-border"
-                    }`}
-                  >
-                    <div className={`w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${notify ? "translate-x-4" : "translate-x-0"}`} />
-                  </div>
-                  <span className="text-xs text-text">Gửi thông báo hủy lịch đến nhân viên</span>
-                </label>
-
-                {notify && (
-                  <p className="text-[11px] text-primary/80 bg-primary/5 border border-primary/20 rounded-md px-2.5 py-1.5">
-                    ✓ Nhân viên bị ảnh hưởng sẽ nhận thông báo qua hệ thống.
-                  </p>
-                )}
-              </>
-            )}
-
-            {error && (
-              <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-2.5 py-1.5">
-                {error}
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={handleClose}
-                disabled={loading}
-                className="flex-1 py-1.5 rounded-md text-xs font-medium bg-surface-2 border border-border text-text hover:bg-surface-3 transition disabled:opacity-50"
-              >
-                Hủy bỏ
-              </button>
-              {!isPast && (
-                <button
-                  onClick={handleConfirm}
-                  disabled={loading}
-                  className="flex-1 py-1.5 rounded-md text-xs font-medium bg-error hover:bg-error/80 text-white transition disabled:opacity-50"
-                >
-                  {loading ? "Đang xử lý..." : "Xác nhận xóa"}
-                </button>
-              )}
-            </div>
-          </>
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import api from "@/lib/api-client";
 import type { ScheduleStaff, StaffShift, LibraryZone, StaffScheduleAssignment } from "@/lib/types";
 
@@ -35,17 +35,11 @@ export default function AssignStaffDialog({
   const [staffId, setStaffId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [approvedLeaves, setApprovedLeaves] = useState<any[]>([]);
+
   const [forceSave, setForceSave] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (open) {
-      api.getScheduleAvailability({ status: "approved" })
-        .then(setApprovedLeaves)
-        .catch((err) => console.error("Failed to load approved leaves", err));
-    }
-  }, [open]);
+
 
   const shift = useMemo(() => shifts.find((s) => s.id === shiftId), [shifts, shiftId]);
 
@@ -71,12 +65,6 @@ export default function AssignStaffDialog({
     const w: string[] = [];
     const selectedStaff = staff.find((s) => s.id === staffId);
     if (!selectedStaff) return w;
-    const isLeave = approvedLeaves.some(
-      (l) => l.staffId === staffId && date >= l.dateFrom && date <= l.dateTo
-    );
-    if (isLeave) {
-      w.push(`${selectedStaff.fullName || selectedStaff.email} đang trong thời gian nghỉ phép`);
-    }
     const existAsg = dayAssignments.find((a) => a.staffId === staffId);
     if (existAsg) {
       const existShift = shifts.find((sh) => sh.id === existAsg.shiftId);
@@ -120,13 +108,7 @@ export default function AssignStaffDialog({
   };
 
   const getStaffLabel = (s: ScheduleStaff) => {
-    const isLeave = approvedLeaves.some(
-      (l) => l.staffId === s.id && date >= l.dateFrom && date <= l.dateTo
-    );
     const existAsg = dayAssignments.find((a) => a.staffId === s.id);
-    if (isLeave) {
-      return `${s.fullName || s.email} (⚠️ Xin nghỉ phép)`;
-    }
     if (existAsg) {
       const existShift = shifts.find((sh) => sh.id === existAsg.shiftId);
       const newStart = shift?.startTime?.slice(0, 5);

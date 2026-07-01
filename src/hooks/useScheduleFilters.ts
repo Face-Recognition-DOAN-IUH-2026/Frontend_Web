@@ -14,19 +14,6 @@ export interface ScheduleFilters {
   filteredAssignments: StaffScheduleAssignment[];
   filteredShifts: StaffShift[];
   weekStats: { total: number; active: number; staffCount: number };
-import type { StaffScheduleAssignment, StaffShift, LibraryZone } from "@/lib/types";
-
-interface UseScheduleFiltersReturn {
-  filter: string;
-  setFilter: (v: string) => void;
-  zoneFilter: string;
-  setZoneFilter: (v: string) => void;
-  shiftFilter: string;
-  setShiftFilter: (v: string) => void;
-  filteredAssignments: StaffScheduleAssignment[];
-  filteredShifts: StaffShift[];
-  shiftList: StaffShift[];
-  weekStats: { total: number; active: number };
 }
 
 export function useScheduleFilters(
@@ -36,8 +23,6 @@ export function useScheduleFilters(
   zones: LibraryZone[],
 ): ScheduleFilters {
   const [filter, setFilter] = useState("all");
-): UseScheduleFiltersReturn {
-  const [filter, setFilter] = useState<string>("all");
   const [zoneFilter, setZoneFilter] = useState("");
   const [shiftFilter, setShiftFilter] = useState("");
 
@@ -69,13 +54,5 @@ export function useScheduleFilters(
     filter, zoneFilter, shiftFilter,
     setFilter, setZoneFilter, setShiftFilter,
     shiftList, filteredAssignments, filteredShifts, weekStats,
-    return { total, active };
-  }, [assignments]);
-
-  return {
-    filter, setFilter,
-    zoneFilter, setZoneFilter,
-    shiftFilter, setShiftFilter,
-    filteredAssignments, filteredShifts, shiftList, weekStats,
   };
 }

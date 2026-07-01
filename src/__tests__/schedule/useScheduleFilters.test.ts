@@ -3,19 +3,19 @@ import { useScheduleFilters } from "@/hooks/useScheduleFilters";
 import type { StaffScheduleAssignment, StaffShift, ScheduleStaff, LibraryZone } from "@/lib/types";
 
 const mockShifts: StaffShift[] = [
-  { id: "s1", name: "Sáng", startTime: "08:00", endTime: "12:00", isActive: true, zoneId: "z1", createdAt: "" },
-  { id: "s2", name: "Chiều", startTime: "13:00", endTime: "17:00", isActive: true, zoneId: "z1", createdAt: "" },
-  { id: "s3", name: "Tối", startTime: "18:00", endTime: "22:00", isActive: false, zoneId: "z1", createdAt: "" },
+  { id: "s1", name: "Sáng", startTime: "08:00", endTime: "12:00", minStaff: 1, maxStaff: 2, isActive: true },
+  { id: "s2", name: "Chiều", startTime: "13:00", endTime: "17:00", minStaff: 1, maxStaff: 2, isActive: true },
+  { id: "s3", name: "Tối", startTime: "18:00", endTime: "22:00", minStaff: 1, maxStaff: 2, isActive: false },
 ];
 
 const mockZones: LibraryZone[] = [
-  { id: "z1", zoneName: "Zone A", floor: 1, isActive: true },
-  { id: "z2", zoneName: "Zone B", floor: 2, isActive: true },
+  { id: "z1", zoneName: "Zone A", floor: 1, description: null, isActive: true },
+  { id: "z2", zoneName: "Zone B", floor: 2, description: null, isActive: true },
 ];
 
 const mockStaff: ScheduleStaff[] = [
-  { id: "u1", fullName: "A", email: "a@test.com", role: "staff", isActive: true },
-  { id: "u2", fullName: "B", email: "b@test.com", role: "staff", isActive: true },
+  { id: "u1", fullName: "A", email: "a@test.com", role: "staff", status: "active" },
+  { id: "u2", fullName: "B", email: "b@test.com", role: "staff", status: "active" },
 ];
 
 const mockAssignments: StaffScheduleAssignment[] = [
