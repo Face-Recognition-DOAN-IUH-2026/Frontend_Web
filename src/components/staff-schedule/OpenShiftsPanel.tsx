@@ -102,10 +102,11 @@ export default function OpenShiftsPanel({ onError }: OpenShiftsPanelProps) {
             size="small"
             variant="outlined"
             startIcon={<GavelIcon sx={{ fontSize: 16 }} />}
-            disabled
-            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600, opacity: 0.6 }}
+            disabled={!s.assignmentId || biddingId === s.assignmentId}
+            onClick={s.assignmentId ? () => handleBid(s.assignmentId!) : undefined}
+            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600, ...(s.assignmentId ? { color: "primary.main" } : { opacity: 0.6 }) }}
           >
-            Liên hệ admin
+            {s.assignmentId ? (biddingId === s.assignmentId ? "Đang đăng ký..." : "Đăng ký") : "Liên hệ admin"}
           </Button>
         </Paper>
       ))}

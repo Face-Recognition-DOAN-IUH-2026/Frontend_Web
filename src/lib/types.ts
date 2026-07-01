@@ -609,6 +609,7 @@ export interface OpenShift {
   shift: StaffShift;
   zone: LibraryZone;
   workDate: string;
+  assignmentId?: string;
 }
 
 export interface ShiftBid {

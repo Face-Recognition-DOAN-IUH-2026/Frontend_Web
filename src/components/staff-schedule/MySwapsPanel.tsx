@@ -13,6 +13,7 @@ import {
 import SwapHorizIcon from "@mui/icons-material/SwapHorizOutlined";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import ClaimIcon from "@mui/icons-material/HowToRegOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import type { ShiftSwap } from "@/lib/types";
@@ -27,12 +28,13 @@ export default function MySwapsPanel({ onError, refreshKey }: MySwapsPanelProps)
   const [swaps, setSwaps] = useState<ShiftSwap[]>([]);
   const [loading, setLoading] = useState(true);
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const result = await api.listMySwaps({});
-      setSwaps(result.filter((s: ShiftSwap) => s.status === "pending"));
+      setSwaps(result.filter((s: ShiftSwap) => s.status === "pending" || s.targetStaffId === null));
     } catch (err) {
       onError?.(getErrorMessage(err));
     } finally {
@@ -51,6 +53,18 @@ export default function MySwapsPanel({ onError, refreshKey }: MySwapsPanelProps)
       onError?.(getErrorMessage(err));
     } finally {
       setRespondingId(null);
+    }
+  };
+
+  const handleClaim = async (id: string) => {
+    setClaimingId(id);
+    try {
+      await api.claimOpenSwap(id);
+      await load();
+    } catch (err) {
+      onError?.(getErrorMessage(err));
+    } finally {
+      setClaimingId(null);
     }
   };
 
@@ -98,7 +112,19 @@ export default function MySwapsPanel({ onError, refreshKey }: MySwapsPanelProps)
                 </Typography>
               )}
             </Box>
-            {swap.targetStaffId === user?.id ? (
+            {swap.targetStaffId === null ? (
+              <Button
+                size="small"
+                variant="outlined"
+                color="primary"
+                startIcon={<ClaimIcon sx={{ fontSize: 14 }} />}
+                disabled={claimingId === swap.id}
+                onClick={() => handleClaim(swap.id)}
+                sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+              >
+                {claimingId === swap.id ? "Đang nhận..." : "Nhận đổi ca"}
+              </Button>
+            ) : swap.targetStaffId === user?.id ? (
               <Stack direction="row" spacing={0.5}>
                 <Button
                   size="small"
