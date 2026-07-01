@@ -51,8 +51,12 @@ interface GateToast {
   message: string;
 }
 
-const ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM || "http://192.168.1.13:8080/video";
-const EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM || "http://192.168.1.240:8080/video";
+const _ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM;
+if (!_ENTRY_CAM) throw new Error("NEXT_PUBLIC_ENTRY_CAM is not set");
+const ENTRY_CAM: string = _ENTRY_CAM;
+const _EXIT_CAM = process.env.NEXT_PUBLIC_EXIT_CAM;
+if (!_EXIT_CAM) throw new Error("NEXT_PUBLIC_EXIT_CAM is not set");
+const EXIT_CAM: string = _EXIT_CAM;
 const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || "entry_gate";
 const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || "exit_gate";
 const HISTORY_LIMIT = 8;

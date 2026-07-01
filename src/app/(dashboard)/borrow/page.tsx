@@ -35,7 +35,9 @@ import DashboardCard from "@/components/ui/DashboardCard";
 import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
 
 const MAX_BORROW_BOOKS = 3;
-const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.6:8080/video";
+const _RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
+if (!_RAW_CAM_URL) throw new Error("NEXT_PUBLIC_BORROW_CAM_URL is not set");
+const RAW_CAM_URL: string = _RAW_CAM_URL;
 const BORROW_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
 
 export default function BorrowPage() {

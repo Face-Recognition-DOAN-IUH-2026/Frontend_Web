@@ -73,15 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
 
-  const setTokenCookie = (token: string) => {
-    const isSecure = window.location.protocol === "https:";
-    document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict${isSecure ? "; secure" : ""}`;
-  };
-
-  const clearTokenCookie = () => {
-    document.cookie = "access_token=; path=/; max-age=0";
-  };
-
   const login = async (email: string, password: string) => {
     const data: LoginRequest = { email, password };
     const response = await api.login(data);
@@ -90,7 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     localStorage.setItem("access_token", response.access_token);
-    setTokenCookie(response.access_token);
     if (response.refresh_token) {
       localStorage.setItem("refresh_token", response.refresh_token);
     }
@@ -112,7 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
     localStorage.setItem("access_token", accessToken);
-    setTokenCookie(accessToken);
     if (refreshToken) {
       localStorage.setItem("refresh_token", refreshToken);
     }
@@ -129,11 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch { /* ignore */ }
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
-    clearTokenCookie();
     setUser(null);
     setAccessToken(null);
     router.push("/login");
@@ -147,7 +138,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { access_token, refresh_token: newRefreshToken } = await api.refreshAuthToken(refreshToken);
       if (access_token) {
         localStorage.setItem("access_token", access_token);
-        setTokenCookie(access_token);
         setAccessToken(access_token);
       }
       if (newRefreshToken) {

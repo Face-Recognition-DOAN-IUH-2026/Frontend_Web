@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Alert, Box, Button, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import {
   Alert,
   Box,
@@ -17,6 +18,9 @@ import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
 import TodayIcon from "@mui/icons-material/TodayOutlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
+import ActiveIcon from "@mui/icons-material/CheckCircleOutlined";
+import TotalIcon from "@mui/icons-material/AssignmentOutlined";
+import StaffIcon from "@mui/icons-material/PersonOutlined";
 import GroupIcon from "@mui/icons-material/GroupsOutlined";
 import TotalIcon from "@mui/icons-material/AssignmentOutlined";
 import StaffIcon from "@mui/icons-material/PersonOutlined";
@@ -24,6 +28,10 @@ import ActiveIcon from "@mui/icons-material/CheckCircleOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
 import { useAuth } from "@/lib/auth-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { useScheduleData, formatDateRange } from "@/hooks/useScheduleData";
+import { useScheduleFilters } from "@/hooks/useScheduleFilters";
+import { usePendingCounts } from "@/hooks/usePendingCounts";
+import { useAutoSchedule } from "@/hooks/useAutoSchedule";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { StaffScheduleAssignment } from "@/lib/types";
 import PageHeader from "@/components/ui/PageHeader";
@@ -47,6 +55,10 @@ import GeofenceConfigPanel from "@/components/staff-schedule/GeofenceConfigPanel
 import TemplateManagementPanel from "@/components/staff-schedule/TemplateManagementPanel";
 import DeleteWeekDialog from "@/components/staff-schedule/DeleteWeekDialog";
 import ManualCheckInAdmin from "@/components/staff-schedule/ManualCheckInAdmin";
+import OpenShiftsPanel from "@/components/staff-schedule/OpenShiftsPanel";
+import MyBidsPanel from "@/components/staff-schedule/MyBidsPanel";
+import MyAvailabilityPanel from "@/components/staff-schedule/MyAvailabilityPanel";
+import AdminActionMenu from "@/components/staff-schedule/AdminActionMenu";
 import AdminActionMenu from "@/components/staff-schedule/AdminActionMenu";
 import MyBidsPanel from "@/components/staff-schedule/MyBidsPanel";
 import MyAvailabilityPanel from "@/components/staff-schedule/MyAvailabilityPanel";
@@ -70,39 +82,26 @@ const STAT_GRADIENT = {
 
 const HEADER_GRADIENT = "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)";
 
-function startOfWeek(date = new Date()) {
-  const value = new Date(date);
-  const day = value.getDay() || 7;
-  value.setDate(value.getDate() - day + 1);
-  value.setHours(0, 0, 0, 0);
-  return value;
-}
-
-function getWeekDays(anchor: Date) {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(anchor);
-    d.setDate(anchor.getDate() + i);
-    return d;
-  });
-}
-
-function toDateInput(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function formatDateRange(days: Date[]) {
-  const from = days[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-  const to = days[6].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
-  return `${from} — ${to}`;
-}
-
 export default function StaffSchedulesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const isStaff = !!user;
+
+  const {
+    staff, zones, shifts, assignments, loading, error, setError,
+    weekStart, days, from, to,
+    goPrevWeek, goNextWeek, goToday, loadData,
+  } = useScheduleData();
+
+  const {
+    filter, zoneFilter, shiftFilter,
+    setFilter, setZoneFilter, setShiftFilter,
+    shiftList, filteredAssignments, filteredShifts, weekStats,
+  } = useScheduleFilters(assignments, shifts, staff, zones);
+
+  const { pendingBidCount, pendingSwapCount, pendingManualCount } = usePendingCounts(isAdmin, loading);
+
+  const auto = useAutoSchedule(loadData, setError);
   const [weekStart, setWeekStart] = useState(startOfWeek);
 
   const { assignments, staff, zones, shifts, loading, error, loadData, setError } =
@@ -125,6 +124,8 @@ export default function StaffSchedulesPage() {
   const [showAuditLogs, setShowAuditLogs] = useState(false);
   const [showGeofence, setShowGeofence] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showDeleteWeek, setShowDeleteWeek] = useState(false);
+  const [showManualCheckIn, setShowManualCheckIn] = useState(false);
   const [showAutoSchedule, setShowAutoSchedule] = useState(false);
   const [showDeleteWeek, setShowDeleteWeek] = useState(false);
   const [showManualCheckIn, setShowManualCheckIn] = useState(false);
@@ -145,11 +146,11 @@ export default function StaffSchedulesPage() {
   };
 
   const handleDeleteAssignment = async (id: string) => {
-    if (!confirm("Xóa ca trực này?")) return;
     try { await api.deleteScheduleAssignment(id); await loadData(); }
     catch (err) { setError(getErrorMessage(err)); }
   };
 
+  const handleViewStaff = (_staffId: string) => {
   const handleAdminAction = (action: string) => {
     switch (action) {
       case "auto-schedule": setShowAutoSchedule(true); break;
@@ -175,7 +176,7 @@ export default function StaffSchedulesPage() {
     );
   }
 
-  const isCurrentWeek = toDateInput(days[0]) === toDateInput(getWeekDays(new Date())[0]);
+  const isCurrentWeek = from === (() => { const d = new Date(); const day = d.getDay() || 7; d.setDate(d.getDate() - day + 1); return d; })().toISOString().slice(0, 10);
 
   const headerActions = (
     <>
@@ -184,15 +185,8 @@ export default function StaffSchedulesPage() {
           <PrevIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      <Button
-        onClick={goToday}
-        size="small"
-        variant={isCurrentWeek ? "contained" : "outlined"}
-        startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
-        sx={{
-          borderRadius: 2,
-          fontWeight: 700,
-          fontSize: "0.75rem",
+      <Button onClick={goToday} size="small" variant={isCurrentWeek ? "contained" : "outlined"} startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
+        sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem",
           ...(isCurrentWeek
             ? { bgcolor: "#6366f1", "&:hover": { bgcolor: "#4f46e5" } }
             : { color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }
@@ -211,6 +205,16 @@ export default function StaffSchedulesPage() {
           pendingBidCount={pendingBidCount}
           pendingSwapCount={pendingSwapCount}
           pendingManualCount={pendingManualCount}
+          onAutoSchedule={() => auto.setShowAutoSchedule(true)}
+          onTemplates={() => setShowTemplates(true)}
+          onDeleteWeek={() => setShowDeleteWeek(true)}
+          onLeaveApproval={() => setShowLeaveApproval(true)}
+          onBidsReview={() => setShowBidsReview(true)}
+          onSwapsView={() => setShowSwapsView(true)}
+          onManualCheckIn={() => setShowManualCheckIn(true)}
+          onManagement={() => setShowManagement(true)}
+          onGeofence={() => setShowGeofence(true)}
+          onAuditLogs={() => setShowAuditLogs(true)}
           onAction={handleAdminAction}
         />
       ) : (
@@ -222,7 +226,7 @@ export default function StaffSchedulesPage() {
           </Tooltip>
           <Tooltip title="Đổi ca">
             <IconButton onClick={() => setShowSwapRequest(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <GroupIcon fontSize="small" />
+              <PrintIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </>
@@ -250,26 +254,49 @@ export default function StaffSchedulesPage() {
         {[
           { key: "total", label: "Tổng ca tuần", value: weekStats.total, icon: TotalIcon, gradient: STAT_GRADIENT.total, pct: 100 },
           { key: "active", label: "Đang trực", value: weekStats.active, icon: ActiveIcon, gradient: STAT_GRADIENT.active, pct: weekStats.total ? (weekStats.active / weekStats.total) * 100 : 0 },
-          { key: "staff", label: "Nhân viên", value: staff.length, icon: StaffIcon, gradient: STAT_GRADIENT.staff, pct: 100 },
+          { key: "staff", label: "Nhân viên", value: weekStats.staffCount, icon: StaffIcon, gradient: STAT_GRADIENT.staff, pct: 100 },
         ].map((s, idx) => (
           <Box key={s.key} sx={staggerSx(idx)}>
-            <MuiStatCard
-              label={s.label}
-              value={s.value}
-              icon={s.icon}
-              gradient={s.gradient}
-              pct={s.pct}
-              index={idx}
-            />
+            <MuiStatCard label={s.label} value={s.value} icon={s.icon} gradient={s.gradient} pct={s.pct} index={idx} />
           </Box>
         ))}
       </Box>
 
       <DashboardCard>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 1, textTransform: "uppercase", letterSpacing: 0.5, fontSize: "0.7rem" }}>
             Bộ lọc:
           </Typography>
+          <ToggleButtonGroup
+            value={filter} exclusive onChange={(_, v) => v ? setFilter(v) : undefined} size="small"
+            sx={{ "& .MuiToggleButton-root": { px: 2, py: 0.6, borderRadius: "20px!important", textTransform: "none", fontWeight: 600, fontSize: "0.78rem", border: "1px solid", borderColor: "divider" }, gap: 0.5 }}
+          >
+            {FILTERS.map((f) => (
+              <ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+          <TextField
+            select size="small" label="Khu vực" value={zoneFilter}
+            onChange={(e) => setZoneFilter(e.target.value)}
+            sx={{ minWidth: 160, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            slotProps={{ inputLabel: { shrink: true } }}
+          >
+            <MenuItem value="">Tất cả khu vực</MenuItem>
+            {zones.map((z) => (
+              <MenuItem key={z.id} value={z.id}>{z.zoneName}</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select size="small" label="Ca trực" value={shiftFilter}
+            onChange={(e) => setShiftFilter(e.target.value)}
+            sx={{ minWidth: 140, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            slotProps={{ inputLabel: { shrink: true } }}
+          >
+            <MenuItem value="">Tất cả ca trực</MenuItem>
+            {shiftList.map((s) => (
+              <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+            ))}
+          </TextField>
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <Select
               value={zoneFilter}
@@ -301,21 +328,17 @@ export default function StaffSchedulesPage() {
       </DashboardCard>
 
       {error ? (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>
-          {error}
-        </Alert>
+        <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>{error}</Alert>
       ) : null}
 
       <LoadingOverlay loading={loading} message="Đang tải lịch trực...">
         <DashboardCard noPadding>
           <TimetableGrid
-            days={days}
-            shifts={filteredShifts}
-            assignments={filteredAssignments}
-            filter={filter}
-            isAdmin={isAdmin}
+            days={days} shifts={filteredShifts} assignments={filteredAssignments}
+            filter={filter} isAdmin={isAdmin}
             onCellClick={isAdmin ? handleCellClick : undefined}
             onDeleteAssignment={isAdmin ? handleDeleteAssignment : undefined}
+            onViewStaff={isAdmin ? handleViewStaff : undefined}
           />
         </DashboardCard>
       </LoadingOverlay>
@@ -325,6 +348,20 @@ export default function StaffSchedulesPage() {
       </DashboardCard>
 
       {!isAdmin ? (
+        <>
+          <DashboardCard title="Ca mở">
+            <OpenShiftsPanel onError={(msg) => setError(msg)} />
+          </DashboardCard>
+          <DashboardCard title="Đăng ký ca của tôi">
+            <MyBidsPanel onError={(msg) => setError(msg)} />
+          </DashboardCard>
+          <DashboardCard title="Xin nghỉ của tôi">
+            <MyAvailabilityPanel onError={(msg) => setError(msg)} />
+          </DashboardCard>
+          <DashboardCard title="Đổi ca chờ xử lý">
+            <MySwapsPanel refreshKey={swapRefreshKey} onError={(msg) => setError(msg)} />
+          </DashboardCard>
+        </>
         <DashboardCard title="Đăng ký ca của tôi">
           <MyBidsPanel onError={(msg) => setError(msg)} />
         </DashboardCard>
@@ -343,22 +380,16 @@ export default function StaffSchedulesPage() {
       ) : null}
 
       <AssignStaffDialog
-        open={!!assignDialog}
-        date={assignDialog?.date || ""}
-        shiftId={assignDialog?.shiftId || ""}
-        shiftName={assignDialog?.shiftName || ""}
-        shifts={shiftList}
-        zones={zones}
-        staff={staff}
-        existingAssignments={assignments.filter(
-          (a) => a.shiftId === assignDialog?.shiftId && a.workDate === assignDialog?.date && a.status !== "cancelled"
-        )}
-        dayAssignments={assignments.filter(
-          (a) => a.workDate === assignDialog?.date && a.status !== "cancelled"
-        )}
+        open={!!assignDialog} date={assignDialog?.date || ""} shiftId={assignDialog?.shiftId || ""} shiftName={assignDialog?.shiftName || ""}
+        shifts={shiftList} zones={zones} staff={staff}
+        existingAssignments={assignments.filter((a) => a.shiftId === assignDialog?.shiftId && a.workDate === assignDialog?.date && a.status !== "cancelled")}
+        dayAssignments={assignments.filter((a) => a.workDate === assignDialog?.date && a.status !== "cancelled")}
         onClose={() => setAssignDialog(null)}
         onAssigned={() => { setAssignDialog(null); loadData(); }}
       />
+      <ScheduleManagementPanel open={showManagement} onClose={() => setShowManagement(false)} zones={zones} shifts={shiftList} onUpdate={loadData} />
+      <AvailabilityDialog open={showAvailability} onClose={() => setShowAvailability(false)} onSubmitted={() => { setShowAvailability(false); loadData(); }} />
+      <SwapRequestDialog open={showSwapRequest} onClose={() => setShowSwapRequest(false)} onSubmitted={() => { setShowSwapRequest(false); setSwapRefreshKey((k) => k + 1); loadData(); }} myAssignments={assignments} allStaff={staff} />
 
       <ScheduleManagementPanel
         open={showManagement}
@@ -389,6 +420,12 @@ export default function StaffSchedulesPage() {
       <GeofenceConfigPanel open={showGeofence} onClose={() => setShowGeofence(false)} zones={zones} onUpdated={loadData} />
       <TemplateManagementPanel open={showTemplates} onClose={() => setShowTemplates(false)} zones={zones} shifts={shifts} staff={staff} onUpdated={loadData} />
       <AutoScheduleDialog
+        open={auto.showAutoSchedule}
+        onClose={() => { auto.setShowAutoSchedule(false); auto.autoStep !== "preview" ? undefined : undefined; }}
+        onConfirm={auto.handleAutoSchedule}
+        onConfirmFinal={auto.handleAutoScheduleConfirm}
+        loading={auto.autoLoading} step={auto.autoStep}
+        proposals={auto.autoProposals} skippedCount={auto.autoSkipped} actualRange={auto.autoActualRange}
         open={showAutoSchedule}
         onClose={() => { setShowAutoSchedule(false); autoSchedule.resetAuto(); }}
         onConfirm={autoSchedule.handleAutoSchedule}
@@ -404,11 +441,11 @@ export default function StaffSchedulesPage() {
         onClose={() => setShowManualCheckIn(false)}
         onUpdated={() => { loadData(); }}
       />
+      <ManualCheckInAdmin open={showManualCheckIn} onClose={() => setShowManualCheckIn(false)} onUpdated={loadData} />
       <DeleteWeekDialog
-        open={showDeleteWeek}
-        onClose={() => setShowDeleteWeek(false)}
-        weekFrom={from}
-        weekTo={to}
+        open={showDeleteWeek} onClose={() => setShowDeleteWeek(false)}
+        weekFrom={from} weekTo={to}
+        affectedCount={assignments.filter(a => a.status !== "cancelled" && a.workDate >= from && a.workDate <= to).length}
         onDeleted={loadData}
       />
     </Stack>

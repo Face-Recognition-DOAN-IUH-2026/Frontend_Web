@@ -13,6 +13,7 @@ import {
 import SwapHorizIcon from "@mui/icons-material/SwapHorizOutlined";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import ClaimIcon from "@mui/icons-material/HowToRegOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import type { ShiftSwap } from "@/lib/types";
@@ -33,7 +34,7 @@ export default function MySwapsPanel({ onError, refreshKey }: MySwapsPanelProps)
     setLoading(true);
     try {
       const result = await api.listMySwaps({});
-      setSwaps(result.filter((s: ShiftSwap) => s.status === "pending"));
+      setSwaps(result.filter((s: ShiftSwap) => s.status === "pending" || s.targetStaffId === null));
     } catch (err) {
       onError?.(getErrorMessage(err));
     } finally {
@@ -55,6 +56,10 @@ export default function MySwapsPanel({ onError, refreshKey }: MySwapsPanelProps)
     }
   };
 
+  const handleClaim = async (id: string) => {
+    setClaimingId(id);
+    try {
+      await api.claimOpenSwap(id);
   const handleClaimSwap = async (swapId: string) => {
     setClaimingId(swapId);
     try {
@@ -119,6 +124,19 @@ export default function MySwapsPanel({ onError, refreshKey }: MySwapsPanelProps)
                 </Typography>
               )}
             </Box>
+            {swap.targetStaffId === null ? (
+              <Button
+                size="small"
+                variant="outlined"
+                color="primary"
+                startIcon={<ClaimIcon sx={{ fontSize: 14 }} />}
+                disabled={claimingId === swap.id}
+                onClick={() => handleClaim(swap.id)}
+                sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+              >
+                {claimingId === swap.id ? "Đang nhận..." : "Nhận đổi ca"}
+              </Button>
+            ) : swap.targetStaffId === user?.id ? (
             {isForMe(swap) ? (
               <Stack direction="row" spacing={0.5}>
                 <Button
