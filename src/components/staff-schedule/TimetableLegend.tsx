@@ -7,6 +7,8 @@ const ITEMS = [
   { color: "bg-warning/40 border-warning", label: "Hôm nay" },
   { color: "bg-orange-400/40 border-orange-400", label: "Thiếu người" },
   { color: "bg-error/40 border-error", label: "Tạm ngưng" },
+  { color: "bg-yellow-200/40 border-yellow-400", label: "Chờ xác nhận" },
+  { color: "bg-blue-200/40 border-blue-400", label: "Chờ admin xác nhận" },
 ];
 
 export default function TimetableLegend() {
