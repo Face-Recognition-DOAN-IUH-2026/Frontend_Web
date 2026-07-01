@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   IconButton,
-  Paper,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
@@ -19,13 +18,11 @@ import TodayIcon from "@mui/icons-material/TodayOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
-import GroupIcon from "@mui/icons-material/GroupsOutlined";
 import ActiveIcon from "@mui/icons-material/CheckCircleOutlined";
 import TotalIcon from "@mui/icons-material/AssignmentOutlined";
 import StaffIcon from "@mui/icons-material/PersonOutlined";
 import MapIcon from "@mui/icons-material/PinDropOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
-import LeaveIcon from "@mui/icons-material/BeachAccessOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
@@ -40,13 +37,7 @@ import TimetableGrid from "@/components/staff-schedule/TimetableGrid";
 import TimetableLegend from "@/components/staff-schedule/TimetableLegend";
 import AssignStaffDialog from "@/components/staff-schedule/AssignStaffDialog";
 import ScheduleManagementPanel from "@/components/staff-schedule/ScheduleManagementPanel";
-import AvailabilityDialog from "@/components/staff-schedule/AvailabilityDialog";
-import MySwapsPanel from "@/components/staff-schedule/MySwapsPanel";
-import SwapRequestDialog from "@/components/staff-schedule/SwapRequestDialog";
 import AutoScheduleDialog from "@/components/staff-schedule/AutoScheduleDialog";
-import LeaveApprovalPanel from "@/components/staff-schedule/LeaveApprovalPanel";
-import BidsReviewPanel from "@/components/staff-schedule/BidsReviewPanel";
-import SwapsViewPanel from "@/components/staff-schedule/SwapsViewPanel";
 import AuditLogsPanel from "@/components/staff-schedule/AuditLogsPanel";
 import GeofenceConfigPanel from "@/components/staff-schedule/GeofenceConfigPanel";
 import TemplateManagementPanel from "@/components/staff-schedule/TemplateManagementPanel";
@@ -114,12 +105,6 @@ export default function StaffSchedulesPage() {
 
   const [showManagement, setShowManagement] = useState(false);
   const [assignDialog, setAssignDialog] = useState<{ date: string; shiftId: string; shiftName: string } | null>(null);
-  const [showAvailability, setShowAvailability] = useState(false);
-  const [showSwapRequest, setShowSwapRequest] = useState(false);
-  const [swapRefreshKey, setSwapRefreshKey] = useState(0);
-  const [showLeaveApproval, setShowLeaveApproval] = useState(false);
-  const [showBidsReview, setShowBidsReview] = useState(false);
-  const [showSwapsView, setShowSwapsView] = useState(false);
   const [showAuditLogs, setShowAuditLogs] = useState(false);
   const [showGeofence, setShowGeofence] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -131,8 +116,6 @@ export default function StaffSchedulesPage() {
   const [autoActualRange, setAutoActualRange] = useState<{ from: string; to: string } | null>(null);
   const [showDeleteWeek, setShowDeleteWeek] = useState(false);
   const [showManualCheckIn, setShowManualCheckIn] = useState(false);
-  const [pendingBidCount, setPendingBidCount] = useState(0);
-  const [pendingSwapCount, setPendingSwapCount] = useState(0);
   const [pendingManualCount, setPendingManualCount] = useState(0);
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
@@ -180,13 +163,7 @@ export default function StaffSchedulesPage() {
     if (!isAdmin) return;
     const loadCounts = async () => {
       try {
-        const [bids, swaps, manuals] = await Promise.all([
-          api.listAllBids({ status: "pending" }).catch(() => []),
-          api.listAllSwaps({ status: "pending" }).catch(() => []),
-          api.listManualCheckInRequests().catch(() => []),
-        ]);
-        setPendingBidCount(bids.length);
-        setPendingSwapCount(swaps.length);
+        const manuals = await api.listManualCheckInRequests().catch(() => []);
         setPendingManualCount(manuals.filter((m: ManualCheckInRequest) => m.status === "pending_manual").length);
       } catch {}
     };
@@ -301,7 +278,7 @@ export default function StaffSchedulesPage() {
           <NextIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      {isAdmin ? (
+      {isAdmin && (
         <>
           <Tooltip title="Gợi ý lịch tự động">
             <IconButton onClick={() => setShowAutoSchedule(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
@@ -311,31 +288,6 @@ export default function StaffSchedulesPage() {
           <Tooltip title="Quản lý ca/khu vực">
             <IconButton onClick={() => setShowManagement(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
               <SettingsIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Duyệt đơn nghỉ">
-            <IconButton onClick={() => setShowLeaveApproval(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
-              <LeaveIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Duyệt đăng ký ca">
-            <IconButton onClick={() => setShowBidsReview(true)} size="small" sx={{ color: "#10b981", border: "1px solid rgba(16,185,129,0.3)", "&:hover": { bgcolor: "rgba(16,185,129,0.1)" }, position: "relative" }}>
-              <ActiveIcon fontSize="small" />
-              {pendingBidCount > 0 ? (
-                <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingBidCount > 9 ? "9+" : pendingBidCount}</Typography>
-                </Box>
-              ) : null}
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Đổi ca chờ xử lý">
-            <IconButton onClick={() => setShowSwapsView(true)} size="small" sx={{ color: "#3b82f6", border: "1px solid rgba(59,130,246,0.3)", "&:hover": { bgcolor: "rgba(59,130,246,0.1)" }, position: "relative" }}>
-              <GroupIcon fontSize="small" />
-              {pendingSwapCount > 0 ? (
-                <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingSwapCount > 9 ? "9+" : pendingSwapCount}</Typography>
-                </Box>
-              ) : null}
             </IconButton>
           </Tooltip>
           <Tooltip title="Mẫu lịch">
@@ -374,19 +326,6 @@ export default function StaffSchedulesPage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-            </IconButton>
-          </Tooltip>
-        </>
-      ) : (
-        <>
-          <Tooltip title="Xin nghỉ">
-            <IconButton onClick={() => setShowAvailability(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
-              <TodayIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Đổi ca">
-            <IconButton onClick={() => setShowSwapRequest(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <GroupIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </>
@@ -551,29 +490,6 @@ export default function StaffSchedulesPage() {
         onUpdate={loadData}
       />
 
-      <AvailabilityDialog
-        open={showAvailability}
-        onClose={() => setShowAvailability(false)}
-        onSubmitted={() => { setShowAvailability(false); loadData(); }}
-      />
-
-      <SwapRequestDialog
-        open={showSwapRequest}
-        onClose={() => setShowSwapRequest(false)}
-        onSubmitted={() => { setShowSwapRequest(false); setSwapRefreshKey((k) => k + 1); loadData(); }}
-        myAssignments={assignments}
-        allStaff={staff}
-      />
-
-      {!isAdmin ? (
-        <DashboardCard title="Đổi ca chờ xử lý">
-          <MySwapsPanel refreshKey={swapRefreshKey} onError={(msg) => setError(msg)} />
-        </DashboardCard>
-      ) : null}
-
-      <LeaveApprovalPanel open={showLeaveApproval} onClose={() => setShowLeaveApproval(false)} onUpdated={loadData} />
-      <BidsReviewPanel open={showBidsReview} onClose={() => setShowBidsReview(false)} onUpdated={loadData} />
-      <SwapsViewPanel open={showSwapsView} onClose={() => setShowSwapsView(false)} onUpdated={loadData} />
       <AuditLogsPanel open={showAuditLogs} onClose={() => setShowAuditLogs(false)} />
       <GeofenceConfigPanel open={showGeofence} onClose={() => setShowGeofence(false)} zones={zones} onUpdated={loadData} />
       <TemplateManagementPanel open={showTemplates} onClose={() => setShowTemplates(false)} zones={zones} shifts={shifts} staff={staff} onUpdated={loadData} />

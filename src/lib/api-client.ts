@@ -38,12 +38,8 @@ import type {
   LibraryZone,
   ScheduleAssignmentList,
   ScheduleStaff,
-  StaffAvailabilityRequest,
   StaffScheduleAssignment,
-   StaffShift,
-  OpenShift,
-  ShiftBid,
-  ShiftSwap,
+  StaffShift,
   ManualCheckInRequest,
   GeofenceConfig,
   AiCommandCenterSummary,
@@ -1066,50 +1062,6 @@ class ApiClient {
     return response.data;
   }
 
-  async createMyAvailability(data: { dateFrom: string; dateTo: string; reason?: string | null }): Promise<StaffAvailabilityRequest> {
-    const response = await this.client.post<StaffAvailabilityRequest>("/api/schedules/me/availability", data);
-    return response.data;
-  }
-
-  // === Shift Bidding ===
-  async getOpenShifts(): Promise<OpenShift[]> {
-    const response = await this.client.get<OpenShift[]>("/api/schedules/open-shifts");
-    return response.data;
-  }
-
-  async createBid(data: { assignmentId: string; note?: string | null }): Promise<ShiftBid> {
-    const response = await this.client.post<ShiftBid>("/api/schedules/bids", data);
-    return response.data;
-  }
-
-  async listMyBids(): Promise<ShiftBid[]> {
-    const response = await this.client.get<ShiftBid[]>("/api/schedules/bids");
-    return response.data;
-  }
-
-  async cancelBid(id: string): Promise<ShiftBid> {
-    const response = await this.client.post<ShiftBid>(`/api/schedules/bids/${id}/cancel`);
-    return response.data;
-  }
-
-  // === Shift Swap ===
-  async createSwap(data: { targetStaffId: string; requesterAssignmentId: string; targetAssignmentId?: string | null; reason?: string | null }): Promise<ShiftSwap> {
-    const response = await this.client.post<ShiftSwap>("/api/schedules/swaps", data);
-    return response.data;
-  }
-
-  async listMySwaps(params?: { status?: string }): Promise<ShiftSwap[]> {
-    const query: any = {};
-    if (params?.status) query.status = params.status;
-    const response = await this.client.get<ShiftSwap[]>("/api/schedules/swaps", { params: query });
-    return response.data;
-  }
-
-  async respondSwap(id: string, data: { action: "accepted" | "rejected"; responseNote?: string | null }): Promise<ShiftSwap> {
-    const response = await this.client.post<ShiftSwap>(`/api/schedules/swaps/${id}/respond`, data);
-    return response.data;
-  }
-
   async autoSchedule(data: { from: string; to: string }): Promise<{ proposed: Array<{ staffId: string; shiftId: string; zoneId: string; workDate: string; note: string }>; skipped: number; total: number; actualFrom?: string; actualTo?: string }> {
     const response = await this.client.post<any>("/api/schedules/auto-schedule", data);
     return response.data;
@@ -1132,49 +1084,6 @@ class ApiClient {
   }
 
   // === Admin Schedule Operations ===
-  async getScheduleAvailability(filters?: { staffId?: string; status?: string }): Promise<StaffAvailabilityRequest[]> {
-    const query: any = {};
-    if (filters?.staffId) query.staff_id = filters.staffId;
-    if (filters?.status) query.status = filters.status;
-    const response = await this.client.get<StaffAvailabilityRequest[]>("/api/schedules/availability", { params: query });
-    return response.data;
-  }
-
-  async approveScheduleAvailability(id: string): Promise<StaffAvailabilityRequest> {
-    const response = await this.client.post<StaffAvailabilityRequest>(`/api/schedules/availability/${id}/approve`);
-    return response.data;
-  }
-
-  async rejectScheduleAvailability(id: string): Promise<StaffAvailabilityRequest> {
-    const response = await this.client.post<StaffAvailabilityRequest>(`/api/schedules/availability/${id}/reject`);
-    return response.data;
-  }
-
-  async listAllBids(filters?: { staffId?: string; status?: string }): Promise<ShiftBid[]> {
-    const query: any = {};
-    if (filters?.staffId) query.staff_id = filters.staffId;
-    if (filters?.status) query.status = filters.status;
-    const response = await this.client.get<ShiftBid[]>("/api/schedules/bids", { params: query });
-    return response.data;
-  }
-
-  async approveBid(id: string): Promise<ShiftBid> {
-    const response = await this.client.post<ShiftBid>(`/api/schedules/bids/${id}/approve`);
-    return response.data;
-  }
-
-  async rejectBid(id: string): Promise<ShiftBid> {
-    const response = await this.client.post<ShiftBid>(`/api/schedules/bids/${id}/reject`);
-    return response.data;
-  }
-
-  async listAllSwaps(filters?: { status?: string }): Promise<ShiftSwap[]> {
-    const query: any = {};
-    if (filters?.status) query.status = filters.status;
-    const response = await this.client.get<ShiftSwap[]>("/api/schedules/swaps", { params: query });
-    return response.data;
-  }
-
   async adminConfirmAssignment(id: string): Promise<StaffScheduleAssignment> {
     const response = await this.client.post<StaffScheduleAssignment>(`/api/schedules/assignments/${id}/admin-confirm`);
     return response.data;
@@ -1260,10 +1169,6 @@ class ApiClient {
     return response.data;
   }
 
-  async claimOpenSwap(swapId: string): Promise<ShiftSwap> {
-    const response = await this.client.post<ShiftSwap>(`/api/schedules/swaps/${swapId}/claim`);
-    return response.data;
-  }
 
 
   async getAiCommandCenterSummary(): Promise<AiCommandCenterSummary> {

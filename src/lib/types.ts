@@ -588,57 +588,9 @@ export interface StaffAttendance {
   deletedAt: string | null;
 }
 
-export interface StaffAvailabilityRequest {
-  id: string;
-  staffId: string;
-  dateFrom: string;
-  dateTo: string;
-  type: string;
-  reason: string | null;
-  status: string;
-  reviewedBy: string | null;
-  reviewedAt: string | null;
-}
-
 export interface ScheduleAssignmentList {
   items: StaffScheduleAssignment[];
   total: number;
-}
-
-export interface OpenShift {
-  shift: StaffShift;
-  zone: LibraryZone;
-  workDate: string;
-}
-
-export interface ShiftBid {
-  id: string;
-  staffId: string;
-  assignmentId: string;
-  status: string;
-  note: string | null;
-  reviewedBy: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
-  assignment: StaffScheduleAssignment | null;
-  staff: ScheduleStaff | null;
-}
-
-export interface ShiftSwap {
-  id: string;
-  requesterStaffId: string;
-  targetStaffId: string | null;
-  requesterAssignmentId: string;
-  targetAssignmentId: string | null;
-  reason: string | null;
-  status: string;
-  responseNote: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
-  requester: ScheduleStaff | null;
-  target: ScheduleStaff | null;
-  requesterAssignment: StaffScheduleAssignment | null;
-  targetAssignment: StaffScheduleAssignment | null;
 }
 
 export interface GeofenceConfig {

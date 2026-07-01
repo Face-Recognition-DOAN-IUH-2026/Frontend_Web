@@ -112,7 +112,7 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, onDe
                     }
                   </p>
                   <p className="text-[11px] text-text-3 pt-1">
-                    Tất cả yêu cầu đăng ký ca (bids) và đổi ca (swaps) đang chờ duyệt liên quan cũng sẽ bị hủy tự động.
+                    Tất cả các yêu cầu liên quan cũng sẽ được xử lý tự động.
                   </p>
                 </div>
 

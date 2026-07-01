@@ -6,9 +6,7 @@ import { Chip } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import FingerprintIcon from "@mui/icons-material/Fingerprint";
-import GavelIcon from "@mui/icons-material/Gavel";
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
-import EventBusyIcon from "@mui/icons-material/EventBusy";
+
 import TuneIcon from "@mui/icons-material/Tune";
 import EventIcon from "@mui/icons-material/Event";
 import PersonIcon from "@mui/icons-material/Person";
@@ -43,20 +41,6 @@ const ACTION_CONFIG: Record<string, { label: string; color: string; icon: React.
   "attendance.auto_checkout":                { label: "Auto check-out",      color: "#f59e0b", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
   "attendance.admin_fixed":                  { label: "Admin sửa điểm danh", color: "#8b5cf6", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
   "attendance.removed_orphaned":             { label: "Xóa attendance mồ côi", color: "#ef4444", icon: <FingerprintIcon sx={{ fontSize: 14 }} />, category: "attendance" },
-  "availability.created":                    { label: "Đơn xin nghỉ",        color: "#f59e0b", icon: <EventBusyIcon sx={{ fontSize: 14 }} />,    category: "availability" },
-  "availability.approved":                   { label: "Duyệt đơn nghỉ",      color: "#10b981", icon: <EventBusyIcon sx={{ fontSize: 14 }} />,    category: "availability" },
-  "availability.rejected":                   { label: "Từ chối đơn nghỉ",    color: "#ef4444", icon: <EventBusyIcon sx={{ fontSize: 14 }} />,    category: "availability" },
-  "availability.auto_rejected":              { label: "Tự từ chối (quá hạn)", color: "#6b7280", icon: <EventBusyIcon sx={{ fontSize: 14 }} />,   category: "availability" },
-  "availability.approved_cascade_cancel":    { label: "Duyệt + hủy ca liên quan", color: "#f97316", icon: <EventBusyIcon sx={{ fontSize: 14 }} />, category: "availability" },
-  "bid.created":                             { label: "Đăng ký bid",         color: "#3b82f6", icon: <GavelIcon sx={{ fontSize: 14 }} />,        category: "bid" },
-  "bid.approved":                            { label: "Duyệt bid",           color: "#10b981", icon: <GavelIcon sx={{ fontSize: 14 }} />,        category: "bid" },
-  "bid.rejected":                            { label: "Từ chối bid",         color: "#ef4444", icon: <GavelIcon sx={{ fontSize: 14 }} />,        category: "bid" },
-  "bid.expired":                             { label: "Bid hết hạn",         color: "#6b7280", icon: <GavelIcon sx={{ fontSize: 14 }} />,        category: "bid" },
-  "swap.created":                            { label: "Yêu cầu đổi ca",     color: "#3b82f6", icon: <SwapHorizIcon sx={{ fontSize: 14 }} />,    category: "swap" },
-  "swap.accepted":                           { label: "Chấp nhận đổi ca",    color: "#10b981", icon: <SwapHorizIcon sx={{ fontSize: 14 }} />,    category: "swap" },
-  "swap.rejected":                           { label: "Từ chối đổi ca",      color: "#ef4444", icon: <SwapHorizIcon sx={{ fontSize: 14 }} />,    category: "swap" },
-  "swap.expired":                            { label: "Đổi ca hết hạn",      color: "#6b7280", icon: <SwapHorizIcon sx={{ fontSize: 14 }} />,    category: "swap" },
-  "swap.cancelled_by_requester":             { label: "Hủy đổi ca",          color: "#6b7280", icon: <SwapHorizIcon sx={{ fontSize: 14 }} />,    category: "swap" },
   "zone.deactivated":                        { label: "Vô hiệu hóa zone",    color: "#ef4444", icon: <TuneIcon sx={{ fontSize: 14 }} />,         category: "config" },
   "shift.deactivated":                       { label: "Vô hiệu hóa ca",      color: "#ef4444", icon: <ScheduleIcon sx={{ fontSize: 14 }} />,     category: "config" },
   "template.deactivated":                    { label: "Vô hiệu hóa mẫu",     color: "#ef4444", icon: <EventIcon sx={{ fontSize: 14 }} />,        category: "config" },
@@ -65,9 +49,6 @@ const ACTION_CONFIG: Record<string, { label: string; color: string; icon: React.
 const CATEGORY_ACTIONS: Record<string, string[]> = {
   assignment: ["assignment.created", "assignment.confirmed", "assignment.admin_confirmed", "assignment.cancelled", "assignment.cancelled_by_config_delete"],
   attendance: ["attendance.checked_in", "attendance.checked_out", "attendance.auto_checkout", "attendance.admin_fixed", "attendance.removed_orphaned"],
-  availability: ["availability.created", "availability.approved", "availability.rejected", "availability.auto_rejected", "availability.approved_cascade_cancel"],
-  bid: ["bid.created", "bid.approved", "bid.rejected", "bid.expired"],
-  swap: ["swap.created", "swap.accepted", "swap.rejected", "swap.expired", "swap.cancelled_by_requester"],
   config: ["zone.deactivated", "shift.deactivated", "template.deactivated"],
 };
 
@@ -75,9 +56,6 @@ const CATEGORY_FILTERS = [
   { key: "all",        label: "Tất cả",     icon: <TimelineIcon sx={{ fontSize: 14 }} /> },
   { key: "assignment", label: "Phân ca",    icon: <AssignmentIndIcon sx={{ fontSize: 14 }} /> },
   { key: "attendance", label: "Điểm danh",  icon: <FingerprintIcon sx={{ fontSize: 14 }} /> },
-  { key: "availability", label: "Xin nghỉ", icon: <EventBusyIcon sx={{ fontSize: 14 }} /> },
-  { key: "bid",        label: "Bid",         icon: <GavelIcon sx={{ fontSize: 14 }} /> },
-  { key: "swap",       label: "Đổi ca",     icon: <SwapHorizIcon sx={{ fontSize: 14 }} /> },
   { key: "config",     label: "Cấu hình",   icon: <TuneIcon sx={{ fontSize: 14 }} /> },
 ];
 
@@ -106,8 +84,7 @@ function formatMetadata(metadata: Record<string, unknown> | null | undefined): {
 }
 
 const ENTITY_LABELS: Record<string, string> = {
-  staff_schedule: "Lịch làm việc", staff_availability_request: "Đơn xin nghỉ",
-  shift_bid: "Bid ca", shift_swap: "Đổi ca", zone: "Khu vực",
+  staff_schedule: "Lịch làm việc", zone: "Khu vực",
   shift: "Ca", template: "Mẫu lịch", attendance: "Điểm danh",
 };
 
