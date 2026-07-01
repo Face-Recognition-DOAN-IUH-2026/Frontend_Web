@@ -101,8 +101,6 @@ export default function RegisterPage() {
       });
       localStorage.setItem("access_token", res.access_token);
       if (res.refresh_token) localStorage.setItem("refresh_token", res.refresh_token);
-      const isSecure = window.location.protocol === "https:";
-      document.cookie = `access_token=${res.access_token}; path=/; max-age=86400; samesite=strict${isSecure ? "; secure" : ""}`;
       setRegistrationTokens({ access_token: res.access_token, refresh_token: res.refresh_token });
       setRegistering(false);
       setActiveStep(3);

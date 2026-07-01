@@ -78,8 +78,6 @@ function normalizeAccessLog(log: any): AccessLogPublic {
 function setStoredAccessToken(token: string) {
   if (typeof window === "undefined") return;
   localStorage.setItem("access_token", token);
-  const isSecure = window.location.protocol === "https:";
-  document.cookie = `access_token=${token}; path=/; max-age=86400; samesite=strict${isSecure ? "; secure" : ""}`;
 }
 
 function clearStoredAuth() {
@@ -87,7 +85,6 @@ function clearStoredAuth() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("user");
-  document.cookie = "access_token=; path=/; max-age=0";
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -145,6 +142,7 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
+      withCredentials: true,
     });
 
     this.client.interceptors.request.use(
@@ -266,6 +264,10 @@ class ApiClient {
   async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
     const response = await this.client.post<TokenResponse>("/api/auth/refresh", { refresh_token: refreshToken });
     return response.data;
+  }
+
+  async logout(): Promise<void> {
+    await this.client.post("/api/auth/logout");
   }
 
   async faceLogin(imageFile: File): Promise<TokenResponse> {
@@ -525,8 +527,7 @@ class ApiClient {
     onEvent: (event: CameraEvent) => void,
     onConnectionChange?: (connected: boolean) => void,
   ): () => void {
-    const token = localStorage.getItem("access_token") || "";
-    const es = new EventSource(`${API_BASE_URL}/api/access/events?token=${encodeURIComponent(token)}`);
+    const es = new EventSource(`${API_BASE_URL}/api/access/events`, { withCredentials: true });
     es.addEventListener("open", () => onConnectionChange?.(true));
     es.addEventListener("camera_event", (msg: MessageEvent) => {
       try {
