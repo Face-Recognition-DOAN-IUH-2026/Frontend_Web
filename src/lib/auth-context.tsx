@@ -106,6 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("refresh_token", refreshToken);
     }
 
+    document.cookie = `access_token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+
     // Decode JWT to get user id and role if not provided
     const payload = decodeJwtPayload(accessToken);
     const userId = (payload?.sub as string) || "";
@@ -125,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
+    document.cookie = "access_token=; path=/; max-age=0";
     setUser(null);
     setAccessToken(null);
     router.push("/login");

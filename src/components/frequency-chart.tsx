@@ -1,6 +1,7 @@
 "use client";
 
-import { BarChart3 } from "lucide-react";
+import { Box, CircularProgress, Paper, Typography } from "@mui/material";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
@@ -8,13 +9,18 @@ import type { AccessFrequencyDay } from "@/lib/types";
 
 export default function FrequencyChart({ data, loading }: { data: AccessFrequencyDay[]; loading: boolean }) {
   return (
-    <div className="bg-surface rounded-lg border border-border p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <BarChart3 className="w-5 h-5 text-text-3" />
-        <h2 className="text-heading-md text-text">Thống kê tần suất ra vào</h2>
-      </div>
+    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+        <BarChartIcon sx={{ fontSize: 20, color: "text.secondary" }} />
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+          Thống kê tần suất ra vào
+        </Typography>
+      </Box>
       {loading ? (
-        <p className="text-text-3 text-body-sm">Đang tải...</p>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 2 }}>
+          <CircularProgress size={16} />
+          <Typography variant="body2" color="text.secondary">Đang tải...</Typography>
+        </Box>
       ) : (
         <ResponsiveContainer width="100%" height={250}>
           <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
@@ -44,6 +50,6 @@ export default function FrequencyChart({ data, loading }: { data: AccessFrequenc
           </BarChart>
         </ResponsiveContainer>
       )}
-    </div>
+    </Paper>
   );
 }

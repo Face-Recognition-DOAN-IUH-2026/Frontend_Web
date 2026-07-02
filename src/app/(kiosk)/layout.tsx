@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "@/lib/auth-context";
 
 export default function KioskLayout({
@@ -26,12 +27,22 @@ export default function KioskLayout({
 
   if (!mounted || isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
-          <p className="text-body-sm text-slate-400">Đang tải...</p>
-        </div>
-      </div>
+      <Box
+        sx={{
+          minHeight: "100vh",
+          bgcolor: "grey.900",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <CircularProgress size={40} sx={{ color: "primary.light" }} />
+          <Typography variant="body2" color="grey.400">
+            Đang tải...
+          </Typography>
+        </Box>
+      </Box>
     );
   }
 

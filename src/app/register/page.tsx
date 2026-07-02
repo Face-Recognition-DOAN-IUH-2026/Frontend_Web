@@ -99,8 +99,6 @@ export default function RegisterPage() {
         date_of_birth: dateOfBirth || undefined,
         faculty: faculty || undefined,
       });
-      localStorage.setItem("access_token", res.access_token);
-      if (res.refresh_token) localStorage.setItem("refresh_token", res.refresh_token);
       setRegistrationTokens({ access_token: res.access_token, refresh_token: res.refresh_token });
       setRegistering(false);
       setActiveStep(3);
@@ -116,12 +114,13 @@ export default function RegisterPage() {
     setFaceLoading(true);
     setFaceResult(null);
     try {
-      const data = await api.enrollBatch(files, consent);
+      const token = registrationTokens?.access_token;
+      const data = await api.enrollBatch(files, consent, token);
       setPhase("face-enrolling");
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = setInterval(async () => {
         try {
-          const statusData = await api.getTaskStatus(data.job_id);
+          const statusData = await api.getTaskStatus(data.job_id, token);
           if (statusData.status === "SUCCESS") {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
             if (statusData.result?.status === "error") {

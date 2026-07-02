@@ -551,7 +551,7 @@ export default function PatronsPage() {
                       <TextField label="Số điện thoại" value={createForm.phone || ""} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
                       <TextField label="Hộ khẩu thường trú" value={createForm.permanent_address || ""} onChange={(e) => setCreateForm({ ...createForm, permanent_address: e.target.value })} fullWidth multiline rows={2} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
                       
-                      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+                      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
                         <TextField label="Ngày cấp thẻ" type="date" value={createForm.issue_date} onChange={(e) => setCreateForm({ ...createForm, issue_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} helperText={createForm.course ? "Tự động tính theo khóa" : ""} />
                         <TextField label="Hạn thẻ" type="date" value={createForm.membership_expiry} onChange={(e) => setCreateForm({ ...createForm, membership_expiry: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} helperText={createForm.course ? "Tự động tính theo khóa" : ""} />
                       </Box>

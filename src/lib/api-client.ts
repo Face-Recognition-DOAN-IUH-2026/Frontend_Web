@@ -318,8 +318,9 @@ class ApiClient {
   }
 
   // === Tasks ===
-  async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
-    const response = await this.client.get<TaskStatusResponse>(`/api/tasks/${taskId}`);
+  async getTaskStatus(taskId: string, token?: string): Promise<TaskStatusResponse> {
+    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;
+    const response = await this.client.get<TaskStatusResponse>(`/api/tasks/${taskId}`, config);
     return response.data;
   }
 
@@ -364,7 +365,8 @@ class ApiClient {
 
   async enrollBatch(
     files: { frontal: File; right: File; left: File; down: File },
-    consentGiven: boolean = true
+    consentGiven: boolean = true,
+    token?: string
   ): Promise<{ job_id: string }> {
     const formData = new FormData();
     formData.append("frontal", files.frontal);
@@ -373,7 +375,8 @@ class ApiClient {
     formData.append("down", files.down);
     formData.append("consent_given", String(consentGiven));
 
-    const response = await this.client.post("/api/face/enroll-batch", formData);
+    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;
+    const response = await this.client.post("/api/face/enroll-batch", formData, config);
     return response.data;
   }
 
@@ -1135,6 +1138,22 @@ class ApiClient {
 
   async askAiCommandCenter(question: string): Promise<AiChatResponse> {
     const response = await this.client.post<AiChatResponse>("/api/ai/command-center/chat", { question });
+    return response.data;
+  }
+
+  async askAiChat(message: string, sessionId?: string): Promise<{ response: string; sessionId?: string; toolResults?: any[]; userRole?: string }> {
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+    const userData = storedUser ? JSON.parse(storedUser) : null;
+    const role = userData?.role || 'staff';
+
+    const endpoint = role === 'patron' ? '/api/ai/patrons/chat'
+                   : role === 'staff' ? '/api/ai/staff/chat'
+                   : '/api/ai/admin/chat';
+
+    const body: Record<string, any> = { message };
+    if (sessionId) body.sessionId = sessionId;
+
+    const response = await this.client.post(endpoint, body);
     return response.data;
   }
 

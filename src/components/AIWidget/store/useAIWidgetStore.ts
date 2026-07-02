@@ -26,6 +26,7 @@ interface AIWidgetStore {
   lastSummary: CommandCenterSummary | null;
   messages: ChatMessage[];
   isLoadingChat: boolean;
+  chatSessionId?: string;
 
   open: () => void;
   close: () => void;
@@ -46,6 +47,7 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
       lastSummary: null,
       messages: [],
       isLoadingChat: false,
+      chatSessionId: undefined,
 
       open: () => set({ isOpen: true }),
       close: () => set({ isOpen: false }),
@@ -70,18 +72,20 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
         }));
 
         try {
-          const data = await api.askAiCommandCenter(message);
+          const { chatSessionId } = get();
+          const data = await api.askAiChat(message, chatSessionId);
 
           const assistantMessage: ChatMessage = {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
-            content: data.answer || 'Xin lỗi, tôi không thể trả lời lúc này.',
+            content: data.response || 'Xin lỗi, tôi không thể trả lời lúc này.',
             timestamp: Date.now(),
           };
 
           set((state) => ({
             messages: [...state.messages, assistantMessage],
             isLoadingChat: false,
+            chatSessionId: data.sessionId || state.chatSessionId,
           }));
         } catch {
           const errorMessage: ChatMessage = {
@@ -98,7 +102,7 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
         }
       },
 
-      clearMessages: () => set({ messages: [] }),
+      clearMessages: () => set({ messages: [], chatSessionId: undefined }),
     }),
     {
       name: 'ai-widget-storage',

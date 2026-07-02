@@ -1,5 +1,9 @@
 'use client';
 
+import { Box, CircularProgress, Typography } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import CancelIcon from '@mui/icons-material/Cancel';
 import PulseAnimation from './PulseAnimation';
 
 interface ResultCardProps {
@@ -12,81 +16,98 @@ interface ResultCardProps {
   message?: string;
 }
 
-export default function ResultCard({ status, patronInfo, message }: ResultCardProps) {
-  type PulseColor = 'emerald' | 'red' | 'blue' | 'none';
-  const config: Record<string, {
-    borderColor: string;
-    bgColor: string;
-    pulseColor: PulseColor;
-    icon: React.ReactNode;
-  }> = {
-    success: {
-      borderColor: 'border-emerald-500',
-      bgColor: 'bg-emerald-500/10',
-      pulseColor: 'emerald',
-      icon: (
-        <svg className="w-16 h-16 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    error: {
-      borderColor: 'border-red-500',
-      bgColor: 'bg-red-500/10',
-      pulseColor: 'red',
-      icon: (
-        <svg className="w-16 h-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    unregistered: {
-      borderColor: 'border-blue-500',
-      bgColor: 'bg-blue-500/10',
-      pulseColor: 'blue',
-      icon: (
-        <svg className="w-16 h-16 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-        </svg>
-      ),
-    },
-    processing: {
-      borderColor: 'border-slate-500',
-      bgColor: 'bg-slate-500/10',
-      pulseColor: 'none',
-      icon: (
-        <div className="w-16 h-16 border-4 border-slate-500 border-t-transparent rounded-full animate-spin" />
-      ),
-    },
-  };
+type PulseColor = 'emerald' | 'red' | 'blue' | 'none';
 
-  const { borderColor, bgColor, pulseColor, icon } = config[status];
+const statusConfig: Record<string, {
+  borderColor: string;
+  bgColor: string;
+  pulseColor: PulseColor;
+  iconColor: string;
+  icon: React.ReactNode;
+}> = {
+  success: {
+    borderColor: 'success.main',
+    bgColor: 'rgba(16,185,129,0.1)',
+    pulseColor: 'emerald',
+    iconColor: 'success.main',
+    icon: <CheckCircleIcon sx={{ fontSize: 64 }} />,
+  },
+  error: {
+    borderColor: 'error.main',
+    bgColor: 'rgba(239,68,68,0.1)',
+    pulseColor: 'red',
+    iconColor: 'error.main',
+    icon: <ErrorIcon sx={{ fontSize: 64 }} />,
+  },
+  unregistered: {
+    borderColor: 'primary.main',
+    bgColor: 'rgba(59,130,246,0.1)',
+    pulseColor: 'blue',
+    iconColor: 'primary.main',
+    icon: <CancelIcon sx={{ fontSize: 64 }} />,
+  },
+  processing: {
+    borderColor: 'grey.500',
+    bgColor: 'rgba(107,114,128,0.1)',
+    pulseColor: 'none',
+    iconColor: 'grey.500',
+    icon: <CircularProgress size={64} sx={{ color: 'grey.500' }} />,
+  },
+};
+
+const messageColors: Record<string, string> = {
+  success: 'success.light',
+  error: 'error.light',
+  unregistered: 'primary.light',
+  processing: 'text.secondary',
+};
+
+export default function ResultCard({ status, patronInfo, message }: ResultCardProps) {
+  const config = statusConfig[status];
 
   return (
-    <div className={`relative border-2 ${borderColor} ${bgColor} rounded-2xl p-8 text-center`}>
-      {pulseColor !== 'none' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <PulseAnimation color={pulseColor} />
-        </div>
+    <Box
+      sx={{
+        position: 'relative',
+        border: 2,
+        borderColor: config.borderColor,
+        bgcolor: config.bgColor,
+        borderRadius: 4,
+        p: 4,
+        textAlign: 'center',
+      }}
+    >
+      {config.pulseColor !== 'none' && (
+        <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <PulseAnimation color={config.pulseColor} />
+        </Box>
       )}
 
-      <div className="relative z-10">
-        <div className="flex justify-center mb-4">{icon}</div>
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2, color: config.iconColor }}>
+          {config.icon}
+        </Box>
 
         {patronInfo && (
-          <div className="space-y-2 mb-4">
-            <h3 className="text-2xl font-bold text-white">{patronInfo.fullName}</h3>
-            <p className="text-blue-400 font-mono text-lg">{patronInfo.mssv}</p>
-            <p className="text-slate-400">{patronInfo.faculty}</p>
-          </div>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h4" color="common.white" sx={{ fontWeight: 700 }}>
+              {patronInfo.fullName}
+            </Typography>
+            <Typography variant="h6" color="primary.light" sx={{ fontFamily: "monospace" }}>
+              {patronInfo.mssv}
+            </Typography>
+            <Typography variant="body1" color="grey.400">
+              {patronInfo.faculty}
+            </Typography>
+          </Box>
         )}
 
         {message && (
-          <p className={`text-lg ${status === 'success' ? 'text-emerald-400' : status === 'error' ? 'text-red-400' : 'text-blue-400'}`}>
+          <Typography variant="h6" color={messageColors[status]}>
             {message}
-          </p>
+          </Typography>
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

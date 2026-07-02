@@ -1,6 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import api from "@/lib/api-client";
 import type { ScheduleStaff, StaffShift, LibraryZone, StaffScheduleAssignment } from "@/lib/types";
 
@@ -35,11 +51,8 @@ export default function AssignStaffDialog({
   const [staffId, setStaffId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [forceSave, setForceSave] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
-
-
 
   const shift = useMemo(() => shifts.find((s) => s.id === shiftId), [shifts, shiftId]);
 
@@ -116,113 +129,102 @@ export default function AssignStaffDialog({
       const existStart = existShift?.startTime?.slice(0, 5);
       const existEnd = existShift?.endTime?.slice(0, 5);
       const isOverlap = newStart && newEnd && existStart && existEnd && (newStart < existEnd && newEnd > existStart);
-      
+
       if (isOverlap) {
-        return `${s.fullName || s.email} (⚠️ Trùng ca: ${existShift?.name || existAsg.shiftId})`;
+        return `${s.fullName || s.email} (⚠ Trùng ca: ${existShift?.name || existAsg.shiftId})`;
       }
       return `${s.fullName || s.email} (Đã có ca: ${existShift?.name || existAsg.shiftId})`;
     }
     return s.fullName || s.email;
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-surface rounded-xl shadow-xl border border-border w-80 p-5 space-y-4 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-text">Phân ca trực</h3>
-          <button onClick={onClose} className="text-text-3 hover:text-text transition text-sm">&times;</button>
-        </div>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1 }}>
+        Phân ca trực
+      </DialogTitle>
+      <DialogContent sx={{ pt: 0 }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Ngày: {date}
+            </Typography>
+            <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, ml: 1 }}>
+              Ca: {shiftName}
+            </Typography>
+            {shift && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                {shift.startTime?.slice(0, 5)} &ndash; {shift.endTime?.slice(0, 5)}
+              </Typography>
+            )}
+          </Box>
 
-        <div className="text-xs text-text-3 space-y-0.5">
-          <div><span className="font-medium text-text-2">Ngày:</span> {date}</div>
-          <div><span className="font-medium text-text-2">Ca:</span> <span className="text-primary">{shiftName}</span></div>
-          {shift && (
-            <div className="text-text-3">{shift.startTime?.slice(0, 5)} &ndash; {shift.endTime?.slice(0, 5)}</div>
-          )}
-        </div>
+          <TextField
+            select
+            size="small"
+            label="Khu vực"
+            value={zoneId}
+            onChange={(e) => { setZoneId(e.target.value); setError(null); }}
+            fullWidth
+          >
+            <MenuItem value="">Chọn khu vực</MenuItem>
+            {zones.map((z) => (
+              <MenuItem key={z.id} value={z.id}>{z.zoneName}</MenuItem>
+            ))}
+          </TextField>
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-[11px] font-medium text-text-3 block mb-1">Khu vực</label>
-            <select
-              value={zoneId}
-              onChange={(e) => { setZoneId(e.target.value); setError(null); }}
-              className="w-full px-2.5 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-            >
-              <option value="">Chọn khu vực</option>
-              {zones.map((z) => (
-                <option key={z.id} value={z.id}>{z.zoneName}</option>
-              ))}
-            </select>
-          </div>
+          <TextField
+            select
+            size="small"
+            label={
+              <span>
+                Nhân viên
+                {availableStaff.length < staff.length && (
+                  <span style={{ fontWeight: 400, color: "#999", marginLeft: 4 }}>
+                    ({staff.length - availableStaff.length} đã xếp)
+                  </span>
+                )}
+              </span>
+            }
+            value={staffId}
+            onChange={(e) => { setStaffId(e.target.value); setError(null); }}
+            fullWidth
+          >
+            <MenuItem value="">Chọn nhân viên</MenuItem>
+            {availableStaff.map((s) => (
+              <MenuItem key={s.id} value={s.id}>{getStaffLabel(s)}</MenuItem>
+            ))}
+            {availableStaff.length === 0 && (
+              <MenuItem disabled>Tất cả nhân viên đã được xếp</MenuItem>
+            )}
+          </TextField>
 
-          <div>
-            <label className="text-[11px] font-medium text-text-3 block mb-1">
-              Nhân viên
-              {availableStaff.length < staff.length && (
-                <span className="text-text-3 font-normal ml-1">({staff.length - availableStaff.length} đã xếp)</span>
-              )}
-            </label>
-            <select
-              value={staffId}
-              onChange={(e) => { setStaffId(e.target.value); setError(null); }}
-              className="w-full px-2.5 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-            >
-              <option value="">Chọn nhân viên</option>
-              {availableStaff.map((s) => (
-                <option key={s.id} value={s.id}>{getStaffLabel(s)}</option>
-              ))}
-              {availableStaff.length === 0 && (
-                <option disabled>Tất cả nhân viên đã được xếp</option>
-              )}
-            </select>
-          </div>
-        </div>
+          {error && <Alert severity="error">{error}</Alert>}
 
-        {error && (
-          <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-2.5 py-1.5">
-            {error}
-          </div>
-        )}
-
-        {warnings.length > 0 && (
-          <div className="space-y-2">
-            <div className="text-xs text-amber-600 bg-amber-500/10 border border-amber-400/20 rounded-md px-2.5 py-1.5 space-y-1">
-              {warnings.map((w, i) => (
-                <div key={i}>⚠ {w}</div>
-              ))}
-            </div>
-            <label className="flex items-center gap-2 text-xs text-text-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={forceSave}
-                onChange={(e) => setForceSave(e.target.checked)}
-                className="accent-primary w-3.5 h-3.5"
+          {warnings.length > 0 && (
+            <Box>
+              <Alert severity="warning" sx={{ mb: 1 }}>
+                {warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+              </Alert>
+              <FormControlLabel
+                control={<Checkbox checked={forceSave} onChange={(e) => setForceSave(e.target.checked)} size="small" />}
+                label="Vẫn xếp ca bất chấp cảnh báo"
               />
-              Vẫn xếp ca bất chấp cảnh báo
-            </label>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 justify-end pt-1">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-md text-xs font-medium text-text-2 hover:bg-surface-2 transition border border-border"
-          >
-            Hủy
-          </button>
-          <button
-            onClick={handleAssign}
-            disabled={saving || availableStaff.length === 0}
-            className="px-3 py-1.5 rounded-md text-xs font-medium text-bg bg-primary hover:bg-primary-dark transition disabled:opacity-50"
-          >
-            {saving ? "Đang xử lý..." : "Xếp ca"}
-          </button>
-        </div>
-      </div>
-    </div>
+            </Box>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} variant="outlined" size="small">Hủy</Button>
+        <Button
+          onClick={handleAssign}
+          variant="contained"
+          size="small"
+          disabled={saving || availableStaff.length === 0}
+        >
+          {saving ? <CircularProgress size={14} color="inherit" /> : "Xếp ca"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

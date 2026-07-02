@@ -132,7 +132,7 @@ export default function LoginPage() {
       setSuccess(true);
       setIsLoading(false);
       faceFailCountRef.current = 0;
-      setTimeout(() => router.push("/dashboard"), 500);
+      setTimeout(() => { window.location.href = "/dashboard"; }, 500);
     } catch (err: any) {
       const msg = getErrorMessage(err) || "Đăng nhập thất bại.";
       setError(msg);

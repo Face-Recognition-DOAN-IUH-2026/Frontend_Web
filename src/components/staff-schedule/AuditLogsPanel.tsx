@@ -1,24 +1,33 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import api from "@/lib/api-client";
-import { Chip } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Chip,
+  CircularProgress,
+  Drawer,
+  IconButton,
+  Pagination,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import FingerprintIcon from "@mui/icons-material/Fingerprint";
-
 import TuneIcon from "@mui/icons-material/Tune";
 import EventIcon from "@mui/icons-material/Event";
 import PersonIcon from "@mui/icons-material/Person";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import TodayIcon from "@mui/icons-material/Today";
-import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
-import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import TimelineIcon from "@mui/icons-material/Timeline";
 import SearchIcon from "@mui/icons-material/Search";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import CloseIcon from "@mui/icons-material/Close";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import InputAdornment from "@mui/material/InputAdornment";
+import api from "@/lib/api-client";
 
 interface Props {
   open: boolean;
@@ -170,7 +179,6 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
     if (open && showStats) loadStats();
   }, [open, showStats, fromDate, toDate]);
 
-  // client-side category filter + date grouping
   const groupedLogs = (() => {
     const filtered = filterCategory === "all"
       ? logs
@@ -190,101 +198,115 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
 
   const totalPages = Math.ceil(total / limit);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 flex justify-end" style={{ zIndex: 9999 }}>
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-surface h-full shadow-xl border-l border-border flex flex-col animate-slide-in" style={{ width: 540 }}>
-
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border" style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" }}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(165,180,252,0.2)" }}>
+    <Drawer anchor="right" open={open} onClose={onClose} sx={{ zIndex: 9999 }}>
+      <Box sx={{ width: { xs: "100%", sm: 540 }, height: "100%", display: "flex", flexDirection: "column" }}>
+        {/* Header */}
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: "divider", background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box sx={{ width: 32, height: 32, borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "rgba(165,180,252,0.2)" }}>
               <TimelineIcon sx={{ fontSize: 18, color: "#a5b4fc" }} />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-white">Nhật ký hoạt động</h2>
-              <p className="text-[10px] text-indigo-200">{groupedLogs.reduce((s, g) => s + g.items.length, 0)} / {total} bản ghi</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "common.white" }}>Nhật ký hoạt động</Typography>
+              <Typography variant="caption" sx={{ color: "#c7d2fe" }}>
+                {groupedLogs.reduce((s, g) => s + g.items.length, 0)} / {total} bản ghi
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <IconButton
+              size="small"
               onClick={() => setShowStats(!showStats)}
-              className="p-1.5 rounded-lg transition"
-              style={{ background: showStats ? "rgba(165,180,252,0.3)" : "transparent", color: "#a5b4fc" }}
+              sx={{ color: "#a5b4fc", bgcolor: showStats ? "rgba(165,180,252,0.3)" : "transparent" }}
             >
               <BarChartIcon sx={{ fontSize: 18 }} />
-            </button>
-            <button onClick={onClose} className="text-indigo-200 hover:text-white transition text-lg leading-none">&times;</button>
-          </div>
-        </div>
+            </IconButton>
+            <IconButton size="small" onClick={onClose} sx={{ color: "#c7d2fe" }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </Box>
 
-        {/* ── Stats Summary ── */}
+        {/* Stats Summary */}
         {showStats && (
-          <div className="px-4 py-3 border-b border-border" style={{ background: "rgba(99,102,241,0.05)" }}>
+          <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: "divider", bgcolor: "rgba(99,102,241,0.05)" }}>
             {statsLoading ? (
-              <div className="flex items-center justify-center py-2">
-                <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-              </div>
+              <Box sx={{ display: "flex", justifyContent: "center", py: 1 }}>
+                <CircularProgress size={16} />
+              </Box>
             ) : stats ? (
-              <div className="space-y-2">
-                <div className="flex gap-3">
-                  <div className="flex-1 text-center p-2 rounded-lg bg-white/5">
-                    <div className="text-lg font-bold text-indigo-300">{stats.totalToday}</div>
-                    <div className="text-[10px] text-text-3">Hôm nay</div>
-                  </div>
-                  <div className="flex-1 text-center p-2 rounded-lg bg-white/5">
-                    <div className="text-lg font-bold text-indigo-300">{stats.totalThisWeek}</div>
-                    <div className="text-[10px] text-text-3">Tuần này</div>
-                  </div>
-                </div>
+              <Stack spacing={1}>
+                <Stack direction="row" spacing={2}>
+                  <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.05)" }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: "#a5b4fc" }}>{stats.totalToday}</Typography>
+                    <Typography variant="caption" color="text.secondary">Hôm nay</Typography>
+                  </Box>
+                  <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.05)" }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: "#a5b4fc" }}>{stats.totalThisWeek}</Typography>
+                    <Typography variant="caption" color="text.secondary">Tuần này</Typography>
+                  </Box>
+                </Stack>
                 {stats.topActions?.length > 0 && (
-                  <div>
-                    <div className="text-[10px] text-text-3 mb-1 flex items-center gap-1"><TrendingUpIcon sx={{ fontSize: 11 }} /> Top hành động</div>
-                    <div className="flex flex-wrap gap-1">
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5 }}>
+                      <TrendingUpIcon sx={{ fontSize: 11 }} /> Top hành động
+                    </Typography>
+                    <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap" }} useFlexGap>
                       {stats.topActions.slice(0, 5).map((a: any) => (
-                        <span key={a.action} className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-2">
-                          {ACTION_CONFIG[a.action]?.label || a.action} ({a.count})
-                        </span>
+                        <Chip key={a.action} label={`${ACTION_CONFIG[a.action]?.label || a.action} (${a.count})`} size="small" sx={{ height: 22, fontSize: 10, bgcolor: "rgba(255,255,255,0.05)" }} />
                       ))}
-                    </div>
-                  </div>
+                    </Stack>
+                  </Box>
                 )}
-              </div>
+              </Stack>
             ) : null}
-          </div>
+          </Box>
         )}
 
-        {/* ── Filter Bar ── */}
-        <div className="px-4 py-2.5 border-b border-border space-y-2">
-          {/* Search */}
-          <div className="relative">
-            <SearchIcon sx={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "text.secondary" }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Tìm theo tên nhân viên, metadata..."
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-surface-2 border border-border rounded-lg text-text placeholder:text-text-3 focus:outline-none focus:border-indigo-400"
+        {/* Filter Bar */}
+        <Box sx={{ px: 3, py: 1.5, borderBottom: 1, borderColor: "divider", display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <TextField
+            size="small"
+            placeholder="Tìm theo tên nhân viên, metadata..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            fullWidth
+            slotProps={{
+              input: {
+                startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15 }} /></InputAdornment>,
+                endAdornment: search ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearch("")}>
+                      <CloseIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </InputAdornment>
+                ) : undefined,
+              },
+            }}
+            sx={{ "& .MuiInputBase-root": { fontSize: "0.8rem" } }}
+          />
+          <Stack direction="row" spacing={1}>
+            <TextField
+              size="small"
+              type="date"
+              value={fromDate}
+              onChange={(e) => { setFromDate(e.target.value); setPage(1); }}
+              sx={{ flex: 1, "& .MuiInputBase-root": { fontSize: "0.7rem" } }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
-            {search && (
-              <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-3 hover:text-text">
-                <CloseIcon sx={{ fontSize: 14 }} />
-              </button>
-            )}
-          </div>
-          {/* Date range */}
-          <div className="flex gap-2">
-            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }}
-              className="flex-1 text-[11px] px-2 py-1 bg-surface-2 border border-border rounded text-text" />
-            <span className="text-text-3 self-center text-[10px]">—</span>
-            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }}
-              className="flex-1 text-[11px] px-2 py-1 bg-surface-2 border border-border rounded text-text" />
-          </div>
-          {/* Category pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            <FilterListIcon sx={{ fontSize: 14, color: "text.secondary", mr: 0.5, flexShrink: 0 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>—</Typography>
+            <TextField
+              size="small"
+              type="date"
+              value={toDate}
+              onChange={(e) => { setToDate(e.target.value); setPage(1); }}
+              sx={{ flex: 1, "& .MuiInputBase-root": { fontSize: "0.7rem" } }}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", overflowX: "auto", "&::-webkit-scrollbar": { display: "none" } }}>
+            <FilterListIcon sx={{ fontSize: 14, color: "text.secondary", flexShrink: 0 }} />
             {CATEGORY_FILTERS.map((cat) => (
               <Chip
                 key={cat.key}
@@ -304,132 +326,107 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
                 }}
               />
             ))}
-          </div>
-        </div>
+          </Stack>
+        </Box>
 
-        {/* ── Content ── */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Content */}
+        <Box sx={{ flex: 1, overflowY: "auto" }}>
           {error && (
-            <div className="mx-4 mt-3 text-xs text-error bg-error/10 border border-error/20 rounded-lg px-3 py-2">{error}</div>
+            <Alert severity="error" sx={{ mx: 3, mt: 2 }}>{error}</Alert>
           )}
 
           {loading && (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-              <span className="ml-2 text-xs text-text-3">Đang tải...</span>
-            </div>
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 4, gap: 1 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" color="text.secondary">Đang tải...</Typography>
+            </Box>
           )}
 
           {!loading && logs.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-text-3">
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 8 }}>
               <TimelineIcon sx={{ fontSize: 32, opacity: 0.3, mb: 1 }} />
-              <p className="text-xs italic">Không có nhật ký</p>
-            </div>
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>Không có nhật ký</Typography>
+            </Box>
           )}
 
           {groupedLogs.map((group) => (
-            <div key={group.dateKey}>
-              <div className="flex items-center gap-2 px-5 py-2 sticky top-0 z-10" style={{ background: "#1e1b2e" }}>
+            <Box key={group.dateKey}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 3, py: 1, position: "sticky", top: 0, zIndex: 10, bgcolor: "#1e1b2e" }}>
                 <TodayIcon sx={{ fontSize: 13, color: "#6366f1" }} />
-                <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wide">{group.label}</span>
-                <span className="text-[10px] text-text-3 ml-auto">{group.items.length} hoạt động</span>
-              </div>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  {group.label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                  {group.items.length} hoạt động
+                </Typography>
+              </Box>
 
-              <div className="px-4">
+              <Box sx={{ px: 3 }}>
                 {group.items.map((log: any) => {
                   const config = ACTION_CONFIG[log.action] || { label: log.action, color: "#6b7280", icon: <TimelineIcon sx={{ fontSize: 14 }} />, category: "unknown" };
                   const time = log.createdAt ? new Date(log.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
                   const meta = formatMetadata(log.metadata);
 
                   return (
-                    <div key={log.id} className="flex gap-3 py-2.5 border-b border-border/30 last:border-0 group hover:bg-white/[0.02] transition-colors rounded-md px-1 -mx-1">
-                      <div className="flex flex-col items-center pt-1 flex-shrink-0">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: `${config.color}18`, color: config.color }}>
+                    <Box key={log.id} sx={{ display: "flex", gap: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider", "&:last-child": { borderBottom: 0 }, "&:hover": { bgcolor: "rgba(255,255,255,0.02)" }, borderRadius: 0.5, px: 0.5 }}>
+                      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", pt: 0.5, flexShrink: 0 }}>
+                        <Box sx={{ width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: `${config.color}18`, color: config.color }}>
                           {config.icon}
-                        </div>
-                        <div className="w-px flex-1 bg-border/50 mt-1" />
-                      </div>
+                        </Box>
+                        <Box sx={{ width: 1, flex: 1, bgcolor: "divider", mt: 0.5 }} />
+                      </Box>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold" style={{ color: config.color }}>{config.label}</span>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: config.color, fontSize: "0.8rem" }}>{config.label}</Typography>
                           {log.entityType && (
-                            <span className="text-[10px] text-text-3 bg-white/5 px-1.5 py-0.5 rounded">
-                              {ENTITY_LABELS[log.entityType] || log.entityType}
-                            </span>
+                            <Chip label={ENTITY_LABELS[log.entityType] || log.entityType} size="small" sx={{ height: 20, fontSize: 9, bgcolor: "rgba(255,255,255,0.05)" }} />
                           )}
-                        </div>
+                        </Box>
 
                         {meta.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                          <Box sx={{ mt: 0.5, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
                             {meta.map((m, i) => (
-                              <span key={i} className="text-[10px] text-text-2">
-                                <span className="text-text-3">{m.key}:</span>{" "}
-                                <span className="font-medium">{m.value}</span>
-                              </span>
+                              <Typography key={i} variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>
+                                {m.key}: <Box component="span" sx={{ fontWeight: 500, color: "text.primary" }}>{m.value}</Box>
+                              </Typography>
                             ))}
-                          </div>
+                          </Box>
                         )}
 
-                        <div className="flex items-center gap-1 mt-1">
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
                           <ScheduleIcon sx={{ fontSize: 10, color: "text.secondary" }} />
-                          <span className="text-[10px] text-text-3">{time}</span>
+                          <Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>{time}</Typography>
                           {log.actorName && (
                             <>
-                              <span className="text-[10px] text-text-3 mx-1">·</span>
+                              <Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary", mx: 0.5 }}>·</Typography>
                               <PersonIcon sx={{ fontSize: 10, color: "text.secondary" }} />
-                              <span className="text-[10px] text-text-2">{log.actorName}</span>
+                              <Typography variant="caption" sx={{ fontSize: "0.65rem" }}>{log.actorName}</Typography>
                             </>
                           )}
-                        </div>
-                      </div>
-                    </div>
+                        </Box>
+                      </Box>
+                    </Box>
                   );
                 })}
-              </div>
-            </div>
+              </Box>
+            </Box>
           ))}
-        </div>
+        </Box>
 
-        {/* ── Pagination ── */}
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-2.5 border-t border-border bg-surface">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="flex items-center gap-1 text-xs text-text-3 hover:text-indigo-400 disabled:opacity-30 transition"
-            >
-              <ArrowBackIosNewIcon sx={{ fontSize: 12 }} /> Trước
-            </button>
-            <div className="flex items-center gap-1.5">
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                let pageNum: number;
-                if (totalPages <= 5) pageNum = i + 1;
-                else if (page <= 3) pageNum = i + 1;
-                else if (page >= totalPages - 2) pageNum = totalPages - 4 + i;
-                else pageNum = page - 2 + i;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setPage(pageNum)}
-                    className="w-6 h-6 rounded-full text-[11px] font-medium transition"
-                    style={{ background: page === pageNum ? "#6366f1" : "transparent", color: page === pageNum ? "#fff" : "#9ca3af" }}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="flex items-center gap-1 text-xs text-text-3 hover:text-indigo-400 disabled:opacity-30 transition"
-            >
-              Sau <ArrowForwardIosIcon sx={{ fontSize: 12 }} />
-            </button>
-          </div>
+          <Box sx={{ px: 3, py: 1.5, borderTop: 1, borderColor: "divider", bgcolor: "background.paper", display: "flex", justifyContent: "center" }}>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_, p) => setPage(p)}
+              size="small"
+              color="primary"
+            />
+          </Box>
         )}
-      </div>
-    </div>
+      </Box>
+    </Drawer>
   );
 }

@@ -1,30 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { Library, Users, BookOpen, ScanFace, ArrowRight, Compass } from "lucide-react";
+import {
+  Box,
+  Button,
+  Container,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import LibraryIcon from "@mui/icons-material/LibraryBooks";
+import UsersIcon from "@mui/icons-material/People";
+import BookOpenIcon from "@mui/icons-material/MenuBook";
+import ScanFaceIcon from "@mui/icons-material/Face";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ExploreIcon from "@mui/icons-material/Explore";
 import { motion } from "framer-motion";
 
 const features = [
   {
-    icon: Users,
+    Icon: UsersIcon,
     title: "Quản lý độc giả",
     desc: "Đăng ký, gia hạn thẻ, tra cứu thông tin bạn đọc toàn thư viện.",
-    gradient: "from-blue-500/20 to-blue-600/10",
-    iconColor: "text-blue-400",
+    gradient: "linear-gradient(135deg, rgba(25,118,210,0.15) 0%, rgba(25,118,210,0.08) 100%)",
+    iconColor: "primary.light",
   },
   {
-    icon: BookOpen,
+    Icon: BookOpenIcon,
     title: "Mượn / Trả sách",
     desc: "Quét mã vạch, mượn trả nhanh chóng. Hệ thống theo dõi hạn trả và nhắc nhở tự động.",
-    gradient: "from-emerald-500/20 to-emerald-600/10",
-    iconColor: "text-emerald-400",
+    gradient: "linear-gradient(135deg, rgba(46,125,50,0.15) 0%, rgba(46,125,50,0.08) 100%)",
+    iconColor: "success.light",
   },
   {
-    icon: ScanFace,
+    Icon: ScanFaceIcon,
     title: "Cửa ra vào thông minh",
     desc: "Nhận diện khuôn mặt, kiểm soát ra vào, chống giả mạo và thống kê tần suất.",
-    gradient: "from-violet-500/20 to-violet-600/10",
-    iconColor: "text-violet-400",
+    gradient: "linear-gradient(135deg, rgba(103,58,183,0.15) 0%, rgba(103,58,183,0.08) 100%)",
+    iconColor: "secondary.light",
   },
 ];
 
@@ -43,85 +56,188 @@ const item = {
 
 export default function LandingOverlay() {
   return (
-    <div className="relative z-10 min-h-screen flex flex-col">
+    <Box sx={{ position: "relative", zIndex: 10, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0f172a]/70 backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-[#1A73E8] flex items-center justify-center">
-              <Library className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-base font-bold text-white font-display">Thư Viện</span>
-          </div>
-        </div>
-      </header>
+      <Box
+        component="header"
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          borderBottom: 1,
+          borderColor: "rgba(255,255,255,0.1)",
+          bgcolor: "rgba(15,23,42,0.7)",
+          backdropFilter: "blur(16px)",
+        }}
+      >
+        <Container maxWidth="lg" sx={{ py: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: 1.5,
+                bgcolor: "primary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <LibraryIcon sx={{ color: "common.white", fontSize: 22 }} />
+            </Box>
+            <Typography variant="subtitle1" color="common.white" sx={{ fontWeight: 700 }}>
+              Thư Viện
+            </Typography>
+          </Box>
+        </Container>
+      </Box>
 
       {/* Hero Section */}
-      <main className="flex-1">
+      <Box component="main" sx={{ flex: 1 }}>
         <motion.section
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="mx-auto max-w-6xl px-4 pt-24 pb-20 text-center"
         >
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1A73E8]/10 border border-[#1A73E8]/30 text-[#4DA3FF] text-xs font-medium mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#1A73E8] animate-pulse" />
-            Hệ thống quản lý thư viện thông minh
-          </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight font-display">
-            Chào mừng đến với{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1A73E8] to-[#4DA3FF]">
-              Thư Viện
-            </span>
-          </h1>
-          <p className="mt-4 text-lg text-white/50 max-w-xl mx-auto leading-relaxed">
-            Nền tảng quản lý thư viện toàn diện — quản lý độc giả, theo dõi mượn trả, và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn mặt.
-          </p>
-          <div className="mt-8 flex items-center justify-center gap-4">
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#1A73E8] text-white rounded-lg font-medium hover:bg-[#1557B0] transition-colors shadow-lg shadow-[#1A73E8]/25"
+          <Container maxWidth="lg" sx={{ pt: 15, pb: 12, textAlign: "center" }}>
+            {/* Badge */}
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.75,
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 10,
+                bgcolor: "rgba(25,118,210,0.1)",
+                border: 1,
+                borderColor: "rgba(25,118,210,0.3)",
+                color: "primary.light",
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                mb: 3,
+              }}
             >
-              Truy cập hệ thống
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/library/vr-tour"
-              className="inline-flex items-center gap-2 px-6 py-3 border border-white/20 hover:border-white/40 text-white rounded-lg font-medium hover:bg-white/5 transition-all shadow-lg"
+              <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
+              Hệ thống quản lý thư viện thông minh
+            </Box>
+
+            {/* Title */}
+            <Typography
+              variant="h2"
+              color="common.white"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "2rem", sm: "2.5rem", lg: "3rem" },
+                lineHeight: 1.2,
+                letterSpacing: -0.02,
+              }}
             >
-              <Compass className="w-4 h-4 text-blue-400" />
-              Tham quan 3D
-            </Link>
-          </div>
+              Chào mừng đến với{" "}
+              <Box
+                component="span"
+                sx={{
+                  background: "linear-gradient(90deg, #1A73E8, #4DA3FF)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                Thư Viện
+              </Box>
+            </Typography>
+
+            <Typography sx={{ mt: 2, color: "rgba(255,255,255,0.5)", maxWidth: 560, mx: "auto", lineHeight: 1.7 }}>
+              Nền tảng quản lý thư viện toàn diện — quản lý độc giả, theo dõi mượn trả, và kiểm soát cửa ra vào bằng công nghệ nhận diện khuôn mặt.
+            </Typography>
+
+            {/* CTAs */}
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ justifyContent: "center", mt: 4 }}>
+              <Button
+                component={Link}
+                href="/login"
+                variant="contained"
+                size="large"
+                endIcon={<ArrowForwardIcon />}
+                sx={{
+                  textTransform: "none",
+                  px: 4,
+                  boxShadow: "0 4px 20px rgba(26,115,232,0.35)",
+                  "&:hover": { boxShadow: "0 4px 24px rgba(26,115,232,0.5)" },
+                }}
+              >
+                Truy cập hệ thống
+              </Button>
+              <Button
+                component={Link}
+                href="/library/vr-tour"
+                variant="outlined"
+                size="large"
+                startIcon={<ExploreIcon />}
+                sx={{
+                  textTransform: "none",
+                  px: 4,
+                  color: "common.white",
+                  borderColor: "rgba(255,255,255,0.2)",
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                  "&:hover": { borderColor: "rgba(255,255,255,0.4)", bgcolor: "rgba(255,255,255,0.05)" },
+                }}
+              >
+                Tham quan 3D
+              </Button>
+            </Stack>
+          </Container>
         </motion.section>
 
         {/* Feature Cards */}
-        <motion.section
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="mx-auto max-w-6xl px-4 pb-24"
-        >
-          <div className="grid gap-6 sm:grid-cols-3">
-            {features.map((f) => {
-              const Icon = f.icon;
-              return (
-                <motion.div
-                  key={f.title}
-                  variants={item}
-                  className="group relative rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-[#1A73E8]/5 hover:-translate-y-1"
-                >
-                  <div
-                    className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${f.gradient} ${f.iconColor} group-hover:scale-110 transition-transform`}
+        <motion.section variants={container} initial="hidden" animate="show">
+          <Container maxWidth="lg" sx={{ pb: 12 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={3}>
+              {features.map((f) => (
+                <motion.div key={f.title} variants={item} style={{ flex: 1 }}>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 3,
+                      height: "100%",
+                      bgcolor: "rgba(255,255,255,0.04)",
+                      borderColor: "rgba(255,255,255,0.1)",
+                      borderRadius: 2,
+                      transition: "all 0.3s",
+                      "&:hover": {
+                        bgcolor: "rgba(255,255,255,0.08)",
+                        borderColor: "rgba(255,255,255,0.2)",
+                        boxShadow: "0 8px 32px rgba(26,115,232,0.08)",
+                        transform: "translateY(-4px)",
+                      },
+                    }}
                   >
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-base font-semibold text-white font-display">{f.title}</h3>
-                  <p className="mt-2 text-sm text-white/40 leading-relaxed">{f.desc}</p>
+                    <Box
+                      sx={{
+                        mb: 2,
+                        width: 48,
+                        height: 48,
+                        borderRadius: 2,
+                        background: f.gradient,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        "&:hover": { transform: "scale(1.1)" },
+                        transition: "transform 0.2s",
+                      }}
+                    >
+                      <f.Icon sx={{ fontSize: 26, color: f.iconColor }} />
+                    </Box>
+                    <Typography variant="subtitle1" color="common.white" sx={{ fontWeight: 600 }}>
+                      {f.title}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1, color: "rgba(255,255,255,0.4)", lineHeight: 1.6 }}>
+                      {f.desc}
+                    </Typography>
+                  </Paper>
                 </motion.div>
-              );
-            })}
-          </div>
+              ))}
+            </Stack>
+          </Container>
         </motion.section>
 
         {/* Stats Section */}
@@ -129,38 +245,58 @@ export default function LandingOverlay() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1, duration: 0.8 }}
-          className="mx-auto max-w-6xl px-4 pb-24"
         >
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { label: "Độc giả", value: "1,200+", color: "text-[#4DA3FF]" },
-              { label: "Đầu sách", value: "10,000+", color: "text-[#E6A817]" },
-              { label: "Lượt mượn", value: "25,000+", color: "text-[#10B981]" },
-              { label: "Lượt ra vào", value: "50,000+", color: "text-[#8B5CF6]" },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="text-center p-4 rounded-xl border border-white/5 bg-white/[0.02]"
-              >
-                <div className={`text-2xl sm:text-3xl font-bold font-display ${stat.color}`}>
-                  {stat.value}
-                </div>
-                <div className="text-xs text-white/30 mt-1 uppercase tracking-wider">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Container maxWidth="lg" sx={{ pb: 12 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              {[
+                { label: "Độc giả", value: "1,200+", color: "primary.light" },
+                { label: "Đầu sách", value: "10,000+", color: "warning.main" },
+                { label: "Lượt mượn", value: "25,000+", color: "success.main" },
+                { label: "Lượt ra vào", value: "50,000+", color: "secondary.light" },
+              ].map((stat) => (
+                <Paper
+                  key={stat.label}
+                  variant="outlined"
+                  sx={{
+                    flex: 1,
+                    textAlign: "center",
+                    p: 2.5,
+                    borderRadius: 2,
+                    borderColor: "rgba(255,255,255,0.06)",
+                    bgcolor: "rgba(255,255,255,0.02)",
+                  }}
+                >
+                  <Typography variant="h5" color={stat.color} sx={{ fontWeight: 700 }}>
+                    {stat.value}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1 }}>
+                    {stat.label}
+                  </Typography>
+                </Paper>
+              ))}
+            </Stack>
+          </Container>
         </motion.section>
-      </main>
+      </Box>
 
       {/* Footer */}
-      <footer className="border-t border-white/5 bg-[#0f172a]/50">
-        <div className="mx-auto max-w-6xl px-4 py-6 flex items-center justify-between text-xs text-white/20">
-          <span>© {new Date().getFullYear()} Thư Viện. All rights reserved.</span>
-          <span>Phiên bản 1.0</span>
-        </div>
-      </footer>
-    </div>
+      <Box
+        component="footer"
+        sx={{
+          borderTop: 1,
+          borderColor: "rgba(255,255,255,0.06)",
+          bgcolor: "rgba(15,23,42,0.5)",
+        }}
+      >
+        <Container maxWidth="lg" sx={{ py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.2)" }}>
+            © {new Date().getFullYear()} Thư Viện. All rights reserved.
+          </Typography>
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.2)" }}>
+            Phiên bản 1.0
+          </Typography>
+        </Container>
+      </Box>
+    </Box>
   );
 }

@@ -369,8 +369,8 @@ export default function PatronDetailPage() {
             {borrows.length === 0 ? (
               <Alert severity="info" sx={{ m: 2 }}>Độc giả này chưa mượn cuốn sách nào.</Alert>
             ) : (
-              <TableContainer>
-                <Table sx={{ minWidth: 760 }}>
+          <TableContainer sx={{ overflowX: "auto" }}>
+          <Table sx={{ minWidth: 760 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Sách</TableCell>
@@ -435,8 +435,8 @@ export default function PatronDetailPage() {
               <Alert severity="info" sx={{ m: 2 }}>Chưa có lịch sử ra/vào.</Alert>
             ) : (
               <>
-                <TableContainer>
-                  <Table sx={{ minWidth: 900 }}>
+        <TableContainer sx={{ overflowX: "auto" }}>
+        <Table sx={{ minWidth: 900 }}>
                     <TableHead>
                       <TableRow>
                         <TableCell>Thời gian</TableCell>
