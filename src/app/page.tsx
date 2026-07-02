@@ -1,10 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import LandingOverlay from "@/components/landing/LandingOverlay";
+import LandingOverlay from "@/app/_components/landing/LandingOverlay";
 
 const Landing3DScene = dynamic(
-  () => import("@/components/landing/Landing3DScene"),
+  () => import("@/app/_components/landing/Landing3DScene"),
   { ssr: false }
 );
 

@@ -40,12 +40,12 @@ import SupervisorAccountOutlinedIcon from "@mui/icons-material/SupervisorAccount
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
-import EmptyState from "@/components/ui/EmptyState";
-import SearchField from "@/components/ui/SearchField";
-import PageHeader from "@/components/ui/PageHeader";
-import MuiStatCard from "@/components/ui/MuiStatCard";
-import DashboardCard from "@/components/ui/DashboardCard";
-import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";

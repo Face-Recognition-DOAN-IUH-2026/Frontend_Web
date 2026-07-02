@@ -5,13 +5,13 @@ import { Box, Alert, Button, Checkbox, LinearProgress, Stack, Typography } from 
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import CameraCapture from "@/components/camera-capture";
-import JobPoll from "@/components/job-poll";
+import CameraCapture from "@/app/(dashboard)/_components/camera-capture";
+import JobPoll from "@/app/(dashboard)/_components/job-poll";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { LivenessBreakdown } from "@/lib/types";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 const breakdownLabels: Record<keyof LivenessBreakdown, string> = {

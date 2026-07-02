@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Box, useTheme } from "@mui/material";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import ClockIcon from "@mui/icons-material/ScheduleOutlined";
 import type { AccessLogPublic } from "@/lib/types";
 

@@ -4,8 +4,8 @@ import { Avatar, Box, Stack, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import CameraIcon from "@mui/icons-material/PhotoCameraOutlined";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import type { CameraStatus } from "@/lib/types";
 
 interface CameraStatusGridProps {

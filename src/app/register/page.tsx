@@ -9,8 +9,8 @@ import {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import api, { getErrorMessage } from "@/lib/api-client";
-import StudentCardScanner, { type ScannedCardData } from "@/components/StudentCardScanner";
-import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
+import StudentCardScanner, { type ScannedCardData } from "@/app/(dashboard)/_components/StudentCardScanner";
+import MultiAngleCapture, { type CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
 
 const steps = ["Quét thẻ", "Xác nhận thông tin", "Đăng ký", "Khuôn mặt"];
 

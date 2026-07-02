@@ -34,14 +34,14 @@ import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 
 import Markdown from "react-markdown";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-import api from "@/lib/api-client";
-import BookCard, { parseBookCard } from "@/components/BookCard";
+import api, { getApiAccessToken } from "@/lib/api-client";
+import BookCard, { parseBookCard } from "@/app/(dashboard)/_components/BookCard";
 import { fadeInUp } from "@/lib/animations";
 
 interface Message {
@@ -82,7 +82,7 @@ function buildApiUrl(path: string) {
 }
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem("access_token");
+  const token = getApiAccessToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;

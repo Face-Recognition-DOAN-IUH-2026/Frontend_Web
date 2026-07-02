@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import AIWidget from "@/components/AIWidget";
+import AIWidget from "@/app/(dashboard)/_components/AIWidget";
 
 const PUBLIC_PAGES = ["/library/vr-tour"];
 

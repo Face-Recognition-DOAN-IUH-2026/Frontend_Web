@@ -32,10 +32,10 @@ import AtSignIcon from "@mui/icons-material/AlternateEmailOutlined";
 import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
 import api from "@/lib/api-client";
 import type { UserPublic } from "@/lib/types";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 

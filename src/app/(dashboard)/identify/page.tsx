@@ -4,12 +4,12 @@ import { useState } from "react";
 import { Alert, Box, Button, Checkbox, Chip, LinearProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
-import CameraCapture from "@/components/camera-capture";
-import JobPoll from "@/components/job-poll";
+import CameraCapture from "@/app/(dashboard)/_components/camera-capture";
+import JobPoll from "@/app/(dashboard)/_components/job-poll";
 import api, { getErrorMessage } from "@/lib/api-client";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 export default function IdentifyPage() {

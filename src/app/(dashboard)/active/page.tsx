@@ -29,12 +29,12 @@ import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import MuiStatCard from "@/components/ui/MuiStatCard";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import EmptyState from "@/components/ui/EmptyState";
+import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import type { ActivePatron, CameraEvent } from "@/lib/types";
 
 const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);

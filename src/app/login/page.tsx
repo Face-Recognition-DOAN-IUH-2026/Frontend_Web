@@ -31,7 +31,7 @@ import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import { useAuth } from "@/lib/auth-context";
 import api, { getErrorMessage } from "@/lib/api-client";
 import dynamic from "next/dynamic";
-const LoginBackground3D = dynamic(() => import("@/components/LoginBackground3D"), { ssr: false });
+const LoginBackground3D = dynamic(() => import("@/app/login/_components/LoginBackground3D"), { ssr: false });
 
 type LoginMode = "password" | "face";
 

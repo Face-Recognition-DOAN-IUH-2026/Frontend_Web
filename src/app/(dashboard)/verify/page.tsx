@@ -10,15 +10,15 @@ import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import VideocamIcon from "@mui/icons-material/VideocamOutlined";
 import CircularProgress from "@mui/material/CircularProgress";
-import CameraCapture from "@/components/camera-capture";
-import JobPoll from "@/components/job-poll";
+import CameraCapture from "@/app/(dashboard)/_components/camera-capture";
+import JobPoll from "@/app/(dashboard)/_components/job-poll";
 import { useAuth } from "@/lib/auth-context";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { TaskResult } from "@/lib/types";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 function decodeJwt(token: string): { sub: string } | null {

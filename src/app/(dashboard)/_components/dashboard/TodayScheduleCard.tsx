@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CalendarIcon from "@mui/icons-material/CalendarMonthOutlined";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import type { StaffScheduleAssignment } from "@/lib/types";
 
 interface TodayScheduleCardProps {

@@ -218,10 +218,14 @@ describe("PatronFaceVerify Logic", () => {
 describe("Token Storage After Face Login", () => {
   beforeEach(() => {
     localStorage.clear();
+    // Clear cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=; path=/; max-age=0");
+    });
     jest.clearAllMocks();
   });
 
-  it("W8: stores access_token in localStorage after face login", async () => {
+  it("W8: does NOT store access_token in localStorage (security: uses cookie)", async () => {
     const mockFile = new File(["face"], "face.jpg", { type: "image/jpeg" });
     mockApi.faceLogin.mockResolvedValueOnce({
       access_token: "eyJhbGciOiJIUzI1NiJ9.test",
@@ -231,21 +235,19 @@ describe("Token Storage After Face Login", () => {
 
     const result = await mockApi.faceLogin(mockFile);
 
-    // Simulate what the login page does after successful face login
-    localStorage.setItem("access_token", result.access_token);
-    localStorage.setItem("refresh_token", result.refresh_token || "");
-
-    expect(localStorage.getItem("access_token")).toBe("eyJhbGciOiJIUzI1NiJ9.test");
-    expect(localStorage.getItem("refresh_token")).toBe("eyJhbGciOiJIUzI1NiJ9.refresh");
+    // Access token should NOT be in localStorage (XSS protection)
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
   });
 
   it("W8: clears tokens on logout", () => {
-    localStorage.setItem("access_token", "token-to-clear");
-    localStorage.setItem("refresh_token", "refresh-to-clear");
+    // Set cookie to simulate existing session
+    document.cookie = "access_token=token-to-clear; path=/";
+    document.cookie = "refresh_token=refresh-to-clear; path=/";
 
     // Simulate logout
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    document.cookie = "access_token=; path=/; max-age=0";
+    document.cookie = "refresh_token=; path=/; max-age=0";
 
     expect(localStorage.getItem("access_token")).toBeNull();
     expect(localStorage.getItem("refresh_token")).toBeNull();
@@ -259,6 +261,9 @@ describe("Token Storage After Face Login", () => {
 describe("Face Login Success Flow", () => {
   beforeEach(() => {
     localStorage.clear();
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=; path=/; max-age=0");
+    });
     jest.clearAllMocks();
   });
 
@@ -275,9 +280,9 @@ describe("Face Login Success Flow", () => {
     const tokenResponse = await mockApi.faceLogin(mockFile);
     expect(tokenResponse.access_token).toBe("access-abc123");
 
-    // Step 3: Store tokens (simulating what the component does)
-    localStorage.setItem("access_token", tokenResponse.access_token);
-    localStorage.setItem("refresh_token", tokenResponse.refresh_token || "");
+    // Step 3: Verify tokens NOT in localStorage (security)
+    expect(localStorage.getItem("access_token")).toBeNull();
+    expect(localStorage.getItem("refresh_token")).toBeNull();
 
     // Step 4: Call setAuthFromToken (simulating auth context update)
     mockSetAuthFromToken(
@@ -287,8 +292,7 @@ describe("Face Login Success Flow", () => {
       "admin"
     );
 
-    // Verify
-    expect(localStorage.getItem("access_token")).toBe("access-abc123");
+    // Verify setAuthFromToken was called with correct args
     expect(mockSetAuthFromToken).toHaveBeenCalledWith(
       "access-abc123",
       "refresh-xyz789",

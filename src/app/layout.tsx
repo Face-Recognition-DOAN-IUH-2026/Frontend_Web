@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth-context";
 import { MuiThemeProvider } from "@/lib/mui-theme";
-import ClientLayout from "@/components/ClientLayout";
+import ClientLayout from "@/app/_components/ClientLayout";
 import "./globals.css";
 
 export const metadata: Metadata = {
