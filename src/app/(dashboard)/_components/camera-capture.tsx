@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -13,22 +12,40 @@ import {
 import AddAPhotoOutlinedIcon from "@mui/icons-material/AddAPhotoOutlined";
 import CameraswitchOutlinedIcon from "@mui/icons-material/CameraswitchOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
-
+import CameraFallback from "@/app/_components/CameraFallback";
 
 export default function CameraCapture({
   onCapture,
+  showManualFallback,
+  manualLabel,
+  manualPlaceholder,
+  onManualSubmit,
+  onFileUpload,
 }: {
   onCapture: (file: File, dataUrl: string) => void;
+  showManualFallback?: boolean;
+  manualLabel?: string;
+  manualPlaceholder?: string;
+  onManualSubmit?: (value: string) => void;
+  onFileUpload?: (file: File) => void;
 }) {
   const [image, setImage] = useState<string | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [error, setError] = useState<string>("");
   const [cameraReady, setCameraReady] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frameCaptureRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastFrameRef = useRef<string | null>(null);
+  const hasCameraWorkedRef = useRef(false);
 
   const stopCamera = useCallback(() => {
+    if (frameCaptureRef.current) {
+      clearInterval(frameCaptureRef.current);
+      frameCaptureRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -40,6 +57,7 @@ export default function CameraCapture({
   const startCamera = useCallback(async () => {
     try {
       setError("");
+      setShowFallback(false);
       setCameraReady(false);
       stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -53,19 +71,32 @@ export default function CameraCapture({
       else if (err.name === "NotFoundError") setError("Không tìm thấy camera trên thiết bị.");
       else setError("Không thể khởi động camera.");
       setIsCameraOn(false);
+      setShowFallback(true);
     }
   }, [stopCamera]);
 
   useEffect(() => {
     if (!isCameraOn || !videoRef.current || !streamRef.current) return;
     const video = videoRef.current;
-    const onReady = () => setCameraReady(true);
+    const onReady = () => {
+      setCameraReady(true);
+      hasCameraWorkedRef.current = true;
+    };
     video.onloadedmetadata = onReady;
     video.onplaying = onReady;
-    video.onerror = () => setError("Camera gặp lỗi khi phát hình.");
+    video.onerror = () => {
+      setError("Camera gặp lỗi khi phát hình.");
+      setShowFallback(true);
+    };
     video.srcObject = streamRef.current;
-    if (video.readyState >= 2) onReady();
-    readyTimeoutRef.current = setTimeout(() => setCameraReady(true), 3000);
+    if (video.readyState >= 2) {
+      onReady();
+      hasCameraWorkedRef.current = true;
+    }
+    readyTimeoutRef.current = setTimeout(() => {
+      setCameraReady(true);
+      hasCameraWorkedRef.current = true;
+    }, 3000);
     return () => {
       if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
       video.onloadedmetadata = null;
@@ -74,6 +105,28 @@ export default function CameraCapture({
       video.srcObject = null;
     };
   }, [isCameraOn]);
+
+  useEffect(() => {
+    if (!isCameraOn || !cameraReady || !videoRef.current) return;
+    frameCaptureRef.current = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.videoWidth === 0 || !streamRef.current) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0);
+        lastFrameRef.current = canvas.toDataURL("image/jpeg", 0.3);
+      } catch {
+        lastFrameRef.current = null;
+      }
+    }, 2000);
+    return () => {
+      if (frameCaptureRef.current) clearInterval(frameCaptureRef.current);
+    };
+  }, [isCameraOn, cameraReady]);
 
   const capturePhoto = () => {
     if (!videoRef.current || !cameraReady || videoRef.current.videoWidth === 0) {
@@ -102,6 +155,7 @@ export default function CameraCapture({
   const reset = () => {
     setImage(null);
     setError("");
+    setShowFallback(false);
     stopCamera();
   };
 
@@ -123,6 +177,17 @@ export default function CameraCapture({
       >
         {image ? (
           <Box component="img" src={image} alt="Ảnh đã chụp" sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        ) : showFallback ? (
+          <CameraFallback
+            lastFrameUrl={hasCameraWorkedRef.current ? lastFrameRef.current : null}
+            onRetry={startCamera}
+            showManualInput={showManualFallback}
+            manualLabel={manualLabel}
+            manualPlaceholder={manualPlaceholder}
+            onManualSubmit={onManualSubmit}
+            showFileUpload={!!onFileUpload}
+            onFileUpload={onFileUpload}
+          />
         ) : isCameraOn ? (
           <>
             <Box component="video" ref={videoRef} autoPlay playsInline muted sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
@@ -141,28 +206,25 @@ export default function CameraCapture({
         )}
       </Paper>
 
-      {error && !isCameraOn && <Alert severity="warning">{error}</Alert>}
-
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
         {image ? (
           <Button variant="outlined" startIcon={<CameraswitchOutlinedIcon />} onClick={reset} fullWidth>
             Chụp lại
           </Button>
-        ) : !isCameraOn ? (
+        ) : showFallback || (!isCameraOn) ? (
           <Button variant="contained" startIcon={<PhotoCameraOutlinedIcon />} onClick={startCamera} fullWidth>
             Bật camera
           </Button>
-        ) : (
-          <Button variant="contained" startIcon={<AddAPhotoOutlinedIcon />} onClick={capturePhoto} disabled={!cameraReady} fullWidth>
-            Chụp ảnh
-          </Button>
-        )}
-
-        {isCameraOn && !image && (
-          <Button color="error" variant="text" onClick={stopCamera}>
-            Tắt
-          </Button>
-        )}
+        ) : isCameraOn ? (
+          <>
+            <Button variant="contained" startIcon={<AddAPhotoOutlinedIcon />} onClick={capturePhoto} disabled={!cameraReady} fullWidth>
+              Chụp ảnh
+            </Button>
+            <Button color="error" variant="text" onClick={stopCamera}>
+              Tắt
+            </Button>
+          </>
+        ) : null}
       </Stack>
     </Stack>
   );

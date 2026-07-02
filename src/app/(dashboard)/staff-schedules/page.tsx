@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Alert, Box, Button, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
@@ -37,6 +37,8 @@ import GeofenceConfigPanel from "@/app/(dashboard)/_components/staff-schedule/Ge
 import TemplateManagementPanel from "@/app/(dashboard)/_components/staff-schedule/TemplateManagementPanel";
 import DeleteWeekDialog from "@/app/(dashboard)/_components/staff-schedule/DeleteWeekDialog";
 import ManualCheckInAdmin from "@/app/(dashboard)/_components/staff-schedule/ManualCheckInAdmin";
+import UndoSnackbar from "@/app/_components/UndoSnackbar";
+import useUndo from "@/lib/hooks/useUndo";
 
 const FILTERS = [
   { value: "all", label: "Tất cả" },
@@ -87,10 +89,24 @@ export default function StaffSchedulesPage() {
     setAssignDialog({ date, shiftId, shiftName: shift?.name || "" });
   };
 
-  const handleDeleteAssignment = async (id: string) => {
-    try { await api.deleteScheduleAssignment(id); await loadData(); }
-    catch (err) { setError(getErrorMessage(err)); }
-  };
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  const { pendingDelete, countdown, markForDelete, undo } = useUndo<string>({
+    onConfirm: async (id) => {
+      setConfirmingId(id);
+      try { await api.deleteScheduleAssignment(id); await loadData(); }
+      catch (err) { setError(getErrorMessage(err)); }
+      finally { setConfirmingId(null); }
+    },
+  });
+
+  const hiddenIds = useMemo(() => new Set([pendingDelete, confirmingId].filter(Boolean) as string[]), [pendingDelete, confirmingId]);
+  const filteredAssignmentsWithUndo = useMemo(
+    () => filteredAssignments.filter((a) => !hiddenIds.has(a.id)),
+    [filteredAssignments, hiddenIds],
+  );
+
+  const handleDeleteAssignment = (id: string) => markForDelete(id);
 
   const handleViewStaff = (_staffId: string) => {
     // placeholder for staff detail navigation
@@ -258,7 +274,7 @@ export default function StaffSchedulesPage() {
       <LoadingOverlay loading={loading} message="Đang tải lịch trực...">
         <DashboardCard noPadding>
           <TimetableGrid
-            days={days} shifts={filteredShifts} assignments={filteredAssignments}
+            days={days} shifts={filteredShifts} assignments={filteredAssignmentsWithUndo}
             filter={filter} isAdmin={isAdmin}
             onCellClick={isAdmin ? handleCellClick : undefined}
             onDeleteAssignment={isAdmin ? handleDeleteAssignment : undefined}
@@ -298,6 +314,13 @@ export default function StaffSchedulesPage() {
         weekFrom={from} weekTo={to}
         affectedCount={assignments.filter(a => a.status !== "cancelled" && a.workDate >= from && a.workDate <= to).length}
         onDeleted={loadData}
+      />
+
+      <UndoSnackbar
+        open={!!pendingDelete}
+        message="Đã xóa lịch trực"
+        countdown={countdown}
+        onUndo={undo}
       />
     </Stack>
   );

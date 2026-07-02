@@ -27,6 +27,17 @@ export default function IdentifyPage() {
     setMatches(null);
   };
 
+  const handleFileUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const url = e.target?.result as string;
+      setImageFile(file);
+      setDataUrl(url);
+      setMatches(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!imageFile) return;
@@ -144,7 +155,7 @@ export default function IdentifyPage() {
           <DashboardCard>
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={2.5}>
-                <CameraCapture onCapture={handleCapture} />
+                <CameraCapture onCapture={handleCapture} onFileUpload={handleFileUpload} />
        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
          <Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />
          <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, mt: { xs: -0.5, sm: 0 } }}>
