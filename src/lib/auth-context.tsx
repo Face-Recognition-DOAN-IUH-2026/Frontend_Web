@@ -9,7 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import api from "./api-client";
+import api, { setApiAccessToken, getApiAccessToken } from "./api-client";
+import ReauthOverlay from "@/app/_components/ReauthOverlay";
 import type { AuthContextType, AuthUser, LoginRequest } from "./types";
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -42,28 +43,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  function getCookieValue(name: string): string | null {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
   const loadUserFromStorage = useCallback(() => {
     if (typeof window === "undefined") return;
 
-    const storedToken = localStorage.getItem("access_token");
+    const storedToken = getCookieValue("access_token") || localStorage.getItem("access_token") || getApiAccessToken();
     const storedUser = localStorage.getItem("user");
 
-    if (storedToken && storedUser) {
+    if (storedToken) {
       try {
         const payload = decodeJwtPayload(storedToken);
         const exp = payload?.exp as number | undefined;
         const isExpired = exp ? exp * 1000 < Date.now() : false;
         if (isExpired) {
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
+          document.cookie = "access_token=; path=/; max-age=0";
+          document.cookie = "refresh_token=; path=/; max-age=0";
           localStorage.removeItem("user");
         } else {
           setAccessToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          setApiAccessToken(storedToken);
+          if (storedUser) {
+            setUser(JSON.parse(storedUser));
+          } else {
+            const payload = decodeJwtPayload(storedToken);
+            if (payload) {
+              const recovered: AuthUser = {
+                id: (payload?.sub as string) || "",
+                email: (payload?.email as string) || "",
+                role: ((payload?.roles as string[])?.[0]) || "user",
+                full_name: (payload?.full_name as string) || null,
+              };
+              localStorage.setItem("user", JSON.stringify(recovered));
+              setUser(recovered);
+            }
+          }
         }
       } catch {
-        localStorage.removeItem("access_token");
+        document.cookie = "access_token=; path=/; max-age=0";
         localStorage.removeItem("user");
+      }
+    } else {
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch {
+          localStorage.removeItem("user");
+        }
       }
     }
     setIsLoading(false);
@@ -80,8 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Backend did not return access_token");
     }
 
+    setApiAccessToken(response.access_token);
+    document.cookie = `access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
     localStorage.setItem("access_token", response.access_token);
     if (response.refresh_token) {
+      document.cookie = `refresh_token=${response.refresh_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
       localStorage.setItem("refresh_token", response.refresh_token);
     }
     setAccessToken(response.access_token);
@@ -96,19 +129,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     assertWebRole(userData.role);
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
-
-    router.push("/dashboard");
   };
 
   const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
+    setApiAccessToken(accessToken);
+    document.cookie = `access_token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
     localStorage.setItem("access_token", accessToken);
     if (refreshToken) {
+      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
       localStorage.setItem("refresh_token", refreshToken);
     }
 
-    document.cookie = `access_token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-
-    // Decode JWT to get user id and role if not provided
     const payload = decodeJwtPayload(accessToken);
     const userId = (payload?.sub as string) || "";
     const userRole = role || ((payload?.roles as string[])?.[0]) || "user";
@@ -124,10 +155,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.logout();
     } catch { /* ignore */ }
+    setApiAccessToken(null);
+    document.cookie = "access_token=; path=/; max-age=0";
+    document.cookie = "refresh_token=; path=/; max-age=0";
+    localStorage.removeItem("user");
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
-    document.cookie = "access_token=; path=/; max-age=0";
     setUser(null);
     setAccessToken(null);
     router.push("/login");
@@ -135,16 +168,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshAccessToken = async (): Promise<boolean> => {
     try {
-      const refreshToken = localStorage.getItem("refresh_token");
+      const refreshToken = getCookieValue("refresh_token");
       if (!refreshToken) return false;
 
       const { access_token, refresh_token: newRefreshToken } = await api.refreshAuthToken(refreshToken);
       if (access_token) {
-        localStorage.setItem("access_token", access_token);
+        setApiAccessToken(access_token);
+        document.cookie = `access_token=${access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
         setAccessToken(access_token);
       }
       if (newRefreshToken) {
-        localStorage.setItem("refresh_token", newRefreshToken);
+        document.cookie = `refresh_token=${newRefreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
       }
       return true;
     } catch {
@@ -166,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <ReauthOverlay />
     </AuthContext.Provider>
   );
 }

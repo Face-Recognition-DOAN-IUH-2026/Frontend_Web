@@ -36,16 +36,16 @@ import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import UpdateOutlinedIcon from "@mui/icons-material/UpdateOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import MultiAngleCapture from "@/components/MultiAngleCapture";
+import MultiAngleCapture from "@/app/(dashboard)/_components/MultiAngleCapture";
 import { slideInRight } from "@/lib/animations";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
-import type { CaptureAngle } from "@/components/MultiAngleCapture";
+import type { CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
 
 const CAMERA_LABELS: Record<string, string> = {
   entry_gate: "Cổng vào",

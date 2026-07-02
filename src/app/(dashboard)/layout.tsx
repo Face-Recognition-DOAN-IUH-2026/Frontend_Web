@@ -23,8 +23,8 @@ import UserIcon from "@mui/icons-material/PersonOutlined";
 import { useAuth } from "@/lib/auth-context";
 import { useColorMode } from "@/lib/mui-theme";
 import api from "@/lib/api-client";
-import Sidebar from "@/components/sidebar";
-import NotificationDropdown from "@/components/ui/NotificationDropdown";
+import Sidebar from "@/app/(dashboard)/_components/Sidebar";
+import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationDropdown";
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();

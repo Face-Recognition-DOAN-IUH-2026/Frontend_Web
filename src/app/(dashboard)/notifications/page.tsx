@@ -24,10 +24,10 @@ import {
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import type { Notification } from "@/lib/types";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {

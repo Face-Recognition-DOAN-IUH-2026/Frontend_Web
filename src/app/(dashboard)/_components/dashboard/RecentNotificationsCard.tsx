@@ -8,8 +8,8 @@ import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CalendarIcon from "@mui/icons-material/CalendarMonthOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlineOutlined";
 import NotificationsIcon from "@mui/icons-material/NotificationsNoneOutlined";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import type { Notification } from "@/lib/types";
 
 interface RecentNotificationsCardProps {

@@ -4,7 +4,12 @@ const config: Config = {
   darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/_components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/(dashboard)/_components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/(kiosk)/*/_components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/library/*/_components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/login/_components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/register/_components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {

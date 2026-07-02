@@ -31,7 +31,7 @@ import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import GateIcon from "@mui/icons-material/VideocamOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import CameraFeed from "@/components/gate/CameraFeed";
+import CameraFeed from "@/app/(kiosk)/gate/_components/CameraFeed";
 import { useColorMode } from "@/lib/mui-theme";
 import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import type { AccessLogPublic, CameraEvent, KioskResult, PatronLookupResult } from "@/lib/types";
@@ -112,6 +112,8 @@ export default function GatePage() {
   const [mssvInput, setMssvInput] = useState("");
   const [lookup, setLookup] = useState<PatronLookupResult | null>(null);
   const [result, setResult] = useState<KioskResult | null>(null);
+  const [approvalEventCode, setApprovalEventCode] = useState<string | null>(null);
+  const [approvalTimer, setApprovalTimer] = useState(300);
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [toasts, setToasts] = useState<GateToast[]>([]);
@@ -214,7 +216,8 @@ export default function GatePage() {
     try {
       const response = await api.kioskLookup(normalized);
       setLookup(response);
-      if (response.exists && response.has_face && !response.is_expired) {
+      if (response.exists && response.has_face && !response.is_expired && response.patron) {
+        api.kioskPresence(response.patron.id, normalized, "kiosk-1").catch(() => {});
         setStep("verify");
         setStatusText("Mở camera...");
         await startCamera();
@@ -254,11 +257,21 @@ export default function GatePage() {
         const taskResult = await pollTask(response.job_id);
         const success = taskResult?.status === "success";
         const confidence = taskResult?.score ?? taskResult?.confidence;
+        if (!success) {
+          try {
+            const approval = await api.createKioskApprovalRequest({
+              device_id: "kiosk-1",
+              patron_id: response.patron?.id || "",
+              student_code: mssv,
+            });
+            setApprovalEventCode(approval.event_code);
+          } catch {}
+        }
         setResult({
           success,
           message: success
             ? `Xác thực thành công - ${taskResult?.access_type === "exit" ? "Ra" : "Vào"} thư viện`
-            : (taskResult?.error || "Xác thực thất bại."),
+            : "Xác thực khuôn mặt không thành công.",
           patron: response.patron,
           job_id: response.job_id,
           confidence,
@@ -278,12 +291,21 @@ export default function GatePage() {
     }
   };
 
+  useEffect(() => {
+    if (!approvalEventCode) return;
+    if (approvalTimer <= 0) return;
+    const t = setInterval(() => setApprovalTimer((p) => p - 1), 1000);
+    return () => clearInterval(t);
+  }, [approvalEventCode, approvalTimer]);
+
   const reset = () => {
     setStep("idle");
     setMssv("");
     setMssvInput("");
     setLookup(null);
     setResult(null);
+    setApprovalEventCode(null);
+    setApprovalTimer(300);
     stopCamera();
   };
 
@@ -594,7 +616,7 @@ export default function GatePage() {
                 </Stack>
               )}
 
-              {step === "result" && (
+              {step === "result" && !approvalEventCode && (
                 <Stack spacing={2.5} sx={{ textAlign: "center" }}>
                   <Avatar
                     sx={{
@@ -641,6 +663,44 @@ export default function GatePage() {
                     }}
                   >
                     Thử lại
+                  </Button>
+                </Stack>
+              )}
+
+              {step === "result" && approvalEventCode && (
+                <Stack spacing={2.5} sx={{ textAlign: "center" }}>
+                  <Avatar
+                    sx={{ mx: "auto", width: 72, height: 72, bgcolor: "warning.main", color: "warning.contrastText" }}
+                  >
+                    <ErrorOutlineOutlinedIcon fontSize="large" />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 850 }}>Xác thực thất bại</Typography>
+                    <Typography color="text.secondary">Vui lòng ra quầy thủ thư để được hỗ trợ</Typography>
+                  </Box>
+                  <Paper variant="outlined" sx={{ p: 2, bgcolor: "grey.50" }}>
+                    <Typography variant="overline" color="text.secondary">Mã phiên</Typography>
+                    <Typography variant="h3" sx={{ fontWeight: 900, fontFamily: "monospace", letterSpacing: 4 }}>
+                      {approvalEventCode}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Còn {Math.floor(approvalTimer / 60)}:{(approvalTimer % 60).toString().padStart(2, "0")} trước khi hết hạn
+                    </Typography>
+                  </Paper>
+                  {result?.patron && (
+                    <Box>
+                      <Typography variant="h6">{result.patron.full_name}</Typography>
+                      <Typography color="primary.main" sx={{ fontFamily: "monospace" }}>{result.patron.student_code || result.patron.id}</Typography>
+                    </Box>
+                  )}
+                  <Button
+                    variant="contained"
+                    startIcon={<RestartAltOutlinedIcon />}
+                    onClick={reset}
+                    fullWidth
+                    sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                  >
+                    Quay lại
                   </Button>
                 </Stack>
               )}

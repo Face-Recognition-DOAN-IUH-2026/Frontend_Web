@@ -41,11 +41,11 @@ import api from "@/lib/api-client";
 import { successPop } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import MuiStatCard from "@/components/ui/MuiStatCard";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 
 const PAGE_SIZES = [20, 50, 100];
 

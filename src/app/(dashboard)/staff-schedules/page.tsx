@@ -22,21 +22,21 @@ import { usePendingCounts } from "@/hooks/usePendingCounts";
 import { useAutoSchedule } from "@/hooks/useAutoSchedule";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { StaffScheduleAssignment } from "@/lib/types";
-import PageHeader from "@/components/ui/PageHeader";
-import MuiStatCard from "@/components/ui/MuiStatCard";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import TimetableGrid from "@/components/staff-schedule/TimetableGrid";
-import TimetableLegend from "@/components/staff-schedule/TimetableLegend";
-import AssignStaffDialog from "@/components/staff-schedule/AssignStaffDialog";
-import ScheduleManagementPanel from "@/components/staff-schedule/ScheduleManagementPanel";
-import AutoScheduleDialog from "@/components/staff-schedule/AutoScheduleDialog";
-import AuditLogsPanel from "@/components/staff-schedule/AuditLogsPanel";
-import GeofenceConfigPanel from "@/components/staff-schedule/GeofenceConfigPanel";
-import TemplateManagementPanel from "@/components/staff-schedule/TemplateManagementPanel";
-import DeleteWeekDialog from "@/components/staff-schedule/DeleteWeekDialog";
-import ManualCheckInAdmin from "@/components/staff-schedule/ManualCheckInAdmin";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import TimetableGrid from "@/app/(dashboard)/_components/staff-schedule/TimetableGrid";
+import TimetableLegend from "@/app/(dashboard)/_components/staff-schedule/TimetableLegend";
+import AssignStaffDialog from "@/app/(dashboard)/_components/staff-schedule/AssignStaffDialog";
+import ScheduleManagementPanel from "@/app/(dashboard)/_components/staff-schedule/ScheduleManagementPanel";
+import AutoScheduleDialog from "@/app/(dashboard)/_components/staff-schedule/AutoScheduleDialog";
+import AuditLogsPanel from "@/app/(dashboard)/_components/staff-schedule/AuditLogsPanel";
+import GeofenceConfigPanel from "@/app/(dashboard)/_components/staff-schedule/GeofenceConfigPanel";
+import TemplateManagementPanel from "@/app/(dashboard)/_components/staff-schedule/TemplateManagementPanel";
+import DeleteWeekDialog from "@/app/(dashboard)/_components/staff-schedule/DeleteWeekDialog";
+import ManualCheckInAdmin from "@/app/(dashboard)/_components/staff-schedule/ManualCheckInAdmin";
 
 const FILTERS = [
   { value: "all", label: "Tất cả" },

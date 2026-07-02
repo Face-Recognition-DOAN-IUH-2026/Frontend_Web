@@ -35,11 +35,11 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEventsOutlined";
 import api from "@/lib/api-client";
 import { slideInRight, successPop } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import MuiStatCard from "@/components/ui/MuiStatCard";
-import EmptyState from "@/components/ui/EmptyState";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import type {
   AccessLogPublic,
   ActivePatron,

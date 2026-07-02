@@ -37,12 +37,12 @@ import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
-import Book3DViewer from "@/components/Book3DViewer";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
+import Book3DViewer from "@/app/(dashboard)/_components/Book3DViewer";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 function StatCard({ label, value, color, icon }: { label: string; value: number; color: "info" | "success" | "warning"; icon: React.ReactNode }) {

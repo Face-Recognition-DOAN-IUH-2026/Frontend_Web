@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { Box, CircularProgress, Typography } from '@mui/material';
 
-const VRViewer = dynamic(() => import('@/components/vr/VRViewer'), {
+const VRViewer = dynamic(() => import('@/app/library/vr-tour/_components/VRViewer'), {
   ssr: false,
   loading: () => (
     <Box

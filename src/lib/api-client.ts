@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
+import { bus } from "./event-bus";
 import type {
   AccessLogList,
   AccessLogPublic,
@@ -72,15 +73,19 @@ function normalizeAccessLog(log: any): AccessLogPublic {
 }
 
 function setStoredAccessToken(token: string) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("access_token", token);
+  _accessToken = token;
+  setAccessTokenCookie(token);
 }
 
 function clearStoredAuth() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("user");
+  _accessToken = null;
+  clearAccessTokenCookie();
+  if (typeof window !== "undefined") {
+    document.cookie = "refresh_token=; path=/; max-age=0";
+    localStorage.removeItem("user");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+  }
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -108,6 +113,32 @@ function isTokenExpiringSoon(token: string, skewSeconds = 30): boolean {
 }
 
 
+let _accessToken: string | null = null;
+
+export function setApiAccessToken(token: string | null) {
+  _accessToken = token;
+}
+
+export function getApiAccessToken(): string | null {
+  return _accessToken;
+}
+
+function getCookieValue(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function setAccessTokenCookie(token: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+}
+
+function clearAccessTokenCookie() {
+  if (typeof document === "undefined") return;
+  document.cookie = "access_token=; path=/; max-age=0";
+}
+
 export function getErrorMessage(err: any): string {
   if (!err) return "Unknown error";
   if (typeof err === "string") return err;
@@ -134,6 +165,8 @@ export function getErrorMessage(err: any): string {
 class ApiClient {
   client: AxiosInstance;
   private refreshPromise: Promise<boolean> | null = null;
+  private _pendingRequests: Array<{ request: any; resolve: (val: any) => void; reject: (err: any) => void }> = [];
+  private _showingReauth = false;
 
   constructor() {
     this.client = axios.create({
@@ -143,19 +176,22 @@ class ApiClient {
 
     this.client.interceptors.request.use(
       async (config) => {
-        if (typeof window !== "undefined") {
-          let token = localStorage.getItem("access_token");
-          if (token && isTokenExpiringSoon(token) && !config.url?.includes('/auth/')) {
-            if (!this.refreshPromise) {
-              this.refreshPromise = this.refreshToken();
-            }
-            const refreshed = await this.refreshPromise;
-            this.refreshPromise = null;
-            token = refreshed ? localStorage.getItem("access_token") : token;
+        let token = _accessToken;
+        if (!token && typeof document !== "undefined") {
+          token = getCookieValue("access_token");
+        }
+        if (token && isTokenExpiringSoon(token) && !config.url?.includes('/auth/')) {
+          if (!this.refreshPromise) {
+            this.refreshPromise = this.refreshToken();
           }
-          if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+          const refreshed = await this.refreshPromise;
+          this.refreshPromise = null;
+          if (refreshed) {
+            token = _accessToken || getCookieValue("access_token");
           }
+        }
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
       },
@@ -201,16 +237,40 @@ class ApiClient {
       return this.client(originalRequest);
     }
 
-    if (typeof window !== "undefined") {
-      clearStoredAuth();
-      window.location.href = "/login";
-    }
+    return new Promise((resolve, reject) => {
+      this._pendingRequests.push({ request: originalRequest, resolve, reject });
+      if (!this._showingReauth) {
+        this._showingReauth = true;
+        bus.emit("auth:required");
+      }
+    });
+  }
 
-    return Promise.reject(new Error("Session expired"));
+  public retryPendingRequests(newToken: string): void {
+    const token = newToken;
+    _accessToken = token;
+    setAccessTokenCookie(token);
+    const queue = [...this._pendingRequests];
+    this._pendingRequests = [];
+    this._showingReauth = false;
+    queue.forEach(({ request, resolve, reject }) => {
+      request.headers.Authorization = `Bearer ${token}`;
+      this.client(request).then(resolve).catch(reject);
+    });
+  }
+
+  public cancelPendingRequests(): void {
+    const queue = [...this._pendingRequests];
+    this._pendingRequests = [];
+    this._showingReauth = false;
+    queue.forEach(({ reject }) => reject(new Error("Session expired")));
   }
 
   private async refreshToken(): Promise<boolean> {
-    const refreshToken = localStorage.getItem("refresh_token");
+    let refreshToken = getCookieValue("refresh_token");
+    if (!refreshToken) {
+      refreshToken = _accessToken ? null : null;
+    }
     if (!refreshToken) return false;
 
     try {
@@ -220,9 +280,10 @@ class ApiClient {
       );
       const { access_token, refresh_token: newRefreshToken } = response.data;
       if (!access_token) return false;
-      setStoredAccessToken(access_token);
+      _accessToken = access_token;
+      setAccessTokenCookie(access_token);
       if (newRefreshToken) {
-        localStorage.setItem("refresh_token", newRefreshToken);
+        document.cookie = `refresh_token=${newRefreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
       }
       return true;
     } catch {
@@ -701,6 +762,40 @@ class ApiClient {
     formData.append("membership_expiry", membershipExpiry);
     if (className) formData.append("class_name", className);
     const response = await this.client.post<KioskResult>("/api/kiosk/batch-enroll", formData);
+    return response.data;
+  }
+
+  async kioskPresence(patronId: string, studentCode: string, deviceId: string): Promise<{ current_status: string; message: string }> {
+    const response = await this.client.post("/api/access/kiosk/presence", {
+      patron_id: patronId,
+      student_code: studentCode,
+      device_id: deviceId,
+    });
+    return response.data;
+  }
+
+  async createKioskApprovalRequest(data: { device_id: string; patron_id: string; student_code: string; fail_image_url?: string; isbns?: string }): Promise<{ event_code: string; device_auth_token: string; status: string; expires_at: string }> {
+    const response = await this.client.post("/api/access/kiosk/approval-request", data);
+    return response.data;
+  }
+
+  async getPendingApprovalRequests(): Promise<Array<{ id: string; event_code: string; kiosk_device_id: string; patron_id: string | null; patron_student_code: string | null; fail_image_url: string | null; isbns: string | null; status: string; created_at: string; expires_at: string }>> {
+    const response = await this.client.get("/api/access/kiosk/approval-requests/pending");
+    return response.data;
+  }
+
+  async getApprovalRequestStatus(code: string): Promise<{ id: string; event_code: string; status: string; created_at: string; expires_at: string; approved_by: string | null; reject_reason: string | null }> {
+    const response = await this.client.get(`/api/access/kiosk/approval-requests/${code}`);
+    return response.data;
+  }
+
+  async approveKioskRequest(code: string, approvedBy: string): Promise<{ status: string; event_code: string }> {
+    const response = await this.client.post(`/api/access/kiosk/approval-requests/${code}/approve`, { approved_by: approvedBy });
+    return response.data;
+  }
+
+  async rejectKioskRequest(code: string, approvedBy: string, reason?: string): Promise<{ status: string; event_code: string }> {
+    const response = await this.client.post(`/api/access/kiosk/approval-requests/${code}/reject`, { approved_by: approvedBy, reason });
     return response.data;
   }
 
@@ -1188,3 +1283,10 @@ class ApiClient {
 
 export const api = new ApiClient();
 export default api;
+
+export function retryPendingRequests(token: string) {
+  api.retryPendingRequests(token);
+}
+export function cancelPendingRequests() {
+  api.cancelPendingRequests();
+}

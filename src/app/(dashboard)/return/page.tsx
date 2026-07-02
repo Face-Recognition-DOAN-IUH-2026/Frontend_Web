@@ -39,12 +39,12 @@ import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { slideInRight } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import EmptyState from "@/components/ui/EmptyState";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/components/ui/NoticeSnackbar";
-import SearchField from "@/components/ui/SearchField";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
 
 const _RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL;

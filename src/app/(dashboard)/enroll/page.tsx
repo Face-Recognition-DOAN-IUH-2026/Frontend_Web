@@ -7,11 +7,11 @@ import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutli
 import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import MultiAngleCapture, { type CaptureAngle } from "@/components/MultiAngleCapture";
-import PageHeader from "@/components/ui/PageHeader";
-import DashboardCard from "@/components/ui/DashboardCard";
-import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import EmptyState from "@/components/ui/EmptyState";
+import MultiAngleCapture, { type CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 export default function EnrollPage() {

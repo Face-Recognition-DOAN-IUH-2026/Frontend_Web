@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import JobPoll from "@/components/job-poll";
+import JobPoll from "@/app/(dashboard)/_components/job-poll";
 import * as apiClient from "@/lib/api-client";
 
 jest.mock("@/lib/api-client", () => {
