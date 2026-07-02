@@ -1,3 +1,6 @@
+
+![Uploading Hệ_sinh_thái_thư_viện.png…]()
+
 # Face Recognition Platform - Frontend
 
 Next.js 15 frontend for the Face Recognition Platform.
