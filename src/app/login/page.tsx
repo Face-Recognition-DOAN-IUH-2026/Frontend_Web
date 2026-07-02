@@ -30,6 +30,7 @@ import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import { useAuth } from "@/lib/auth-context";
 import api, { getErrorMessage } from "@/lib/api-client";
+import CameraFallback from "@/app/_components/CameraFallback";
 import dynamic from "next/dynamic";
 const LoginBackground3D = dynamic(() => import("@/app/login/_components/LoginBackground3D"), { ssr: false });
 
@@ -49,6 +50,7 @@ export default function LoginPage() {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showFaceFallback, setShowFaceFallback] = useState(false);
 
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotStep, setForgotStep] = useState<1 | 2 | 3 | 4>(1);
@@ -64,8 +66,15 @@ export default function LoginPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCaptureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frameCaptureRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastFaceFrameRef = useRef<string | null>(null);
+  const hasFaceCameraWorkedRef = useRef(false);
 
   const stopCamera = useCallback(() => {
+    if (frameCaptureRef.current) {
+      clearInterval(frameCaptureRef.current);
+      frameCaptureRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -76,11 +85,13 @@ export default function LoginPage() {
 
   const resetFaceState = () => {
     setImagePreview(null);
+    setShowFaceFallback(false);
   };
 
   const startCamera = useCallback(async () => {
     try {
       setError("");
+      setShowFaceFallback(false);
       setCameraReady(false);
       stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -94,19 +105,32 @@ export default function LoginPage() {
       else if (err.name === "NotFoundError") setError("Không tìm thấy camera trên thiết bị.");
       else setError("Không thể truy cập camera.");
       setIsCameraOn(false);
+      setShowFaceFallback(true);
     }
   }, [stopCamera]);
 
   useEffect(() => {
     if (!isCameraOn || !videoRef.current || !streamRef.current) return;
     const video = videoRef.current;
-    const onReady = () => setCameraReady(true);
+    const onReady = () => {
+      setCameraReady(true);
+      hasFaceCameraWorkedRef.current = true;
+    };
     video.onloadedmetadata = onReady;
     video.onplaying = onReady;
-    video.onerror = () => setError("Camera gặp lỗi.");
+    video.onerror = () => {
+      setError("Camera gặp lỗi.");
+      setShowFaceFallback(true);
+    };
     video.srcObject = streamRef.current;
-    if (video.readyState >= 2) onReady();
-    readyTimeoutRef.current = setTimeout(() => setCameraReady(true), 3000);
+    if (video.readyState >= 2) {
+      onReady();
+      hasFaceCameraWorkedRef.current = true;
+    }
+    readyTimeoutRef.current = setTimeout(() => {
+      setCameraReady(true);
+      hasFaceCameraWorkedRef.current = true;
+    }, 3000);
     return () => {
       if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
       if (autoCaptureTimeoutRef.current) clearTimeout(autoCaptureTimeoutRef.current);
@@ -116,6 +140,28 @@ export default function LoginPage() {
       video.srcObject = null;
     };
   }, [isCameraOn]);
+
+  useEffect(() => {
+    if (!isCameraOn || !cameraReady || !videoRef.current) return;
+    frameCaptureRef.current = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.videoWidth === 0 || !streamRef.current) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0);
+        lastFaceFrameRef.current = canvas.toDataURL("image/jpeg", 0.3);
+      } catch {
+        lastFaceFrameRef.current = null;
+      }
+    }, 2000);
+    return () => {
+      if (frameCaptureRef.current) clearInterval(frameCaptureRef.current);
+    };
+  }, [isCameraOn, cameraReady]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
@@ -203,6 +249,7 @@ export default function LoginPage() {
     if (!value) return;
     setMode(value);
     setError("");
+    setShowFaceFallback(false);
     resetFaceState();
     faceFailCountRef.current = 0;
     if (value === "password") stopCamera();
@@ -368,6 +415,16 @@ export default function LoginPage() {
               >
                 {imagePreview ? (
                   <Box component="img" src={imagePreview} alt="Ảnh khuôn mặt" sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                ) : showFaceFallback ? (
+                  <CameraFallback
+                    lastFrameUrl={hasFaceCameraWorkedRef.current ? lastFaceFrameRef.current : null}
+                    onRetry={startCamera}
+                    showManualInput
+                    manualLabel="Email"
+                    manualPlaceholder="Nhập email để đăng nhập..."
+                    onManualSubmit={(value) => { setEmail(value); setMode("password"); }}
+                    showFileUpload={false}
+                  />
                 ) : isCameraOn ? (
                   <>
                     <Box component="video" ref={videoRef} autoPlay playsInline muted sx={{ width: "100%", height: "100%", objectFit: "contain" }} />

@@ -246,6 +246,11 @@ export default function VerifyPage() {
     setResult(null);
   };
 
+  const handleFileUpload = (file: File) => {
+    setImageFile(file);
+    setResult(null);
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!imageFile || !targetUserId) return;
@@ -328,7 +333,7 @@ export default function VerifyPage() {
           <DashboardCard>
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={2.5}>
-                <CameraCapture onCapture={handleCapture} />
+                <CameraCapture onCapture={handleCapture} onFileUpload={handleFileUpload} />
                 <TextField
                   label="User ID"
                   value={targetUserId}

@@ -86,6 +86,12 @@ export default function LivenessPage() {
     setError("");
   };
 
+  const handleFileUpload = (file: File) => {
+    setImageFile(file);
+    setResult(null);
+    setError("");
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!imageFile) return;
@@ -149,7 +155,7 @@ export default function LivenessPage() {
           <DashboardCard>
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={2.5}>
-                <CameraCapture onCapture={handleCapture} />
+                <CameraCapture onCapture={handleCapture} onFileUpload={handleFileUpload} />
        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
          <Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />
          <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, mt: { xs: -0.5, sm: 0 } }}>

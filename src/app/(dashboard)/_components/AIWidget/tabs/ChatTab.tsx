@@ -6,6 +6,8 @@ import SendIcon from "@mui/icons-material/SendOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
 import { useAIWidgetStore, ChatMessage } from "../store/useAIWidgetStore";
+import { parseBookCard, type BookCardData } from "../../BookCard";
+import BookLocationCard from "../cards/BookLocationCard";
 
 export default function ChatTab() {
   const theme = useTheme();
@@ -111,9 +113,36 @@ export default function ChatTab() {
   );
 }
 
+type Segment =
+  | { type: "text"; content: string }
+  | { type: "book_card"; bookData: BookCardData; shelfLocation?: string };
+
 function MessageBubble({ message }: { message: ChatMessage }) {
   const theme = useTheme();
   const isUser = message.role === "user";
+
+  const segments: Segment[] = isUser
+    ? [{ type: "text", content: message.content }]
+    : (() => {
+        const result: Segment[] = [];
+        let remaining = message.content;
+        while (remaining) {
+          const parsed = parseBookCard(remaining);
+          if (parsed.before) {
+            result.push({ type: "text", content: parsed.before });
+          }
+          if (parsed.bookData) {
+            result.push({
+              type: "book_card",
+              bookData: parsed.bookData,
+              shelfLocation: (parsed.bookData as any).shelf_location,
+            });
+          }
+          remaining = parsed.after;
+          if (!parsed.bookData) break;
+        }
+        return result.length > 0 ? result : [{ type: "text", content: message.content }];
+      })();
 
   return (
     <Box
@@ -129,28 +158,39 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           <SmartToyIcon sx={{ fontSize: 16 }} />
         </Avatar>
       )}
-      <Paper
-        sx={{
-          p: 1.5,
-          maxWidth: "75%",
-          bgcolor: isUser ? "primary.main" : theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "grey.100",
-          color: isUser ? "primary.contrastText" : "text.primary",
-          borderRadius: 2,
-          borderBottomRightRadius: isUser ? 0 : 2,
-          borderBottomLeftRadius: isUser ? 2 : 0,
-        }}
-      >
-        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-          {message.content}
-        </Typography>
+      <Box sx={{ maxWidth: "75%", display: "flex", flexDirection: "column", gap: 0.5 }}>
+        {segments.map((seg, i) =>
+          seg.type === "book_card" ? (
+            <BookLocationCard
+              key={i}
+              data={{ ...seg.bookData, shelf_location: seg.shelfLocation }}
+            />
+          ) : (
+            <Paper
+              key={i}
+              sx={{
+                p: 1.5,
+                bgcolor: isUser ? "primary.main" : theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "grey.100",
+                color: isUser ? "primary.contrastText" : "text.primary",
+                borderRadius: 2,
+                borderBottomRightRadius: isUser ? 0 : 2,
+                borderBottomLeftRadius: isUser ? 2 : 0,
+              }}
+            >
+              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {seg.content}
+              </Typography>
+            </Paper>
+          )
+        )}
         <Typography
           variant="caption"
           sx={{
             display: "block",
             textAlign: isUser ? "right" : "left",
             opacity: 0.7,
-            mt: 0.5,
             fontSize: 10,
+            px: 0.5,
           }}
         >
           {new Date(message.timestamp).toLocaleTimeString("vi-VN", {
@@ -158,7 +198,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             minute: "2-digit",
           })}
         </Typography>
-      </Paper>
+      </Box>
       {isUser && (
         <Avatar sx={{ width: 28, height: 28, bgcolor: "secondary.main" }}>
           <PersonIcon sx={{ fontSize: 16 }} />
