@@ -474,13 +474,27 @@ export default function MultiAngleCapture({
             ))}
           </Stack>
 
-          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "action.hover" }}>
-            <FormControlLabel
-              control={<Checkbox checked={consent} onChange={(event) => setConsent?.(event.target.checked)} disabled={!setConsent} />}
-              label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện tại cổng."
-              sx={{ m: 0, color: "text.secondary" }}
-            />
-          </Paper>
+  <Paper
+    variant="outlined"
+    sx={{
+      p: 1.5,
+      bgcolor: "action.hover",
+      display: "flex",
+      flexDirection: { xs: "column", sm: "row" },
+      alignItems: { xs: "flex-start", sm: "center" },
+      gap: 1,
+    }}
+  >
+    <Checkbox
+      checked={consent}
+      onChange={(event) => setConsent?.(event.target.checked)}
+      disabled={!setConsent}
+      sx={{ flexShrink: 0, mt: { xs: 0.25, sm: 0 } }}
+    />
+    <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, whiteSpace: "normal", mt: { xs: -0.5, sm: 0 } }}>
+      Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện tại cổng.
+    </Typography>
+  </Paper>
 
           <Button
             variant="contained"

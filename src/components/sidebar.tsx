@@ -16,11 +16,13 @@ import {
   ListItemText,
   Stack,
   Typography,
+  useMediaQuery,
   useTheme,
 } from "@mui/material";
-import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
+import LogoutIcon from "@mui/icons-material/LogoutOutlined";
+import MenuIcon from "@mui/icons-material/Menu";
 import BarChartIcon from "@mui/icons-material/BarChartOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
@@ -133,6 +135,98 @@ export default function Sidebar() {
   const isAdminOrStaff = role === "admin" || role === "staff";
   const isAdmin = role === "admin";
 
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const drawerContent = (
+    <Stack sx={{ minHeight: "100%" }}>
+      <Box sx={{ p: 2.25 }}>
+        <ButtonBase component={Link} href="/dashboard" sx={{ width: "100%", justifyContent: "flex-start", borderRadius: 1 }} onClick={() => setMobileOpen(false)}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Avatar sx={{ width: 42, height: 42, bgcolor: "primary.main", color: "primary.contrastText", borderRadius: 2 }}>
+              <LibraryIcon />
+            </Avatar>
+            <Box sx={{ minWidth: 0, textAlign: "left" }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900 }} noWrap>THƯ VIỆN IUH</Typography>
+              <Typography variant="caption" color="text.secondary">Hệ thống quản lý</Typography>
+            </Box>
+          </Stack>
+        </ButtonBase>
+      </Box>
+      <Divider />
+      <Stack spacing={2.25} sx={{ flex: 1, p: 1.5, overflowY: "auto" }}>
+        <NavSection title="Thư viện" items={libraryItems} />
+        {isAdminOrStaff ? <NavSection title="Mượn / Trả" items={circulationItems} /> : null}
+        {isAdminOrStaff ? <NavSection title="Nhân sự" items={staffItems} /> : null}
+        {isAdmin ? <NavSection title="Chẩn đoán AI" items={aiItems} /> : null}
+        {isAdminOrStaff ? <NavSection title="AI" items={staffAiItems} /> : null}
+        {isAdmin ? <NavSection title="Quản trị" items={adminItems} /> : null}
+      </Stack>
+      <Divider />
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", p: 1.5 }}>
+        <ButtonBase
+          onClick={() => router.push("/profile")}
+          sx={{
+            borderRadius: 2,
+            px: 1,
+            py: 0.5,
+            flex: 1,
+            minWidth: 0,
+            justifyContent: "flex-start",
+            "&:hover": { bgcolor: "action.hover" },
+          }}
+        >
+          <Avatar
+            src={user?.avatar_url || undefined}
+            sx={{
+              width: 38,
+              height: 38,
+              flexShrink: 0,
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
+              fontWeight: 900,
+            }}
+          >
+            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
+          </Avatar>
+          <Box sx={{ minWidth: 0, flex: 1, textAlign: "left", ml: 0.75, overflow: "hidden" }}>
+            <Typography variant="body2" sx={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
+              {role === "admin" ? "Quản trị viên" : "Nhân viên"}
+            </Typography>
+          </Box>
+        </ButtonBase>
+        <IconButton onClick={logout} title="Đăng xuất" color="error" size="small" sx={{ flexShrink: 0 }}>
+          <LogoutIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+    </Stack>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        <IconButton
+          onClick={() => setMobileOpen(true)}
+          sx={{ position: "fixed", top: 12, left: 12, zIndex: 1400, bgcolor: "background.paper", boxShadow: 1 }}
+        >
+          <MenuIcon />
+        </IconButton>
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          sx={{ "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth } }}
+        >
+          {drawerContent}
+        </Drawer>
+      </>
+    );
+  }
+
   return (
     <Drawer
       variant="permanent"
@@ -147,70 +241,7 @@ export default function Sidebar() {
         },
       }}
     >
-      <Stack sx={{ minHeight: "100%" }}>
-        <Box sx={{ p: 2.25 }}>
-          <ButtonBase component={Link} href="/dashboard" sx={{ width: "100%", justifyContent: "flex-start", borderRadius: 1 }}>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <Avatar sx={{ width: 42, height: 42, bgcolor: "primary.main", color: "primary.contrastText", borderRadius: 2 }}>
-                <LibraryIcon />
-              </Avatar>
-              <Box sx={{ minWidth: 0, textAlign: "left" }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900 }} noWrap>THƯ VIỆN IUH</Typography>
-                <Typography variant="caption" color="text.secondary">Hệ thống quản lý</Typography>
-              </Box>
-            </Stack>
-          </ButtonBase>
-        </Box>
-        <Divider />
-        <Stack spacing={2.25} sx={{ flex: 1, p: 1.5, overflowY: "auto" }}>
-          <NavSection title="Thư viện" items={libraryItems} />
-          {isAdminOrStaff ? <NavSection title="Mượn / Trả" items={circulationItems} /> : null}
-          {isAdminOrStaff ? <NavSection title="Nhân sự" items={staffItems} /> : null}
-          {isAdmin ? <NavSection title="Chẩn đoán AI" items={aiItems} /> : null}
-          {isAdminOrStaff ? <NavSection title="AI" items={staffAiItems} /> : null}
-          {isAdmin ? <NavSection title="Quản trị" items={adminItems} /> : null}
-        </Stack>
-        <Divider />
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", p: 1.5 }}>
-          <ButtonBase
-            onClick={() => router.push('/profile')}
-            sx={{
-              borderRadius: 2,
-              px: 1,
-              py: 0.5,
-              flex: 1,
-              minWidth: 0,
-              justifyContent: "flex-start",
-              "&:hover": { bgcolor: "action.hover" },
-            }}
-          >
-            <Avatar
-              src={user?.avatar_url || undefined}
-              sx={{
-                width: 38,
-                height: 38,
-                flexShrink: 0,
-                bgcolor: "primary.main",
-                color: "primary.contrastText",
-                fontWeight: 900,
-              }}
-            >
-              {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
-            </Avatar>
-            <Box sx={{ minWidth: 0, flex: 1, textAlign: "left", ml: 0.75, overflow: "hidden" }}>
-              <Typography variant="body2" sx={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis" }}>
-                {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
-                {role === "admin" ? "Quản trị viên" : "Nhân viên"}
-              </Typography>
-            </Box>
-          </ButtonBase>
-          <IconButton onClick={logout} title="Đăng xuất" color="error" size="small" sx={{ flexShrink: 0 }}>
-            <LogoutIcon fontSize="small" />
-          </IconButton>
-        </Stack>
-      </Stack>
+      {drawerContent}
     </Drawer>
   );
 }

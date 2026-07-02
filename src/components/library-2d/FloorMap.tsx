@@ -1,10 +1,29 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { BookData, ShelfData } from "./types";
+import {
+  Box,
+  Chip,
+  Divider,
+  IconButton,
+  InputAdornment,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import type { BookData, ShelfData } from "./types";
 
 interface FloorMapProps {
   shelves: ShelfData[];
@@ -75,167 +94,170 @@ export default function FloorMap({ shelves, onBookClick }: FloorMapProps) {
     return currentShelves.reduce((sum, s) => sum + s.books.length, 0);
   }, [currentShelves]);
 
+  const searchResultCount = groups.reduce((s, g) => s + g.tiers.reduce((ts, t) => ts + t.faces[0].length + t.faces[1].length, 0), 0);
+
   return (
-    <div className="min-h-screen bg-bg p-6">
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", p: 3 }}>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-text flex items-center gap-2">
-          <MenuBookIcon sx={{ fontSize: 28, color: "var(--color-primary)" }} />
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1 }}>
+          <MenuBookIcon sx={{ fontSize: 28, color: "primary.main" }} />
           Bản đồ thư viện
-        </h1>
-        <p className="text-sm text-text-3 mt-1">
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Chọn tầng để xem vị trí sách trên kệ
-        </p>
-      </div>
+        </Typography>
+      </Box>
 
       {/* Floor tabs */}
-      <div className="flex items-center gap-2 mb-4">
+      <ToggleButtonGroup
+        value={activeFloor}
+        exclusive
+        onChange={(_, v) => v && setActiveFloor(v)}
+        size="small"
+        sx={{ mb: 2, "& .MuiToggleButton-root": { px: 2, py: 1, textTransform: "none", fontWeight: 600 } }}
+      >
         {floors.map((f) => (
-          <button
-            key={f}
-            onClick={() => setActiveFloor(f)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
-              activeFloor === f
-                ? "bg-primary text-white border-primary shadow-sm"
-                : "bg-surface text-text-2 border-border hover:bg-surface-2"
-            }`}
-          >
+          <ToggleButton key={f} value={f}>
             Tầng {f}
-          </button>
+          </ToggleButton>
         ))}
-      </div>
+      </ToggleButtonGroup>
 
       {/* Search bar */}
-      <div className="relative mb-4 max-w-md">
-        <SearchIcon
-          sx={{ fontSize: 18, position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-3)" }}
-        />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Tìm kiếm sách theo tên, tác giả, ISBN..."
-          className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-border bg-surface text-sm text-text placeholder:text-text-3 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-surface-2 transition"
-          >
-            <ClearIcon sx={{ fontSize: 16, color: "var(--color-text-3)" }} />
-          </button>
-        )}
-      </div>
+      <TextField
+        size="small"
+        fullWidth
+        placeholder="Tìm kiếm sách theo tên, tác giả, ISBN..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        sx={{ mb: 2, maxWidth: 480 }}
+        slotProps={{
+          input: {
+            startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+            endAdornment: searchQuery ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearchQuery("")}>
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ) : undefined,
+          },
+        }}
+      />
 
       {/* Stats */}
-      <div className="flex items-center gap-4 text-xs text-text-3 mb-4">
-        <span>
-          Kệ: <span className="font-bold text-text-2">{currentShelves.length}</span>
-        </span>
-        <span className="w-px h-3 bg-border" />
-        <span>
-          Sách: <span className="font-bold text-text-2">{totalBooks}</span>
-        </span>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          Kệ: <Box component="span" sx={{ fontWeight: 700 }}>{currentShelves.length}</Box>
+        </Typography>
+        <Divider orientation="vertical" flexItem />
+        <Typography variant="caption" color="text.secondary">
+          Sách: <Box component="span" sx={{ fontWeight: 700 }}>{totalBooks}</Box>
+        </Typography>
         {searchQuery && (
           <>
-            <span className="w-px h-3 bg-border" />
-            <span>
-              Kết quả: <span className="font-bold text-primary">{groups.reduce((s, g) => s + g.tiers.reduce((ts, t) => ts + t.faces[0].length + t.faces[1].length, 0), 0)}</span>
-            </span>
+            <Divider orientation="vertical" flexItem />
+            <Typography variant="caption" color="text.secondary">
+              Kết quả: <Box component="span" sx={{ fontWeight: 700, color: "primary.main" }}>{searchResultCount}</Box>
+            </Typography>
           </>
         )}
-      </div>
+      </Box>
 
       {/* Table */}
       {groups.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-48 text-text-3">
-          <MenuBookIcon sx={{ fontSize: 40, opacity: 0.3, mb: 2 }} />
-          <p className="text-sm">Không tìm thấy kệ nào{searchQuery ? ` với từ khóa "${searchQuery}"` : ""}</p>
-        </div>
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 8, color: "text.secondary" }}>
+          <MenuBookIcon sx={{ fontSize: 48, opacity: 0.3, mb: 1 }} />
+          <Typography variant="body2">Không tìm thấy kệ nào{searchQuery ? ` với từ khóa "${searchQuery}"` : ""}</Typography>
+        </Box>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden bg-surface">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-surface-2">
-                <th className="px-4 py-3 text-left text-xs font-bold text-text-3 uppercase tracking-wider w-[120px]">Kệ</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-text-3 uppercase tracking-wider w-[100px]">Tầng kệ</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-text-3 uppercase tracking-wider w-[110px]">Mặt</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-text-3 uppercase tracking-wider">Sách</th>
-              </tr>
-            </thead>
-            <tbody>
+        <TableContainer sx={{ borderRadius: 2, border: 1, borderColor: "divider" }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: "background.paper" }}>
+                <TableCell sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: 0.5, width: 120 }}>Kệ</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: 0.5, width: 100 }}>Tầng kệ</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: 0.5, width: 110 }}>Mặt</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: 0.5 }}>Sách</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {groups.map((group) =>
                 group.tiers.flatMap((tier, ti) =>
                   tier.faces.map((faceBooks, faceIdx) => {
                     const isFirstRowOfShelf = ti === 0 && faceIdx === 0;
                     const isFirstFaceOfTier = faceIdx === 0;
                     return (
-                      <tr
+                      <TableRow
                         key={`${group.shelf.id}-${tier.tierIndex}-${faceIdx}`}
-                        className={`border-t border-border transition hover:bg-primary/[0.03] ${
-                          ti === 0 && faceIdx === 0 ? "border-t-2 border-t-primary/20" : ""
-                        }`}
+                        sx={{
+                          borderTop: ti === 0 && faceIdx === 0 ? 2 : 1,
+                          borderColor: ti === 0 && faceIdx === 0 ? "primary.light" : "divider",
+                          "&:hover": { bgcolor: "rgba(25,118,210,0.03)" },
+                        }}
                       >
-                        {/* Shelf code — only show on first row */}
                         {isFirstRowOfShelf && (
-                          <td
-                            className="px-4 py-3 font-bold text-primary align-top"
-                            rowSpan={group.tiers.length * 2}
-                          >
+                          <TableCell rowSpan={group.tiers.length * 2} sx={{ fontWeight: 700, color: "primary.main", verticalAlign: "top" }}>
                             {group.shelf.code}
-                          </td>
+                          </TableCell>
                         )}
-                        {/* Tier — show on first face row, rowspan=2 */}
                         {isFirstFaceOfTier && (
-                          <td
-                            className="px-4 py-3 text-text-2 font-medium align-top"
-                            rowSpan={2}
-                          >
+                          <TableCell rowSpan={2} sx={{ color: "text.secondary", fontWeight: 500, verticalAlign: "top" }}>
                             Tầng {tier.tierIndex + 1}
-                          </td>
+                          </TableCell>
                         )}
-                        {/* Face label */}
-                        <td className="px-4 py-2 text-xs text-text-3">
+                        <TableCell sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
                           {FACE_LABELS[faceIdx]}
-                        </td>
-                        {/* Books */}
-                        <td className="px-4 py-2">
+                        </TableCell>
+                        <TableCell>
                           {faceBooks.length === 0 ? (
-                            <span className="text-xs text-text-3 italic">Trống</span>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>Trống</Typography>
                           ) : (
-                            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
                               {faceBooks.map((book) => (
-                                <button
-                                  key={book.id}
-                                  onClick={() => onBookClick?.(book)}
-                                  className="text-left group/book"
-                                >
-                                  <span className="text-xs text-text group-hover/book:text-primary transition">
-                                    {book.title}
-                                  </span>
-                                  <span className="text-[10px] text-text-3 ml-1">
-                                    — {book.author}
-                                  </span>
-                                  <span
-                                    className={`ml-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle ${
-                                      book.status === "available" ? "bg-success" : "bg-error"
-                                    }`}
-                                    title={book.status === "available" ? "Có sẵn" : "Đã mượn"}
-                                  />
-                                </button>
+                                <Tooltip key={book.id} title={book.status === "available" ? "Có sẵn" : "Đã mượn"} arrow>
+                                  <Box
+                                    component="button"
+                                    onClick={() => onBookClick?.(book)}
+                                    sx={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      border: "none",
+                                      bgcolor: "transparent",
+                                      cursor: "pointer",
+                                      p: 0,
+                                      "&:hover": { "& .book-title": { color: "primary.main" } },
+                                    }}
+                                  >
+                                    <Typography variant="caption" className="book-title" sx={{ transition: "color 0.15s" }}>
+                                      {book.title}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                                      — {book.author}
+                                    </Typography>
+                                    <FiberManualRecordIcon
+                                      sx={{
+                                        fontSize: 8,
+                                        ml: 0.5,
+                                        color: book.status === "available" ? "success.main" : "error.main",
+                                      }}
+                                    />
+                                  </Box>
+                                </Tooltip>
                               ))}
-                            </div>
+                            </Box>
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 )
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
-    </div>
+    </Box>
   );
 }

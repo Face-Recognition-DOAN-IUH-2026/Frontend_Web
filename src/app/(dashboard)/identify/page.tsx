@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, Box, Button, Checkbox, Chip, FormControlLabel, LinearProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, LinearProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import CameraCapture from "@/components/camera-capture";
@@ -103,8 +103,8 @@ export default function IdentifyPage() {
             </DashboardCard>
           ) : (
             <DashboardCard noPadding>
-              <TableContainer>
-                <Table sx={{ minWidth: 820 }}>
+      <TableContainer sx={{ overflowX: "auto" }}>
+      <Table sx={{ minWidth: 820 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Độ tin cậy</TableCell>
@@ -145,10 +145,12 @@ export default function IdentifyPage() {
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={2.5}>
                 <CameraCapture onCapture={handleCapture} />
-                <FormControlLabel
-                  control={<Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />}
-                  label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện."
-                />
+       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
+         <Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+         <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, mt: { xs: -0.5, sm: 0 } }}>
+           Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện.
+         </Typography>
+       </Stack>
                 <Button type="submit" variant="contained" disabled={!imageFile || !consent || isLoading} fullWidth>
                   {isLoading ? "Đang gửi..." : "Nhận diện khuôn mặt"}
                 </Button>

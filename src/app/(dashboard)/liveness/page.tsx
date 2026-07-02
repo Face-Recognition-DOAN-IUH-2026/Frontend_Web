@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Alert, Button, Checkbox, FormControlLabel, LinearProgress, Stack, Typography } from "@mui/material";
+import { Box, Alert, Button, Checkbox, LinearProgress, Stack, Typography } from "@mui/material";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
@@ -150,10 +150,12 @@ export default function LivenessPage() {
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={2.5}>
                 <CameraCapture onCapture={handleCapture} />
-                <FormControlLabel
-                  control={<Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />}
-                  label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để kiểm tra liveness."
-                />
+       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
+         <Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+         <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, mt: { xs: -0.5, sm: 0 } }}>
+           Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để kiểm tra liveness.
+         </Typography>
+       </Stack>
                 <Button type="submit" variant="contained" disabled={!imageFile || !consent || isLoading} fullWidth>
                   {isLoading ? "Đang gửi..." : "Kiểm tra liveness"}
                 </Button>

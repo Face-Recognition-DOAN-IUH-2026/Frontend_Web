@@ -363,8 +363,8 @@ export default function HistoryPage() {
               title="Không có dữ liệu lịch sử phù hợp"
             />
           ) : (
-            <TableContainer>
-              <Table size="small" sx={{ minWidth: 980 }}>
+      <TableContainer sx={{ overflowX: "auto" }}>
+      <Table size="small" sx={{ minWidth: 980 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700 }}>Thời gian</TableCell>

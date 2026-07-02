@@ -526,7 +526,7 @@ export default function BookDetailPage() {
               </IconButton>
             </DialogTitle>
             <DialogContent dividers sx={{ p: 0, overflow: "hidden" }}>
-              {show3D ? <Book3DViewer coverUrl={book.cover_url || ""} /> : null}
+              {show3D ? <Book3DViewer coverUrl={book.cover_url || "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/1-2-3-go-book-cover.jpg/2560px-1-2-3-go-book-cover.jpg"} /> : null}
             </DialogContent>
           </Dialog>
 

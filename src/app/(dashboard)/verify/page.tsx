@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Alert, Box, Button, Checkbox, FormControlLabel, LinearProgress, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, LinearProgress, Stack, TextField, Typography } from "@mui/material";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import FaceIcon from "@mui/icons-material/FaceOutlined";
@@ -338,10 +338,12 @@ export default function VerifyPage() {
                   fullWidth
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
-                <FormControlLabel
-                  control={<Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />}
-                  label="Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để xác thực."
-                />
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
+        <Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+        <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, mt: { xs: -0.5, sm: 0 } }}>
+          Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để xác thực.
+        </Typography>
+      </Stack>
                 <Button type="submit" variant="contained" disabled={!imageFile || !targetUserId || !consent || isLoading} fullWidth>
                   {isLoading ? "Đang gửi..." : "Xác thực khuôn mặt"}
                 </Button>

@@ -2,15 +2,30 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
+import { Box, CircularProgress, Typography } from '@mui/material';
 
 const VRViewer = dynamic(() => import('@/components/vr/VRViewer'), {
   ssr: false,
   loading: () => (
-    <div className="w-screen h-screen bg-slate-950 flex flex-col items-center justify-center">
-      <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4" />
-      <h2 className="text-white text-lg font-bold">Đang tải không gian tham quan 3D...</h2>
-      <p className="text-slate-400 text-sm mt-2">Vui lòng chờ trong giây lát</p>
-    </div>
+    <Box
+      sx={{
+        width: "100vw",
+        height: "100vh",
+        bgcolor: "#020617",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <CircularProgress size={48} sx={{ color: "info.light", mb: 2 }} />
+      <Typography variant="h6" color="common.white" sx={{ fontWeight: 700 }}>
+        Đang tải không gian tham quan 3D...
+      </Typography>
+      <Typography variant="body2" sx={{ color: "grey.500", mt: 0.5 }}>
+        Vui lòng chờ trong giây lát
+      </Typography>
+    </Box>
   ),
 });
 
@@ -23,17 +38,31 @@ export default function VRTourPage() {
 
   if (!mounted) {
     return (
-      <div className="w-screen h-screen bg-slate-950 flex flex-col items-center justify-center">
-        <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4" />
-        <h2 className="text-white text-lg font-bold">Đang tải không gian tham quan 3D...</h2>
-        <p className="text-slate-400 text-sm mt-2">Vui lòng chờ trong giây lát</p>
-      </div>
+      <Box
+        sx={{
+          width: "100vw",
+          height: "100vh",
+          bgcolor: "#020617",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <CircularProgress size={48} sx={{ color: "info.light", mb: 2 }} />
+        <Typography variant="h6" color="common.white" sx={{ fontWeight: 700 }}>
+          Đang tải không gian tham quan 3D...
+        </Typography>
+        <Typography variant="body2" sx={{ color: "grey.500", mt: 0.5 }}>
+          Vui lòng chờ trong giây lát
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <main className="w-screen h-screen overflow-hidden bg-black">
+    <Box component="main" sx={{ width: "100vw", height: "100vh", overflow: "hidden", bgcolor: "common.black" }}>
       <VRViewer />
-    </main>
+    </Box>
   );
 }

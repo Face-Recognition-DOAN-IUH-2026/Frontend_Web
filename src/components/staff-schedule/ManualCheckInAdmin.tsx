@@ -1,6 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Divider,
+  Drawer,
+  IconButton,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
+import PendingIcon from "@mui/icons-material/Pending";
+import InfoIcon from "@mui/icons-material/Info";
 import api from "@/lib/api-client";
 import type { ManualCheckInRequest, ScheduleStaff } from "@/lib/types";
 
@@ -15,11 +38,11 @@ function getApiError(err: any): string {
   return data?.error || data?.message || err?.message || "Có lỗi xảy ra";
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending_manual: { label: "Chờ duyệt", color: "#f59e0b" },
-  check_in: { label: "Đã check-in", color: "#10b981" },
-  check_out: { label: "Đã check-out", color: "#3b82f6" },
-  rejected: { label: "Từ chối", color: "#ef4444" },
+const STATUS_CONFIG: Record<string, { label: string; color: "warning" | "success" | "info" | "error"; icon: React.ReactNode }> = {
+  pending_manual: { label: "Chờ duyệt", color: "warning", icon: <PendingIcon sx={{ fontSize: 14 }} /> },
+  check_in: { label: "Đã check-in", color: "success", icon: <CheckCircleIcon sx={{ fontSize: 14 }} /> },
+  check_out: { label: "Đã check-out", color: "info", icon: <InfoIcon sx={{ fontSize: 14 }} /> },
+  rejected: { label: "Từ chối", color: "error", icon: <CancelIcon sx={{ fontSize: 14 }} /> },
 };
 
 export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) {
@@ -30,6 +53,8 @@ export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) 
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<string>("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -58,7 +83,6 @@ export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) 
   };
 
   const handleApprove = async (id: string) => {
-    if (!confirm("Duyệt check-in thủ công này?")) return;
     setActioningId(id);
     try {
       await api.approveManualCheckIn(id);
@@ -97,130 +121,167 @@ export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) 
     setRejectReason("");
   };
 
-  if (!open) return null;
+  const openConfirmDialog = (id: string) => {
+    setConfirmTargetId(id);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmApprove = () => {
+    if (confirmTargetId) handleApprove(confirmTargetId);
+    setConfirmOpen(false);
+    setConfirmTargetId(null);
+  };
 
   const pending = requests.filter((r) => r.status === "pending_manual");
   const others = requests.filter((r) => r.status !== "pending_manual");
 
   return (
-    <div className="fixed inset-0 flex justify-end" style={{ zIndex: 1300 }}>
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-surface w-96 h-full shadow-xl border-l border-border flex flex-col animate-slide-in">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="font-serif text-sm font-semibold text-primary">Check-in thủ công</h2>
-          <button onClick={onClose} className="text-text-3 hover:text-text transition text-sm">&times;</button>
-        </div>
+    <>
+      <Drawer anchor="right" open={open} onClose={onClose} sx={{ zIndex: 1300 }}>
+        <Box sx={{ width: { xs: "100%", sm: 420 }, height: "100%", display: "flex", flexDirection: "column" }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5, borderBottom: 1, borderColor: "divider" }}>
+            <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 700 }}>
+              Check-in thủ công
+            </Typography>
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {error && (
-            <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-2.5 py-1.5">
-              {error}
-            </div>
-          )}
+          <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
-          {loading && (
-            <p className="text-xs text-text-3 italic text-center py-4">Đang tải...</p>
-          )}
+            {loading && (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>Đang tải...</Typography>
+              </Box>
+            )}
 
-          {!loading && pending.length === 0 && others.length === 0 && (
-            <p className="text-xs text-text-3 italic text-center py-4">Không có yêu cầu nào</p>
-          )}
+            {!loading && pending.length === 0 && others.length === 0 && (
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic", textAlign: "center", py: 4 }}>
+                Không có yêu cầu nào
+              </Typography>
+            )}
 
-          {pending.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Chờ duyệt ({pending.length})</p>
-              {pending.map((req) => {
-                const status = STATUS_LABELS[req.status] || { label: req.status, color: "#6b7280" };
-                return (
-                  <div key={req.id} className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-text">{getStaffName(req.staffId)}</span>
-                      <span
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: `${status.color}20`, color: status.color }}
-                      >
-                        {status.label}
-                      </span>
-                    </div>
-                    {req.invalidatedReason && (
-                      <div className="text-[11px] text-text-3 italic">Lý do: {req.invalidatedReason.replace("manual_checkin_request:", "")}</div>
-                    )}
-                    <div className="text-[10px] text-text-3">Giờ check-in: {req.checkInAt ? new Date(req.checkInAt).toLocaleString("vi-VN") : "Chưa"}</div>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={() => handleApprove(req.id)}
-                        disabled={actioningId === req.id}
-                        className="flex-1 py-1.5 rounded-md text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
-                      >
-                        {actioningId === req.id ? "..." : "Duyệt"}
-                      </button>
-                      {rejectingId === req.id ? (
-                        <button
-                          onClick={cancelReject}
-                          className="flex-1 py-1.5 rounded-md text-xs font-medium text-text-2 bg-surface-2 border border-border hover:bg-surface transition"
-                        >
-                          Hủy
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => startReject(req.id)}
-                          disabled={actioningId === req.id}
-                          className="flex-1 py-1.5 rounded-md text-xs font-medium text-white bg-red-500 hover:bg-red-600 transition disabled:opacity-50"
-                        >
-                          Từ chối
-                        </button>
-                      )}
-                    </div>
-                    {rejectingId === req.id ? (
-                      <div className="space-y-1.5 pt-1">
-                        <input
-                          type="text"
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                          placeholder="Lý do từ chối (không bắt buộc)"
-                          className="w-full px-2.5 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-                        />
-                        <button
-                          onClick={() => handleReject(req.id)}
-                          disabled={actioningId === req.id}
-                          className="w-full py-1.5 rounded-md text-xs font-medium text-white bg-red-500 hover:bg-red-600 transition disabled:opacity-50"
-                        >
-                          {actioningId === req.id ? "Đang xử lý..." : "Xác nhận từ chối"}
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+            {pending.length > 0 && (
+              <Box>
+                <Typography variant="caption" color="warning.main" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Chờ duyệt ({pending.length})
+                </Typography>
+                <Stack spacing={1} sx={{ mt: 0.5 }}>
+                  {pending.map((req) => {
+                    const config = STATUS_CONFIG[req.status] || { label: req.status, color: "info" as const, icon: <InfoIcon sx={{ fontSize: 14 }} /> };
+                    return (
+                      <Box key={req.id} sx={{ border: 1, borderColor: "warning.light", borderRadius: 1, bgcolor: "warning.light", opacity: 0.9, p: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>{getStaffName(req.staffId)}</Typography>
+                          <Chip icon={config.icon as React.ReactElement} label={config.label} color={config.color} size="small" sx={{ height: 22, fontSize: 10, fontWeight: 700 }} />
+                        </Box>
+                        {req.invalidatedReason && (
+                          <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                            Lý do: {req.invalidatedReason.replace("manual_checkin_request:", "")}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" color="text.secondary">
+                          Giờ check-in: {req.checkInAt ? new Date(req.checkInAt).toLocaleString("vi-VN") : "Chưa"}
+                        </Typography>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            onClick={() => openConfirmDialog(req.id)}
+                            disabled={actioningId === req.id}
+                            fullWidth
+                          >
+                            {actioningId === req.id ? <CircularProgress size={14} color="inherit" /> : "Duyệt"}
+                          </Button>
+                          {rejectingId === req.id ? (
+                            <Button size="small" variant="outlined" onClick={cancelReject} fullWidth>
+                              Hủy
+                            </Button>
+                          ) : (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="error"
+                              onClick={() => startReject(req.id)}
+                              disabled={actioningId === req.id}
+                              fullWidth
+                            >
+                              Từ chối
+                            </Button>
+                          )}
+                        </Stack>
+                        {rejectingId === req.id && (
+                          <Stack spacing={1}>
+                            <TextField
+                              size="small"
+                              placeholder="Lý do từ chối (không bắt buộc)"
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              fullWidth
+                            />
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="error"
+                              onClick={() => handleReject(req.id)}
+                              disabled={actioningId === req.id}
+                              fullWidth
+                            >
+                              {actioningId === req.id ? "Đang xử lý..." : "Xác nhận từ chối"}
+                            </Button>
+                          </Stack>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            )}
 
-          {others.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-text-3 uppercase tracking-wider">Đã xử lý</p>
-              {others.map((req) => {
-                const status = STATUS_LABELS[req.status] || { label: req.status, color: "#6b7280" };
-                return (
-                  <div key={req.id} className="rounded-lg border border-border bg-surface-2 p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-text">{getStaffName(req.staffId)}</span>
-                      <span
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: `${status.color}20`, color: status.color }}
-                      >
-                        {status.label}
-                      </span>
-                    </div>
-                    {req.invalidatedReason ? (
-                      <div className="text-[11px] text-text-3 italic">{req.invalidatedReason.replace("manual_checkin_rejected:", "Từ chối: ").replace("manual_checkin_request:", "")}</div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+            {others.length > 0 && (
+              <Box>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Đã xử lý
+                </Typography>
+                <Stack spacing={1} sx={{ mt: 0.5 }}>
+                  {others.map((req) => {
+                    const config = STATUS_CONFIG[req.status] || { label: req.status, color: "info" as const, icon: <InfoIcon sx={{ fontSize: 14 }} /> };
+                    return (
+                      <Box key={req.id} sx={{ border: 1, borderColor: "divider", borderRadius: 1, bgcolor: "background.paper", p: 1.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>{getStaffName(req.staffId)}</Typography>
+                          <Chip icon={config.icon as React.ReactElement} label={config.label} color={config.color} size="small" sx={{ height: 22, fontSize: 10, fontWeight: 700 }} />
+                        </Box>
+                        {req.invalidatedReason && (
+                          <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                            {req.invalidatedReason.replace("manual_checkin_rejected:", "Từ chối: ").replace("manual_checkin_request:", "")}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </Drawer>
+
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>Xác nhận</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Duyệt check-in thủ công này?</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)}>Hủy</Button>
+          <Button onClick={handleConfirmApprove} variant="contained" color="success">Duyệt</Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

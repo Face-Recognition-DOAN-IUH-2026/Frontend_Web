@@ -13,7 +13,7 @@ import {
 import AddAPhotoOutlinedIcon from "@mui/icons-material/AddAPhotoOutlined";
 import CameraswitchOutlinedIcon from "@mui/icons-material/CameraswitchOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
-import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
+
 
 export default function CameraCapture({
   onCapture,
@@ -99,18 +99,6 @@ export default function CameraCapture({
     }, "image/jpeg", 0.9);
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (!selectedFile) return;
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const dataUrl = loadEvent.target?.result as string;
-      setImage(dataUrl);
-      onCapture(selectedFile, dataUrl);
-    };
-    reader.readAsDataURL(selectedFile);
-  };
-
   const reset = () => {
     setImage(null);
     setError("");
@@ -148,7 +136,7 @@ export default function CameraCapture({
         ) : (
           <Stack spacing={1} sx={{ alignItems: "center", textAlign: "center", color: "grey.300", p: 3 }}>
             <PhotoCameraOutlinedIcon sx={{ fontSize: 42 }} />
-            <Typography>{error || "Bật camera hoặc tải ảnh lên để bắt đầu."}</Typography>
+            <Typography>{error || "Bật camera để bắt đầu."}</Typography>
           </Stack>
         )}
       </Paper>
@@ -167,13 +155,6 @@ export default function CameraCapture({
         ) : (
           <Button variant="contained" startIcon={<AddAPhotoOutlinedIcon />} onClick={capturePhoto} disabled={!cameraReady} fullWidth>
             Chụp ảnh
-          </Button>
-        )}
-
-        {!image && (
-          <Button variant="outlined" component="label" startIcon={<UploadFileOutlinedIcon />} fullWidth>
-            Tải ảnh
-            <input type="file" accept="image/*" onChange={handleFileChange} hidden />
           </Button>
         )}
 

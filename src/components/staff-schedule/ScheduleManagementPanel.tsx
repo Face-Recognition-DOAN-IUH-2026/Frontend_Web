@@ -1,6 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Divider,
+  Drawer,
+  IconButton,
+  MenuItem,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
 import api from "@/lib/api-client";
 import type { LibraryZone, StaffShift } from "@/lib/types";
 
@@ -32,6 +55,11 @@ export default function ScheduleManagementPanel({
   const [endTime, setEndTime] = useState("11:30");
   const [minStaff, setMinStaff] = useState("1");
 
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteTargetType, setDeleteTargetType] = useState<"zone" | "shift" | null>(null);
+  const [deleteWarning, setDeleteWarning] = useState("");
+
   const handleCreateZone = async () => {
     setSaving(true);
     setError(null);
@@ -46,21 +74,49 @@ export default function ScheduleManagementPanel({
     }
   };
 
-  const handleDeleteZone = async (id: string) => {
+  const openDeleteZoneConfirm = async (id: string) => {
+    let warning = "";
     try {
       const assignments = await api.getScheduleAssignments({ zoneId: id });
       const active = assignments.items.filter((a: any) => a.status === "scheduled" || a.status === "confirmed");
-      if (active.length > 0 && !confirm(`Có ${active.length} ca trực đang chờ xử lý sử dụng khu vực này. Vẫn xóa?`)) return;
+      if (active.length > 0) warning = `Có ${active.length} ca trực đang chờ xử lý sử dụng khu vực này. `;
     } catch {}
-    if (!confirm("Xóa khu vực này?")) return;
+    setDeleteWarning(warning);
+    setDeleteTargetId(id);
+    setDeleteTargetType("zone");
+    setDeleteConfirmOpen(true);
+  };
+
+  const openDeleteShiftConfirm = async (id: string) => {
+    let warning = "";
+    try {
+      const assignments = await api.getScheduleAssignments({ shiftId: id });
+      const active = assignments.items.filter((a: any) => a.status === "scheduled" || a.status === "confirmed");
+      if (active.length > 0) warning = `Có ${active.length} ca trực đang chờ xử lý sử dụng ca này. `;
+    } catch {}
+    setDeleteWarning(warning);
+    setDeleteTargetId(id);
+    setDeleteTargetType("shift");
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId || !deleteTargetType) return;
     setSaving(true);
     try {
-      await api.deleteScheduleZone(id);
+      if (deleteTargetType === "zone") {
+        await api.deleteScheduleZone(deleteTargetId);
+      } else {
+        await api.deleteScheduleShift(deleteTargetId);
+      }
       onUpdate();
     } catch (err: any) {
       setError(getApiError(err));
     } finally {
       setSaving(false);
+      setDeleteConfirmOpen(false);
+      setDeleteTargetId(null);
+      setDeleteTargetType(null);
     }
   };
 
@@ -75,24 +131,6 @@ export default function ScheduleManagementPanel({
         minStaff: Math.max(1, Number(minStaff) || 1),
       });
       setShiftName("");
-      onUpdate();
-    } catch (err: any) {
-      setError(getApiError(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteShift = async (id: string) => {
-    try {
-      const assignments = await api.getScheduleAssignments({ shiftId: id });
-      const active = assignments.items.filter((a: any) => a.status === "scheduled" || a.status === "confirmed");
-      if (active.length > 0 && !confirm(`Có ${active.length} ca trực đang chờ xử lý sử dụng ca này. Vẫn xóa?`)) return;
-    } catch {}
-    if (!confirm("Xóa ca trực này?")) return;
-    setSaving(true);
-    try {
-      await api.deleteScheduleShift(id);
       onUpdate();
     } catch (err: any) {
       setError(getApiError(err));
@@ -126,175 +164,173 @@ export default function ScheduleManagementPanel({
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 flex justify-end" style={{ zIndex: 1300 }}>
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-surface w-80 h-full shadow-xl border-l border-border flex flex-col animate-slide-in">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="font-serif text-sm font-semibold text-primary">Quản lý lịch trực</h2>
-          <button onClick={onClose} className="text-text-3 hover:text-text transition text-sm">&times;</button>
-        </div>
+    <>
+      <Drawer anchor="right" open={open} onClose={onClose} sx={{ zIndex: 1300 }}>
+        <Box sx={{ width: { xs: "100%", sm: 400 }, height: "100%", display: "flex", flexDirection: "column" }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5, borderBottom: 1, borderColor: "divider" }}>
+            <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 700 }}>
+              Quản lý lịch trực
+            </Typography>
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
 
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setTab("zones")}
-            className={`flex-1 py-2 text-xs font-medium transition border-b-2 ${
-              tab === "zones"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-3 hover:text-text-2"
-            }`}
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            variant="fullWidth"
+            sx={{ borderBottom: 1, borderColor: "divider", minHeight: 36 }}
           >
-            Khu vực
-          </button>
-          <button
-            onClick={() => setTab("shifts")}
-            className={`flex-1 py-2 text-xs font-medium transition border-b-2 ${
-              tab === "shifts"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-3 hover:text-text-2"
-            }`}
-          >
-            Ca trực
-          </button>
-        </div>
+            <Tab label="Khu vực" value="zones" sx={{ minHeight: 36, py: 0, textTransform: "none", fontWeight: 600, fontSize: "0.8rem" }} />
+            <Tab label="Ca trực" value="shifts" sx={{ minHeight: 36, py: 0, textTransform: "none", fontWeight: 600, fontSize: "0.8rem" }} />
+          </Tabs>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {error && (
-            <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-2.5 py-1.5">
-              {error}
-            </div>
-          )}
+          <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
-          {tab === "zones" && (
-            <>
-              <div className="space-y-2">
-                {zones.length === 0 && (
-                  <p className="text-xs text-text-3 italic">Chưa có khu vực nào</p>
-                )}
-                {zones.map((z) => (
-                  <div key={z.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-surface-2 border border-border">
-                    <div>
-                      <div className="text-xs font-medium text-text">{z.zoneName}</div>
-                      <div className="text-[10px] text-text-3">Tầng {z.floor}</div>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteZone(z.id)}
-                      className="text-error/60 hover:text-error transition text-xs"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-              </div>
+            {tab === "zones" && (
+              <>
+                <Stack spacing={1}>
+                  {zones.length === 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>Chưa có khu vực nào</Typography>
+                  )}
+                  {zones.map((z) => (
+                    <Box key={z.id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, py: 1, borderRadius: 1, bgcolor: "background.paper", border: 1, borderColor: "divider" }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{z.zoneName}</Typography>
+                        <Typography variant="caption" color="text.secondary">Tầng {z.floor}</Typography>
+                      </Box>
+                      <IconButton size="small" color="error" onClick={() => openDeleteZoneConfirm(z.id)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Stack>
 
-              <div className="space-y-2 pt-2 border-t border-border">
-                <div className="flex gap-1.5">
-                  <input
+                <Divider />
+
+                <Stack direction="row" spacing={1}>
+                  <TextField
+                    size="small"
                     type="number"
-                    min={1}
+                    label="Tầng"
                     value={zoneFloor}
                     onChange={(e) => setZoneFloor(e.target.value)}
-                    className="w-16 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-                    placeholder="Tầng"
+                    sx={{ width: 70 }}
+                    slotProps={{ htmlInput: { min: 1 } }}
                   />
-                  <input
+                  <TextField
+                    size="small"
+                    placeholder="Tên khu vực"
                     value={zoneName}
                     onChange={(e) => setZoneName(e.target.value)}
-                    className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary placeholder:text-text-3/50"
-                    placeholder="Tên khu vực"
+                    fullWidth
                   />
-                  <button
-                    onClick={handleCreateZone}
-                    disabled={saving}
-                    className="px-2.5 py-1.5 rounded-md text-xs font-medium text-bg bg-primary hover:bg-primary-dark transition disabled:opacity-50"
-                  >
+                  <Button size="small" variant="contained" onClick={handleCreateZone} disabled={saving} startIcon={<AddIcon />}>
                     Thêm
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+                  </Button>
+                </Stack>
+              </>
+            )}
 
-          {tab === "shifts" && (
-            <>
-              <div className="space-y-2">
-                {shifts.length === 0 && (
-                  <p className="text-xs text-text-3 italic">Chưa có ca trực nào</p>
-                )}
-                {shifts.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-surface-2 border border-border">
-                    <div>
-                      <div className="text-xs font-medium text-text">{s.name}</div>
-                      <div className="text-[10px] text-text-3">
-                        {s.startTime?.slice(0, 5)}-{s.endTime?.slice(0, 5)} &middot; {s.minStaff} NV
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteShift(s.id)}
-                      className="text-error/60 hover:text-error transition text-xs"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ))}
-              </div>
+            {tab === "shifts" && (
+              <>
+                <Stack spacing={1}>
+                  {shifts.length === 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>Chưa có ca trực nào</Typography>
+                  )}
+                  {shifts.map((s) => (
+                    <Box key={s.id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, py: 1, borderRadius: 1, bgcolor: "background.paper", border: 1, borderColor: "divider" }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{s.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {s.startTime?.slice(0, 5)}-{s.endTime?.slice(0, 5)} · {s.minStaff} NV
+                        </Typography>
+                      </Box>
+                      <IconButton size="small" color="error" onClick={() => openDeleteShiftConfirm(s.id)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Stack>
 
-              <div className="space-y-2 pt-2 border-t border-border">
-                <input
-                  value={shiftName}
-                  onChange={(e) => setShiftName(e.target.value)}
-                  className="w-full px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary placeholder:text-text-3/50"
-                  placeholder="Tên ca (vd: Ca sáng)"
-                />
-                <div className="flex gap-1.5">
-                  <input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-                  />
-                  <span className="text-xs text-text-3 self-center">&ndash;</span>
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-[11px] text-text-3 whitespace-nowrap">Số NV tối thiểu:</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={minStaff}
-                    onChange={(e) => setMinStaff(e.target.value)}
-                    className="w-16 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-                  />
-                  <button
-                    onClick={handleCreateShift}
-                    disabled={saving}
-                    className="ml-auto px-2.5 py-1.5 rounded-md text-xs font-medium text-bg bg-primary hover:bg-primary-dark transition disabled:opacity-50"
-                  >
-                    Thêm
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+                <Divider />
 
-        <div className="px-4 py-3 border-t border-border">
-          <button
-            onClick={createDefaults}
-            disabled={saving}
-            className="w-full py-2 rounded-md text-xs font-medium text-text-2 bg-surface-2 hover:bg-surface-3 transition disabled:opacity-50"
-          >
-            {saving ? "Đang xử lý..." : "Tạo mẫu (2 khu vực + 3 ca)"}
-          </button>
-        </div>
-      </div>
-    </div>
+                <Stack spacing={1.5}>
+                  <TextField
+                    size="small"
+                    placeholder="Tên ca (vd: Ca sáng)"
+                    value={shiftName}
+                    onChange={(e) => setShiftName(e.target.value)}
+                    fullWidth
+                  />
+                   <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <TextField
+                      size="small"
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      sx={{ flex: 1 }}
+                    />
+                    <Typography variant="body2" color="text.secondary">–</Typography>
+                    <TextField
+                      size="small"
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      sx={{ flex: 1 }}
+                    />
+                  </Stack>
+                   <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>Số NV tối thiểu:</Typography>
+                    <TextField
+                      size="small"
+                      type="number"
+                      value={minStaff}
+                      onChange={(e) => setMinStaff(e.target.value)}
+                      sx={{ width: 70 }}
+                      slotProps={{ htmlInput: { min: 1 } }}
+                    />
+                    <Button size="small" variant="contained" onClick={handleCreateShift} disabled={saving} sx={{ ml: "auto" }} startIcon={<AddIcon />}>
+                      Thêm
+                    </Button>
+                  </Stack>
+                </Stack>
+              </>
+            )}
+          </Box>
+
+          <Box sx={{ px: 2, py: 1.5, borderTop: 1, borderColor: "divider" }}>
+            <Button
+              fullWidth
+              variant="outlined"
+              size="small"
+              onClick={createDefaults}
+              disabled={saving}
+            >
+              {saving ? <CircularProgress size={14} color="inherit" /> : "Tạo mẫu (2 khu vực + 3 ca)"}
+            </Button>
+          </Box>
+        </Box>
+      </Drawer>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+        <DialogTitle>Xác nhận xóa</DialogTitle>
+        <DialogContent>
+          {deleteWarning && <Alert severity="warning" sx={{ mb: 1 }}>{deleteWarning}</Alert>}
+          <DialogContentText>
+            {deleteTargetType === "zone" ? "Xóa khu vực này?" : "Xóa ca trực này?"}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Hủy</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error" disabled={saving}>
+            {saving ? <CircularProgress size={14} color="inherit" /> : "Xóa"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

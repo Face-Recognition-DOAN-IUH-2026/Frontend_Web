@@ -1,6 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Divider,
+  Drawer,
+  IconButton,
+  MenuItem,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
 import api from "@/lib/api-client";
 import type { LibraryZone, StaffShift, ScheduleStaff } from "@/lib/types";
 
@@ -33,6 +56,9 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
   const [staffId, setStaffId] = useState("");
   const [validFrom, setValidFrom] = useState("");
   const [validTo, setValidTo] = useState("");
+
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -87,14 +113,22 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Xóa mẫu lịch này?")) return;
+  const openDeleteConfirm = (id: string) => {
+    setDeleteTargetId(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
     try {
-      await api.deleteScheduleTemplate(id);
+      await api.deleteScheduleTemplate(deleteTargetId);
       await loadData();
       onUpdated();
     } catch (err) {
       setError(getApiError(err));
+    } finally {
+      setDeleteConfirmOpen(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -105,197 +139,205 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
   const getShiftName = (id: string) => shifts.find((s) => s.id === id)?.name || "Ca";
   const getZoneName = (id: string) => zones.find((z) => z.id === id)?.zoneName || "Khu vực";
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 flex justify-end" style={{ zIndex: 1300 }}>
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-surface w-96 h-full shadow-xl border-l border-border flex flex-col animate-slide-in">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="font-serif text-sm font-semibold text-primary">Mẫu lịch tự động</h2>
-          <button onClick={onClose} className="text-text-3 hover:text-text transition text-sm">&times;</button>
-        </div>
+    <>
+      <Drawer anchor="right" open={open} onClose={onClose} sx={{ zIndex: 1300 }}>
+        <Box sx={{ width: { xs: "100%", sm: 420 }, height: "100%", display: "flex", flexDirection: "column" }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5, borderBottom: 1, borderColor: "divider" }}>
+            <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 700 }}>
+              Mẫu lịch tự động
+            </Typography>
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {error && (
-            <div className="text-xs text-error bg-error/10 border border-error/20 rounded-md px-2.5 py-1.5">
-              {error}
-            </div>
-          )}
+          <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
-          <div className="space-y-2">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary placeholder:text-text-3/50"
-              placeholder="Tên mẫu (vd: Ca sáng T2-T6)"
-            />
-            <div className="space-y-1">
-              <div className="flex gap-1 justify-between">
-                {DAYS.map((d, i) => {
-                  const selected = selectedDays.includes(i);
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        setSelectedDays(prev =>
-                          prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]
-                        );
-                      }}
-                      className={`flex-1 py-1 rounded text-[11px] font-semibold border transition text-center ${
-                        selected
-                          ? "bg-primary border-primary text-bg"
-                          : "bg-surface-2 border-border text-text-2 hover:bg-surface-3"
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <select
-              value={shiftId}
-              onChange={(e) => setShiftId(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-            >
-              <option value="">Chọn ca trực</option>
-              {shifts.filter((s) => s.isActive).map((s) => (
-                <option key={s.id} value={s.id}>{s.name} ({s.startTime?.slice(0, 5)}-{s.endTime?.slice(0, 5)})</option>
-              ))}
-            </select>
-            <select
-              value={zoneId}
-              onChange={(e) => setZoneId(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-            >
-              <option value="">Chọn khu vực</option>
-              {zones.filter((z) => z.isActive).map((z) => (
-                <option key={z.id} value={z.id}>{z.zoneName} (Tầng {z.floor})</option>
-              ))}
-            </select>
-            <select
-              value={staffId}
-              onChange={(e) => setStaffId(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-md bg-surface-2 border border-border text-xs text-text focus:outline-none focus:border-primary"
-            >
-              <option value="">Chọn nhân viên</option>
-              {staff.map((s) => (
-                <option key={s.id} value={s.id}>{s.fullName || s.email}</option>
-              ))}
-            </select>
-            <div className="space-y-1.5 pt-1">
-              <label className="text-[11px] font-medium text-text-3 block">Thời hạn áp dụng</label>
-              <div className="flex gap-1 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setValidFrom("");
-                    setValidTo("");
-                  }}
-                  className={`px-2 py-0.5 rounded text-[10px] border transition ${
-                    !validFrom && !validTo
-                      ? "bg-primary/10 border-primary text-primary"
-                      : "bg-surface-2 border-border text-text-2 hover:bg-surface-3"
-                  }`}
-                >
-                  Vô thời hạn (Tất cả)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const y = now.getFullYear();
-                    const m = now.getMonth();
-                    const first = new Date(y, m, 1);
-                    const last = new Date(y, m + 1, 0);
-                    setValidFrom(first.toISOString().split("T")[0]);
-                    setValidTo(last.toISOString().split("T")[0]);
-                  }}
-                  className={`px-2 py-0.5 rounded text-[10px] border transition ${
-                    validFrom && validTo && validFrom.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`)
-                      ? "bg-primary/10 border-primary text-primary"
-                      : "bg-surface-2 border-border text-text-2 hover:bg-surface-3"
-                  }`}
-                >
-                  Tháng này
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const y = now.getFullYear();
-                    const m = now.getMonth();
-                    const first = new Date(y, m + 1, 1);
-                    const last = new Date(y, m + 2, 0);
-                    setValidFrom(first.toISOString().split("T")[0]);
-                    setValidTo(last.toISOString().split("T")[0]);
-                  }}
-                  className={`px-2 py-0.5 rounded text-[10px] border transition ${
-                    validFrom && validTo && validFrom.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 2).padStart(2, '0')}`)
-                      ? "bg-primary/10 border-primary text-primary"
-                      : "bg-surface-2 border-border text-text-2 hover:bg-surface-3"
-                  }`}
-                >
-                  Tháng sau
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={validFrom}
-                  onChange={(e) => setValidFrom(e.target.value)}
-                  className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-[11px] text-text focus:outline-none focus:border-primary"
-                  placeholder="Từ ngày"
-                />
-                <input
-                  type="date"
-                  value={validTo}
-                  onChange={(e) => setValidTo(e.target.value)}
-                  className="flex-1 px-2 py-1.5 rounded-md bg-surface-2 border border-border text-[11px] text-text focus:outline-none focus:border-primary"
-                  placeholder="Đến ngày"
-                />
-              </div>
-            </div>
-            <button
-              onClick={handleCreate}
-              disabled={saving}
-              className="w-full py-1.5 rounded-md text-xs font-medium text-bg bg-primary hover:bg-primary-dark transition disabled:opacity-50"
-            >
-              {saving ? "Đang tạo..." : "Thêm mẫu"}
-            </button>
-          </div>
+            <Stack spacing={1.5}>
+              <TextField
+                size="small"
+                placeholder="Tên mẫu (vd: Ca sáng T2-T6)"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                fullWidth
+              />
 
-          <div className="space-y-2 pt-2 border-t border-border">
-            <p className="text-[11px] text-text-3 font-medium uppercase tracking-wide">Đã tạo ({templates.length})</p>
-            {loading && <p className="text-xs text-text-3 italic">Đang tải...</p>}
-            {!loading && templates.length === 0 && (
-              <p className="text-xs text-text-3 italic">Chưa có mẫu nào</p>
-            )}
-            {templates.map((t) => (
-              <div key={t.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-surface-2 border border-border">
-                <div>
-                  <div className="text-xs font-medium text-text">{t.name}</div>
-                  <div className="text-[10px] text-text-3">
-                    {DAYS[t.dayOfWeek]} &middot; {getShiftName(t.shiftId)} &middot; {getZoneName(t.zoneId)}
-                  </div>
-                  <div className="text-[10px] text-text-3">
-                    {getStaffName(t.staffId)}
-                    {t.validFrom ? ` (${t.validFrom} → ${t.validTo || "..."})` : " (Vô thời hạn)"}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleDelete(t.id)}
-                  className="text-error/60 hover:text-error transition text-xs"
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>Ngày trong tuần</Typography>
+                <ToggleButtonGroup
+                  value={selectedDays}
+                  onChange={(_, v) => setSelectedDays(v)}
+                  size="small"
+                  sx={{ flexWrap: "wrap", gap: 0.5, "& .MuiToggleButton-root": { px: 1, py: 0.25, fontSize: "0.7rem", textTransform: "none", borderRadius: 1 } }}
                 >
-                  &times;
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+                  {DAYS.map((d, i) => (
+                    <ToggleButton key={i} value={i}>{d}</ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </Box>
+
+              <TextField
+                select
+                size="small"
+                label="Ca trực"
+                value={shiftId}
+                onChange={(e) => setShiftId(e.target.value)}
+                fullWidth
+              >
+                <MenuItem value="">Chọn ca trực</MenuItem>
+                {shifts.filter((s) => s.isActive).map((s) => (
+                  <MenuItem key={s.id} value={s.id}>{s.name} ({s.startTime?.slice(0, 5)}-{s.endTime?.slice(0, 5)})</MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                select
+                size="small"
+                label="Khu vực"
+                value={zoneId}
+                onChange={(e) => setZoneId(e.target.value)}
+                fullWidth
+              >
+                <MenuItem value="">Chọn khu vực</MenuItem>
+                {zones.filter((z) => z.isActive).map((z) => (
+                  <MenuItem key={z.id} value={z.id}>{z.zoneName} (Tầng {z.floor})</MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                select
+                size="small"
+                label="Nhân viên"
+                value={staffId}
+                onChange={(e) => setStaffId(e.target.value)}
+                fullWidth
+              >
+                <MenuItem value="">Chọn nhân viên</MenuItem>
+                {staff.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>{s.fullName || s.email}</MenuItem>
+                ))}
+              </TextField>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>Thời hạn áp dụng</Typography>
+                <Stack direction="row" spacing={0.5} sx={{ mb: 1 }}>
+                  <Button
+                    size="small"
+                    variant={!validFrom && !validTo ? "contained" : "outlined"}
+                    onClick={() => { setValidFrom(""); setValidTo(""); }}
+                    sx={{ fontSize: "0.65rem", textTransform: "none" }}
+                  >
+                    Vô thời hạn
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={validFrom && validTo && validFrom.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`) ? "contained" : "outlined"}
+                    onClick={() => {
+                      const now = new Date();
+                      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+                      const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                      setValidFrom(first.toISOString().split("T")[0]);
+                      setValidTo(last.toISOString().split("T")[0]);
+                    }}
+                    sx={{ fontSize: "0.65rem", textTransform: "none" }}
+                  >
+                    Tháng này
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={validFrom && validTo && validFrom.startsWith(`${new Date().getFullYear()}-${String(new Date().getMonth() + 2).padStart(2, '0')}`) ? "contained" : "outlined"}
+                    onClick={() => {
+                      const now = new Date();
+                      const first = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                      const last = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+                      setValidFrom(first.toISOString().split("T")[0]);
+                      setValidTo(last.toISOString().split("T")[0]);
+                    }}
+                    sx={{ fontSize: "0.65rem", textTransform: "none" }}
+                  >
+                    Tháng sau
+                  </Button>
+                </Stack>
+                <Stack direction="row" spacing={1}>
+                  <TextField
+                    size="small"
+                    type="date"
+                    label="Từ ngày"
+                    value={validFrom}
+                    onChange={(e) => setValidFrom(e.target.value)}
+                    sx={{ flex: 1 }}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                  <TextField
+                    size="small"
+                    type="date"
+                    label="Đến ngày"
+                    value={validTo}
+                    onChange={(e) => setValidTo(e.target.value)}
+                    sx={{ flex: 1 }}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Stack>
+              </Box>
+
+              <Button
+                fullWidth
+                variant="contained"
+                size="small"
+                onClick={handleCreate}
+                disabled={saving}
+                startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <AddIcon />}
+              >
+                {saving ? "Đang tạo..." : "Thêm mẫu"}
+              </Button>
+            </Stack>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Đã tạo ({templates.length})
+              </Typography>
+              {loading && <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic", mt: 0.5 }}>Đang tải...</Typography>}
+              {!loading && templates.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic", mt: 0.5 }}>Chưa có mẫu nào</Typography>
+              )}
+              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                {templates.map((t) => (
+                  <Box key={t.id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, py: 1, borderRadius: 1, bgcolor: "background.paper", border: 1, borderColor: "divider" }}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{t.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {DAYS[t.dayOfWeek]} · {getShiftName(t.shiftId)} · {getZoneName(t.zoneId)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                        {getStaffName(t.staffId)}
+                        {t.validFrom ? ` (${t.validFrom} → ${t.validTo || "..."})` : " (Vô thời hạn)"}
+                      </Typography>
+                    </Box>
+                    <IconButton size="small" color="error" onClick={() => openDeleteConfirm(t.id)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          </Box>
+        </Box>
+      </Drawer>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+        <DialogTitle>Xác nhận xóa</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Xóa mẫu lịch này?</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Hủy</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error">Xóa</Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

@@ -1,29 +1,63 @@
 'use client';
 
+import { Box } from '@mui/material';
+import { keyframes } from '@mui/system';
+
+const pulseAnimation = keyframes`
+  0% { transform: scale(1); opacity: 0; }
+  50% { opacity: 0.4; }
+  100% { transform: scale(1.8); opacity: 0; }
+`;
+
 interface PulseAnimationProps {
   color?: 'blue' | 'emerald' | 'red';
   size?: number;
 }
 
+const colorMap = {
+  blue: { border: 'primary.main', ring: 'primary.dark' },
+  emerald: { border: 'success.main', ring: 'success.dark' },
+  red: { border: 'error.main', ring: 'error.dark' },
+};
+
 export default function PulseAnimation({ color = 'blue', size = 120 }: PulseAnimationProps) {
-  const colorMap = {
-    blue: 'border-blue-500',
-    emerald: 'border-emerald-500',
-    red: 'border-red-500',
-  };
+  const colors = colorMap[color];
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <div
-        className={`absolute inset-0 rounded-full border-2 ${colorMap[color]} opacity-0 animate-ping`}
-        style={{ animationDuration: '2s' }}
+    <Box sx={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Outer pulse ring */}
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: '50%',
+          border: 2,
+          borderColor: colors.border,
+          animation: `${pulseAnimation} 2s ease-out infinite`,
+        }}
       />
-      <div
-        className={`absolute inset-2 rounded-full border ${colorMap[color]} opacity-40`}
+      {/* Middle ring */}
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: '8px',
+          borderRadius: '50%',
+          border: 1,
+          borderColor: colors.border,
+          opacity: 0.4,
+        }}
       />
-      <div
-        className={`absolute inset-4 rounded-full border ${colorMap[color]} opacity-60`}
+      {/* Inner ring */}
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: '16px',
+          borderRadius: '50%',
+          border: 1,
+          borderColor: colors.border,
+          opacity: 0.6,
+        }}
       />
-    </div>
+    </Box>
   );
 }

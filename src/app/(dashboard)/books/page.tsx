@@ -462,8 +462,8 @@ export default function BooksPage() {
                   </Button>
                 ) : null}
               </Stack>
-              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, borderRadius: 2 }}>
-                <Table size="small" stickyHeader>
+      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, borderRadius: 2, overflowX: "auto" }}>
+      <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
                       <TableCell padding="checkbox" sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>
@@ -570,8 +570,8 @@ export default function BooksPage() {
 
       {showResults && importResults ? (
         <DashboardCard title="Kết quả nhập kho">
-          <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320 }}>
-            <Table size="small" stickyHeader>
+      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflowX: "auto" }}>
+      <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
                   <TableCell>ISBN</TableCell>
@@ -727,7 +727,7 @@ export default function BooksPage() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>ISBN: {selectedBook.isbn}</Typography>
                 </Box>
               </Stack>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 1 }}>
                 <Alert severity="info">Tổng: {selectedBook.total_copies}</Alert>
                 <Alert severity="success">Sẵn sàng: {selectedBook.available_copies}</Alert>
                 <Alert severity="warning">Đang mượn: {selectedBook.total_copies - selectedBook.available_copies}</Alert>
@@ -783,19 +783,21 @@ export default function BooksPage() {
       />
 
       <Fade in={selectedIds.size > 0}>
-        <Paper
-          elevation={8}
-          sx={{
-            position: "fixed",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 1300,
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            px: 3,
-            py: 1.5,
+  <Paper
+    elevation={8}
+    sx={{
+      position: "fixed",
+      bottom: { xs: 12, sm: 24 },
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 1300,
+      maxWidth: "calc(100vw - 32px)",
+      width: "auto",
+      display: "flex",
+      alignItems: "center",
+      gap: 1.5,
+      px: { xs: 1.5, sm: 3 },
+      py: 1.5,
             borderRadius: 3,
             background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
             border: "1px solid",

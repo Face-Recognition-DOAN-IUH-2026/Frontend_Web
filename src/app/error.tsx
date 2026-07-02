@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { Box, Button, Typography } from '@mui/material';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlineOutlined';
 
 export default function Error({
   error,
@@ -14,37 +16,28 @@ export default function Error({
   }, [error]);
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      padding: '2rem',
-      textAlign: 'center',
-      backgroundColor: '#0D1117',
-      color: '#E6EDF3',
-    }}>
-      <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
-        Da xay ra loi
-      </h2>
-      <p style={{ color: '#8B949E', marginBottom: '1.5rem', maxWidth: '400px' }}>
-        {error.message || 'Khong the tai trang. Vui long thu lai.'}
-      </p>
-      <button
-        onClick={reset}
-        style={{
-          padding: '0.75rem 1.5rem',
-          backgroundColor: '#1A73E8',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontSize: '1rem',
-        }}
-      >
-        Thu lai
-      </button>
-    </div>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        p: 3,
+        textAlign: 'center',
+        bgcolor: 'background.default',
+      }}
+    >
+      <ErrorOutlineIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
+      <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
+        Đã xảy ra lỗi
+      </Typography>
+      <Typography color="text.secondary" sx={{ mb: 3, maxWidth: 400 }}>
+        {error.message || 'Không thể tải trang. Vui lòng thử lại.'}
+      </Typography>
+      <Button variant="contained" onClick={reset}>
+        Thử lại
+      </Button>
+    </Box>
   );
 }

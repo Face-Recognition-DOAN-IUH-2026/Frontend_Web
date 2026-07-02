@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, KeyboardEvent } from 'react';
+import { IconButton, InputAdornment, TextField } from '@mui/material';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 interface MssvInputProps {
   onSubmit: (mssv: string) => void;
@@ -17,27 +19,45 @@ export default function MssvInput({ onSubmit, disabled }: MssvInputProps) {
   };
 
   return (
-    <div className="relative">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder="Nhập MSSV..."
-        className="w-full bg-slate-800/80 border border-slate-600 rounded-xl px-5 py-4 text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all disabled:opacity-50 font-mono tracking-wider text-center"
-      />
-      {value && (
-        <button
-          onClick={() => onSubmit(value.trim())}
-          disabled={disabled}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-white disabled:opacity-50 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-          </svg>
-        </button>
-      )}
-    </div>
+    <TextField
+      fullWidth
+      type="text"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={handleKeyDown}
+      disabled={disabled}
+      placeholder="Nhập MSSV..."
+      variant="outlined"
+      sx={{
+        "& .MuiInputBase-root": {
+          fontSize: "1.1rem",
+          fontFamily: "monospace",
+          letterSpacing: "0.1em",
+          textAlign: "center",
+          bgcolor: "rgba(30,41,59,0.8)",
+          borderRadius: 3,
+          "& fieldset": { borderColor: "grey.600" },
+          "&:hover fieldset": { borderColor: "primary.main" },
+          "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 2 },
+        },
+        "& .MuiInputBase-input": { textAlign: "center", py: "16px" },
+      }}
+      slotProps={{
+        input: {
+          endAdornment: value ? (
+            <InputAdornment position="end">
+              <IconButton
+                onClick={() => onSubmit(value.trim())}
+                disabled={disabled}
+                color="primary"
+                sx={{ bgcolor: "primary.main", color: "white", "&:hover": { bgcolor: "primary.dark" }, p: 1 }}
+              >
+                <ArrowForwardIcon />
+              </IconButton>
+            </InputAdornment>
+          ) : undefined,
+        },
+      }}
+    />
   );
 }

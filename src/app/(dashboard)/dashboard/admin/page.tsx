@@ -229,8 +229,8 @@ export default function AdminPage() {
           </Typography>
         </Stack>
 
-        <TableContainer>
-          <Table sx={{ minWidth: 600 }}>
+      <TableContainer sx={{ overflowX: "auto" }}>
+      <Table sx={{ minWidth: 600 }}>
             <TableHead>
               <TableRow sx={{ "& .MuiTableCell-head": { fontWeight: 700, bgcolor: "action.hover", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: 0.5, color: "text.secondary" } }}>
                 <TableCell>Người dùng</TableCell>
