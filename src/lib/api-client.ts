@@ -11,6 +11,7 @@ import type {
   BookCopyData,
   CameraEvent,
   CameraStatus,
+  FaceResultEvent,
   LoginRequest,
   KioskResult,
   PatronCreate,
@@ -211,7 +212,7 @@ class ApiClient {
         }
         const originalRequest = error.config;
         if (status === 401 && originalRequest) {
-          if (originalRequest.url?.includes('/auth/')) {
+          if (originalRequest.url?.includes('/auth/') || originalRequest.url?.includes('/camera/')) {
             return Promise.reject(error);
           }
           return this.handleUnauthorized(originalRequest);
@@ -238,13 +239,8 @@ class ApiClient {
       return this.client(originalRequest);
     }
 
-    return new Promise((resolve, reject) => {
-      this._pendingRequests.push({ request: originalRequest, resolve, reject });
-      if (!this._showingReauth) {
-        this._showingReauth = true;
-        bus.emit("auth:required");
-      }
-    });
+    bus.emit("auth:required");
+    return Promise.reject(new Error("Session expired"));
   }
 
   public retryPendingRequests(newToken: string): void {
@@ -485,6 +481,30 @@ class ApiClient {
     return response.data;
   }
 
+  async processFaceImage(formData: FormData): Promise<{ task_id: string; status: string }> {
+    const response = await this.client.post("/api/face/process", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async processFaceImageSync(data: {
+    image: string;
+    camera_id?: string;
+    process_type?: string;
+    consent_given?: boolean;
+    target_user_id?: string;
+    connection_id?: string;
+  }): Promise<{
+    status: string;
+    process_type: string;
+    result: Record<string, unknown>;
+    processing_time_ms: number;
+  }> {
+    const response = await this.client.post("/api/face/process-sync", data);
+    return response.data;
+  }
+
   // === Patrons ===
   async searchPatrons(
     query?: string,
@@ -593,6 +613,22 @@ class ApiClient {
     es.addEventListener("camera_event", (msg: MessageEvent) => {
       try {
         const data = JSON.parse(msg.data) as CameraEvent;
+        onEvent(data);
+      } catch { /* ignore parse errors */ }
+    });
+    es.addEventListener("error", () => { onConnectionChange?.(false); });
+    return () => es.close();
+  }
+
+  connectFaceResultSSE(
+    onEvent: (event: FaceResultEvent) => void,
+    onConnectionChange?: (connected: boolean) => void,
+  ): () => void {
+    const es = new EventSource(`${API_BASE_URL}/api/access/events`, { withCredentials: true });
+    es.addEventListener("open", () => onConnectionChange?.(true));
+    es.addEventListener("face_result", (msg: MessageEvent) => {
+      try {
+        const data = JSON.parse(msg.data) as FaceResultEvent;
         onEvent(data);
       } catch { /* ignore parse errors */ }
     });

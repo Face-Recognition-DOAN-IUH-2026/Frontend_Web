@@ -31,6 +31,7 @@ import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import GateIcon from "@mui/icons-material/VideocamOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import CameraFeed from "@/app/(kiosk)/gate/_components/CameraFeed";
 import { useColorMode } from "@/lib/mui-theme";
 import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
@@ -106,6 +107,7 @@ export default function GatePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE(120000);
 
   const [step, setStep] = useState<Step>("idle");
   const [mssv, setMssv] = useState("");
@@ -151,6 +153,47 @@ export default function GatePage() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  useEffect(() => {
+    return () => resetSSE();
+  }, [resetSSE]);
+
+  // Handle SSE result for kiosk face verification
+  useEffect(() => {
+    if (sseState.status === "SUCCESS") {
+      const taskResult = sseState.result;
+      const success = taskResult?.status === "success";
+      const confidence = (taskResult as any)?.score ?? (taskResult as any)?.confidence;
+      if (!success) {
+        api.createKioskApprovalRequest({
+          device_id: "kiosk-1",
+          patron_id: lookup?.patron?.id || "",
+          student_code: mssv,
+        }).then((approval) => setApprovalEventCode(approval.event_code)).catch(() => {});
+      }
+      setResult({
+        success: !!success,
+        message: success
+          ? `Xác thực thành công - ${(taskResult as any)?.access_type === "exit" ? "Ra" : "Vào"} thư viện`
+          : "Xác thực khuôn mặt không thành công.",
+        patron: lookup?.patron || null,
+        job_id: null,
+        confidence,
+      });
+      setStep("result");
+      setLoading(false);
+      setStatusText("");
+    } else if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
+      const message = sseState.error || "Xác thực thất bại.";
+      setResult({ success: false, message, patron: null, job_id: null });
+      setStep("result");
+      setLoading(false);
+      setStatusText("");
+      addToast({ severity: "error", message });
+    } else if (sseState.status === "WAITING") {
+      setStatusText("Đang xử lý...");
+    }
+  }, [sseState.status, sseState.result, sseState.error, lookup, mssv, addToast]);
+
   const startCamera = useCallback(async () => {
     try {
       if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
@@ -190,22 +233,6 @@ export default function GatePage() {
       }, "image/jpeg", 0.9);
     })
   ), []);
-
-  const pollTask = useCallback(async (jobId: string, intervalMs = 2000, timeoutMs = 120000): Promise<any> => {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-      try {
-        const task = await api.getTaskStatus(jobId);
-        if (task.status === "SUCCESS") return task.result;
-        if (task.status === "FAILURE") throw new Error(task.result?.error || "Task failed");
-        setStatusText(task.result?.status === "granted" ? "Đã ghi nhận..." : "Đang xử lý...");
-      } catch {
-        // Task state can lag behind the worker; continue until timeout.
-      }
-    }
-    throw new Error("Quá thời gian chờ kết quả");
-  }, []);
 
   const handleLookup = async (inputMssv: string) => {
     const normalized = inputMssv.trim();
@@ -254,40 +281,20 @@ export default function GatePage() {
       setStatusText("Đang xác thực khuôn mặt...");
       const response = await api.kioskEnter(imageFile, mssv);
       if (response.job_id) {
-        const taskResult = await pollTask(response.job_id);
-        const success = taskResult?.status === "success";
-        const confidence = taskResult?.score ?? taskResult?.confidence;
-        if (!success) {
-          try {
-            const approval = await api.createKioskApprovalRequest({
-              device_id: "kiosk-1",
-              patron_id: response.patron?.id || "",
-              student_code: mssv,
-            });
-            setApprovalEventCode(approval.event_code);
-          } catch {}
-        }
-        setResult({
-          success,
-          message: success
-            ? `Xác thực thành công - ${taskResult?.access_type === "exit" ? "Ra" : "Vào"} thư viện`
-            : "Xác thực khuôn mặt không thành công.",
-          patron: response.patron,
-          job_id: response.job_id,
-          confidence,
-        });
+        startSSE(response.job_id);
       } else {
         setResult(response);
+        setStep("result");
+        setLoading(false);
+        setStatusText("");
       }
-      setStep("result");
     } catch (err: any) {
       const message = getErrorMessage(err) || "Xác thực thất bại.";
       setResult({ success: false, message, patron: null, job_id: null });
       setStep("result");
-      addToast({ severity: "error", message });
-    } finally {
       setLoading(false);
       setStatusText("");
+      addToast({ severity: "error", message });
     }
   };
 

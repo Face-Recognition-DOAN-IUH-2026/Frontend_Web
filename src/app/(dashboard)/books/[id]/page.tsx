@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -37,13 +38,17 @@ import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
-import Book3DViewer from "@/app/(dashboard)/_components/Book3DViewer";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+
+const Book3DViewer = dynamic(
+  () => import("@/app/(dashboard)/_components/Book3DViewer"),
+  { ssr: false, loading: () => <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "grey.100", borderRadius: 2 }}><CircularProgress /></Box> }
+);
 
 function StatCard({ label, value, color, icon }: { label: string; value: number; color: "info" | "success" | "warning"; icon: React.ReactNode }) {
   return (

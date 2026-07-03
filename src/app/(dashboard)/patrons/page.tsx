@@ -50,7 +50,7 @@ import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
 import type { CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
 import MultiAngleCapture from "@/app/(dashboard)/_components/MultiAngleCapture";
-import StudentCardScanner, { type ScannedCardData } from "@/app/(dashboard)/_components/StudentCardScanner";
+import { StudentCardScanner, type ScannedCardData } from "@/app/(dashboard)/_components/scanner";
 import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 
 type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face" | "deleted";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Box,
@@ -19,6 +19,7 @@ import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import type { PatronPublic } from "@/lib/types";
 
 export interface PatronVerifyResult {
@@ -42,6 +43,7 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE(30000);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -80,6 +82,32 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
     onClose?.();
   }, [stopCamera, onClose]);
 
+  useEffect(() => {
+    return () => resetSSE();
+  }, [resetSSE]);
+
+  useEffect(() => {
+    if (sseState.status === "SUCCESS" && sseState.result) {
+      const r = sseState.result;
+      const patronResult: PatronVerifyResult = {
+        patron_id: (r.patron_id as string) || "",
+        student_code: (r.student_code as string) || studentCode,
+        full_name: (r.full_name as string) || "",
+        score: (r.score as number) || 0,
+      };
+      stopCamera();
+      setOpen(false);
+      onVerified(patronResult);
+      return;
+    }
+    if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
+      const errMsg = sseState.error || "Xác minh khuôn mặt thất bại";
+      setError(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
+      setVerifying(false);
+      return;
+    }
+  }, [sseState, studentCode, stopCamera, onVerified]);
+
   const captureAndVerify = useCallback(async () => {
     if (!videoRef.current || !studentCode.trim()) return;
 
@@ -107,32 +135,7 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
       const result = await api.kioskEnter(file, studentCode.trim());
 
       if (result.job_id) {
-        let attempts = 0;
-        const maxAttempts = 30;
-        while (attempts < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 1000));
-          const taskStatus = await api.getTaskStatus(result.job_id);
-          if (taskStatus.status === "SUCCESS" && taskStatus.result) {
-            const patronResult: PatronVerifyResult = {
-              patron_id: taskStatus.result.patron_id || "",
-              student_code: taskStatus.result.student_code || studentCode,
-              full_name: taskStatus.result.full_name || "",
-              score: taskStatus.result.score || 0,
-            };
-            stopCamera();
-            setOpen(false);
-            onVerified(patronResult);
-            return;
-          }
-          if (taskStatus.status === "FAILURE" || taskStatus.status === "ERROR") {
-            const errMsg = taskStatus.result?.error || taskStatus.result?.detail || "Xác minh khuôn mặt thất bại";
-            setError(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
-            setVerifying(false);
-            return;
-          }
-          attempts++;
-        }
-        setError("Hết thời gian chờ xác minh. Vui lòng thử lại.");
+        startSSE(result.job_id);
       } else if (result.patron) {
         const patronResult: PatronVerifyResult = {
           patron_id: result.patron.id,
@@ -153,7 +156,7 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
       setCapturing(false);
       setVerifying(false);
     }
-  }, [studentCode, stopCamera, onVerified]);
+  }, [studentCode, stopCamera, onVerified, startSSE]);
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>

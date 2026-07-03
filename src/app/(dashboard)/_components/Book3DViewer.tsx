@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, Suspense } from "react";
+import { useRef, Suspense, useMemo, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, useTexture } from "@react-three/drei";
 import * as THREE from "three";
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 
 interface BookProps {
   coverUrl: string;
@@ -25,20 +25,29 @@ function BookModel({ coverUrl }: BookProps) {
 
   const coverTexture = useTexture(proxiedUrl);
   
-  // Basic colors for other sides
-  const pageMaterial = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.8 });
-  const coverMaterial = new THREE.MeshStandardMaterial({ map: coverTexture, roughness: 0.3 });
-  const backMaterial = new THREE.MeshStandardMaterial({ color: 0x1976d2, roughness: 0.4 }); // Primary color spine/back
+  // Memoize materials to avoid recreation on every render, and handle their disposal
+  const materials = useMemo(() => {
+    const pageMaterial = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.8 });
+    const coverMaterial = new THREE.MeshStandardMaterial({ map: coverTexture, roughness: 0.3 });
+    const backMaterial = new THREE.MeshStandardMaterial({ color: 0x1976d2, roughness: 0.4 }); // Primary color spine/back
 
-  // Materials for BoxGeometry (right, left, top, bottom, front, back)
-  const materials = [
-    pageMaterial,  // right (pages edge)
-    backMaterial,  // left (spine)
-    pageMaterial,  // top (pages edge)
-    pageMaterial,  // bottom (pages edge)
-    coverMaterial, // front cover
-    backMaterial,  // back cover
-  ];
+    // Materials for BoxGeometry (right, left, top, bottom, front, back)
+    return [
+      pageMaterial,  // right (pages edge)
+      backMaterial,  // left (spine)
+      pageMaterial,  // top (pages edge)
+      pageMaterial,  // bottom (pages edge)
+      coverMaterial, // front cover
+      backMaterial,  // back cover
+    ];
+  }, [coverTexture]);
+
+  // Clean up materials to prevent WebGL memory leaks
+  useEffect(() => {
+    return () => {
+      materials.forEach((mat) => mat.dispose());
+    };
+  }, [materials]);
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -57,8 +66,21 @@ function BookModel({ coverUrl }: BookProps) {
 
 function Loader() {
   return (
-    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", flexDirection: "column", gap: 1 }}>
-      <CircularProgress size={30} />
+    <Box sx={{
+      width: "100%", height: "400px",
+      display: "flex", justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 1,
+      bgcolor: "action.hover",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
+      borderRadius: 1,
+    }}>
+      <Box sx={{
+        width: 40, height: 40, borderRadius: "50%",
+        border: "3px solid", borderColor: "divider",
+        borderTopColor: "primary.main",
+        animation: "spin 0.8s linear infinite",
+        "@keyframes spin": { "100%": { transform: "rotate(360deg)" } },
+      }} />
       <Typography variant="caption" color="text.secondary">Đang tải 3D...</Typography>
     </Box>
   );

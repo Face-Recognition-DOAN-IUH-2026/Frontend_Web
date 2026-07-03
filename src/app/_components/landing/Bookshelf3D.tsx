@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import * as THREE from "three";
 
 interface Bookshelf3DProps {
@@ -33,6 +33,13 @@ function ShelfBook({ x, color, height }: { x: number; color: string; height: num
     const pageMat = new THREE.MeshStandardMaterial({ color: 0xF5F5F0, roughness: 0.8 });
     return [pageMat, spineMat, pageMat, pageMat, coverMat, spineMat];
   }, [color]);
+
+  // Clean up materials to prevent WebGL memory leaks
+  useEffect(() => {
+    return () => {
+      materials.forEach((mat) => mat.dispose());
+    };
+  }, [materials]);
 
   return (
     <mesh position={[x, height / 2, 0]} material={materials} castShadow>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useMemo } from "react";
+import { Suspense, useRef, useState, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -103,6 +103,7 @@ export default function DataVisualization3D() {
           Tương tác: Kéo thả để xoay • Cuộn để zoom • Trỏ chuột vào cột
         </Typography>
       </Box>
+      <Suspense fallback={<Box sx={{ width: "100%", height: 350, bgcolor: "action.hover", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }} />}>
       <Canvas shadows camera={{ position: [5, 5, 8], fov: 50 }}>
         <ambientLight intensity={0.5} />
         <directionalLight 
@@ -138,6 +139,7 @@ export default function DataVisualization3D() {
           autoRotateSpeed={0.5}
         />
       </Canvas>
+      </Suspense>
     </Box>
   );
 }

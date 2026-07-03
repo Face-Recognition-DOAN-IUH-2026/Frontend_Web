@@ -4,21 +4,41 @@ import userEvent from "@testing-library/user-event";
 import BooksPage from "@/app/(dashboard)/books/page";
 import * as apiClient from "@/lib/api-client";
 
-jest.mock("@/lib/api-client", () => ({
-  api: {
-    listBooks: jest.fn(),
-    searchBooks: jest.fn(),
+// Global mock state variables that start with 'mock' to comply with Jest hoisting rules
+let mockBooksResponseVal: any;
+let mockSearchResultsVal: any;
+let mockBarcodesVal: any;
+
+jest.mock("@/lib/api-client", () => {
+  const mockObj = {
+    listBooks: jest.fn(() => Promise.resolve(mockBooksResponseVal)),
+    searchBooks: jest.fn(() => Promise.resolve(mockSearchResultsVal)),
     importBooks: jest.fn(),
     getBarcodePreview: jest.fn(),
     downloadBookTemplate: jest.fn(),
     exportBooks: jest.fn(),
     updateBookQuantity: jest.fn(),
-    getBarcodes: jest.fn(),
-  },
-  getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
+    getBarcodes: jest.fn(() => Promise.resolve(mockBarcodesVal)),
+  };
+  return {
+    __esModule: true,
+    default: mockObj,
+    api: mockObj,
+    getErrorMessage: jest.fn((err) => err?.message || "Unknown error"),
+  };
+});
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+  }),
+  usePathname: () => "",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
-const mockApi = apiClient.api as jest.Mocked<typeof apiClient.api>;
+const mockApi = apiClient.api as any;
 
 const mockBooksResponse = {
   items: [
@@ -53,9 +73,9 @@ const mockBooksResponse = {
 describe("BooksPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockApi.listBooks.mockResolvedValue(mockBooksResponse as any);
-    mockApi.searchBooks.mockResolvedValue(mockBooksResponse.items as any);
-    mockApi.getBarcodes.mockResolvedValue([]);
+    mockBooksResponseVal = mockBooksResponse;
+    mockSearchResultsVal = mockBooksResponse.items;
+    mockBarcodesVal = [];
   });
 
   it("renders book list with data from API", async () => {
@@ -86,7 +106,7 @@ describe("BooksPage", () => {
     await userEvent.click(bookRow);
 
     await waitFor(() => {
-      expect(screen.getByText(/số lượng/i)).toBeInTheDocument();
+      expect(screen.getByText("Sửa số lượng sách")).toBeInTheDocument();
     });
   });
 
@@ -94,8 +114,8 @@ describe("BooksPage", () => {
     render(<BooksPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("5")).toBeInTheDocument();
-      expect(screen.getByText("3")).toBeInTheDocument();
+      expect(screen.getAllByText("5").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("3").length).toBeGreaterThan(0);
     });
   });
 
@@ -127,9 +147,7 @@ describe("BooksPage", () => {
     render(<BooksPage />);
 
     await waitFor(() => {
-      const buttons = screen.getAllByRole("button");
-      const templateBtn = buttons.find((b) => b.textContent?.includes("Tải mẫu"));
-      expect(templateBtn).toBeTruthy();
+      expect(screen.getByLabelText("Tải mẫu")).toBeInTheDocument();
     });
   });
 
@@ -137,24 +155,22 @@ describe("BooksPage", () => {
     render(<BooksPage />);
 
     await waitFor(() => {
-      const buttons = screen.getAllByRole("button");
-      const exportBtn = buttons.find((b) => b.textContent?.includes("Xuất Excel"));
-      expect(exportBtn).toBeTruthy();
+      expect(screen.getByLabelText("Xuất Excel")).toBeInTheDocument();
     });
   });
 
   it("handles empty book list gracefully", async () => {
-    mockApi.listBooks.mockResolvedValueOnce({
+    mockBooksResponseVal = {
       items: [],
       total: 0,
       skip: 0,
       limit: 10,
-    });
+    };
 
     render(<BooksPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/không tìm thấy/i)).toBeInTheDocument();
+      expect(screen.getByText(/không tìm thấy|chưa có sách/i)).toBeInTheDocument();
     });
   });
 
@@ -169,14 +185,14 @@ describe("BooksPage", () => {
     await userEvent.click(bookRow);
 
     await waitFor(() => {
-      expect(screen.getByText(/số lượng/i)).toBeInTheDocument();
+      expect(screen.getByText("Sửa số lượng sách")).toBeInTheDocument();
     });
 
     const quantityInput = screen.getByRole("spinbutton");
     await userEvent.clear(quantityInput);
     await userEvent.type(quantityInput, "-1");
 
-    const saveButton = screen.getByText("Lưu");
+    const saveButton = screen.getByText(/lưu/i);
     await userEvent.click(saveButton);
 
     expect(mockApi.updateBookQuantity).not.toHaveBeenCalled();

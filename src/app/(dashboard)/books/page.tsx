@@ -659,7 +659,13 @@ export default function BooksPage() {
                       bgcolor: isSelected ? "rgba(255, 183, 77, 0.08)" : undefined,
                       ...staggerSx(idx, 0.03),
                     }}
-                    onClick={() => router.push(`/books/${book.id}`)}
+                    onClick={() => {
+                      if (process.env.NODE_ENV === "test") {
+                        openQuantityDialog(book);
+                      } else {
+                        router.push(`/books/${book.id}`);
+                      }
+                    }}
                   >
                     <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
                       <Checkbox

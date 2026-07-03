@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import {
   Alert, Box, Button, Card, CardContent, Checkbox, CircularProgress,
   FormControlLabel, Paper, Stack, Step, StepLabel, Stepper,
@@ -9,7 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import api, { getErrorMessage } from "@/lib/api-client";
-import StudentCardScanner, { type ScannedCardData } from "@/app/(dashboard)/_components/StudentCardScanner";
+import { StudentCardScanner, type ScannedCardData } from "@/app/(dashboard)/_components/scanner";
 import MultiAngleCapture, { type CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
 
 const steps = ["Quét thẻ", "Xác nhận thông tin", "Đăng ký", "Khuôn mặt"];
@@ -23,7 +24,6 @@ export default function RegisterPage() {
   const [scannedData, setScannedData] = useState<ScannedCardData | null>(null);
   const [error, setError] = useState("");
   const [registering, setRegistering] = useState(false);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,16 +39,29 @@ export default function RegisterPage() {
   const [faceResult, setFaceResult] = useState<any>(null);
   const [faceLoading, setFaceLoading] = useState(false);
   const [faceError, setFaceError] = useState("");
+  const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE();
 
   const [registrationTokens, setRegistrationTokens] = useState<{
     access_token: string; refresh_token?: string;
   } | null>(null);
 
   useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, []);
+    if (sseState.status === "SUCCESS") {
+      if ((sseState.result as any)?.status === "error") {
+        setFaceError((sseState.result as any)?.error || "Đăng ký khuôn mặt thất bại");
+      }
+      setFaceResult(sseState.result);
+      setFaceLoading(false);
+      setPhase("done");
+    } else if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
+      setFaceError(sseState.error || "Không thể lấy trạng thái tác vụ");
+      setFaceResult(sseState.result);
+      setFaceLoading(false);
+      setPhase("done");
+    }
+  }, [sseState, resetSSE]);
+
+  useEffect(() => () => resetSSE(), [resetSSE]);
 
   const handleScanned = async (data: ScannedCardData) => {
     setError("");
@@ -117,32 +130,7 @@ export default function RegisterPage() {
       const token = registrationTokens?.access_token;
       const data = await api.enrollBatch(files, consent, token);
       setPhase("face-enrolling");
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          const statusData = await api.getTaskStatus(data.job_id, token);
-          if (statusData.status === "SUCCESS") {
-            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-            if (statusData.result?.status === "error") {
-              setFaceError(statusData.result.error || "Đăng ký khuôn mặt thất bại");
-            }
-            setFaceResult(statusData.result);
-            setFaceLoading(false);
-            setPhase("done");
-          } else if (statusData.status === "FAILURE") {
-            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-            setFaceError(statusData.result?.error || "Đăng ký khuôn mặt thất bại");
-            setFaceResult(statusData.result);
-            setFaceLoading(false);
-            setPhase("done");
-          }
-        } catch {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          setFaceError("Không thể lấy trạng thái tác vụ");
-          setFaceLoading(false);
-          setPhase("done");
-        }
-      }, 2000);
+      startSSE(data.job_id);
     } catch (err: any) {
       setFaceError(getErrorMessage(err) || "Đăng ký khuôn mặt thất bại");
       setFaceLoading(false);

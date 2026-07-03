@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { Suspense, useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { Box } from "@mui/material";
-
 function Particles() {
   const pointsRef = useRef<THREE.Points>(null);
 
@@ -71,7 +70,7 @@ function Particles() {
   );
 }
 
-export default function LoginBackground3D() {
+function Scene() {
   return (
     <Box 
       sx={{ 
@@ -81,7 +80,7 @@ export default function LoginBackground3D() {
         width: "100vw", 
         height: "100vh", 
         zIndex: -1,
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1e2f 100%)", // Dark elegant background
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1e2f 100%)",
         pointerEvents: "none"
       }}
     >
@@ -90,5 +89,15 @@ export default function LoginBackground3D() {
         <Particles />
       </Canvas>
     </Box>
+  );
+}
+
+export default function LoginBackground3D() {
+  return (
+    <Suspense fallback={
+      <Box sx={{ width: "100vw", height: "100vh", bgcolor: "#0f172a" }} />
+    }>
+      <Scene />
+    </Suspense>
   );
 }

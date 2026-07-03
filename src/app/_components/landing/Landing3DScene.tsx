@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { Suspense, useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { Box } from "@mui/material";
 import Book3D from "./Book3D";
 import Bookshelf3D from "./Bookshelf3D";
-
 function FloatingParticles() {
   const pointsRef = useRef<THREE.Points>(null);
 
@@ -81,7 +81,7 @@ const books = [
   { pos: [-3, -2.5, -4.5] as [number, number, number], rot: [0.05, 0.2, 0.15] as [number, number, number], color: "#4A8C5C", scale: 0.65, floatSpeed: 1.15 },
 ];
 
-export default function Landing3DScene() {
+function Scene() {
   return (
     <div
       style={{
@@ -103,7 +103,6 @@ export default function Landing3DScene() {
         <pointLight position={[-4, 3, 2]} intensity={0.5} color="#1A73E8" distance={15} />
         <pointLight position={[4, -2, 3]} intensity={0.3} color="#E6A817" distance={12} />
 
-        {/* Floating books */}
         {books.map((b, i) => (
           <Book3D
             key={i}
@@ -117,17 +116,23 @@ export default function Landing3DScene() {
           />
         ))}
 
-        {/* Bookshelves */}
         <Bookshelf3D position={[-6, -3, -6]} rotation={[0, 0.3, 0]} scale={1.2} shelves={4} booksPerShelf={7} />
         <Bookshelf3D position={[6, -3.5, -7]} rotation={[0, -0.25, 0]} scale={1.0} shelves={3} booksPerShelf={6} />
         <Bookshelf3D position={[0, -4, -9]} rotation={[0, 0, 0]} scale={1.4} shelves={5} booksPerShelf={8} />
 
-        {/* Particles */}
         <FloatingParticles />
-
-        {/* Camera animation */}
         <CameraRig />
       </Canvas>
     </div>
+  );
+}
+
+export default function Landing3DScene() {
+  return (
+    <Suspense fallback={
+      <Box sx={{ width: "100vw", height: "100vh", bgcolor: "#0f172a" }} />
+    }>
+      <Scene />
+    </Suspense>
   );
 }
