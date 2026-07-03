@@ -43,12 +43,13 @@ import type {
   StaffShift,
   ManualCheckInRequest,
   GeofenceConfig,
-  AiCommandCenterSummary,
-  AiInsight,
-  AiInsightExplanation,
-  AiInsightList,
-  AiChatResponse,
-  BookRecommendationResponse,
+  AICommandCenterSummary,
+  AIInsight,
+  AIInsightExplanation,
+  AIInsightList,
+  AIChatResponse,
+  AIConfirmResponse,
+  AIBookRecommendationResponse,
   Notification,
   NotificationListResponse,
 } from "./types";
@@ -1206,37 +1207,37 @@ class ApiClient {
 
 
 
-  async getAiCommandCenterSummary(): Promise<AiCommandCenterSummary> {
-    const response = await this.client.get<AiCommandCenterSummary>("/api/ai/command-center/summary");
+  async getAICommandCenterSummary(): Promise<AICommandCenterSummary> {
+    const response = await this.client.get<AICommandCenterSummary>("/api/ai/command-center/summary");
     return response.data;
   }
 
-  async refreshAiCommandCenter(): Promise<AiCommandCenterSummary> {
-    const response = await this.client.post<AiCommandCenterSummary>("/api/ai/command-center/refresh");
+  async refreshAiCommandCenter(): Promise<AICommandCenterSummary> {
+    const response = await this.client.post<AICommandCenterSummary>("/api/ai/command-center/refresh");
     return response.data;
   }
 
-  async getAiInsights(params?: { status?: string; category?: string; severity?: string }): Promise<AiInsightList> {
-    const response = await this.client.get<AiInsightList>("/api/ai/insights", { params });
+  async getAIInsights(params?: { status?: string; category?: string; severity?: string }): Promise<AIInsightList> {
+    const response = await this.client.get<AIInsightList>("/api/ai/insights", { params });
     return response.data;
   }
 
-  async dismissAiInsight(id: string): Promise<AiInsight> {
-    const response = await this.client.post<AiInsight>(`/api/ai/insights/${id}/dismiss`);
+  async dismissAIInsight(id: string): Promise<AIInsight> {
+    const response = await this.client.post<AIInsight>(`/api/ai/insights/${id}/dismiss`);
     return response.data;
   }
 
-  async explainAiInsight(id: string): Promise<AiInsightExplanation> {
-    const response = await this.client.get<AiInsightExplanation>(`/api/ai/insights/${id}/explain`);
+  async explainAIInsight(id: string): Promise<AIInsightExplanation> {
+    const response = await this.client.get<AIInsightExplanation>(`/api/ai/insights/${id}/explain`);
     return response.data;
   }
 
-  async askAiCommandCenter(question: string): Promise<AiChatResponse> {
-    const response = await this.client.post<AiChatResponse>("/api/ai/command-center/chat", { question });
+  async askAiCommandCenter(question: string): Promise<AIChatResponse> {
+    const response = await this.client.post<AIChatResponse>("/api/ai/command-center/chat", { question });
     return response.data;
   }
 
-  async askAiChat(message: string, sessionId?: string): Promise<{ response: string; sessionId?: string; toolResults?: any[]; userRole?: string }> {
+  async askAiChat(message: string, sessionId?: string): Promise<AIChatResponse> {
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
     const userData = storedUser ? JSON.parse(storedUser) : null;
     const role = userData?.role || 'staff';
@@ -1252,8 +1253,21 @@ class ApiClient {
     return response.data;
   }
 
-  async getBookRecommendations(studentCode: string): Promise<BookRecommendationResponse> {
-    const response = await this.client.get<BookRecommendationResponse>(`/api/ai/recommendations/patron/${studentCode}`);
+  async confirmAction(sessionId: string, action: 'approve' | 'reject', role?: string): Promise<AIConfirmResponse> {
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+    const userData = storedUser ? JSON.parse(storedUser) : null;
+    const effectiveRole = role || userData?.role || 'staff';
+
+    const endpoint = effectiveRole === 'patron' ? '/api/ai/patrons/confirm'
+                   : effectiveRole === 'staff' ? '/api/ai/staff/confirm'
+                   : '/api/ai/admin/confirm';
+
+    const response = await this.client.post(endpoint, { sessionId, action });
+    return response.data;
+  }
+
+  async getBookRecommendations(studentCode: string): Promise<AIBookRecommendationResponse> {
+    const response = await this.client.get<AIBookRecommendationResponse>(`/api/ai/recommendations/patron/${studentCode}`);
     return response.data;
   }
 

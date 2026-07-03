@@ -620,14 +620,14 @@ export interface ManualCheckInRequest {
 }
 
 // === AI Command Center ===
-export type AiInsightCategory = "access" | "borrow" | "schedule" | "inventory" | "risk";
-export type AiInsightSeverity = "info" | "warning" | "critical";
-export type AiInsightStatus = "open" | "dismissed" | "resolved";
+export type AIInsightCategory = "access" | "borrow" | "schedule" | "inventory" | "risk";
+export type AIInsightSeverity = "info" | "warning" | "critical";
+export type AIInsightStatus = "open" | "dismissed" | "resolved";
 
-export interface AiInsight {
+export interface AIInsight {
   id: string;
-  category: AiInsightCategory;
-  severity: AiInsightSeverity;
+  category: AIInsightCategory;
+  severity: AIInsightSeverity;
   title: string;
   summary: string;
   evidence: Array<{ label: string; value: string | number }>;
@@ -635,20 +635,20 @@ export interface AiInsight {
   reason: string;
   confidence: number;
   alternatives: string[];
-  status: AiInsightStatus;
+  status: AIInsightStatus;
   generated_at: string;
 }
 
-export interface AiInsightExplanation extends AiInsight {
+export interface AIInsightExplanation extends AIInsight {
   reasoning_trace: string;
 }
 
-export interface AiCommandCenterSummary {
+export interface AICommandCenterSummary {
   generated_at: string;
   model: string;
   headline: string;
   operational_score: number;
-  insights: AiInsight[];
+  insights: AIInsight[];
   snapshot: {
     active_patrons: number;
     today_entries: number;
@@ -659,12 +659,12 @@ export interface AiCommandCenterSummary {
   };
 }
 
-export interface AiInsightList {
-  items: AiInsight[];
+export interface AIInsightList {
+  items: AIInsight[];
   total: number;
 }
 
-export interface BookRecommendation {
+export interface AIBookRecommendation {
   book_id: string;
   isbn: string;
   title: string;
@@ -675,18 +675,53 @@ export interface BookRecommendation {
   relevance_score: number;
 }
 
-export interface BookRecommendationResponse {
+export interface AIBookRecommendationResponse {
   patron_id: string;
   patron_name: string;
-  recommendations: BookRecommendation[];
+  recommendations: AIBookRecommendation[];
   generated_at: string;
   model: string;
 }
 
-export interface AiChatResponse {
+export interface AIChatResponse {
+  response: string;
+  sessionId: string;
+  toolResults?: AIToolResult[];
+  requiresConfirmation?: boolean;
+  pendingAction?: AIPendingAction;
+  userRole?: string;
+}
+
+export interface AIConfirmResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface AICommandCenterChatResponse {
   answer: string;
   model: string;
   generated_at: string;
+}
+
+export interface AIMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  toolResults?: AIToolResult[];
+  requiresConfirmation?: boolean;
+  pendingAction?: AIPendingAction;
+  timestamp: string;
+}
+
+export interface AIToolResult {
+  name: string;
+  result: { success: boolean; data?: any; error?: string };
+}
+
+export interface AIPendingAction {
+  action: string;
+  description: string;
+  params: Record<string, any>;
 }
 
 // === Notifications ===

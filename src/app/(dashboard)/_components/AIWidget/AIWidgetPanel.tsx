@@ -8,10 +8,15 @@ import ScoreTab from "./tabs/ScoreTab";
 import ChatTab from "./tabs/ChatTab";
 import ActionsTab from "./tabs/ActionsTab";
 
-export default function AIWidgetPanel() {
+interface AIWidgetPanelProps {
+  role: string;
+}
+
+export default function AIWidgetPanel({ role }: AIWidgetPanelProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const { isOpen, activeTab, minimize } = useAIWidgetStore();
+  const { isOpen, activeTab, minimize, setActiveTab } = useAIWidgetStore();
+  const isPatron = role === 'patron';
 
   const panelWidth = isMobile ? "100vw" : 420;
 
@@ -63,14 +68,18 @@ export default function AIWidgetPanel() {
             >
               <AIWidgetHeader onMinimize={minimize} />
 
-              <TabNavigation />
+              {!isPatron && <TabNavigation />}
 
               <Box sx={{ flex: 1, overflow: "auto" }}>
-                <AnimatePresence mode="wait">
-                  {activeTab === "score" && <ScoreTab key="score" />}
-                  {activeTab === "chat" && <ChatTab key="chat" />}
-                  {activeTab === "actions" && <ActionsTab key="actions" />}
-                </AnimatePresence>
+                {isPatron ? (
+                  <ChatTab />
+                ) : (
+                  <AnimatePresence mode="wait">
+                    {activeTab === "score" && <ScoreTab key="score" />}
+                    {activeTab === "chat" && <ChatTab key="chat" />}
+                    {activeTab === "actions" && <ActionsTab key="actions" />}
+                  </AnimatePresence>
+                )}
               </Box>
             </Box>
           </motion.div>
