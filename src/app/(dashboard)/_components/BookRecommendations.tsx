@@ -19,7 +19,7 @@ import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CloseIcon from "@mui/icons-material/CloseOutlined";
 import LightbulbIcon from "@mui/icons-material/LightbulbOutlined";
 import api from "@/lib/api-client";
-import type { BookRecommendation, BookRecommendationResponse } from "@/lib/types";
+import type { AIBookRecommendation, AIBookRecommendationResponse } from "@/lib/types";
 import { fadeInUp } from "@/lib/animations";
 
 export default function BookRecommendations({
@@ -29,7 +29,7 @@ export default function BookRecommendations({
   studentCode: string;
   onClose?: () => void;
 }) {
-  const [data, setData] = useState<BookRecommendationResponse | null>(null);
+  const [data, setData] = useState<AIBookRecommendationResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -89,7 +89,7 @@ export default function BookRecommendations({
   );
 }
 
-function RecommendationCard({ book, index }: { book: BookRecommendation; index: number }) {
+function RecommendationCard({ book, index }: { book: AIBookRecommendation; index: number }) {
   return (
     <Card
       variant="outlined"

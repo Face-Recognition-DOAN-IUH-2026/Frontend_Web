@@ -16,6 +16,10 @@ export default function AIWidget() {
 
   const isBlacklisted = BLACKLIST_PATHS.some((p) => pathname?.startsWith(p));
 
+  const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+  const userData = storedUser ? JSON.parse(storedUser) : null;
+  const role = userData?.role || 'staff';
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -47,7 +51,7 @@ export default function AIWidget() {
           />
         )}
       </AnimatePresence>
-      <AIWidgetPanel />
+      <AIWidgetPanel role={role} />
     </>
   );
 }

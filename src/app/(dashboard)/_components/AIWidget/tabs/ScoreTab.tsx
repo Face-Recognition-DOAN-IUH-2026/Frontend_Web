@@ -14,7 +14,7 @@ export default function ScoreTab() {
   const handleRefresh = async () => {
     setLoading(true);
     try {
-      const raw = await api.getAiCommandCenterSummary();
+      const raw = await api.getAICommandCenterSummary();
       updateSummary({
         operational_score: raw.operational_score,
         active_patrons: raw.snapshot.active_patrons,
