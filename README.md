@@ -1,6 +1,4 @@
-# Thư Viện Thông Minh — Frontend Web
 
-![Uploading Hệ_sinh_thái_thư_viện.png…]()
 
 # Face Recognition Platform - Frontend
 
