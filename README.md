@@ -1,5 +1,9 @@
 # Thư Viện Thông Minh — Frontend Web
 
+![Uploading Hệ_sinh_thái_thư_viện.png…]()
+
+# Face Recognition Platform - Frontend
+
 Giao diện web quản lý thư viện thông minh — dashboard cho admin/nhân viên, mượn/trả sách, AI chatbot, quản lý bạn đọc, nhận diện khuôn mặt, VR tour và kiosk cổng ra vào.
 
 ![Thư viện thông minh](./smart-library.png)
@@ -211,3 +215,10 @@ npx playwright test  # E2E tests
 ## Troubleshooting
 
 Xem `docker compose logs` của backend nếu API không hoạt động. Đảm bảo `.env.local` tồn tại và backend service đang `Healthy`.
+1. [ ] Docker Desktop is running
+2. [ ] Backend is fully built and running (`docker-compose ps` shows all Up/Healthy)
+3. [ ] TypeScript services built (`npm run build` succeeds locally)
+4. [ ] `.env.local` exists with correct `NEXT_PUBLIC_API_URL`
+5. [ ] `npm install` completed without errors
+6. [ ] Port 3000 (frontend) and 80 (backend gateway) are free
+7. [ ] Browser has camera permissions for face recognition features
