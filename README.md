@@ -1,347 +1,213 @@
-# Face Recognition Platform - Frontend
+# Thư Viện Thông Minh — Frontend Web
 
-Next.js 15 frontend for the Face Recognition Platform.
+Giao diện web quản lý thư viện thông minh — dashboard cho admin/nhân viên, mượn/trả sách, AI chatbot, quản lý bạn đọc, nhận diện khuôn mặt, VR tour và kiosk cổng ra vào.
+
+![Thư viện thông minh](./smart-library.png)
 
 ## Architecture
 
 ```
-Frontend_web/
+Frontend_Web/
 ├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── (dashboard)/        # Protected dashboard routes
+│   ├── app/
+│   │   ├── _components/         # Shared UI components
+│   │   │   ├── landing/         # 3D landing (Three.js, @react-three/fiber)
+│   │   │   ├── UndoSnackbar.tsx
+│   │   │   ├── ReauthOverlay.tsx
+│   │   │   ├── ClientLayout.tsx
+│   │   │   ├── CameraFallback.tsx
+│   │   │   └── HoldButton.tsx
+│   │   ├── (dashboard)/         # Protected dashboard routes
+│   │   │   ├── _components/     # Dashboard-specific components (sidebar, AI widget, stat cards, tables)
+│   │   │   ├── dashboard/       # Overview, admin panel
+│   │   │   ├── borrow/          # Mượn sách
+│   │   │   ├── return/          # Trả sách
+│   │   │   ├── books/           # Danh mục sách, chi tiết sách
+│   │   │   ├── history/         # Lịch sử mượn trả
+│   │   │   ├── patrons/         # Quản lý bạn đọc
+│   │   │   ├── active/          # Bạn đọc đang ở thư viện
+│   │   │   ├── enroll/          # Đăng ký khuôn mặt
+│   │   │   ├── verify/          # Xác thực khuôn mặt
+│   │   │   ├── identify/        # Nhận diện khuôn mặt
+│   │   │   ├── liveness/        # Kiểm tra sống (liveness)
+│   │   │   ├── ai-assistant/    # AI chatbot hỗ trợ thư viện
+│   │   │   ├── notifications/   # Thông báo
+│   │   │   ├── profile/         # Hồ sơ cá nhân
+│   │   │   ├── staff-schedules/ # Lịch làm việc
+│   │   │   ├── stats/           # Thống kê thư viện
+│   │   │   ├── error.tsx
+│   │   │   └── layout.tsx
+│   │   ├── (kiosk)/             # Kiosk mode — màn hình cổng ra vào
+│   │   │   └── gate/
+│   │   ├── library/
+│   │   │   └── vr-tour/         # Tham quan thư viện 3D/VR
+│   │   ├── api/                 # Next.js API routes (proxy)
 │   │   ├── login/
 │   │   ├── register/
-│   │   └── page.tsx            # Landing page
-│   ├── components/
-│   │   ├── camera-capture.tsx  # Webcam capture component
-│   │   ├── job-poll.tsx        # Celery job polling
-│   │   └── sidebar.tsx          # Dashboard navigation
-│   └── lib/
-│       ├── api-client.ts       # Axios API client with JWT
-│       ├── auth-context.tsx    # Auth context provider
-│       └── types.ts            # TypeScript interfaces
-├── docker-compose.yml
-├── Dockerfile
-└── next.config.js
+│   │   ├── page.tsx             # Landing page với 3D scene
+│   │   ├── layout.tsx
+│   │   └── globals.css
+│   ├── lib/
+│   │   ├── api-client.ts        # Axios client với JWT interceptor
+│   │   ├── auth-context.tsx      # Auth context + refresh token
+│   │   ├── mui-theme.tsx         # MUI theme (dark/light/auto)
+│   │   ├── types.ts             # TypeScript interfaces
+│   │   ├── animations.ts        # Framer motion variants
+│   │   ├── hooks/               # Custom React hooks
+│   │   ├── mock-data/           # Dữ liệu mẫu cho UI
+│   │   └── vr/                  # VR tour helpers
+│   ├── hooks/                   # Global hooks
+│   └── middleware.ts             # Next.js middleware — auth guard
+├── public/
+├── e2e/                         # Playwright E2E tests
+├── next.config.js               # Rewrites /api/* → backend gateway
+├── tailwind.config.ts
+├── jest.config.mjs
+└── playwright.config.ts
 ```
-
----
-
-## Installation
-
-### Prerequisites
-
-- Node.js 18+ (recommended: 20.x LTS)
-- npm or yarn
-- Docker Desktop (if running with Docker)
-
-### Option 1: Local Development
-
-#### Step 1: Install Dependencies
-
-```bash
-cd D:/IUH/test/Frontend_Web_Test
-npm install
-```
-
-#### Step 2: Setup Environment
-
-Create or edit `.env.local`:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost/api
-```
-
-#### Step 3: Start Backend
-
-Make sure the backend is running first:
-
-```bash
-cd D:/IUH/test/Backend
-docker-compose up -d
-```
-
-#### Step 4: Start Frontend
-
-```bash
-cd D:/IUH/test/Frontend_Web_Test
-npm run dev
-```
-
-Visit http://localhost:3000
-
-### Option 2: Docker
-
-#### Step 1: Start Backend
-
-```bash
-cd D:/IUH/test/Backend
-docker-compose up -d
-```
-
-#### Step 2: Start Frontend
-
-```bash
-cd D:/IUH/test/Frontend_Web_Test
-docker-compose up -d
-```
-
-Frontend runs at http://localhost:3000
-
----
-
-## Common Errors & Fixes
-
-### 1. "Cannot find module 'next'" or other dependency errors
-
-**Cause:** node_modules missing or corrupted.
-
-**Fix:**
-```bash
-cd D:/IUH/test/Frontend_Web_Test
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### 2. "NEXT_PUBLIC_API_URL is not set"
-
-**Cause:** Environment variable not configured.
-
-**Fix:** Create `.env.local` in the project root:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost/api
-```
-
-For Docker backend, ensure backend is running first.
-
-### 3. "Hydration failed" or "Content mismatch" errors
-
-**Cause:** SSR mismatch, usually with localStorage access during render.
-
-**Fix:** Ensure API calls are wrapped in `useEffect` or use dynamic imports for components using browser-only APIs.
-
-### 4. Port 3000 already in use
-
-**Fix:**
-```powershell
-# Find process using port 3000
-netstat -ano | findstr :3000
-taskkill /PID <pid> /F
-
-# Or change port
-npm run dev -- -p 3001
-```
-
-### 5. Webcam not working
-
-**Cause:** Browser permissions or HTTPS requirement.
-
-**Fix:**
-- Allow camera permissions in browser
-- For HTTPS: Use `https://localhost:3000` or Chrome flags:
-  ```
-  chrome://flags/#unsafely-treat-insecure-origin-as-secure
-  ```
-
-### 6. API requests failing (CORS errors)
-
-**Cause:** Backend CORS not configured or backend not running.
-
-**Fix:**
-```bash
-# Check if backend is running
-cd D:/IUH/test/Backend
-docker-compose ps
-
-# Restart backend if needed
-docker-compose restart
-
-# Check gateway logs
-docker-compose logs gateway
-```
-
-### 7. "Connection refused" to backend
-
-**Cause:** Backend not running or wrong API URL.
-
-**Fix:**
-```bash
-# Verify backend is running
-cd D:/IUH/test/Backend
-docker-compose ps
-
-# All containers should be "Up" or "Healthy"
-
-# Check .env.local has correct URL
-NEXT_PUBLIC_API_URL=http://localhost/api
-```
-
-### 8. Docker build fails for frontend
-
-**Cause:** Build context missing files.
-
-**Fix:**
-```bash
-cd D:/IUH/test/Frontend_Web_Test
-npm run build  # Test local build first
-docker build -t face-recognition-web .
-```
-
-### 9. Login/Register not working
-
-**Cause:** Backend services not healthy or JWT misconfiguration.
-
-**Fix:**
-```bash
-# Check all backend services
-docker-compose ps
-
-# View user-service logs
-docker-compose logs user-service
-
-# View gateway logs
-docker-compose logs gateway
-
-# Restart if needed
-docker-compose restart
-```
-
-### 10. Build errors with TypeScript
-
-**Cause:** Type checking failures.
-
-**Fix:**
-```bash
-cd D:/IUH/test/Frontend_Web_Test
-# Check TypeScript
-npx tsc --noEmit
-
-# Build with skipping lint
-npm run build -- --no-lint
-```
-
----
-
-## Development
-
-### Available Scripts
-
-```bash
-npm run dev      # Start development server (Turbo)
-npm run build    # Build for production
-npm run start    # Start production server
-npm run lint     # Run ESLint
-```
-
-### Code Quality
-
-```bash
-# Format code
-npm run lint -- --fix
-```
-
----
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NEXT_PUBLIC_API_URL` | `/api` | API Gateway URL |
-
-For local development with Docker backend:
-```env
-NEXT_PUBLIC_API_URL=http://localhost/api
-```
-
----
 
 ## Pages
 
-| Route | Auth | Description |
-|-------|------|-------------|
-| `/` | No | Landing page |
-| `/login` | No | Login form |
-| `/register` | No | Registration form |
-| `/dashboard` | Yes | Dashboard overview |
-| `/dashboard/enroll` | Yes | Enroll face |
-| `/dashboard/verify` | Yes | Verify face |
-| `/dashboard/identify` | Yes | Identify face |
-| `/dashboard/liveness` | Yes | Liveness check |
-| `/dashboard/admin` | Admin | User management |
-
----
-
-## API Integration
-
-The frontend communicates with the backend via the API Gateway (http://localhost/api).
-
-### Authentication Flow
-
-1. User logs in via `/auth/login`
-2. Backend returns `access_token` + `refresh_token`
-3. Frontend stores tokens in localStorage
-4. API client auto-attaches `Authorization: Bearer <token>` to requests
-5. On 401 response, client auto-refreshes the access token
-
----
-
-## Backend Repository
-
-The backend code is in: `D:/IUH/test/Backend/`
-
-For the full stack to work:
-
-1. **Start backend first:**
-   ```bash
-   cd D:/IUH/test/Backend
-   # Build TypeScript services first
-   cd user-service && npm install && npm run build && cd ..
-   cd api-gateway && npm install && npm run build && cd ..
-   # Then start Docker
-   docker-compose up -d --build
-   ```
-
-2. **Start frontend:**
-   ```bash
-   cd D:/IUH/test/Frontend_Web_Test
-   npm install
-   npm run dev
-   ```
-
----
+| Route | Auth | Mô tả |
+|-------|------|-------|
+| `/` | No | Landing page với 3D library scene |
+| `/login` | No | Đăng nhập (mật khẩu / khuôn mặt) |
+| `/register` | No | Đăng ký tài khoản bạn đọc |
+| `/dashboard` | Yes | Dashboard tổng quan thư viện |
+| `/dashboard/admin` | Admin | Quản lý người dùng (admin panel) |
+| `/borrow` | Yes | Mượn sách |
+| `/return` | Yes | Trả sách |
+| `/books` | Yes | Danh mục sách |
+| `/books/[id]` | Yes | Chi tiết sách |
+| `/history` | Yes | Lịch sử mượn/trả |
+| `/patrons` | Yes | Quản lý bạn đọc |
+| `/patrons/[id]` | Yes | Chi tiết bạn đọc |
+| `/active` | Yes | Bạn đọc đang ở thư viện (real-time) |
+| `/enroll` | Yes | Đăng ký khuôn mặt (webcam) |
+| `/verify` | Yes | Xác thực khuôn mặt |
+| `/identify` | Yes | Nhận diện khuôn mặt |
+| `/liveness` | Yes | Kiểm tra sống (liveness detection) |
+| `/ai-assistant` | Yes | AI chatbot hỗ trợ thư viện |
+| `/notifications` | Yes | Thông báo |
+| `/profile` | Yes | Hồ sơ cá nhân |
+| `/staff-schedules` | Yes | Lịch làm việc nhân viên |
+| `/stats` | Yes | Thống kê hoạt động thư viện |
+| `/gate` | No | Kiosk cổng ra vào (check-in/out) |
+| `/library/vr-tour` | No | Tham quan thư viện 3D |
 
 ## Tech Stack
 
-- Next.js 15 (App Router)
-- React 19
-- TypeScript
-- Tailwind CSS
-- Axios
-- react-webcam
+- **Next.js 15** (App Router, Turbopack)
+- **React 19** với Server Components
+- **TypeScript** 5
+- **MUI** 9 (Material UI) — dashboard components
+- **Tailwind CSS** — utility styling
+- **Framer Motion** — animation, layout transitions
+- **Three.js** (`@react-three/fiber`, `@react-three/drei`) — 3D landing, VR tour
+- **Axios** + JWT interceptor — API client
+- **react-webcam** — chụp ảnh từ camera
+- **@zxing** — QR/barcode scanner
+- **Jest** + **Playwright** — unit test + E2E
 
-## Build for Production
+## API Integration
 
-```bash
-npm run build
-npm start
+Frontend giao tiếp với backend qua API Gateway (`http://localhost/api`). Cấu hình trong `next.config.js`:
+
+```js
+// Rewrites /api/* → http://127.0.0.1:80/api/*
+async rewrites() { ... }
 ```
 
-Or use Docker:
+### Auth Flow
+
+1. Đăng nhập → nhận `access_token` + `refresh_token`
+2. Lưu token trong localStorage
+3. Axios interceptor tự động gắn `Authorization: Bearer <token>`
+4. 401 → auto refresh token → retry request
+5. Hết hạn refresh → redirect `/login`
+
+## Cài đặt
+
+### Yêu cầu
+
+- Node.js 20 LTS
+- Backend đang chạy (xem `Backend/README.md`)
+
+### Local dev
 
 ```bash
-docker build -t face-recognition-web .
-docker run -p 3000:3000 face-recognition-web
+# 1. Cài dependencies
+npm install
+
+# 2. Tạo .env.local
+echo NEXT_PUBLIC_API_URL=http://localhost/api > .env.local
+
+# 3. Start backend (riêng terminal)
+cd ../Backend
+docker compose up -d
+
+# 4. Start frontend
+cd ../Frontend_Web
+npm run dev
 ```
 
----
+Truy cập http://localhost:3000
 
-## Troubleshooting Checklist
+### Docker
 
-1. [ ] Docker Desktop is running
-2. [ ] Backend is fully built and running (`docker-compose ps` shows all Up/Healthy)
-3. [ ] TypeScript services built (`npm run build` succeeds locally)
-4. [ ] `.env.local` exists with correct `NEXT_PUBLIC_API_URL`
-5. [ ] `npm install` completed without errors
-6. [ ] Port 3000 (frontend) and 80 (backend gateway) are free
-7. [ ] Browser has camera permissions for face recognition features
+```bash
+cd ../Backend
+docker compose up -d
+
+cd ../Frontend_Web
+docker compose up -d
+```
+
+## Scripts
+
+```bash
+npm run dev      # Dev server (Turbo)
+npm run build    # Build production
+npm run start    # Start production
+npm run lint     # ESLint
+npm test         # Jest unit tests
+npx playwright test  # E2E tests
+```
+
+## Tính năng chính
+
+### Dashboard
+- Thống kê real-time: bạn đọc trong thư viện, lượt ra vào, sách đang mượn
+- Biểu đồ hoạt động theo giờ/ngày/tuần
+- AI widget gợi ý sách, trả lời câu hỏi
+
+### Face Recognition
+- Đăng ký khuôn mặt qua webcam
+- Xác thực khuôn mặt (1:1)
+- Nhận diện khuôn mặt (1:N)
+- Kiểm tra sống (liveness detection)
+
+### Mượn/Trả sách
+- Quét QR/barcode sách
+- Tìm kiếm danh mục
+- Lịch sử mượn trả
+- Gợi ý sách từ AI
+
+### Cổng ra vào (Kiosk)
+- Check-in/out bằng khuôn mặt
+- Màn hình cảm ứng cho cổng thư viện
+
+### Quản lý
+- Bạn đọc (patron CRUD, gia hạn thẻ, khóa)
+- Nhân viên (lịch làm việc, ca, chấm công)
+- Thống kê báo cáo
+
+## Environment
+
+| Variable | Default | Mô tả |
+|----------|---------|-------|
+| `NEXT_PUBLIC_API_URL` | `/api` | Backend API Gateway URL |
+
+## Troubleshooting
+
+Xem `docker compose logs` của backend nếu API không hoạt động. Đảm bảo `.env.local` tồn tại và backend service đang `Healthy`.
