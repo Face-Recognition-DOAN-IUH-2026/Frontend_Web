@@ -1,5 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    optimizePackageImports: [
+      '@mui/icons-material',
+      '@mui/material',
+      'lucide-react',
+      'recharts',
+    ],
+  },
   async rewrites() {
     return [
       {

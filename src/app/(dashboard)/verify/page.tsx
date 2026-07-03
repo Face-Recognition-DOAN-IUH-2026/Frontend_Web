@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Alert, Box, Button, Checkbox, LinearProgress, Stack, TextField, Typography } from "@mui/material";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
@@ -46,6 +47,7 @@ function BorrowVerifyFlow({ studentCode, onDone }: { studentCode: string; onDone
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE(30000);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -76,6 +78,46 @@ function BorrowVerifyFlow({ studentCode, onDone }: { studentCode: string; onDone
     return () => stopCamera();
   }, [stopCamera]);
 
+  useEffect(() => {
+    return () => resetSSE();
+  }, [resetSSE]);
+
+  useEffect(() => {
+    if (sseState.status === "SUCCESS" && sseState.result) {
+      if (sseState.result.verified) {
+        (async () => {
+          try {
+            const data = await api.getActiveBorrowsByStudentCode(studentCode);
+            stopCamera();
+            sessionStorage.setItem("verifiedPatron", JSON.stringify({
+              student_code: studentCode,
+              patron_id: data.patron.id,
+              full_name: data.patron.full_name || data.patron.student_code,
+              total: data.total,
+              overdue_count: data.overdue_count,
+            }));
+            setSuccess(true);
+            setTimeout(() => router.push("/borrow"), 1000);
+          } catch (err: any) {
+            const status = err?.response?.status || err?.status;
+            if (status === 403) { setError("Độc giả chưa ở trong thư viện hoặc thẻ đã bị khóa."); }
+            else { setError(getErrorMessage(err) || "Không thể kiểm tra thông tin độc giả"); }
+            setVerifying(false);
+          }
+        })();
+        return;
+      }
+      setError("Khuôn mặt không khớp với độc giả này");
+      setVerifying(false);
+      return;
+    }
+    if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
+      setError(sseState.error || "Xác minh thất bại");
+      setVerifying(false);
+      return;
+    }
+  }, [sseState, studentCode, stopCamera, router]);
+
   const handleVerify = useCallback(async () => {
     if (!videoRef.current) return;
     setVerifying(true);
@@ -103,53 +145,12 @@ function BorrowVerifyFlow({ studentCode, onDone }: { studentCode: string; onDone
       if (lookupResult.is_locked) { setError("Thẻ độc giả đã bị khóa"); setVerifying(false); return; }
 
       const verifyResult = await api.verifyFace(file, lookupResult.patron.id, true);
-
-      let attempts = 0;
-      const maxAttempts = 30;
-      while (attempts < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 1000));
-        const taskStatus = await api.getTaskStatus(verifyResult.job_id);
-        if (taskStatus.status === "SUCCESS" && taskStatus.result) {
-          if (taskStatus.result.verified) {
-            try {
-              const data = await api.getActiveBorrowsByStudentCode(studentCode);
-              stopCamera();
-              sessionStorage.setItem("verifiedPatron", JSON.stringify({
-                student_code: studentCode,
-                patron_id: data.patron.id,
-                full_name: data.patron.full_name || data.patron.student_code,
-                total: data.total,
-                overdue_count: data.overdue_count,
-              }));
-              setSuccess(true);
-              setTimeout(() => router.push("/borrow"), 1000);
-              return;
-            } catch (err: any) {
-              const status = err?.response?.status || err?.status;
-              if (status === 403) { setError("Độc giả chưa ở trong thư viện hoặc thẻ đã bị khóa."); }
-              else { setError(getErrorMessage(err) || "Không thể kiểm tra thông tin độc giả"); }
-              setVerifying(false);
-              return;
-            }
-          }
-          setError("Khuôn mặt không khớp với độc giả này");
-          setVerifying(false);
-          return;
-        }
-        if (taskStatus.status === "FAILURE" || taskStatus.status === "ERROR") {
-          setError(taskStatus.result?.error || taskStatus.result?.detail || "Xác minh thất bại");
-          setVerifying(false);
-          return;
-        }
-        attempts++;
-      }
-      setError("Hết thời gian chờ xác minh");
-      setVerifying(false);
+      startSSE(verifyResult.job_id);
     } catch (err) {
       setError(getErrorMessage(err) || "Lỗi xác minh khuôn mặt");
       setVerifying(false);
     }
-  }, [studentCode, stopCamera, router, setError, setVerifying, setSuccess]);
+  }, [studentCode, setError, setVerifying, startSSE]);
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 920, mx: "auto" }}>

@@ -1,30 +1,60 @@
 "use client";
 
-import { useState } from "react";
-import { Alert, Box, Button, Checkbox, Chip, LinearProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, LinearProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import CameraCapture from "@/app/(dashboard)/_components/camera-capture";
-import JobPoll from "@/app/(dashboard)/_components/job-poll";
 import api, { getErrorMessage } from "@/lib/api-client";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import type { FaceResultEvent } from "@/lib/types";
+import { preprocessImage, isImageTooDark, getImageSizeReduction } from "@/lib/image-preprocessor";
 
 export default function IdentifyPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [dataUrl, setDataUrl] = useState<string>("");
   const [consent, setConsent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState("");
   const [matches, setMatches] = useState<any[] | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [lowLightWarning, setLowLightWarning] = useState(false);
+  const [processingStats, setProcessingStats] = useState<{
+    originalSize: number;
+    processedSize: number;
+    reduction: number;
+  } | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const cleanup = api.connectFaceResultSSE(
+    (event: FaceResultEvent) => {
+      if (event.process_type !== "identify") return;
+      if (event.status === "SUCCESS" && event.result) {
+        const resultMatches = event.result.matches;
+        setMatches(Array.isArray(resultMatches) ? resultMatches : []);
+        setIsLoading(false);
+      } else if (event.status === "FAILURE") {
+        setError((event.result?.error as string) || "Nhận diện thất bại.");
+        setIsLoading(false);
+      }
+    },
+      (connected) => setConnected(connected),
+    );
+    cleanupRef.current = cleanup;
+    return () => { cleanup(); cleanupRef.current = null; };
+  }, []);
 
   const handleCapture = (file: File, url: string) => {
     setImageFile(file);
     setDataUrl(url);
     setMatches(null);
+    setLowLightWarning(false);
+    setProcessingStats(null);
   };
 
   const handleFileUpload = (file: File) => {
@@ -34,6 +64,8 @@ export default function IdentifyPage() {
       setImageFile(file);
       setDataUrl(url);
       setMatches(null);
+      setLowLightWarning(false);
+      setProcessingStats(null);
     };
     reader.readAsDataURL(file);
   };
@@ -43,14 +75,65 @@ export default function IdentifyPage() {
     if (!imageFile) return;
     setError("");
     setIsLoading(true);
-    setJobId(null);
+    setIsProcessing(true);
     setMatches(null);
+    setLowLightWarning(false);
+    setProcessingStats(null);
+    
     try {
-      const data = await api.identifyFace(imageFile, consent);
-      setJobId(data.job_id);
+      const preprocessed = await preprocessImage(imageFile, {
+        maxWidth: 640,
+        maxHeight: 480,
+        quality: 0.7,
+        convertToGrayscale: true,
+        brightnessThreshold: 50,
+      });
+
+      setProcessingStats({
+        originalSize: preprocessed.originalSize,
+        processedSize: preprocessed.processedSize,
+        reduction: getImageSizeReduction(preprocessed.originalSize, preprocessed.processedSize),
+      });
+
+      if (isImageTooDark(preprocessed.brightness, 50)) {
+        setLowLightWarning(true);
+        setIsLoading(false);
+        setIsProcessing(false);
+        return;
+      }
+
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(preprocessed.blob);
+      });
+
+      setIsProcessing(false);
+
+      const result = await api.processFaceImageSync({
+        image: base64,
+        camera_id: "identify_dashboard",
+        process_type: "identify",
+        consent_given: consent,
+      });
+
+      if (result.status === "success" && result.result?.matches) {
+        setMatches(Array.isArray(result.result.matches) ? result.result.matches : []);
+      } else if (result.result?.error) {
+        setError(result.result.error as string);
+      } else {
+        setError("Nhận diện thất bại.");
+      }
     } catch (err: any) {
       setError(getErrorMessage(err) || "Nhận diện thất bại.");
+    } finally {
       setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -58,9 +141,11 @@ export default function IdentifyPage() {
     setMatches(null);
     setDataUrl("");
     setImageFile(null);
-    setJobId(null);
     setError("");
     setIsLoading(false);
+    setIsProcessing(false);
+    setLowLightWarning(false);
+    setProcessingStats(null);
   };
 
   return (
@@ -80,14 +165,36 @@ export default function IdentifyPage() {
         </Box>
       ) : null}
 
-      {jobId ? (
+      {lowLightWarning ? (
+        <Box sx={staggerSx(1)}>
+          <Alert 
+            severity="warning" 
+            action={
+              <Button color="inherit" size="small" onClick={reset}>
+                Thử lại
+              </Button>
+            }
+          >
+            Ánh sáng yếu! Vui lòng di chuyển đến nơi có ánh sáng tốt hơn hoặc bật đèn.
+          </Alert>
+        </Box>
+      ) : null}
+
+      {isLoading ? (
         <Box sx={staggerSx(1)}>
           <DashboardCard>
-            <JobPoll
-              jobId={jobId}
-              onComplete={(result) => { setIsLoading(false); setJobId(null); setMatches(result?.matches || []); }}
-              onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
-            />
+            <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+              <CircularProgress size={28} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 800 }}>
+                  {isProcessing ? "Đang tiền xử lý ảnh..." : "Đang nhận diện..."}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {connected ? "Kết nối SSE đang chờ kết quả" : "Đang kết nối..."}
+                </Typography>
+                <LinearProgress sx={{ mt: 1.5, borderRadius: 99 }} />
+              </Box>
+            </Stack>
           </DashboardCard>
         </Box>
       ) : matches ? (
@@ -101,6 +208,15 @@ export default function IdentifyPage() {
           {dataUrl ? (
             <DashboardCard noPadding>
               <Box component="img" src={dataUrl} alt="Ảnh đã chụp" sx={{ width: 160, height: 160, objectFit: "cover", borderRadius: 2, border: 1, borderColor: "divider", mx: "auto" }} />
+            </DashboardCard>
+          ) : null}
+
+          {processingStats ? (
+            <DashboardCard>
+              <Typography variant="body2" color="text.secondary">
+                Ảnh đã xử lý: {processingStats.originalSize} → {processingStats.processedSize} 
+                (giảm {processingStats.reduction}%)
+              </Typography>
             </DashboardCard>
           ) : null}
 

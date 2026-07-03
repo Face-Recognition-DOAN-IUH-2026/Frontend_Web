@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Box, Alert, Button, Chip, Divider, Stack, Typography } from "@mui/material";
 import FaceOutlinedIcon from "@mui/icons-material/FaceOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import MultiAngleCapture, { type CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
@@ -20,38 +21,23 @@ export default function EnrollPage() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE();
 
   useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, []);
+    return () => resetSSE();
+  }, [resetSSE]);
 
-  const pollForResult = async (taskId: string) => {
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    pollIntervalRef.current = setInterval(async () => {
-      try {
-        const data = await api.getTaskStatus(taskId);
-        if (data.status === "SUCCESS") {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          const inner = data.result;
-          if (inner?.status === "error") setError(inner.error || "Đăng ký thất bại.");
-          setResult(inner);
-          setIsLoading(false);
-        } else if (data.status === "FAILURE") {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          setError(data.result?.error || "Đăng ký thất bại.");
-          setResult(data.result);
-          setIsLoading(false);
-        }
-      } catch {
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        setError("Không thể lấy trạng thái tác vụ.");
-        setIsLoading(false);
-      }
-    }, 2000);
-  };
+  useEffect(() => {
+    if (sseState.status === "SUCCESS") {
+      const inner = sseState.result as Record<string, any> | null;
+      if (inner?.status === "error") setError(String(inner.error) || "Đăng ký thất bại.");
+      setResult(inner);
+      setIsLoading(false);
+    } else if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
+      setError(sseState.error || "Không thể lấy trạng thái tác vụ.");
+      setIsLoading(false);
+    }
+  }, [sseState.status, sseState.result, sseState.error]);
 
   const handleFilesReady = async (files: Record<CaptureAngle, File>) => {
     setError("");
@@ -61,7 +47,7 @@ export default function EnrollPage() {
     try {
       const data = await api.enrollBatch(files, consent);
       setJobId(data.job_id);
-      await pollForResult(data.job_id);
+      startSSE(data.job_id);
     } catch (err: any) {
       setError(getErrorMessage(err) || "Đăng ký nhiều góc thất bại.");
       setIsLoading(false);

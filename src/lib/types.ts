@@ -534,6 +534,19 @@ export interface CameraEvent {
   landmarks?: [number, number][];
 }
 
+export interface FaceResultEvent {
+  event_id: string;
+  event_type: "face_result";
+  task_id: string;
+  process_type: "face_recognition" | "liveness_check" | "verify" | "identify";
+  status: "SUCCESS" | "FAILURE";
+  result?: Record<string, unknown>;
+  user_id?: string;
+  camera_id?: string;
+  occurred_at: string;
+  source: string;
+}
+
 // === Staff Schedule ===
 export interface ScheduleStaff {
   id: string;

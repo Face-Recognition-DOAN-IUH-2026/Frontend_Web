@@ -138,6 +138,19 @@ function VRScene({ room, onNavigate, gyroEnabled, resetTrigger, hotspotsVisible,
   const { camera } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const textureRef = useRef<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    textureRef.current = texture;
+  }, [texture]);
+
+  useEffect(() => {
+    return () => {
+      if (textureRef.current) {
+        textureRef.current.dispose();
+      }
+    };
+  }, []);
   
   // Load and dispose texture dynamically in background (prevent unmount/flicker and memory leak)
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -65,6 +65,13 @@ export default function Book3D({
       spineMat,  // back cover
     ];
   }, [coverColor]);
+
+  // Clean up materials to prevent WebGL memory leaks
+  useEffect(() => {
+    return () => {
+      materials.forEach((mat) => mat.dispose());
+    };
+  }, [materials]);
 
   useFrame((state) => {
     if (!meshRef.current) return;

@@ -28,6 +28,7 @@ import WarningIcon from "@mui/icons-material/WarningAmberOutlined";
 import BorrowIPCameraDialog from "@/app/(dashboard)/_components/BorrowIPCameraDialog";
 import BookRecommendations from "@/app/(dashboard)/_components/BookRecommendations";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import { fadeInUp, slideInRight } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
@@ -48,6 +49,7 @@ export default function BorrowPage() {
   const [overdueCount, setOverdueCount] = useState(0);
   const [error, setError] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE(30000);
   const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -101,6 +103,39 @@ export default function BorrowPage() {
     return () => stopCamera();
   }, [patronId, patronCode, startWebcam, stopCamera]);
 
+  // Handle SSE result for face verification
+  useEffect(() => {
+    if (sseState.status === "SUCCESS") {
+      const taskResult = sseState.result;
+      if (taskResult?.verified) {
+        api.getActiveBorrowsByStudentCode(patronCode.trim())
+          .then((data) => {
+            stopCamera();
+            setPatron(patronCode.trim(), data.patron.id, data.patron.full_name || data.patron.student_code);
+            setActiveCount(data.total);
+            setOverdueCount(data.overdue_count);
+            setSnackbar({ severity: "success", message: `Đã xác minh khuôn mặt: ${data.patron.full_name || data.patron.student_code}` });
+            setFaceScanning(false);
+          })
+          .catch((err: any) => {
+            const status = err?.response?.status || err?.status;
+            if (status === 403) {
+              setError("Độc giả chưa ở trong thư viện hoặc thẻ đã bị khóa.");
+            } else {
+              setError(getErrorMessage(err) || "Không thể kiểm tra thông tin độc giả");
+            }
+            setFaceScanning(false);
+          });
+      } else {
+        setError("Khuôn mặt không khớp với độc giả này");
+        setFaceScanning(false);
+      }
+    } else if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
+      setError(sseState.error || "Xác minh thất bại");
+      setFaceScanning(false);
+    }
+  }, [sseState.status, sseState.result, sseState.error, patronCode, stopCamera, setPatron, setSnackbar]);
+
   const handleFaceVerify = useCallback(async () => {
     if (!videoRef.current || !patronCode.trim()) return;
     setFaceScanning(true);
@@ -131,51 +166,12 @@ export default function BorrowPage() {
       }
       const verifyResult = await api.verifyFace(file, lookupResult.patron.id, true);
 
-      let attempts = 0;
-      const maxAttempts = 30;
-      while (attempts < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 1000));
-        const taskStatus = await api.getTaskStatus(verifyResult.job_id);
-        if (taskStatus.status === "SUCCESS" && taskStatus.result) {
-          if (taskStatus.result.verified) {
-            try {
-              const data = await api.getActiveBorrowsByStudentCode(patronCode.trim());
-              stopCamera();
-              setPatron(patronCode.trim(), data.patron.id, data.patron.full_name || data.patron.student_code);
-              setActiveCount(data.total);
-              setOverdueCount(data.overdue_count);
-              setSnackbar({ severity: "success", message: `Đã xác minh khuôn mặt: ${data.patron.full_name || data.patron.student_code}` });
-              setFaceScanning(false);
-              return;
-            } catch (err: any) {
-              const status = err?.response?.status || err?.status;
-              if (status === 403) {
-                setError("Độc giả chưa ở trong thư viện hoặc thẻ đã bị khóa.");
-              } else {
-                setError(getErrorMessage(err) || "Không thể kiểm tra thông tin độc giả");
-              }
-              setFaceScanning(false);
-              return;
-            }
-          }
-          setError("Khuôn mặt không khớp với độc giả này");
-          setFaceScanning(false);
-          return;
-        }
-        if (taskStatus.status === "FAILURE" || taskStatus.status === "ERROR") {
-          setError(taskStatus.result?.error || taskStatus.result?.detail || "Xác minh thất bại");
-          setFaceScanning(false);
-          return;
-        }
-        attempts++;
-      }
-      setError("Hết thời gian chờ xác minh");
-      setFaceScanning(false);
+      startSSE(verifyResult.job_id);
     } catch (err) {
       setError(getErrorMessage(err) || "Lỗi xác minh khuôn mặt");
       setFaceScanning(false);
     }
-  }, [patronCode, stopCamera, setPatron]);
+  }, [patronCode, stopCamera, setPatron, startSSE, setSnackbar]);
 
   const handleScanSuccess = useCallback((message: string) => {
     setSnackbar({ severity: "success", message });
