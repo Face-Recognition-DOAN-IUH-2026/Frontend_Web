@@ -811,6 +811,16 @@ class ApiClient {
     return response.data;
   }
 
+  async confirmEntry(patronId: string): Promise<{ current_status: string; message: string }> {
+    const response = await this.client.post(`/api/internal/access/patrons/${patronId}/confirm-entry`);
+    return response.data;
+  }
+
+  async revertPending(patronId: string): Promise<{ current_status: string; message: string }> {
+    const response = await this.client.post(`/api/internal/access/patrons/${patronId}/revert-pending`);
+    return response.data;
+  }
+
   async createKioskApprovalRequest(data: { device_id: string; patron_id: string; student_code: string; fail_image_url?: string; isbns?: string }): Promise<{ event_code: string; device_auth_token: string; status: string; expires_at: string }> {
     const response = await this.client.post("/api/access/kiosk/approval-request", data);
     return response.data;
