@@ -182,6 +182,9 @@ export default function GatePage() {
       setStep("result");
       setLoading(false);
       setStatusText("");
+      if (success && lookup?.patron?.id) {
+        api.confirmEntry(lookup.patron.id).catch(() => {});
+      }
     } else if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
       const message = sseState.error || "Xác thực thất bại.";
       setResult({ success: false, message, patron: null, job_id: null });
@@ -189,6 +192,9 @@ export default function GatePage() {
       setLoading(false);
       setStatusText("");
       addToast({ severity: "error", message });
+      if (lookup?.patron?.id) {
+        api.revertPending(lookup.patron.id).catch(() => {});
+      }
     } else if (sseState.status === "WAITING") {
       setStatusText("Đang xử lý...");
     }

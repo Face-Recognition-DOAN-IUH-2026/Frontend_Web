@@ -45,6 +45,7 @@ import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
+import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
 
 const _RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
@@ -102,6 +103,7 @@ export default function ReturnPage() {
   const [error, setError] = useState("");
   const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [overdueGuideOpen, setOverdueGuideOpen] = useState(false);
   const [scannedReturns, setScannedReturns] = useState<ScannedReturnItem[]>([]);
   const [batchReturning, setBatchReturning] = useState(false);
   const [scanToast, setScanToast] = useState("");
@@ -466,10 +468,20 @@ export default function ReturnPage() {
                 </Stack>
 
                 {selectedBorrower.overdue_count > 0 ? (
-                  <Alert severity="error" sx={{ py: 0.5 }}>
-                    <AlertIcon fontSize="small" sx={{ mr: 0.5 }} />
-                    Có {selectedBorrower.overdue_count} cuốn sách quá hạn
-                  </Alert>
+                  <>
+                    <Alert severity="error" sx={{ py: 0.5 }}>
+                      <AlertIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      Có {selectedBorrower.overdue_count} cuốn sách quá hạn
+                    </Alert>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setOverdueGuideOpen(true)}
+                      sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+                    >
+                      Xem hướng dẫn xử lý
+                    </Button>
+                  </>
                 ) : null}
 
                 <Button
@@ -685,6 +697,11 @@ export default function ReturnPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <OverdueGuideModal
+        open={overdueGuideOpen}
+        onClose={() => setOverdueGuideOpen(false)}
+      />
 
       <NoticeSnackbar open={!!snackbar} message={snackbar?.message || ""} severity={snackbar?.severity || "success"} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
 

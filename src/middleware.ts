@@ -4,11 +4,16 @@ import { jwtVerify } from "jose";
 
 const publicPaths = ["/login", "/register", "/", "/library/vr-tour"];
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || ""
-);
+const rawSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "";
+const JWT_SECRET = new TextEncoder().encode(rawSecret);
 
 export async function middleware(request: NextRequest) {
+  if (!rawSecret) {
+    return new NextResponse(JSON.stringify({ error: "Server misconfigured: JWT secret not set" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const path = request.nextUrl.pathname;
 
   if (publicPaths.includes(path)) {
