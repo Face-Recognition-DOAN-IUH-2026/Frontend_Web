@@ -111,10 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setApiAccessToken(response.access_token);
-    document.cookie = `access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    document.cookie = `access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
     localStorage.setItem("access_token", response.access_token);
     if (response.refresh_token) {
-      document.cookie = `refresh_token=${response.refresh_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      document.cookie = `refresh_token=${response.refresh_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
       localStorage.setItem("refresh_token", response.refresh_token);
     }
     setAccessToken(response.access_token);
@@ -133,10 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
     setApiAccessToken(accessToken);
-    document.cookie = `access_token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+    document.cookie = `access_token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
     localStorage.setItem("access_token", accessToken);
     if (refreshToken) {
-      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
       localStorage.setItem("refresh_token", refreshToken);
     }
 
@@ -174,11 +174,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { access_token, refresh_token: newRefreshToken } = await api.refreshAuthToken(refreshToken);
       if (access_token) {
         setApiAccessToken(access_token);
-        document.cookie = `access_token=${access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+        document.cookie = `access_token=${access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
         setAccessToken(access_token);
       }
       if (newRefreshToken) {
-        document.cookie = `refresh_token=${newRefreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+        document.cookie = `refresh_token=${newRefreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
       }
       return true;
     } catch {

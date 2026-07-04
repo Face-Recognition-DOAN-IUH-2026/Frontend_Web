@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputAdornment,
   Paper,
   Snackbar,
   Stack,
@@ -24,6 +25,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import ErrorIcon from "@mui/icons-material/ReportOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
+import SearchIcon from "@mui/icons-material/SearchOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
 import { slideInRight, successPop } from "@/lib/animations";
@@ -66,6 +68,7 @@ export default function BorrowIPCameraDialog({
   const [scanToast, setScanToast] = useState("");
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [manualIsbn, setManualIsbn] = useState("");
   const lastScannedRef = useRef<string | null>(null);
 
   const lookupItem = useCallback(async (barcode: string, isbn: string) => {
@@ -102,9 +105,9 @@ export default function BorrowIPCameraDialog({
           copy_barcode: item.copy?.barcode || null,
         } : i
       ));
-    } catch {
+    } catch (err: unknown) {
       setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
-      setLookupError(`Lỗi tra cứu: ${barcode}`);
+      setLookupError(`Lỗi tra cứu: ${barcode} — ${getErrorMessage(err)}`);
     }
   }, [patronId]);
 
@@ -251,6 +254,57 @@ export default function BorrowIPCameraDialog({
 
               {createError ? <Alert severity="error" onClose={() => setCreateError("")}>{createError}</Alert> : null}
 
+              {lookupError ? (
+                <Paper variant="outlined" sx={{ p: 1.5, borderColor: "error.main", bgcolor: "error.50" }}>
+                  <Stack spacing={1}>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <ErrorIcon color="error" sx={{ fontSize: 20 }} />
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: "error.900", flex: 1 }}>
+                        {lookupError}
+                      </Typography>
+                      <IconButton size="small" onClick={() => setLookupError(null)}>
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => {
+                        setManualIsbn("");
+                        setLookupError(null);
+                      }}
+                      sx={{ textTransform: "none", fontWeight: 600, alignSelf: "flex-start" }}
+                    >
+                      Nhập ISBN thủ công
+                    </Button>
+                  </Stack>
+                </Paper>
+              ) : null}
+
+              <TextField
+                size="small"
+                placeholder="Nhập ISBN thủ công..."
+                value={manualIsbn}
+                onChange={(e) => setManualIsbn(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && manualIsbn.trim()) {
+                    addScanned(manualIsbn.trim());
+                    setManualIsbn("");
+                  }
+                }}
+                fullWidth
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+              />
+
               {scanned.length === 0 ? (
                 <Alert severity="info" sx={{ flex: 1, display: "flex", alignItems: "center" }}>
                   Đưa mã vạch vào camera. Sách sẽ xuất hiện tại đây.
@@ -378,16 +432,6 @@ export default function BorrowIPCameraDialog({
           </Alert>
         ) : undefined}
       </Snackbar>
-
-      <Dialog open={!!lookupError} onClose={() => setLookupError(null)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 900 }}>Thông báo</DialogTitle>
-        <DialogContent>
-          <Typography>{lookupError}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLookupError(null)} variant="contained">Đóng</Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }

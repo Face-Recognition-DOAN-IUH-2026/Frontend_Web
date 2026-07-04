@@ -133,7 +133,7 @@ function getCookieValue(name: string): string | null {
 
 function setAccessTokenCookie(token: string) {
   if (typeof document === "undefined") return;
-  document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+  document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
 }
 
 function clearAccessTokenCookie() {
@@ -581,11 +581,9 @@ class ApiClient {
       if (params.accessType) query.access_type = params.accessType;
       if (params.dateFrom) {
         query.date_from = params.dateFrom;
-        query.dateFrom = params.dateFrom;
       }
       if (params.dateTo) {
         query.date_to = params.dateTo;
-        query.dateTo = params.dateTo;
       }
       if (params.search) query.search = params.search;
       query.skip = params.skip ?? 0;
@@ -678,11 +676,9 @@ class ApiClient {
     const query: any = {};
     if (params?.dateFrom) {
       query.date_from = params.dateFrom;
-      query.dateFrom = params.dateFrom;
     }
     if (params?.dateTo) {
       query.date_to = params.dateTo;
-      query.dateTo = params.dateTo;
     }
     const response = await this.client.get<AccessFrequencyResponse | any[]>("/api/access/frequency", { params: query });
     const data = response.data;
@@ -904,6 +900,11 @@ class ApiClient {
 
   async getBorrowStats(): Promise<{ total: number; active: number; overdue: number }> {
     const response = await this.client.get("/api/borrow/staff/stats");
+    return response.data;
+  }
+
+  async getBorrowConfig(): Promise<{ max_borrow_books: number; max_borrow_books_per_slip: number; max_borrow_days: number }> {
+    const response = await this.client.get("/api/borrow/config");
     return response.data;
   }
 

@@ -26,6 +26,7 @@ import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import VideocamIcon from "@mui/icons-material/VideocamOutlined";
 import WarningIcon from "@mui/icons-material/WarningAmberOutlined";
 import BorrowIPCameraDialog from "@/app/(dashboard)/_components/BorrowIPCameraDialog";
+import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
 import BookRecommendations from "@/app/(dashboard)/_components/BookRecommendations";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
@@ -34,12 +35,7 @@ import { staggerSx } from "@/lib/useStaggeredAnimation";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
-
-const MAX_BORROW_BOOKS = 3;
-const _RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
-if (!_RAW_CAM_URL) throw new Error("NEXT_PUBLIC_BORROW_CAM_URL is not set");
-const RAW_CAM_URL: string = _RAW_CAM_URL;
-const BORROW_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
+import { useMemo } from "react";
 
 export default function BorrowPage() {
   const [patronCode, setPatronCode] = useState("");
@@ -51,6 +47,13 @@ export default function BorrowPage() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE(30000);
   const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
+  const [borrowConfig, setBorrowConfig] = useState<{ max_borrow_books: number }>({ max_borrow_books: 3 });
+  const [overdueGuideOpen, setOverdueGuideOpen] = useState(false);
+  const borrowCamUrl = useMemo(() => {
+    const raw = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
+    if (!raw) return null;
+    return `/api/camera/proxy?url=${encodeURIComponent(raw)}`;
+  }, []);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -58,7 +61,11 @@ export default function BorrowPage() {
   const [cameraError, setCameraError] = useState("");
   const [faceScanning, setFaceScanning] = useState(false);
 
-  const remaining = MAX_BORROW_BOOKS - activeCount;
+  useEffect(() => {
+    api.getBorrowConfig().then(setBorrowConfig).catch(() => {});
+  }, []);
+
+  const remaining = borrowConfig.max_borrow_books - activeCount;
   const canBorrow = remaining > 0 && overdueCount === 0;
 
   const setPatron = useCallback((code: string, id: string, name: string) => {
@@ -189,7 +196,7 @@ export default function BorrowPage() {
   const faceVerifyDisabled = faceScanning || !patronCode.trim() || !!patronId;
 
   const subtitle = patronId
-    ? `Đang mượn: ${patronName} — ${activeCount}/${MAX_BORROW_BOOKS} sách`
+    ? `Đang mượn: ${patronName} — ${activeCount}/${borrowConfig.max_borrow_books} sách`
     : "Quét khuôn mặt hoặc nhập MSSV để bắt đầu";
 
   return (
@@ -271,14 +278,24 @@ export default function BorrowPage() {
                     <Stack spacing={1}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>Số sách đã mượn</Typography>
-                        <Chip size="small" color={activeCount >= MAX_BORROW_BOOKS ? "error" : "primary"} label={`${activeCount}/${MAX_BORROW_BOOKS}`} sx={{ fontWeight: 700 }} />
+                        <Chip size="small" color={activeCount >= borrowConfig.max_borrow_books ? "error" : "primary"} label={`${activeCount}/${borrowConfig.max_borrow_books}`} sx={{ fontWeight: 700 }} />
                       </Box>
-                      <LinearProgress variant="determinate" value={(activeCount / MAX_BORROW_BOOKS) * 100} color={activeCount >= MAX_BORROW_BOOKS ? "error" : "primary"} sx={{ borderRadius: 2, height: 6, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { borderRadius: 2 } }} />
+                      <LinearProgress variant="determinate" value={(activeCount / borrowConfig.max_borrow_books) * 100} color={activeCount >= borrowConfig.max_borrow_books ? "error" : "primary"} sx={{ borderRadius: 2, height: 6, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { borderRadius: 2 } }} />
                       {overdueCount > 0 ? (
-                        <Alert severity="error" sx={{ py: 0.5, borderRadius: 2 }}>
-                          <WarningIcon fontSize="small" sx={{ mr: 0.5 }} />
-                          Có {overdueCount} cuốn sách quá hạn
-                        </Alert>
+                        <>
+                          <Alert severity="error" sx={{ py: 0.5, borderRadius: 2 }}>
+                            <WarningIcon fontSize="small" sx={{ mr: 0.5 }} />
+                            Có {overdueCount} cuốn sách quá hạn
+                          </Alert>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setOverdueGuideOpen(true)}
+                            sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+                          >
+                            Xem hướng dẫn xử lý
+                          </Button>
+                        </>
                       ) : null}
                       <Typography variant="body2" color={remaining > 0 ? "text.secondary" : "error"} sx={{ fontWeight: 600 }}>
                         {remaining > 0 ? `Có thể mượn thêm ${remaining} cuốn` : "Đã đạt giới hạn mượn"}
@@ -289,7 +306,7 @@ export default function BorrowPage() {
                       variant="contained"
                       fullWidth
                       startIcon={<QrCodeScannerIcon />}
-                      disabled={!canBorrow}
+                      disabled={!canBorrow || !borrowCamUrl}
                       onClick={() => setScannerOpen(true)}
                       sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", py: 1.5, background: canBorrow ? "linear-gradient(135deg, #10b981 0%, #059669 100%)" : undefined, "&:hover": canBorrow ? { background: "linear-gradient(135deg, #059669 0%, #047857 100%)" } : {} }}
                     >
@@ -327,7 +344,7 @@ export default function BorrowPage() {
                     <Typography variant="body1" color="text.secondary" sx={{ textAlign: "center" }}>
                       {"Bấm nút \"Quét mã vạch sách\" để mở IP Camera"}
                     </Typography>
-                    <Button variant="outlined" color="inherit" startIcon={<QrCodeScannerIcon />} onClick={() => setScannerOpen(true)} disabled={!canBorrow}>
+                    <Button variant="outlined" color="inherit" startIcon={<QrCodeScannerIcon />} onClick={() => setScannerOpen(true)} disabled={!canBorrow || !borrowCamUrl}>
                       Mở IP Camera
                     </Button>
                   </Stack>
@@ -397,14 +414,21 @@ export default function BorrowPage() {
         </Grid>
       </Grid>
 
+      {borrowCamUrl && (
       <BorrowIPCameraDialog
         open={scannerOpen}
         patronId={patronId || ""}
         patronName={patronName}
         maxItems={remaining > 0 ? remaining : undefined}
-        cameraUrl={BORROW_CAM_URL}
+        cameraUrl={borrowCamUrl}
         onClose={() => setScannerOpen(false)}
         onSuccess={handleScanSuccess}
+      />
+      )}
+
+      <OverdueGuideModal
+        open={overdueGuideOpen}
+        onClose={() => setOverdueGuideOpen(false)}
       />
 
       <NoticeSnackbar
