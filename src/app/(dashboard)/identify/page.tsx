@@ -84,8 +84,8 @@ export default function IdentifyPage() {
       const preprocessed = await preprocessImage(imageFile, {
         maxWidth: 640,
         maxHeight: 480,
-        quality: 0.7,
-        convertToGrayscale: true,
+        quality: 0.85,
+        convertToGrayscale: false,
         brightnessThreshold: 50,
       });
 

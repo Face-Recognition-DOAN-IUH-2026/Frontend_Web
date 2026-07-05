@@ -27,8 +27,8 @@ self.onmessage = async (e: MessageEvent<PreprocessMessage>) => {
     image,
     maxWidth = 640,
     maxHeight = 480,
-    quality = 0.7,
-    convertToGrayscale = true,
+    quality = 0.85,
+    convertToGrayscale = false,
   } = e.data;
 
   try {
@@ -85,7 +85,7 @@ self.onmessage = async (e: MessageEvent<PreprocessMessage>) => {
     ctx.putImageData(imageData, 0, 0);
 
     const blob = await canvas.convertToBlob({
-      type: 'image/webp',
+      type: 'image/jpeg',
       quality,
     });
 

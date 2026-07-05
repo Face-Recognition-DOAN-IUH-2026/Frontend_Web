@@ -25,8 +25,8 @@ interface PreprocessOptions {
 const DEFAULT_OPTIONS: PreprocessOptions = {
   maxWidth: 640,
   maxHeight: 480,
-  quality: 0.7,
-  convertToGrayscale: true,
+  quality: 0.85,
+  convertToGrayscale: false,
   brightnessThreshold: 50,
 };
 
@@ -152,7 +152,7 @@ async function fallbackPreprocess(
   const blob = await new Promise<Blob>((resolve) => {
     canvas.toBlob(
       (b) => resolve(b!),
-      'image/webp',
+      'image/jpeg',
       quality
     );
   });

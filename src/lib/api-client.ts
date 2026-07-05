@@ -133,7 +133,9 @@ function getCookieValue(name: string): string | null {
 
 function setAccessTokenCookie(token: string) {
   if (typeof document === "undefined") return;
-  document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
+  const isProduction = typeof process !== "undefined" && process.env.NODE_ENV === "production";
+  const secureFlag = isProduction ? "; Secure" : "";
+  document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${secureFlag}`;
 }
 
 function clearAccessTokenCookie() {
