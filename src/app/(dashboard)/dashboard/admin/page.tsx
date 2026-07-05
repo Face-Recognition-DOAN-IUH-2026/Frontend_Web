@@ -45,7 +45,7 @@ import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
@@ -68,6 +68,7 @@ const STAT_GRADIENT: Record<string, string> = {
 };
 
 export default function AdminPage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const { isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<UserPublic[]>([]);
@@ -123,6 +124,7 @@ export default function AdminPage() {
       setShowCreate(false);
       setCreateForm({ email: "", password: "", role: "staff" });
       setNotice("Tạo người dùng thành công. Tài khoản đã active.");
+      apiAnt.success({ message: "Tạo người dùng thành công. Tài khoản đã active.", placement: "topRight" });
       load();
     } catch (err: any) {
       setCreateError(err?.response?.data?.detail || "Tạo người dùng thất bại.");
@@ -447,7 +449,7 @@ export default function AdminPage() {
         </Box>
       </Drawer>
 
-      <NoticeSnackbar open={Boolean(notice)} message={notice} severity="success" onClose={() => setNotice("")} />
+      {contextHolder}
     </Stack>
   );
 }

@@ -42,7 +42,7 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
 import type { CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
@@ -87,6 +87,7 @@ function borrowStatus(record: BorrowRecord) {
 }
 
 export default function PatronDetailPage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
@@ -167,7 +168,7 @@ export default function PatronDetailPage() {
     if (!patron) return;
     await api.updatePatron(patron.id, editForm);
     setShowEdit(false);
-    setNotice("Đã cập nhật thông tin độc giả.");
+    apiAnt.success({ message: "Đã cập nhật thông tin độc giả.", placement: "topRight" });
     await loadPatron();
   };
 
@@ -177,7 +178,7 @@ export default function PatronDetailPage() {
     const next = new Date(current);
     next.setFullYear(next.getFullYear() + 1);
     await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
-    setNotice("Đã gia hạn thẻ thêm 1 năm.");
+    apiAnt.success({ message: "Đã gia hạn thẻ thêm 1 năm.", placement: "topRight" });
     await loadPatron();
   };
 
@@ -188,10 +189,10 @@ export default function PatronDetailPage() {
       router.push("/patrons");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setNotice("Độc giả không tồn tại hoặc đã bị xóa.");
+        apiAnt.error({ message: "Độc giả không tồn tại hoặc đã bị xóa.", placement: "topRight" });
         router.push("/patrons");
       } else {
-        setNotice(`Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
+        apiAnt.error({ message: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
       }
     }
   };
@@ -202,10 +203,10 @@ export default function PatronDetailPage() {
       await api.restorePatron(patron.id);
       setShowRestore(false);
       setRestoreConfirmText("");
-      setNotice("Đã khôi phục độc giả.");
+      apiAnt.success({ message: "Đã khôi phục độc giả.", placement: "topRight" });
       await loadPatron();
     } catch (err: any) {
-      setNotice(`Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
+      apiAnt.error({ message: `Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
     }
   };
 
@@ -583,7 +584,7 @@ export default function PatronDetailPage() {
             </DialogActions>
           </Dialog>
 
-          <NoticeSnackbar open={Boolean(notice)} message={notice || ""} severity="success" onClose={() => setNotice("")} />
+          {contextHolder}
         </Stack>
       )}
     </LoadingOverlay>

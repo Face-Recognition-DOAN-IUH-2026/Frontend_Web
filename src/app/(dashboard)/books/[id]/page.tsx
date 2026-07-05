@@ -42,12 +42,17 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 const Book3DViewer = dynamic(
   () => import("@/app/(dashboard)/_components/Book3DViewer"),
   { ssr: false, loading: () => <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "grey.100", borderRadius: 2 }}><CircularProgress /></Box> }
+);
+
+const VRViewer = dynamic(
+  () => import("@/app/library/vr-tour/_components/VRViewer"),
+  { ssr: false, loading: () => <Box sx={{ height: 400, display: "flex", alignItems: "center", justifyContent: "center" }}><CircularProgress /></Box> }
 );
 
 function StatCard({ label, value, color, icon }: { label: string; value: number; color: "info" | "success" | "warning"; icon: React.ReactNode }) {
@@ -94,6 +99,7 @@ function MetaItem({ icon, label, value }: { icon: React.ReactNode; label: string
 }
 
 export default function BookDetailPage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const theme = useTheme();
   const params = useParams();
   const router = useRouter();
@@ -104,12 +110,12 @@ export default function BookDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [show3D, setShow3D] = useState(false);
+  const [showVR, setShowVR] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
-  const [editSnackbar, setEditSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
 
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -209,9 +215,9 @@ export default function BookDetailPage() {
 
       setBook(updated);
       setEditOpen(false);
-      setEditSnackbar({ open: true, message: "Cập nhật sách thành công", severity: "success" });
+      apiAnt.success({ message: "Cập nhật sách thành công", placement: "topRight" });
     } catch (err: any) {
-      setEditSnackbar({ open: true, message: err?.response?.data?.error || "Cập nhật sách thất bại", severity: "error" });
+      apiAnt.error({ message: err?.response?.data?.error || "Cập nhật sách thất bại", placement: "topRight" });
     } finally {
       setEditSaving(false);
     }
@@ -224,10 +230,10 @@ export default function BookDetailPage() {
       router.push("/books");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setEditSnackbar({ open: true, message: "Sách không tồn tại hoặc đã bị xóa.", severity: "error" });
+        apiAnt.error({ message: "Sách không tồn tại hoặc đã bị xóa.", placement: "topRight" });
         router.push("/books");
       } else {
-        setEditSnackbar({ open: true, message: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, severity: "error" });
+        apiAnt.error({ message: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
       }
     }
   };
@@ -328,7 +334,7 @@ export default function BookDetailPage() {
                       position: "absolute",
                       bottom: 16,
                       left: 16,
-                      right: 16,
+                      right: book.shelf_location ? "calc(50% + 4px)" : 16,
                       width: "auto",
                       borderRadius: 2,
                       boxShadow: 3,
@@ -338,6 +344,27 @@ export default function BookDetailPage() {
                   >
                     Góc nhìn 3D
                   </Button>
+                  {book.shelf_location ? (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      startIcon={<LocationOnIcon />}
+                      onClick={() => setShowVR(true)}
+                      sx={{
+                        position: "absolute",
+                        bottom: 16,
+                        left: "calc(50% + 4px)",
+                        right: 16,
+                        width: "auto",
+                        borderRadius: 2,
+                        boxShadow: 3,
+                        bgcolor: "rgba(16,185,129,0.9)",
+                        backdropFilter: "blur(4px)",
+                      }}
+                    >
+                      Chỉ đường đến kệ
+                    </Button>
+                  ) : null}
                 </Box>
 
                 <Box sx={{ p: 2.5 }}>
@@ -535,6 +562,18 @@ export default function BookDetailPage() {
             </DialogContent>
           </Dialog>
 
+          <Dialog open={showVR} onClose={() => setShowVR(false)} maxWidth="lg" fullWidth fullScreen>
+            <DialogTitle sx={{ m: 0, p: 2, display: "flex", justifyContent: "space-between", alignItems: "center", bgcolor: "#0f172a", color: "white" }}>
+              <Typography variant="h6">Chỉ đường đến kệ — {book.shelf_location}</Typography>
+              <IconButton onClick={() => setShowVR(false)} sx={{ color: "white" }}>
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers sx={{ p: 0, overflow: "hidden" }}>
+              {showVR ? <VRViewer /> : null}
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
             <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700 }}>
               Chỉnh sửa thông tin sách
@@ -687,13 +726,7 @@ export default function BookDetailPage() {
             </Box>
           </Dialog>
 
-          <NoticeSnackbar
-            open={editSnackbar.open}
-            message={editSnackbar.message}
-            severity={editSnackbar.severity}
-            onClose={() => setEditSnackbar((s) => ({ ...s, open: false }))}
-            anchorOrigin={{ vertical: "top", horizontal: "right" }}
-          />
+          {contextHolder}
         </Stack>
       )}
     </LoadingOverlay>

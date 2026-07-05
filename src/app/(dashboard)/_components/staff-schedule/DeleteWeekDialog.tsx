@@ -1,12 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, Typography, Switch, Stack, Alert, Box,
-} from "@mui/material";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import Modal from "antd/es/modal";
+import Alert from "antd/es/alert";
+import Switch from "antd/es/switch";
+import { useColorMode } from "@/lib/mui-theme";
 import api from "@/lib/api-client";
 import type { StaffScheduleAssignment } from "@/lib/types";
 
@@ -30,6 +28,8 @@ function fmtDate(d: string) {
 }
 
 export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affectedCount, onDeleted }: Props) {
+  const { effectiveMode } = useColorMode();
+  const isDark = effectiveMode === "dark";
   const [notify, setNotify] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ cancelled: number; skipped: number; message: string } | null>(null);
@@ -80,96 +80,64 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
   const displayCount = affectedCount ?? fetchedAffectedCount;
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1.5 }}>
-        <Box sx={{ width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "rgba(239,68,68,0.1)" }}>
-          {result ? (
-            <CheckCircleIcon sx={{ fontSize: 18, color: "success.main" }} />
-          ) : (
-            <WarningAmberIcon sx={{ fontSize: 18, color: "error.main" }} />
+    <Modal
+      open={open}
+      onCancel={handleClose}
+      title={result ? "Đã xóa lịch trực" : "Xóa lịch trực trong tuần"}
+      width={440}
+      okText={result ? "Đóng" : "Xác nhận xóa"}
+      cancelText={result ? undefined : "Hủy bỏ"}
+      okButtonProps={result ? {} : { danger: true, loading, onClick: handleConfirm }}
+      cancelButtonProps={result ? { style: { display: "none" } } : { disabled: loading }}
+      onOk={result ? handleClose : undefined}
+      maskClosable={!loading}
+    >
+      {result ? (
+        <div>
+          <Alert message={result.message} type="success" showIcon style={{ marginBottom: 8 }} />
+          {result.skipped > 0 && (
+            <div style={{ fontSize: "0.75rem", color: "#d97706" }}>
+              Đã bỏ qua {result.skipped} ca trong quá khứ (không thể hủy).
+            </div>
           )}
-        </Box>
-        {result ? "Đã xóa lịch trực" : "Xóa lịch trực trong tuần"}
-      </DialogTitle>
-      <DialogContent>
-        {result ? (
-          <Stack spacing={1.5}>
-            <Alert severity="success" sx={{ borderRadius: 2 }}>
-              {result.message}
-            </Alert>
-            {result.skipped > 0 ? (
-              <Typography variant="caption" sx={{ color: "warning.main" }}>
-                Đã bỏ qua {result.skipped} ca trong quá khứ (không thể hủy).
-              </Typography>
-            ) : null}
-          </Stack>
-        ) : isPast ? (
-          <Alert severity="warning" sx={{ borderRadius: 2 }}>
-            Toàn bộ lịch trong tuần này đã qua. Không có ca nào để hủy.
-          </Alert>
-        ) : (
-          <Stack spacing={2}>
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid", borderColor: "divider" }}>
-              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
-                Thao tác này sẽ <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>hủy toàn bộ ca trực</Box> từ hôm nay đến cuối tuần:
-              </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: "text.primary" }}>
-                {effectiveFrom === today && weekFrom < today
-                  ? `${fmtDate(today)} → ${fmtDate(weekTo)} (các ngày quá khứ đã bỏ qua)`
-                  : `${fmtDate(weekFrom)} → ${fmtDate(weekTo)}`
-                }
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.disabled", display: "block", mt: 0.75, fontSize: "0.7rem" }}>
-                Tất cả yêu cầu đăng ký ca (bids) và đổi ca (swaps) đang chờ duyệt liên quan cũng sẽ bị hủy tự động.
-              </Typography>
-            </Box>
+        </div>
+      ) : isPast ? (
+        <Alert message="Toàn bộ lịch trong tuần này đã qua. Không có ca nào để hủy." type="warning" showIcon />
+      ) : (
+        <div>
+          <div style={{ padding: 12, borderRadius: 8, border: `1px solid ${isDark ? "#2E3345" : "#D0D7E2"}`, marginBottom: 12, background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)" }}>
+            <div style={{ fontSize: "0.75rem", color: isDark ? "#B8B0A4" : "#344054", marginBottom: 4 }}>
+              Thao tác này sẽ <span style={{ color: "#ef4444", fontWeight: 700 }}>hủy toàn bộ ca trực</span> từ hôm nay đến cuối tuần:
+            </div>
+            <div style={{ fontWeight: 600, fontSize: "0.875rem", color: isDark ? "#EDE2DF" : "#101828" }}>
+              {effectiveFrom === today && weekFrom < today
+                ? `${fmtDate(today)} → ${fmtDate(weekTo)} (các ngày quá khứ đã bỏ qua)`
+                : `${fmtDate(weekFrom)} → ${fmtDate(weekTo)}`
+              }
+            </div>
+            <div style={{ fontSize: "0.7rem", color: isDark ? "#B8B0A4" : "#999", marginTop: 6 }}>
+              Tất cả yêu cầu đăng ký ca (bids) và đổi ca (swaps) đang chờ duyệt liên quan cũng sẽ bị hủy tự động.
+            </div>
+          </div>
 
-            {displayCount !== undefined && displayCount !== null ? (
-              <Alert severity="info" sx={{ borderRadius: 2 }}>
-                {displayCount} ca trực sẽ bị ảnh hưởng trong khoảng thời gian này.
-              </Alert>
-            ) : null}
+          {displayCount !== undefined && displayCount !== null && (
+            <Alert message={`${displayCount} ca trực sẽ bị ảnh hưởng trong khoảng thời gian này.`} type="info" showIcon style={{ marginBottom: 12 }} />
+          )}
 
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <Switch
-                checked={notify}
-                onChange={(e) => setNotify(e.target.checked)}
-                size="small"
-                sx={{ "& .MuiSwitch-switchBase.MuiChecked": { color: "primary.main" } }}
-              />
-              <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                Gửi thông báo hủy lịch đến nhân viên
-              </Typography>
-            </Box>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <Switch checked={notify} onChange={setNotify} size="small" />
+            <span style={{ fontSize: "0.75rem", fontWeight: 500 }}>Gửi thông báo hủy lịch đến nhân viên</span>
+          </div>
 
-            {notify ? (
-              <Typography variant="caption" sx={{ color: "primary.main", bgcolor: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 1, p: 1.5, display: "block", fontSize: "0.7rem" }}>
-                Nhân viên bị ảnh hưởng sẽ nhận thông báo qua hệ thống.
-              </Typography>
-            ) : null}
+          {notify && (
+            <div style={{ fontSize: "0.7rem", color: "#6366f1", background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 6, padding: 8 }}>
+              Nhân viên bị ảnh hưởng sẽ nhận thông báo qua hệ thống.
+            </div>
+          )}
 
-            {error ? (
-              <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>
-            ) : null}
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={handleClose} disabled={loading} sx={{ textTransform: "none" }}>
-          {result ? "Đóng" : "Hủy bỏ"}
-        </Button>
-        {!result && !isPast ? (
-          <Button
-            onClick={handleConfirm}
-            disabled={loading}
-            variant="contained"
-            color="error"
-            sx={{ textTransform: "none", fontWeight: 600 }}
-          >
-            {loading ? "Đang xử lý..." : "Xác nhận xóa"}
-          </Button>
-        ) : null}
-      </DialogActions>
-    </Dialog>
+          {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginTop: 12 }} />}
+        </div>
+      )}
+    </Modal>
   );
 }

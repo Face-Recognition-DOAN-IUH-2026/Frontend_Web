@@ -2,16 +2,10 @@
 
 import { useEffect, useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Divider,
   Drawer,
   IconButton,
@@ -19,6 +13,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import Alert from "antd/es/alert";
+import Modal from "antd/es/modal";
 import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -53,9 +49,6 @@ export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) 
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<string>("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
-
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -122,14 +115,14 @@ export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) 
   };
 
   const openConfirmDialog = (id: string) => {
-    setConfirmTargetId(id);
-    setConfirmOpen(true);
-  };
-
-  const handleConfirmApprove = () => {
-    if (confirmTargetId) handleApprove(confirmTargetId);
-    setConfirmOpen(false);
-    setConfirmTargetId(null);
+    Modal.confirm({
+      title: "Xác nhận",
+      content: "Duyệt check-in thủ công này?",
+      okText: "Duyệt",
+      cancelText: "Hủy",
+      okButtonProps: { style: { background: "#10b981", borderColor: "#10b981" } },
+      onOk: () => handleApprove(id),
+    });
   };
 
   const pending = requests.filter((r) => r.status === "pending_manual");
@@ -149,7 +142,7 @@ export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) 
           </Box>
 
           <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+            {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} />}
 
             {loading && (
               <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
@@ -272,16 +265,6 @@ export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) 
         </Box>
       </Drawer>
 
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>Xác nhận</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Duyệt check-in thủ công này?</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Hủy</Button>
-          <Button onClick={handleConfirmApprove} variant="contained" color="success">Duyệt</Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }

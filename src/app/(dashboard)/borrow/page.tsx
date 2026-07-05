@@ -25,6 +25,8 @@ import FaceIcon from "@mui/icons-material/FaceOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import VideocamIcon from "@mui/icons-material/VideocamOutlined";
 import WarningIcon from "@mui/icons-material/WarningAmberOutlined";
+import notification from "antd/es/notification";
+import Result from "antd/es/result";
 import BorrowIPCameraDialog from "@/app/(dashboard)/_components/BorrowIPCameraDialog";
 import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
 import BookRecommendations from "@/app/(dashboard)/_components/BookRecommendations";
@@ -34,10 +36,10 @@ import { fadeInUp, slideInRight } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import { useMemo } from "react";
 
 export default function BorrowPage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const [patronCode, setPatronCode] = useState("");
   const [patronId, setPatronId] = useState<string | null>(null);
   const [patronName, setPatronName] = useState("");
@@ -46,7 +48,6 @@ export default function BorrowPage() {
   const [error, setError] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE(30000);
-  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
   const [borrowConfig, setBorrowConfig] = useState<{ max_borrow_books: number }>({ max_borrow_books: 3 });
   const [overdueGuideOpen, setOverdueGuideOpen] = useState(false);
   const borrowCamUrl = useMemo(() => {
@@ -121,7 +122,7 @@ export default function BorrowPage() {
             setPatron(patronCode.trim(), data.patron.id, data.patron.full_name || data.patron.student_code);
             setActiveCount(data.total);
             setOverdueCount(data.overdue_count);
-            setSnackbar({ severity: "success", message: `Đã xác minh khuôn mặt: ${data.patron.full_name || data.patron.student_code}` });
+            apiAnt.success({ message: `Đã xác minh: ${data.patron.full_name || data.patron.student_code}`, placement: "topRight" });
             setFaceScanning(false);
           })
           .catch((err: any) => {
@@ -141,7 +142,7 @@ export default function BorrowPage() {
       setError(sseState.error || "Xác minh thất bại");
       setFaceScanning(false);
     }
-  }, [sseState.status, sseState.result, sseState.error, patronCode, stopCamera, setPatron, setSnackbar]);
+  }, [sseState.status, sseState.result, sseState.error, patronCode, stopCamera, setPatron, apiAnt]);
 
   const handleFaceVerify = useCallback(async () => {
     if (!videoRef.current || !patronCode.trim()) return;
@@ -178,12 +179,12 @@ export default function BorrowPage() {
       setError(getErrorMessage(err) || "Lỗi xác minh khuôn mặt");
       setFaceScanning(false);
     }
-  }, [patronCode, stopCamera, setPatron, startSSE, setSnackbar]);
+  }, [patronCode, stopCamera, setPatron, startSSE, apiAnt]);
 
   const handleScanSuccess = useCallback((message: string) => {
-    setSnackbar({ severity: "success", message });
+    apiAnt.success({ message, placement: "topRight" });
     setTimeout(() => window.location.reload(), 1500);
-  }, []);
+  }, [apiAnt]);
 
   const handleClearPatron = () => {
     setPatronId(null);
@@ -431,13 +432,7 @@ export default function BorrowPage() {
         onClose={() => setOverdueGuideOpen(false)}
       />
 
-      <NoticeSnackbar
-        open={!!snackbar}
-        message={snackbar?.message || ""}
-        severity={snackbar?.severity || "success"}
-        onClose={() => setSnackbar(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      />
+      {contextHolder}
     </Stack>
   );
 }

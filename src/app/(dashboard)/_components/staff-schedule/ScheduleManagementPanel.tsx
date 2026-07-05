@@ -2,15 +2,9 @@
 
 import { useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Divider,
   Drawer,
   IconButton,
@@ -21,6 +15,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import Alert from "antd/es/alert";
+import Modal from "antd/es/modal";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -55,11 +51,6 @@ export default function ScheduleManagementPanel({
   const [endTime, setEndTime] = useState("11:30");
   const [minStaff, setMinStaff] = useState("1");
 
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const [deleteTargetType, setDeleteTargetType] = useState<"zone" | "shift" | null>(null);
-  const [deleteWarning, setDeleteWarning] = useState("");
-
   const handleCreateZone = async () => {
     setSaving(true);
     setError(null);
@@ -81,10 +72,29 @@ export default function ScheduleManagementPanel({
       const active = assignments.items.filter((a: any) => a.status === "scheduled" || a.status === "confirmed");
       if (active.length > 0) warning = `Có ${active.length} ca trực đang chờ xử lý sử dụng khu vực này. `;
     } catch {}
-    setDeleteWarning(warning);
-    setDeleteTargetId(id);
-    setDeleteTargetType("zone");
-    setDeleteConfirmOpen(true);
+    Modal.confirm({
+      title: "Xác nhận xóa",
+      content: (
+        <div>
+          {warning && <Alert message={warning} type="warning" showIcon style={{ marginBottom: 8 }} />}
+          <span>Xóa khu vực này?</span>
+        </div>
+      ),
+      okText: "Xóa",
+      cancelText: "Hủy",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setSaving(true);
+        try {
+          await api.deleteScheduleZone(id);
+          onUpdate();
+        } catch (err: any) {
+          setError(getApiError(err));
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
   };
 
   const openDeleteShiftConfirm = async (id: string) => {
@@ -94,30 +104,29 @@ export default function ScheduleManagementPanel({
       const active = assignments.items.filter((a: any) => a.status === "scheduled" || a.status === "confirmed");
       if (active.length > 0) warning = `Có ${active.length} ca trực đang chờ xử lý sử dụng ca này. `;
     } catch {}
-    setDeleteWarning(warning);
-    setDeleteTargetId(id);
-    setDeleteTargetType("shift");
-    setDeleteConfirmOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTargetId || !deleteTargetType) return;
-    setSaving(true);
-    try {
-      if (deleteTargetType === "zone") {
-        await api.deleteScheduleZone(deleteTargetId);
-      } else {
-        await api.deleteScheduleShift(deleteTargetId);
-      }
-      onUpdate();
-    } catch (err: any) {
-      setError(getApiError(err));
-    } finally {
-      setSaving(false);
-      setDeleteConfirmOpen(false);
-      setDeleteTargetId(null);
-      setDeleteTargetType(null);
-    }
+    Modal.confirm({
+      title: "Xác nhận xóa",
+      content: (
+        <div>
+          {warning && <Alert message={warning} type="warning" showIcon style={{ marginBottom: 8 }} />}
+          <span>Xóa ca trực này?</span>
+        </div>
+      ),
+      okText: "Xóa",
+      cancelText: "Hủy",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setSaving(true);
+        try {
+          await api.deleteScheduleShift(id);
+          onUpdate();
+        } catch (err: any) {
+          setError(getApiError(err));
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
   };
 
   const handleCreateShift = async () => {
@@ -188,7 +197,7 @@ export default function ScheduleManagementPanel({
           </Tabs>
 
           <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+            {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} />}
 
             {tab === "zones" && (
               <>
@@ -316,21 +325,6 @@ export default function ScheduleManagementPanel({
         </Box>
       </Drawer>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Xác nhận xóa</DialogTitle>
-        <DialogContent>
-          {deleteWarning && <Alert severity="warning" sx={{ mb: 1 }}>{deleteWarning}</Alert>}
-          <DialogContentText>
-            {deleteTargetType === "zone" ? "Xóa khu vực này?" : "Xóa ca trực này?"}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Hủy</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error" disabled={saving}>
-            {saving ? <CircularProgress size={14} color="inherit" /> : "Xóa"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }

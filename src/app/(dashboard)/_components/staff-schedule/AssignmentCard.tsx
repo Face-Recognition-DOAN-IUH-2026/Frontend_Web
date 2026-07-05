@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Box, Chip, IconButton, Tooltip, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
+import CancelIcon from "@mui/icons-material/CancelOutlined";
 import type { StaffScheduleAssignment } from "@/lib/types";
 
 interface AssignmentCardProps {
@@ -13,14 +15,14 @@ interface AssignmentCardProps {
 
 type StatusKey = "past" | "active" | "future" | "today" | "understaffed" | "cancelled" | "completed";
 
-const STATUS_STYLES: Record<StatusKey, { bg: string; border: string; text: string; label: string }> = {
-  past:        { bg: "rgba(255,255,255,0.04)",       border: "rgba(255,255,255,0.08)",  text: "rgba(255,255,255,0.45)", label: "Đã qua" },
-  active:      { bg: "rgba(16,185,129,0.10)",        border: "rgba(16,185,129,0.30)",  text: "#10b981",                label: "Đang trực" },
-  future:      { bg: "rgba(99,102,241,0.10)",        border: "rgba(99,102,241,0.20)",   text: "#a5b4fc",                label: "Sắp tới" },
-  today:       { bg: "rgba(245,158,11,0.10)",        border: "rgba(245,158,11,0.30)",   text: "#f59e0b",                label: "Hôm nay" },
-  understaffed:{ bg: "rgba(251,146,60,0.10)",        border: "rgba(251,146,60,0.40)",   text: "#fb923c",                label: "Thiếu người" },
-  cancelled:   { bg: "rgba(239,68,68,0.10)",         border: "rgba(239,68,68,0.30)",   text: "#ef4444",                label: "Đã hủy" },
-  completed:   { bg: "rgba(99,102,241,0.06)",        border: "rgba(99,102,241,0.15)",  text: "rgba(165,180,252,0.7)", label: "Hoàn thành" },
+const STATUS_META: Record<StatusKey, { label: string; chipColor: "default" | "success" | "primary" | "warning" | "error"; accentBorder?: string }> = {
+  past:         { label: "Đã qua",     chipColor: "default" },
+  active:       { label: "Đang trực",  chipColor: "success", accentBorder: "#10b981" },
+  future:       { label: "Sắp tới",    chipColor: "primary" },
+  today:        { label: "Hôm nay",    chipColor: "warning", accentBorder: "#f59e0b" },
+  understaffed: { label: "Thiếu người", chipColor: "warning" },
+  cancelled:    { label: "Đã hủy",     chipColor: "error" },
+  completed:    { label: "Hoàn thành", chipColor: "default" },
 };
 
 function getStatus(assignment: StaffScheduleAssignment): StatusKey {
@@ -41,9 +43,14 @@ export default function AssignmentCard({ assignment, onDelete, understaffed }: A
   const [hover, setHover] = useState(false);
   const baseStatus = getStatus(assignment);
   const status: StatusKey = understaffed ? "understaffed" : baseStatus;
-  const style = STATUS_STYLES[status];
+  const meta = STATUS_META[status];
   const displayName = assignment.staff?.fullName || assignment.staff?.email || "Nhân viên";
   const zoneName = assignment.zone?.zoneName || "";
+
+  const isGround = status === "past" || status === "completed" || status === "future";
+  const isFigure = status === "active" || status === "today";
+  const isUnderstaffed = status === "understaffed";
+  const isCancelled = status === "cancelled";
 
   return (
     <Box
@@ -54,9 +61,28 @@ export default function AssignmentCard({ assignment, onDelete, understaffed }: A
         px: 1.5,
         py: 1,
         borderRadius: 1,
-        border: `1px solid ${style.border}`,
-        bgcolor: style.bg,
-        "&:hover": onDelete ? { borderColor: style.border } : undefined,
+        border: "1px solid",
+        borderColor: isCancelled
+          ? "rgba(239,68,68,0.25)"
+          : isUnderstaffed
+          ? "rgba(251,146,60,0.35)"
+          : isFigure
+          ? "transparent"
+          : "action.hover",
+        borderLeftWidth: isFigure ? 3 : 1,
+        borderLeftColor: meta.accentBorder,
+        bgcolor: isCancelled
+          ? "rgba(239,68,68,0.06)"
+          : isUnderstaffed
+          ? "rgba(251,146,60,0.08)"
+          : isFigure
+          ? "rgba(99,102,241,0.04)"
+          : "background.paper",
+        backgroundImage: isCancelled
+          ? "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(239,68,68,0.06) 4px, rgba(239,68,68,0.06) 8px)"
+          : "none",
+        transition: "background 0.15s, border-color 0.15s",
+        "&:hover": onDelete ? { borderColor: "action.focus" } : undefined,
       }}
     >
       {zoneName ? (
@@ -69,27 +95,33 @@ export default function AssignmentCard({ assignment, onDelete, understaffed }: A
       ) : null}
       <Typography
         variant="caption"
-        sx={{ fontWeight: 600, color: style.text, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        sx={{
+          fontWeight: 600,
+          color: isCancelled ? "error.main" : isUnderstaffed ? "warning.dark" : isFigure ? "text.primary" : "text.secondary",
+          display: "block",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
       >
         {displayName}
       </Typography>
-      {hover ? (
-        <Chip
-          label={style.label}
-          size="small"
-          sx={{
-            position: "absolute",
-            top: 2,
-            right: onDelete ? 20 : 2,
-            height: 16,
-            fontSize: "0.5rem",
-            fontWeight: 700,
-            bgcolor: `${style.text}18`,
-            color: style.text,
-            border: `1px solid ${style.border}`,
-          }}
-        />
-      ) : null}
+
+      <Chip
+        icon={isUnderstaffed ? <WarningAmberIcon sx={{ fontSize: 12 }} /> : isCancelled ? <CancelIcon sx={{ fontSize: 12 }} /> : undefined}
+        label={meta.label}
+        size="small"
+        color={meta.chipColor}
+        variant={isGround ? "outlined" : "filled"}
+        sx={{
+          mt: 0.5,
+          height: 18,
+          fontSize: "0.6rem",
+          fontWeight: 700,
+          "& .MuiChip-label": { px: 0.75 },
+        }}
+      />
+
       {onDelete ? (
         <Tooltip title="Xóa ca trực">
           <IconButton

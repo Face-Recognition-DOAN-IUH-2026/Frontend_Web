@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Box, Typography, CircularProgress, LinearProgress, alpha } from "@mui/material";
+import { Box, Typography, CircularProgress, alpha } from "@mui/material";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
 import Webcam from "react-webcam";
@@ -93,7 +93,7 @@ export function ScannerUI({
       {!cameraReady && <NotReadyOverlay />}
 
       {phase === "processing" && ocrLoading && (
-        <ProcessingOverlay ocrProgress={ocrProgress} />
+        <ProcessingOverlay />
       )}
     </Box>
   );
@@ -198,7 +198,7 @@ function NotReadyOverlay() {
   );
 }
 
-function ProcessingOverlay({ ocrProgress }: { ocrProgress: number }) {
+function ProcessingOverlay() {
   return (
     <Box
       sx={{
@@ -211,16 +211,6 @@ function ProcessingOverlay({ ocrProgress }: { ocrProgress: number }) {
     >
       <CircularProgress size={28} color="inherit" />
       <Typography variant="body2">Đang nhận dạng chữ viết...</Typography>
-      <Box sx={{ width: 160 }}>
-        <LinearProgress
-          variant="determinate"
-          value={Math.max(ocrProgress * 100, 5)}
-          sx={{ borderRadius: 1, height: 4 }}
-        />
-        <Typography variant="caption" sx={{ mt: 0.5, display: "block", textAlign: "center" }}>
-          {Math.round(ocrProgress * 100)}%
-        </Typography>
-      </Box>
     </Box>
   );
 }

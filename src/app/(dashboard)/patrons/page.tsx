@@ -16,85 +16,50 @@ import {
   Drawer,
   IconButton,
   MenuItem,
-  Paper,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
   Typography,
-  Stepper,
-  Step,
-  StepLabel,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
-import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
-import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
-import PersonIcon from "@mui/icons-material/PersonOutlined";
-import BadgeIcon from "@mui/icons-material/BadgeOutlined";
-import SchoolIcon from "@mui/icons-material/SchoolOutlined";
+import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import { initials, statusLabel, statusColor } from "@/lib/utils";
-import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { initials } from "@/lib/utils";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
-import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
-import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
-import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
-import type { CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
-import MultiAngleCapture from "@/app/(dashboard)/_components/MultiAngleCapture";
-import { StudentCardScanner, type ScannedCardData } from "@/app/(dashboard)/_components/scanner";
+import notification from "antd/es/notification";
+import ConfirmDialog from "@/app/(dashboard)/_components/ui/ConfirmDialog";
+import PatronStatCards from "@/app/(dashboard)/_components/ui/PatronStatCards";
+import PatronToolbar from "@/app/(dashboard)/_components/ui/PatronToolbar";
+import PatronGridView from "@/app/(dashboard)/_components/ui/PatronGridView";
+import PatronListView from "@/app/(dashboard)/_components/ui/PatronListView";
+import PatronWizard from "@/app/(dashboard)/_components/ui/PatronWizard";
 import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 
-type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face" | "deleted";
+export type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face" | "deleted";
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
-const _RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
-if (!_RAW_CAM_URL) throw new Error("NEXT_PUBLIC_BORROW_CAM_URL is not set");
-const RAW_CAM_URL: string = _RAW_CAM_URL;
-const CARD_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
-
-const defaultIssueDate = new Date().toISOString().split("T")[0];
-const defaultExpiry = new Date();
-defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
-const defaultExpiryStr = defaultExpiry.toISOString().split("T")[0];
-
-function emptyCreateForm(): PatronCreate {
-  return {
-    full_name: "",
-    student_code: "",
-    class_name: "",
-    issue_date: defaultIssueDate,
-    membership_expiry: defaultExpiryStr,
-    course: "",
-    permanent_address: "",
-    identity_number: "",
-    email: "",
-    phone: "",
-  };
-}
+const STAT_GRADIENT = {
+  total: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+  active: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  expired: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+  face: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+};
 
 export default function PatronsPage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const router = useRouter();
   const [patrons, setPatrons] = useState<PatronPublic[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterValue>("all");
+  const [view, setView] = useState<"grid" | "list">("grid");
   const [loading, setLoading] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
-  const [createScan, setCreateScan] = useState(true);
-  const [createForm, setCreateForm] = useState<PatronCreate>(emptyCreateForm());
-  const [createError, setCreateError] = useState("");
-  const [scannedFromCard, setScannedFromCard] = useState(false);
-  const [createStep, setCreateStep] = useState<"scan" | "form" | "face" | "done">("scan");
-  const [submitting, setSubmitting] = useState(false);
 
   const [editTarget, setEditTarget] = useState<PatronPublic | null>(null);
   const [editForm, setEditForm] = useState<PatronUpdate>({});
@@ -110,39 +75,12 @@ export default function PatronsPage() {
   const [renewMonths, setRenewMonths] = useState(12);
 
   const [notice, setNotice] = useState<Notice>(null);
-
-  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
-
-  useEffect(() => {
-    if (createStep === "form") {
-      let startYear = 0;
-      let endYear = 0;
-      
-      const courseStr = (createForm.course || "").toString();
-      const years = courseStr.match(/\b(20\d{2})\b/g);
-      
-      if (years && years.length > 0) {
-        startYear = parseInt(years[0]);
-        endYear = years.length > 1 ? parseInt(years[1]) : startYear + 4;
-      } else if (createForm.student_code && createForm.student_code.match(/^(1[0-9]|2[0-9])/)) {
-        const prefix = parseInt(createForm.student_code.substring(0, 2));
-        startYear = 2000 + prefix;
-        endYear = startYear + 4;
-      }
-      
-      if (startYear > 0 && endYear > 0) {
-        const newIssue = `${startYear}-09-01`;
-        const newExpiry = `${endYear}-09-01`;
-        
-        setCreateForm(prev => {
-          if (prev.issue_date !== newIssue || prev.membership_expiry !== newExpiry) {
-            return { ...prev, issue_date: newIssue, membership_expiry: newExpiry };
-          }
-          return prev;
-        });
-      }
-    }
-  }, [createForm.course, createForm.student_code, createStep]);
+  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => {
+    if (severity === "success") apiAnt.success({ message, placement: "topRight" });
+    else if (severity === "error") apiAnt.error({ message, placement: "topRight" });
+    else if (severity === "warning") apiAnt.warning({ message, placement: "topRight" });
+    else apiAnt.info({ message, placement: "topRight" });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -167,69 +105,6 @@ export default function PatronsPage() {
     else if (filter === "no_face") list = list.filter((p) => !p.has_face);
     return list;
   }, [patrons, filter]);
-
-  const handleCardScanned = (data: ScannedCardData) => {
-    setCreateForm((prev) => ({
-      ...prev,
-      full_name: data.fullName || prev.full_name,
-      student_code: data.studentCode || prev.student_code,
-      class_name: data.className || prev.class_name,
-      course: data.course || prev.course,
-      permanent_address: data.permanentAddress || prev.permanent_address,
-    }));
-    setScannedFromCard(true);
-    setCreateStep("form");
-  };
-
-  const closeCreate = () => {
-    setShowCreate(false);
-    setCreateScan(true);
-    setCreateStep("scan");
-    setCreateForm(emptyCreateForm());
-    setCreateError("");
-    setScannedFromCard(false);
-    setSubmitting(false);
-  };
-
-  const handleFormNext = () => {
-    if (!createForm.full_name.trim()) { setCreateError("Vui lòng nhập họ tên"); return; }
-    if (!createForm.student_code.trim()) { setCreateError("Vui lòng nhập MSSV"); return; }
-    setCreateError("");
-    setCreateStep("face");
-  };
-
-  const handleSkipFace = async () => {
-    setSubmitting(true);
-    setCreateError("");
-    try {
-      await api.createPatron(createForm);
-      closeCreate();
-      await load();
-      showNotice("success", "Đã tạo độc giả mới");
-    } catch (err: any) {
-      if (err?.response?.status === 409) setCreateError("MSSV hoặc mã thẻ đã tồn tại");
-      else setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleFaceReady = async (files: Record<CaptureAngle, File>) => {
-    setSubmitting(true);
-    setCreateError("");
-    try {
-      const newPatron = await api.createPatron(createForm);
-      await api.enrollPatronFaceBatch(newPatron.id, files);
-      closeCreate();
-      await load();
-      showNotice("success", "Đã tạo độc giả và đăng ký khuôn mặt");
-    } catch (err: any) {
-      if (err?.response?.status === 409) setCreateError("MSSV hoặc mã thẻ đã tồn tại");
-      else setCreateError(getErrorMessage(err) || "Tạo độc giả thất bại");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const openEdit = (patron: PatronPublic) => {
     setEditTarget(patron);
@@ -308,35 +183,7 @@ export default function PatronsPage() {
     }
   };
 
-  const activeCount  = patrons.filter((p) => p.status === "active").length;
-  const expiredCount = patrons.filter((p) => p.status === "expired" || p.status === "inactive").length;
-  const faceCount    = patrons.filter((p) => p.has_face).length;
-
-  const STAT_GRADIENT = {
-    total: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-    active: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-    expired: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-    face: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-  };
-
-  const FILTERS: { value: FilterValue; label: string }[] = [
-    { value: "all",      label: "Tất cả" },
-    { value: "active",   label: "Hoạt động" },
-    { value: "inactive", label: "Tạm khóa" },
-    { value: "expired",  label: "Hết hạn" },
-    { value: "has_face", label: "Có khuôn mặt" },
-    { value: "no_face",  label: "Chưa có khuôn mặt" },
-    { value: "deleted",  label: "Đã xóa" },
-  ];
-
-  const statItems = [
-    { label: "Tổng độc giả", value: patrons.length, gradient: STAT_GRADIENT.total, icon: PeopleIcon, pct: 100 },
-    { label: "Hoạt động", value: activeCount, gradient: STAT_GRADIENT.active, icon: PersonIcon, pct: patrons.length ? Math.round((activeCount / patrons.length) * 100) : 0 },
-    { label: "Hết hạn / Khóa", value: expiredCount, gradient: STAT_GRADIENT.expired, icon: UpdateIcon, pct: patrons.length ? Math.round((expiredCount / patrons.length) * 100) : 0 },
-    { label: "Có khuôn mặt", value: faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((faceCount / patrons.length) * 100) : 0 },
-  ];
-
-  const statBadges = `${patrons.length} độc giả · ${activeCount} đang hoạt động · ${faceCount} đã đăng ký khuôn mặt`;
+  const statBadges = `${patrons.length} độc giả · ${patrons.filter((p) => p.status === "active").length} đang hoạt động · ${patrons.filter((p) => p.has_face).length} đã đăng ký khuôn mặt`;
 
   return (
     <Stack spacing={3}>
@@ -347,255 +194,52 @@ export default function PatronsPage() {
         statBadges={statBadges}
         onRefresh={load}
         actions={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setCreateScan(true); setShowCreate(true); }}
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreate(true)}
             sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", boxShadow: "0 4px 14px rgba(99,102,241,0.4)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}>
             Thêm độc giả
           </Button>
         }
       />
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
-        {statItems.map((item, idx) => (
-          <MuiStatCard
-            key={item.label}
-            label={item.label}
-            value={item.value}
-            icon={item.icon}
-            gradient={item.gradient}
-            pct={item.pct}
-            index={idx}
-          />
-        ))}
-      </Box>
+      <PatronStatCards patrons={patrons} />
 
-      <DashboardCard noPadding>
-        <Stack spacing={1.5} sx={{ p: 2 }}>
-          <SearchField value={query} onChange={setQuery} placeholder="Tìm theo tên, MSSV, mã thẻ..." />
-          <ToggleButtonGroup value={filter} onChange={(_, v) => { if (v) setFilter(v); }} size="small" exclusive
-            sx={{ display: "flex", flexWrap: "wrap", gap: 0.75,
-              "& .MuiToggleButton-root": { border: "1px solid", borderColor: "divider", borderRadius: "20px !important", px: 1.5, py: 0.5, fontSize: "0.75rem", fontWeight: 600, textTransform: "none", color: "text.secondary",
-                "&.Mui-selected": { bgcolor: "primary.main", color: "#fff", "&:hover": { bgcolor: "primary.dark" } } } }}>
-            {FILTERS.map((f) => (<ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>))}
-          </ToggleButtonGroup>
-        </Stack>
-      </DashboardCard>
+      <PatronToolbar
+        query={query}
+        onQueryChange={setQuery}
+        filter={filter}
+        onFilterChange={setFilter}
+        view={view}
+        onViewChange={setView}
+        onAddPatron={() => setShowCreate(true)}
+      />
 
       {loading && filtered.length === 0 ? (
         <LoadingOverlay loading message="Đang tải danh sách độc giả..." />
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={<PersonIcon sx={{ fontSize: 32 }} />}
+          icon={<PeopleIcon sx={{ fontSize: 32 }} />}
           title="Không tìm thấy độc giả nào"
           action={<Button size="small" sx={{ textTransform: "none" }} onClick={() => { setQuery(""); setFilter("all"); }}>Xóa bộ lọc</Button>}
         />
+      ) : view === "grid" ? (
+        <PatronGridView
+          patrons={filtered}
+          onEdit={openEdit}
+          onRenew={(p) => { setRenewTarget(p); setRenewMonths(12); }}
+          onDelete={(p) => { setDeleteTarget(p); setDeleteConfirmText(""); }}
+          onRestore={(p) => { setRestoreTarget(p); setRestoreConfirmText(""); }}
+        />
       ) : (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }, gap: 2 }}>
-          {filtered.map((patron, idx) => {
-            const isExpired = new Date(patron.membership_expiry) < new Date();
-            const isSoonExp = !isExpired && (new Date(patron.membership_expiry).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000;
-            return (
-              <Paper key={patron.id} variant="outlined"
-                onClick={() => router.push(`/patrons/${patron.id}`)}
-                sx={{ borderRadius: 3, p: 0, cursor: "pointer", transition: "all 0.25s ease", overflow: "hidden",
-                  ...staggerSx(idx, 0.05),
-                  "&:hover": { transform: "translateY(-2px)", boxShadow: 4, borderColor: "primary.main" } }}>
-                <Box sx={{ height: 4, background: patron.status === "active" ? STAT_GRADIENT.active : patron.status === "expired" ? STAT_GRADIENT.expired : "linear-gradient(135deg, #64748b 0%, #475569 100%)" }} />
-                <Box sx={{ p: 2.5 }}>
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", mb: 2 }}>
-                    <Avatar sx={{ width: 44, height: 44, bgcolor: patron.status === "active" ? "rgba(16,185,129,0.15)" : patron.status === "expired" ? "rgba(245,158,11,0.15)" : "rgba(100,116,139,0.15)", color: patron.status === "active" ? "success.main" : patron.status === "expired" ? "warning.main" : "text.secondary", fontWeight: 700, fontSize: 16 }}>
-                      {initials(patron.full_name)}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{patron.full_name}</Typography>
-                      <Typography variant="caption" sx={{ fontFamily: "monospace", color: "text.secondary" }}>{patron.student_code}</Typography>
-                    </Box>
-                    <Chip label={statusLabel(patron.status)} color={statusColor(patron.status)} size="small" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.7rem", height: 24 }} />
-                  </Stack>
-                  <Stack spacing={0.75} sx={{ mb: 2 }}>
-                    {patron.course ? (
-                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                        <SchoolIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-                        <Typography variant="caption" color="text.secondary">{patron.course}</Typography>
-                      </Stack>
-                    ) : null}
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                      <FaceIcon sx={{ fontSize: 14, color: patron.has_face ? "primary.main" : "action.disabled" }} />
-                      <Typography variant="caption" color={patron.has_face ? "primary.main" : "text.secondary"}>
-                        {patron.has_face ? "Đã đăng ký khuôn mặt" : "Chưa có khuôn mặt"}
-                      </Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                      <BadgeIcon sx={{ fontSize: 14, color: isExpired ? "error.main" : isSoonExp ? "warning.main" : "text.secondary" }} />
-                      <Typography variant="caption" color={isExpired ? "error.main" : isSoonExp ? "warning.main" : "text.secondary"}>
-                        Hạn thẻ: {patron.membership_expiry}{isExpired ? " — Hết hạn" : isSoonExp ? " — Sắp hết hạn" : ""}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                  <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end", pt: 1.5, borderTop: 1, borderColor: "divider" }} onClick={(e) => e.stopPropagation()}>
-                    {patron.status === "deleted" ? (
-                      <>
-                        <Button size="small" variant="outlined" color="success" onClick={() => { setRestoreTarget(patron); setRestoreConfirmText(""); }} sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.75rem" }}>Khôi phục</Button>
-                        <IconButton size="small" color="error" onClick={() => { setDeleteTarget(patron); setDeleteConfirmText(""); }} title="Xóa vĩnh viễn"><DeleteIcon fontSize="small" /></IconButton>
-                      </>
-                    ) : (
-                      <>
-                        <Tooltip title="Chỉnh sửa"><IconButton size="small" onClick={() => openEdit(patron)} sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}><EditIcon fontSize="small" /></IconButton></Tooltip>
-                        <Tooltip title="Gia hạn thẻ"><IconButton size="small" onClick={() => { setRenewTarget(patron); setRenewMonths(12); }} sx={{ color: "text.secondary", "&:hover": { color: "success.main" } }}><UpdateIcon fontSize="small" /></IconButton></Tooltip>
-                        <Tooltip title="Xóa"><IconButton size="small" onClick={() => { setDeleteTarget(patron); setDeleteConfirmText(""); }} sx={{ color: "text.secondary", "&:hover": { color: "error.main" } }}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
-                        <Tooltip title="Xem chi tiết"><IconButton size="small" onClick={() => router.push(`/patrons/${patron.id}`)} sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}><ChevronRightIcon fontSize="small" /></IconButton></Tooltip>
-                      </>
-                    )}
-                  </Stack>
-                </Box>
-              </Paper>
-            );
-          })}
-        </Box>
+        <PatronListView
+          patrons={filtered}
+          onEdit={openEdit}
+          onRenew={(p) => { setRenewTarget(p); setRenewMonths(12); }}
+          onDelete={(p) => { setDeleteTarget(p); setDeleteConfirmText(""); }}
+          onRestore={(p) => { setRestoreTarget(p); setRestoreConfirmText(""); }}
+        />
       )}
 
-      <Dialog open={showCreate} onClose={closeCreate} fullScreen>
-        <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
-          <Box sx={{ px: 3, py: 2, display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: 1, borderColor: "divider", bgcolor: "background.paper" }}>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>Cấp phát thẻ độc giả mới</Typography>
-            <IconButton onClick={closeCreate} sx={{ bgcolor: "action.hover" }}><CloseIcon /></IconButton>
-          </Box>
-          
-          <Box sx={{ flex: 1, display: "flex", overflow: "hidden" }}>
-            <Box sx={{ flex: 1, bgcolor: "grey.50", display: { xs: "none", md: "flex" }, alignItems: "center", justifyContent: "center", p: 4, borderRight: 1, borderColor: "divider", position: "relative" }}>
-              <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.4, backgroundImage: "radial-gradient(#1976d2 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-              
-              <Box sx={{ 
-                width: 420, 
-                aspectRatio: "1.586", 
-                borderRadius: 4, 
-                bgcolor: "primary.main", 
-                color: "white", 
-                p: 4, 
-                boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
-                position: "relative",
-                overflow: "hidden",
-                background: "linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)",
-                zIndex: 1,
-                transition: "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-                "&:hover": { transform: "scale(1.02)" }
-              }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 4 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: 2 }}>THẺ THƯ VIỆN</Typography>
-                  <SchoolIcon sx={{ opacity: 0.5 }} />
-                </Box>
-                <Stack direction="row" spacing={3} sx={{ alignItems: "center" }}>
-                  <Avatar sx={{ width: 80, height: 80, bgcolor: "rgba(255,255,255,0.2)", fontSize: 32, fontWeight: 700, border: "2px solid rgba(255,255,255,0.4)" }}>
-                    {initials(createForm.full_name || "?")}
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 800, textTransform: "uppercase", letterSpacing: 1 }}>{createForm.full_name || "HỌ VÀ TÊN"}</Typography>
-                    <Typography variant="body1" sx={{ opacity: 0.9, fontFamily: "monospace", fontSize: "1.1rem", mt: 0.5 }}>{createForm.student_code || "MSSV"}</Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.7, mt: 0.5 }}>{createForm.class_name || "Lớp"}</Typography>
-                  </Box>
-                </Stack>
-                <Box sx={{ position: "absolute", bottom: -20, right: -20, opacity: 0.1 }}>
-                  <SchoolIcon sx={{ fontSize: 160 }} />
-                </Box>
-              </Box>
-            </Box>
-
-            <Box sx={{ flex: { xs: 1, md: "0 0 500px" }, display: "flex", flexDirection: "column", bgcolor: "background.paper", boxShadow: "-4px 0 24px rgba(0,0,0,0.02)", zIndex: 2 }}>
-              <Box sx={{ p: 4, borderBottom: 1, borderColor: "divider", bgcolor: "background.default" }}>
-                <Stepper activeStep={createStep === "scan" ? 0 : createStep === "form" ? 1 : 2} alternativeLabel>
-                  <Step><StepLabel>Quét thẻ</StepLabel></Step>
-                  <Step><StepLabel>Thông tin</StepLabel></Step>
-                  <Step><StepLabel>Khuôn mặt</StepLabel></Step>
-                </Stepper>
-              </Box>
-              <Box sx={{ flex: 1, overflowY: "auto", p: { xs: 3, md: 5 } }}>
-                {createStep === "scan" ? (
-                  <Stack spacing={3}>
-                    <Box>
-                      <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Quét thẻ sinh viên</Typography>
-                      <Typography variant="body2" color="text.secondary">Đặt thẻ sinh viên vào camera để hệ thống tự động trích xuất thông tin một cách nhanh chóng.</Typography>
-                    </Box>
-                    <Box sx={{ borderRadius: 3, overflow: "hidden", border: "2px dashed", borderColor: "divider", bgcolor: "grey.50" }}>
-                      <StudentCardScanner
-                        onScanned={handleCardScanned}
-                        onError={(msg) => setCreateError(msg)}
-                        onSkip={() => { setCreateScan(false); setCreateStep("form"); }}
-                        videoSource="ipcamera"
-                        ipCameraUrl={CARD_CAM_URL}
-                      />
-                    </Box>
-                    {createError ? <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert> : null}
-                  </Stack>
-                ) : null}
-                {createStep === "form" ? (
-                  <Stack spacing={3}>
-                    <Box>
-                      <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Thông tin cá nhân</Typography>
-                      {scannedFromCard ? (
-                        <Alert severity="success" sx={{ borderRadius: 2 }}>Đã trích xuất thông tin thành công từ thẻ sinh viên.</Alert>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">Vui lòng điền thông tin chi tiết của độc giả mới.</Typography>
-                      )}
-                    </Box>
-                    
-                    <Stack spacing={2.5}>
-                      <TextField label="Họ tên" value={createForm.full_name} onChange={(e) => { setCreateForm({ ...createForm, full_name: e.target.value }); setCreateError(""); }} required fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
-                      <TextField label="MSSV" value={createForm.student_code} onChange={(e) => { setCreateForm({ ...createForm, student_code: e.target.value }); setCreateError(""); }} required fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
-                      
-                      <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
-                        <Box sx={{ flex: 1 }}><TextField label="Lớp" value={createForm.class_name || ""} onChange={(e) => setCreateForm({ ...createForm, class_name: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} /></Box>
-                        <Box sx={{ flex: 1 }}><TextField label="Khóa học" value={createForm.course || ""} onChange={(e) => setCreateForm({ ...createForm, course: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} /></Box>
-                      </Box>
-                      
-                      <TextField label="CMND/CCCD" value={createForm.identity_number || ""} onChange={(e) => setCreateForm({ ...createForm, identity_number: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
-                      <TextField label="Email" type="email" value={createForm.email || ""} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
-                      <TextField label="Số điện thoại" value={createForm.phone || ""} onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
-                      <TextField label="Hộ khẩu thường trú" value={createForm.permanent_address || ""} onChange={(e) => setCreateForm({ ...createForm, permanent_address: e.target.value })} fullWidth multiline rows={2} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
-                      
-                      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
-                        <TextField label="Ngày cấp thẻ" type="date" value={createForm.issue_date} onChange={(e) => setCreateForm({ ...createForm, issue_date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} helperText={createForm.course ? "Tự động tính theo khóa" : ""} />
-                        <TextField label="Hạn thẻ" type="date" value={createForm.membership_expiry} onChange={(e) => setCreateForm({ ...createForm, membership_expiry: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} fullWidth sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} helperText={createForm.course ? "Tự động tính theo khóa" : ""} />
-                      </Box>
-                    </Stack>
-                    {createError ? <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert> : null}
-                  </Stack>
-                ) : null}
-                {createStep === "face" ? (
-                  <Stack spacing={3}>
-                    <Box>
-                      <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Bảo mật khuôn mặt</Typography>
-                      <Typography variant="body2" color="text.secondary">Vui lòng hướng mặt về phía camera để hệ thống thu thập dữ liệu sinh trắc học dùng cho cổng an ninh.</Typography>
-                    </Box>
-                    <Box sx={{ borderRadius: 3, overflow: "hidden", border: 1, borderColor: "divider", p: 2, bgcolor: "grey.50" }}>
-                      <MultiAngleCapture consent={true} onFilesReady={handleFaceReady} />
-                    </Box>
-                    {createError ? <Alert severity="error" sx={{ borderRadius: 2 }}>{createError}</Alert> : null}
-                  </Stack>
-                ) : null}
-              </Box>
-              
-              <Box sx={{ p: { xs: 3, md: 4 }, borderTop: 1, borderColor: "divider", bgcolor: "background.default" }}>
-                {createStep === "scan" ? (
-                  <Button variant="contained" fullWidth size="large" onClick={() => { setCreateScan(false); setCreateStep("form"); }} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Nhập thông tin thủ công</Button>
-                ) : null}
-                {createStep === "form" ? (
-                  <Stack direction="row" spacing={2}>
-                    <Button variant="outlined" fullWidth onClick={() => setCreateStep("scan")} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Quét lại thẻ</Button>
-                    <Button variant="contained" fullWidth onClick={handleFormNext} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Tiếp tục</Button>
-                  </Stack>
-                ) : null}
-                {createStep === "face" ? (
-                  <Stack direction="row" spacing={2}>
-                    <Button variant="outlined" fullWidth onClick={() => setCreateStep("form")} disabled={submitting} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>Quay lại</Button>
-                    <Button variant="contained" fullWidth onClick={handleSkipFace} disabled={submitting} sx={{ borderRadius: 2, py: 1.5, fontWeight: 700 }}>
-                      {submitting ? <CircularProgress size={24} color="inherit" /> : "Tạo (Bỏ qua Face)"}
-                    </Button>
-                  </Stack>
-                ) : null}
-              </Box>
-            </Box>
-          </Box>
-        </Box>
-      </Dialog>
+      <PatronWizard open={showCreate} onClose={() => setShowCreate(false)} onComplete={load} />
 
       <Drawer
         anchor="right"
@@ -612,7 +256,7 @@ export default function PatronsPage() {
           {editTarget ? (
             <Stack spacing={2.5} sx={{ flex: 1, overflow: "auto", px: 2.5, py: 2.5 }}>
               <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                <Avatar sx={{ width: 48, height: 48, bgcolor: "primary.main", fontWeight: 700 }}>
+                <Avatar sx={{ width: 48, height: 48, bgcolor: STAT_GRADIENT.total, fontWeight: 700 }}>
                   {initials(editTarget.full_name)}
                 </Avatar>
                 <Box>
@@ -692,7 +336,7 @@ export default function PatronsPage() {
         <DialogContent>
           <Stack spacing={2}>
             <Typography>
-              Xóa <strong>{deleteTarget?.full_name}</strong>? Thao tác này sẽ xóa dữ liệu liên quan (thông báo, lịch trực) và không thể hoàn tác từ giao diện.
+              Xóa <strong>{deleteTarget?.full_name}</strong>? Thao tác này sẽ xóa dữ liệu liên quan và không thể hoàn tác từ giao diện.
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Nhập <strong>XÓA</strong> để xác nhận:
@@ -743,12 +387,7 @@ export default function PatronsPage() {
         </DialogActions>
       </Dialog>
 
-      <NoticeSnackbar
-        open={!!notice}
-        message={notice?.message || ""}
-        severity={notice?.severity || "success"}
-        onClose={() => setNotice(null)}
-      />
+      {contextHolder}
     </Stack>
   );
 }

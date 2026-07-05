@@ -16,7 +16,14 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
 import MapIcon from "@mui/icons-material/MapOutlined";
+import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
+import dynamic from "next/dynamic";
 import type { BookCardData } from "../../BookCard";
+
+const VRViewer = dynamic(
+  () => import("@/app/library/vr-tour/_components/VRViewer"),
+  { ssr: false }
+);
 
 interface BookLocationCardProps {
   data: BookCardData & { shelf_location?: string };
@@ -24,6 +31,7 @@ interface BookLocationCardProps {
 
 export default function BookLocationCard({ data }: BookLocationCardProps) {
   const [mapOpen, setMapOpen] = useState(false);
+  const [vrOpen, setVrOpen] = useState(false);
 
   const floorMatch = data.shelf_location?.match(/^([A-Za-z]+\d+)/);
   const floorLabel = floorMatch ? `Tầng ${floorMatch[1]}` : null;
@@ -100,6 +108,18 @@ export default function BookLocationCard({ data }: BookLocationCardProps) {
           >
             Xem trên bản đồ
           </Button>
+          {data.shelf_location ? (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<ViewInArIcon />}
+              onClick={() => setVrOpen(true)}
+              fullWidth
+              sx={{ mt: 1, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", "&:hover": { background: "linear-gradient(135deg, #059669 0%, #047857 100%)" } }}
+            >
+              Chỉ đường 3D
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -141,6 +161,18 @@ export default function BookLocationCard({ data }: BookLocationCardProps) {
             </Box>
           </DialogContent>
         </>
+      </Dialog>
+
+      <Dialog open={vrOpen} onClose={() => setVrOpen(false)} maxWidth="lg" fullWidth fullScreen>
+        <DialogTitle sx={{ m: 0, p: 2, display: "flex", justifyContent: "space-between", alignItems: "center", bgcolor: "#0f172a", color: "white" }}>
+          <Typography variant="h6">Chỉ đường đến kệ — {data.shelf_location}</Typography>
+          <IconButton onClick={() => setVrOpen(false)} sx={{ color: "white" }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0, overflow: "hidden" }}>
+          {vrOpen ? <VRViewer /> : null}
+        </DialogContent>
       </Dialog>
     </>
   );

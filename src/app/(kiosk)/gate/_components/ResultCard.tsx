@@ -1,6 +1,7 @@
 'use client';
 
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
+import Spin from 'antd/es/spin';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -51,7 +52,7 @@ const statusConfig: Record<string, {
     bgColor: 'rgba(107,114,128,0.1)',
     pulseColor: 'none',
     iconColor: 'grey.500',
-    icon: <CircularProgress size={64} sx={{ color: 'grey.500' }} />,
+    icon: <Spin size="large" />,
   },
 };
 

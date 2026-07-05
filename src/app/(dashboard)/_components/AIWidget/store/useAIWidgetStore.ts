@@ -27,6 +27,8 @@ interface AIWidgetStore {
   messages: ChatMessage[];
   isLoadingChat: boolean;
   chatSessionId?: string;
+  proactiveMessage: string | null;
+  failedSearchCount: number;
 
   open: () => void;
   close: () => void;
@@ -36,6 +38,9 @@ interface AIWidgetStore {
   updateSummary: (summary: CommandCenterSummary) => void;
   sendMessage: (message: string) => Promise<void>;
   clearMessages: () => void;
+  recordFailedSearch: () => void;
+  resetFailedSearch: () => void;
+  dismissProactive: () => void;
 }
 
 export const useAIWidgetStore = create<AIWidgetStore>()(
@@ -48,6 +53,8 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
       messages: [],
       isLoadingChat: false,
       chatSessionId: undefined,
+      proactiveMessage: null,
+      failedSearchCount: 0,
 
       open: () => set({ isOpen: true }),
       close: () => set({ isOpen: false }),
@@ -57,6 +64,21 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
 
       updateSummary: (summary) => set({ lastSummary: summary }),
+
+      recordFailedSearch: () => set((state) => {
+        const next = state.failedSearchCount + 1;
+        if (next >= 3 && !state.proactiveMessage) {
+          return {
+            failedSearchCount: next,
+            proactiveMessage: "Bạn đang tìm sách? Tôi có thể giúp bạn tìm kiếm hoặc gợi ý sách phù hợp.",
+          };
+        }
+        return { failedSearchCount: next };
+      }),
+
+      resetFailedSearch: () => set({ failedSearchCount: 0 }),
+
+      dismissProactive: () => set({ proactiveMessage: null }),
 
       sendMessage: async (message: string) => {
         const userMessage: ChatMessage = {

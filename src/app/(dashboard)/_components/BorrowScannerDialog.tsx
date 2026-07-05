@@ -13,13 +13,14 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  InputAdornment,
   Paper,
-  Snackbar,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
+import Input from "antd/es/input";
+import Result from "antd/es/result";
+import Steps from "antd/es/steps";
+import notification from "antd/es/notification";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
@@ -27,7 +28,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import ErrorIcon from "@mui/icons-material/ReportOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import SearchIcon from "@mui/icons-material/SearchOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
 import { slideInRight, successPop } from "@/lib/animations";
@@ -57,6 +57,7 @@ export default function BorrowScannerDialog({
   onClose: () => void;
   onSuccess: (message: string) => void;
 }) {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<any>(null);
@@ -69,6 +70,7 @@ export default function BorrowScannerDialog({
   const [scanToast, setScanToast] = useState("");
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [manualIsbn, setManualIsbn] = useState("");
+  const [successResult, setSuccessResult] = useState<{ message: string; bookCount: number } | null>(null);
 
   const stopCamera = useCallback(() => {
     if (readerRef.current) {
@@ -159,6 +161,7 @@ export default function BorrowScannerDialog({
       setCameraError("");
       setCreateError("");
       setScanToast("");
+      setSuccessResult(null);
       lastScannedRef.current = null;
       return;
     }
@@ -233,9 +236,7 @@ export default function BorrowScannerDialog({
       });
       if (confirmResult.status === "success") {
         stopCamera();
-        setScanned([]);
-        onSuccess(confirmResult.message);
-        onClose();
+        setSuccessResult({ message: confirmResult.message, bookCount: validItems.length });
       }
     } catch (err) {
       const detail = getErrorMessage(err);
@@ -281,6 +282,7 @@ export default function BorrowScannerDialog({
 
   const validCount = scanned.filter((item) => item.can_borrow).length;
   const totalScanned = scanned.length;
+  const currentStep = successResult ? 2 : lookingUp ? 1 : 0;
 
   return (
     <>
@@ -291,12 +293,39 @@ export default function BorrowScannerDialog({
               <QrCodeScannerIcon color="primary" />
               <Typography variant="h6" sx={{ fontWeight: 900 }}>Quét ISBN sách</Typography>
             </Stack>
-            {!lookingUp && (
+            {!lookingUp && !successResult && (
               <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
             )}
           </Stack>
+          <Steps
+            current={currentStep}
+            size="small"
+            items={[
+              { title: "Quét sách" },
+              { title: "Xác nhận" },
+              { title: "Hoàn tất" },
+            ]}
+            style={{ marginTop: 12 }}
+          />
         </DialogTitle>
         <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {successResult ? (
+            <Result
+              status="success"
+              title="Tạo phiếu mượn thành công"
+              subTitle={`${successResult.bookCount} cuốn sách đã được thêm vào phiếu`}
+              extra={[
+                <Button key="close" variant="contained" onClick={() => {
+                  setSuccessResult(null);
+                  setScanned([]);
+                  onSuccess(successResult.message);
+                  onClose();
+                }}>
+                  Đóng
+                </Button>,
+              ]}
+            />
+          ) : (
           <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
             <Paper
               variant="outlined"
@@ -374,28 +403,19 @@ export default function BorrowScannerDialog({
                 </Paper>
               ) : null}
 
-              <TextField
-                size="small"
+              <Input
+                size="middle"
                 placeholder="Nhập ISBN thủ công..."
+                prefix={<QrCodeScannerIcon style={{ fontSize: 14, color: "#999" }} />}
                 value={manualIsbn}
                 onChange={(e) => setManualIsbn(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && manualIsbn.trim()) {
+                onPressEnter={() => {
+                  if (manualIsbn.trim()) {
                     addScanned(manualIsbn.trim());
                     setManualIsbn("");
                   }
                 }}
-                fullWidth
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                allowClear
               />
 
               {scanned.length === 0 ? (
@@ -481,31 +501,23 @@ export default function BorrowScannerDialog({
               )}
             </Stack>
           </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose} disabled={lookingUp}>Hủy</Button>
-          <Button
-            variant="contained"
-            disabled={lookingUp || validCount === 0}
-            onClick={handleCreateSlip}
-          >
-            {lookingUp ? "Đang xử lý..." : `Tạo phiếu mượn (${validCount} cuốn)`}
-          </Button>
+          {!successResult && (
+            <Button
+              variant="contained"
+              disabled={lookingUp || validCount === 0}
+              onClick={handleCreateSlip}
+            >
+              {lookingUp ? "Đang xử lý..." : `Tạo phiếu mượn (${validCount} cuốn)`}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={!!scanToast}
-        autoHideDuration={2000}
-        onClose={() => setScanToast("")}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        message={
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <CheckCircleIcon sx={{ fontSize: 18 }} />
-            <span>{scanToast}</span>
-          </Stack>
-        }
-      />
+      {contextHolder}
     </>
   );
 }

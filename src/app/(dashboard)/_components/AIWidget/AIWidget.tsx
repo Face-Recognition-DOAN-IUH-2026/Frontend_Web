@@ -12,7 +12,7 @@ const BLACKLIST_PATHS = ["/login", "/register", "/gate", "/liveness", "/identify
 
 export default function AIWidget() {
   const pathname = usePathname();
-  const { isOpen, close } = useAIWidgetStore();
+  const { isOpen, close, proactiveMessage } = useAIWidgetStore();
 
   const isBlacklisted = BLACKLIST_PATHS.some((p) => pathname?.startsWith(p));
 
@@ -30,6 +30,15 @@ export default function AIWidget() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, close]);
+
+  useEffect(() => {
+    if (proactiveMessage && !isOpen) {
+      const timer = setTimeout(() => {
+        useAIWidgetStore.getState().open();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [proactiveMessage, isOpen]);
 
   if (isBlacklisted) return null;
 

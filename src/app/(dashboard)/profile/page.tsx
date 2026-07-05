@@ -35,11 +35,12 @@ import type { UserPublic } from "@/lib/types";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import notification from "antd/es/notification";
 
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 export default function ProfilePage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +65,12 @@ export default function ProfilePage() {
   const [emailLoading, setEmailLoading] = useState(false);
 
   const [notice, setNotice] = useState<Notice>(null);
-  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
+  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => {
+    if (severity === "success") apiAnt.success({ message, placement: "topRight" });
+    else if (severity === "error") apiAnt.error({ message, placement: "topRight" });
+    else if (severity === "warning") apiAnt.warning({ message, placement: "topRight" });
+    else apiAnt.info({ message, placement: "topRight" });
+  };
 
   useEffect(() => { fetchProfile(); }, []);
 
@@ -371,12 +377,7 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
-      <NoticeSnackbar
-        open={!!notice}
-        message={notice?.message || ""}
-        severity={notice?.severity || "success"}
-        onClose={() => setNotice(null)}
-      />
+      {contextHolder}
     </Stack>
   );
 }

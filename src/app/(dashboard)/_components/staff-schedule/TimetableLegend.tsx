@@ -3,16 +3,12 @@
 import { Box, Stack, Typography } from "@mui/material";
 
 const ITEMS = [
-  { bg: "rgba(255,255,255,0.04)",       border: "rgba(255,255,255,0.08)",  label: "Đã qua" },
-  { bg: "rgba(16,185,129,0.20)",        border: "rgba(16,185,129,0.5)",   label: "Đang trực" },
-  { bg: "rgba(99,102,241,0.20)",        border: "rgba(99,102,241,0.5)",    label: "Sắp tới" },
-  { bg: "rgba(245,158,11,0.20)",        border: "rgba(245,158,11,0.5)",   label: "Hôm nay" },
-  { bg: "rgba(251,146,60,0.20)",        border: "rgba(251,146,60,0.5)",   label: "Thiếu người" },
-  { bg: "rgba(239,68,68,0.20)",         border: "rgba(239,68,68,0.5)",    label: "Đã hủy" },
-  { bg: "rgba(99,102,241,0.10)",        border: "rgba(99,102,241,0.25)",  label: "Hoàn thành" },
-  { bg: "rgba(239,68,68,0.10)",         border: "rgba(239,68,68,0.30)",   label: "Tạm ngưng" },
-  { bg: "rgba(245,158,11,0.10)",        border: "rgba(245,158,11,0.30)",  label: "Chờ xác nhận" },
-  { bg: "rgba(99,102,241,0.06)",        border: "rgba(99,102,241,0.15)",  label: "Chờ admin xác nhận" },
+  { bg: "background.paper",       border: "action.hover",         label: "Đã qua",      variant: "outlined" as const },
+  { bg: "rgba(16,185,129,0.08)",  border: "#10b981",              label: "Đang trực",   variant: "filled" as const, accentLeft: true },
+  { bg: "background.paper",       border: "action.hover",         label: "Sắp tới",     variant: "outlined" as const },
+  { bg: "rgba(245,158,11,0.08)",  border: "#f59e0b",              label: "Hôm nay",     variant: "filled" as const, accentLeft: true },
+  { bg: "rgba(251,146,60,0.08)",  border: "rgba(251,146,60,0.35)",label: "Thiếu người", variant: "filled" as const },
+  { bg: "rgba(239,68,68,0.06)",   border: "rgba(239,68,68,0.25)", label: "Đã hủy",      variant: "filled" as const },
 ];
 
 export default function TimetableLegend() {
@@ -23,7 +19,16 @@ export default function TimetableLegend() {
       </Typography>
       {ITEMS.map((item) => (
         <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-          <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: item.bg, border: `1px solid ${item.border}` }} />
+          <Box sx={{
+            width: 12,
+            height: 12,
+            borderRadius: 0.5,
+            bgcolor: item.bg,
+            border: "1px solid",
+            borderColor: item.border,
+            borderLeftWidth: item.accentLeft ? 3 : 1,
+            borderLeftColor: item.accentLeft ? item.border : undefined,
+          }} />
           <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>{item.label}</Typography>
         </Box>
       ))}

@@ -43,9 +43,9 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
 import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
 import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
+import notification from "antd/es/notification";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
 
 const _RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
@@ -90,6 +90,7 @@ interface ScannedReturnItem {
 }
 
 export default function ReturnPage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const [borrowers, setBorrowers] = useState<StaffActiveBorrowerSummary[]>([]);
   const [selectedStudentCode, setSelectedStudentCode] = useState<string | null>(null);
   const [detail, setDetail] = useState<StaffPatronActiveBorrowsResponse | null>(null);
@@ -101,12 +102,10 @@ export default function ReturnPage() {
   const [confirmRecord, setConfirmRecord] = useState<BorrowRecord | null>(null);
   const [condition, setCondition] = useState("");
   const [error, setError] = useState("");
-  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error" | "warning"; message: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [overdueGuideOpen, setOverdueGuideOpen] = useState(false);
   const [scannedReturns, setScannedReturns] = useState<ScannedReturnItem[]>([]);
   const [batchReturning, setBatchReturning] = useState(false);
-  const [scanToast, setScanToast] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
   const readerRef = useRef<any>(null);
   const [imgReady, setImgReady] = useState(false);
@@ -186,13 +185,13 @@ export default function ReturnPage() {
     setError("");
     try {
       await api.staffReturnBorrowRecord(confirmRecord.id, condition || null);
-      setSnackbar({ severity: "success", message: "Trả sách thành công" });
+      apiAnt.success({ message: "Trả sách thành công", placement: "topRight" });
       setCondition("");
       setConfirmRecord(null);
       await loadBorrowers();
       if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
     } catch (err: any) {
-      setSnackbar({ severity: "error", message: getErrorMessage(err) || "Trả sách thất bại" });
+      apiAnt.error({ message: getErrorMessage(err) || "Trả sách thất bại", placement: "topRight" });
     } finally {
       setReturningId(null);
     }
@@ -214,9 +213,9 @@ export default function ReturnPage() {
     setBatchReturning(false);
     setScannerOpen(false);
     setScannedReturns([]);
-    setSnackbar({
-      severity: fail > 0 ? "warning" : "success",
+    apiAnt[fail > 0 ? "warning" : "success"]({
       message: `Trả ${ok} sách thành công${fail > 0 ? `, ${fail} thất bại` : ""}`,
+      placement: "topRight",
     });
     await loadBorrowers();
     if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
@@ -255,12 +254,14 @@ export default function ReturnPage() {
       toast = `Không tìm thấy sách đang mượn: ${normalized}`;
       return prev;
     });
-    setScanToast(toast);
+    if (toast) {
+      apiAnt[toast.startsWith("Đã thêm") ? "success" : "warning"]({ message: toast, placement: "topRight", duration: 2 });
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       lastScannedRef.current = null;
     }, 2000);
-  }, [detail]);
+  }, [detail, apiAnt]);
 
   const stopScanning = useCallback(() => {
     if (intervalRef.current) {
@@ -703,9 +704,7 @@ export default function ReturnPage() {
         onClose={() => setOverdueGuideOpen(false)}
       />
 
-      <NoticeSnackbar open={!!snackbar} message={snackbar?.message || ""} severity={snackbar?.severity || "success"} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
-
-      <NoticeSnackbar open={!!scanToast} message={scanToast} severity="success" onClose={() => setScanToast("")} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
+      {contextHolder}
     </Stack>
   );
 }

@@ -2,15 +2,9 @@
 
 import { useEffect, useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Divider,
   Drawer,
   IconButton,
@@ -21,6 +15,8 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import Alert from "antd/es/alert";
+import Modal from "antd/es/modal";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -56,9 +52,6 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
   const [staffId, setStaffId] = useState("");
   const [validFrom, setValidFrom] = useState("");
   const [validTo, setValidTo] = useState("");
-
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -114,22 +107,22 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
   };
 
   const openDeleteConfirm = (id: string) => {
-    setDeleteTargetId(id);
-    setDeleteConfirmOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTargetId) return;
-    try {
-      await api.deleteScheduleTemplate(deleteTargetId);
-      await loadData();
-      onUpdated();
-    } catch (err) {
-      setError(getApiError(err));
-    } finally {
-      setDeleteConfirmOpen(false);
-      setDeleteTargetId(null);
-    }
+    Modal.confirm({
+      title: "Xác nhận xóa",
+      content: "Xóa mẫu lịch này?",
+      okText: "Xóa",
+      cancelText: "Hủy",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await api.deleteScheduleTemplate(id);
+          await loadData();
+          onUpdated();
+        } catch (err) {
+          setError(getApiError(err));
+        }
+      },
+    });
   };
 
   const getStaffName = (id: string) => {
@@ -153,7 +146,7 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
           </Box>
 
           <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-            {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+            {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} />}
 
             <Stack spacing={1.5}>
               <TextField
@@ -328,16 +321,6 @@ export default function TemplateManagementPanel({ open, onClose, zones, shifts, 
         </Box>
       </Drawer>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Xác nhận xóa</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Xóa mẫu lịch này?</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Hủy</Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error">Xóa</Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, LinearProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import Spin from "antd/es/spin";
+import Progress from "antd/es/progress";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import CameraCapture from "@/app/(dashboard)/_components/camera-capture";
@@ -184,7 +186,7 @@ export default function IdentifyPage() {
         <Box sx={staggerSx(1)}>
           <DashboardCard>
             <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-              <CircularProgress size={28} />
+              <Spin size="small" />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography sx={{ fontWeight: 800 }}>
                   {isProcessing ? "Đang tiền xử lý ảnh..." : "Đang nhận diện..."}
@@ -192,7 +194,7 @@ export default function IdentifyPage() {
                 <Typography variant="body2" color="text.secondary">
                   {connected ? "Kết nối SSE đang chờ kết quả" : "Đang kết nối..."}
                 </Typography>
-                <LinearProgress sx={{ mt: 1.5, borderRadius: 99 }} />
+                <Progress percent={99} status="active" showInfo={false} strokeColor="#6366f1" trailColor="rgba(0,0,0,0.06)" />
               </Box>
             </Stack>
           </DashboardCard>
@@ -249,7 +251,14 @@ export default function IdentifyPage() {
                         <TableRow key={`${match.user_id}-${index}`} hover>
                           <TableCell sx={{ minWidth: 180 }}>
                             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                              <LinearProgress variant="determinate" value={Math.min(percent, 100)} color={score > 0.6 ? "success" : score > 0.3 ? "warning" : "error"} sx={{ width: 90, height: 7, borderRadius: 99 }} />
+                              <Progress
+                                percent={Math.min(percent, 100)}
+                                size="small"
+                                status={score > 0.6 ? "success" : score > 0.3 ? "normal" : "exception"}
+                                strokeColor={score > 0.6 ? "#10b981" : score > 0.3 ? "#f59e0b" : "#ef4444"}
+                                showInfo={false}
+                                style={{ width: 90 }}
+                              />
                               <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{percent}%</Typography>
                             </Stack>
                           </TableCell>
