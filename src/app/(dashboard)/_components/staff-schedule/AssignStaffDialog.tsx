@@ -1,22 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import Modal from "antd/es/modal";
+import Form from "antd/es/form";
+import Select from "antd/es/select";
+import Checkbox from "antd/es/checkbox";
+import Button from "antd/es/button";
+import Alert from "antd/es/alert";
+import notification from "antd/es/notification";
+import { useColorMode } from "@/lib/mui-theme";
 import api from "@/lib/api-client";
 import type { ScheduleStaff, StaffShift, LibraryZone, StaffScheduleAssignment } from "@/lib/types";
 
@@ -34,6 +26,12 @@ interface AssignStaffDialogProps {
   onAssigned: () => void;
 }
 
+interface FormValues {
+  zoneId: string;
+  staffId: string;
+  forceSave: boolean;
+}
+
 export default function AssignStaffDialog({
   open,
   date,
@@ -47,12 +45,14 @@ export default function AssignStaffDialog({
   onClose,
   onAssigned,
 }: AssignStaffDialogProps) {
-  const [zoneId, setZoneId] = useState("");
-  const [staffId, setStaffId] = useState("");
+  const { effectiveMode } = useColorMode();
+  const isDark = effectiveMode === "dark";
+  const [apiAnt, contextHolder] = notification.useNotification();
+  const [form] = Form.useForm<FormValues>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [forceSave, setForceSave] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [forceSave, setForceSave] = useState(false);
 
   const shift = useMemo(() => shifts.find((s) => s.id === shiftId), [shifts, shiftId]);
 
@@ -67,14 +67,13 @@ export default function AssignStaffDialog({
   );
 
   const reset = () => {
-    setZoneId("");
-    setStaffId("");
+    form.resetFields();
     setError(null);
     setForceSave(false);
     setWarnings([]);
   };
 
-  const gatherWarnings = (): string[] => {
+  const gatherWarnings = (staffId: string): string[] => {
     const w: string[] = [];
     const selectedStaff = staff.find((s) => s.id === staffId);
     if (!selectedStaff) return w;
@@ -94,25 +93,24 @@ export default function AssignStaffDialog({
   };
 
   const handleAssign = async () => {
-    if (!zoneId || !staffId) {
-      setError("Vui lòng chọn khu vực và nhân viên");
-      return;
-    }
-    const w = gatherWarnings();
-    if (w.length > 0 && !forceSave) {
-      setWarnings(w);
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setWarnings([]);
     try {
-      const params: any = { staffId, shiftId, zoneId, workDate: date };
+      const values = await form.validateFields();
+      const w = gatherWarnings(values.staffId);
+      if (w.length > 0 && !forceSave) {
+        setWarnings(w);
+        return;
+      }
+      setSaving(true);
+      setError(null);
+      setWarnings([]);
+      const params: any = { staffId: values.staffId, shiftId, zoneId: values.zoneId, workDate: date };
       if (forceSave && w.length > 0) params.force = true;
       await api.createScheduleAssignment(params);
+      apiAnt.success({ message: "Phân ca thành công", placement: "topRight" });
       reset();
       onAssigned();
     } catch (err: any) {
+      if (err?.errorFields) return;
       const data = err?.response?.data;
       setError(data?.error || data?.message || data?.detail?.[0]?.message || err?.message || "Có lỗi xảy ra");
     } finally {
@@ -139,92 +137,94 @@ export default function AssignStaffDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1 }}>
-        Phân ca trực
-      </DialogTitle>
-      <DialogContent sx={{ pt: 0 }}>
-        <Stack spacing={2}>
-          <Box>
-            <Typography variant="caption" color="text.secondary">
-              Ngày: {date}
-            </Typography>
-            <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, ml: 1 }}>
-              Ca: {shiftName}
-            </Typography>
-            {shift && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                {shift.startTime?.slice(0, 5)} &ndash; {shift.endTime?.slice(0, 5)}
-              </Typography>
-            )}
-          </Box>
-
-          <TextField
-            select
-            size="small"
-            label="Khu vực"
-            value={zoneId}
-            onChange={(e) => { setZoneId(e.target.value); setError(null); }}
-            fullWidth
+    <Modal
+      open={open}
+      onCancel={() => { reset(); onClose(); }}
+      title="Phân ca trực"
+      width={420}
+      footer={
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <Button onClick={() => { reset(); onClose(); }} disabled={saving}>Hủy</Button>
+          <Button
+            type="primary"
+            loading={saving}
+            disabled={availableStaff.length === 0}
+            onClick={handleAssign}
           >
-            <MenuItem value="">Chọn khu vực</MenuItem>
-            {zones.map((z) => (
-              <MenuItem key={z.id} value={z.id}>{z.zoneName}</MenuItem>
-            ))}
-          </TextField>
+            Xếp ca
+          </Button>
+        </div>
+      }
+    >
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, fontSize: "0.75rem" }}>
+        <span style={{ color: isDark ? "#B8B0A4" : "#344054" }}>Ngày: {date}</span>
+        <span style={{ color: "#1A73E8", fontWeight: 600 }}>Ca: {shiftName}</span>
+        {shift && (
+          <span style={{ color: isDark ? "#B8B0A4" : "#999" }}>
+            {shift.startTime?.slice(0, 5)} – {shift.endTime?.slice(0, 5)}
+          </span>
+        )}
+      </div>
 
-          <TextField
-            select
-            size="small"
-            label={
-              <span>
-                Nhân viên
-                {availableStaff.length < staff.length && (
-                  <span style={{ fontWeight: 400, color: "#999", marginLeft: 4 }}>
-                    ({staff.length - availableStaff.length} đã xếp)
-                  </span>
-                )}
-              </span>
-            }
-            value={staffId}
-            onChange={(e) => { setStaffId(e.target.value); setError(null); }}
-            fullWidth
-          >
-            <MenuItem value="">Chọn nhân viên</MenuItem>
-            {availableStaff.map((s) => (
-              <MenuItem key={s.id} value={s.id}>{getStaffLabel(s)}</MenuItem>
-            ))}
-            {availableStaff.length === 0 && (
-              <MenuItem disabled>Tất cả nhân viên đã được xếp</MenuItem>
-            )}
-          </TextField>
-
-          {error && <Alert severity="error">{error}</Alert>}
-
-          {warnings.length > 0 && (
-            <Box>
-              <Alert severity="warning" sx={{ mb: 1 }}>
-                {warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
-              </Alert>
-              <FormControlLabel
-                control={<Checkbox checked={forceSave} onChange={(e) => setForceSave(e.target.checked)} size="small" />}
-                label="Vẫn xếp ca bất chấp cảnh báo"
-              />
-            </Box>
-          )}
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} variant="outlined" size="small">Hủy</Button>
-        <Button
-          onClick={handleAssign}
-          variant="contained"
-          size="small"
-          disabled={saving || availableStaff.length === 0}
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{ zoneId: undefined, staffId: undefined, forceSave: false }}
+        requiredMark={false}
+        size="middle"
+      >
+        <Form.Item
+          name="zoneId"
+          label="Khu vực"
+          rules={[{ required: true, message: "Vui lòng chọn khu vực" }]}
         >
-          {saving ? <CircularProgress size={14} color="inherit" /> : "Xếp ca"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          <Select
+            placeholder="Chọn khu vực"
+            options={zones.map((z) => ({ value: z.id, label: z.zoneName }))}
+            allowClear
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="staffId"
+          label={
+            <span>
+              Nhân viên
+              {availableStaff.length < staff.length && (
+                <span style={{ fontWeight: 400, color: isDark ? "#B8B0A4" : "#999", marginLeft: 4 }}>
+                  ({staff.length - availableStaff.length} đã xếp)
+                </span>
+              )}
+            </span>
+          }
+          rules={[{ required: true, message: "Vui lòng chọn nhân viên" }]}
+        >
+          <Select
+            placeholder="Chọn nhân viên"
+            options={availableStaff.map((s) => ({ value: s.id, label: getStaffLabel(s) }))}
+            notFoundContent="Tất cả nhân viên đã được xếp"
+            allowClear
+          />
+        </Form.Item>
+      </Form>
+
+      {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginBottom: 12 }} />}
+
+      {warnings.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <Alert
+            type="warning"
+            showIcon
+            description={warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+            style={{ marginBottom: 8 }}
+          />
+          <Checkbox checked={forceSave} onChange={(e) => setForceSave(e.target.checked)}>
+            Vẫn xếp ca bất chấp cảnh báo
+          </Checkbox>
+        </div>
+      )}
+
+      {contextHolder}
+    </Modal>
   );
 }

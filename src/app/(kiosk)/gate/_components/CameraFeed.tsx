@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
   Chip,
-  CircularProgress,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
+import Spin from "antd/es/spin";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 
 interface CameraFeedProps {
@@ -123,7 +123,7 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
         <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
         {ok === null && (
           <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-            <CircularProgress color="inherit" size={28} />
+            <Spin size="small" />
             <Typography variant="body2">Đang kết nối...</Typography>
           </Stack>
         )}

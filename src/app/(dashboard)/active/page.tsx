@@ -29,7 +29,7 @@ import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import notification from "antd/es/notification";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
@@ -88,6 +88,7 @@ const STAT_CARDS = [
 ] as const;
 
 export default function ActivePage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const [patrons, setPatrons] = useState<ActivePatron[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +96,6 @@ export default function ActivePage() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [exitPatron, setExitPatron] = useState<ActivePatron | null>(null);
   const [exiting, setExiting] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ severity: "success" | "error"; message: string } | null>(null);
   const [sseConnected, setSseConnected] = useState(false);
   const hasLoadedRef = useRef(false);
   const fallbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -206,11 +206,11 @@ export default function ActivePage() {
     setExiting(true);
     try {
       await api.forceExitPatron(exitPatron.id);
-      setSnackbar({ severity: "success", message: `Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra` });
+      apiAnt.success({ message: `Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra`, placement: "topRight" });
       setExitPatron(null);
       await load();
     } catch (err) {
-      setSnackbar({ severity: "error", message: getErrorMessage(err) || "Lỗi khi đánh dấu ra" });
+      apiAnt.error({ message: getErrorMessage(err) || "Lỗi khi đánh dấu ra", placement: "topRight" });
     } finally {
       setExiting(false);
     }
@@ -458,7 +458,7 @@ export default function ActivePage() {
         </DialogActions>
       </Dialog>
 
-      <NoticeSnackbar open={!!snackbar} message={snackbar?.message || ""} severity={snackbar?.severity || "success"} onClose={() => setSnackbar(null)} anchorOrigin={{ vertical: "top", horizontal: "right" }} />
+      {contextHolder}
     </Stack>
   );
 }

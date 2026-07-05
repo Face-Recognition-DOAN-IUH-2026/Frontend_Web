@@ -1,17 +1,16 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import LandingOverlay from "@/app/_components/landing/LandingOverlay";
-
-const Landing3DScene = dynamic(
-  () => import("@/app/_components/landing/Landing3DScene"),
-  { ssr: false }
-);
 
 export default function HomePage() {
   return (
     <div className="relative min-h-screen bg-[#0f172a] overflow-hidden">
-      <Landing3DScene />
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          background: "linear-gradient(135deg, #0f172a 0%, #12151f 50%, #0f172a 100%)",
+        }}
+      />
       <LandingOverlay />
     </div>
   );

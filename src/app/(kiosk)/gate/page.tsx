@@ -8,17 +8,17 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Grid,
   IconButton,
   LinearProgress,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   Typography,
   useTheme,
 } from "@mui/material";
+import Spin from "antd/es/spin";
+import antdMsg from "antd/es/message";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
@@ -46,12 +46,6 @@ interface TodayCounts {
 
 type Step = "idle" | "verify" | "result";
 
-interface GateToast {
-  id: number;
-  severity: "success" | "warning" | "error" | "info";
-  message: string;
-}
-
 const _ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM;
 if (!_ENTRY_CAM) throw new Error("NEXT_PUBLIC_ENTRY_CAM is not set");
 const ENTRY_CAM: string = _ENTRY_CAM;
@@ -61,8 +55,6 @@ const EXIT_CAM: string = _EXIT_CAM;
 const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || "entry_gate";
 const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || "exit_gate";
 const HISTORY_LIMIT = 8;
-
-let toastId = 0;
 
 function formatGateTime(value?: string) {
   if (!value) return "--:--";
@@ -118,7 +110,6 @@ export default function GatePage() {
   const [approvalTimer, setApprovalTimer] = useState(300);
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("");
-  const [toasts, setToasts] = useState<GateToast[]>([]);
   const [recentLogs, setRecentLogs] = useState<AccessLogPublic[]>([]);
   const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
   const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
@@ -134,10 +125,8 @@ export default function GatePage() {
     }
   }, []);
 
-  const addToast = useCallback((toast: Omit<GateToast, "id">) => {
-    const id = ++toastId;
-    setToasts((prev) => [{ ...toast, id }, ...prev.slice(0, 4)]);
-    setTimeout(() => setToasts((prev) => prev.filter((item) => item.id !== id)), 6000);
+  const showToast = useCallback((severity: "success" | "warning" | "error" | "info", msg: string) => {
+    antdMsg[severity](msg, 6);
   }, []);
 
   const addRecentLog = useCallback((log: AccessLogPublic) => {
@@ -191,14 +180,14 @@ export default function GatePage() {
       setStep("result");
       setLoading(false);
       setStatusText("");
-      addToast({ severity: "error", message });
+      showToast("error", message);
       if (lookup?.patron?.id) {
         api.revertPending(lookup.patron.id).catch(() => {});
       }
     } else if (sseState.status === "WAITING") {
       setStatusText("Đang xử lý...");
     }
-  }, [sseState.status, sseState.result, sseState.error, lookup, mssv, addToast]);
+  }, [sseState.status, sseState.result, sseState.error, lookup, mssv, showToast]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -210,9 +199,9 @@ export default function GatePage() {
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
     } catch {
-      addToast({ severity: "error", message: "Không thể mở camera." });
+      showToast("error", "Không thể mở camera.");
     }
-  }, [addToast]);
+  }, [showToast]);
 
   const captureImage = useCallback((): Promise<File> => (
     new Promise((resolve, reject) => {
@@ -300,7 +289,7 @@ export default function GatePage() {
       setStep("result");
       setLoading(false);
       setStatusText("");
-      addToast({ severity: "error", message });
+      showToast("error", message);
     }
   };
 
@@ -360,24 +349,24 @@ export default function GatePage() {
       if (event.status === "granted") {
         const type = event.access_type === "entry" ? "entry" : "exit";
         addRecentLog(buildLogFromEvent(event));
-        addToast({
-          severity: type === "entry" ? "success" : "warning",
-          message: `${event.full_name || "Độc giả"} - ${type === "entry" ? "Vào" : "Ra"} thư viện`,
-        });
+        showToast(
+          type === "entry" ? "success" : "warning",
+          `${event.full_name || "Độc giả"} - ${type === "entry" ? "Vào" : "Ra"} thư viện`,
+        );
         setTodayCounts((prev) => ({
           ...prev,
           [type === "entry" ? "entries" : "exits"]: prev[type === "entry" ? "entries" : "exits"] + 1,
         }));
       } else if (event.status === "no_match") {
         setTodayCounts((prev) => ({ ...prev, no_match: prev.no_match + 1 }));
-        addToast({ severity: "info", message: "Khuôn mặt mới - không nhận diện được." });
+        showToast("info", "Khuôn mặt mới - không nhận diện được.");
       } else if (event.status === "spoof") {
         setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
-        addToast({ severity: "error", message: "Phát hiện giả mạo!" });
+        showToast("error", "Phát hiện giả mạo!");
       }
     });
     return cleanup;
-  }, [addRecentLog, addToast]);
+  }, [addRecentLog, showToast]);
 
   const entryLogs = recentLogs.filter((log) => log.access_type === "entry").slice(0, HISTORY_LIMIT);
   const exitLogs = recentLogs.filter((log) => log.access_type === "exit").slice(0, HISTORY_LIMIT);
@@ -499,14 +488,6 @@ export default function GatePage() {
           </Box>
         </Box>
 
-        <Box sx={{ position: "fixed", top: 16, right: 16, zIndex: theme.zIndex.snackbar, width: 360, maxWidth: "calc(100vw - 32px)" }}>
-          <Stack spacing={1}>
-            {toasts.map((toast) => (
-              <Alert key={toast.id} severity={toast.severity} variant="filled">{toast.message}</Alert>
-            ))}
-          </Stack>
-        </Box>
-
         <Grid container spacing={2.5}>
           <Grid size={{ xs: 12, lg: 8 }}>
             <Grid container spacing={2}>
@@ -581,7 +562,7 @@ export default function GatePage() {
                   </Button>
                   {loading && (
                     <Stack spacing={1.25} sx={{ alignItems: "center" }}>
-                      <CircularProgress size={28} sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
+                      <Spin size="small" />
                       <Typography variant="body2" color="text.secondary">{statusText || "Đang xử lý..."}</Typography>
                     </Stack>
                   )}
@@ -601,7 +582,7 @@ export default function GatePage() {
                     </Box>
                     {loading && (
                       <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.65)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.25}>
-                        <CircularProgress color="inherit" sx={{ animation: `${shimmer} 1.5s ease-in-out infinite` }} />
+                        <Spin size="large" />
                         <Typography variant="body2">{statusText}</Typography>
                       </Stack>
                     )}
@@ -730,11 +711,11 @@ export default function GatePage() {
           </Grid>
         </Grid>
 
-        <Snackbar open anchorOrigin={{ vertical: "bottom", horizontal: "left" }}>
-          <Alert severity="success" icon={<Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "success.main" }} />}>
+        <Box sx={{ position: "fixed", bottom: 16, left: 16, zIndex: 1000 }}>
+          <Alert severity="success" icon={<Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "success.main" }} />} sx={{ py: 0 }}>
             Hệ thống đang hoạt động
           </Alert>
-        </Snackbar>
+        </Box>
       </Box>
     </Box>
   );

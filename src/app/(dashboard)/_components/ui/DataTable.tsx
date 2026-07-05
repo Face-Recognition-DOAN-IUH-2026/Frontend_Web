@@ -1,16 +1,6 @@
-import {
-  Box,
-  CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  Typography,
-} from "@mui/material";
 import { ReactNode } from "react";
+import Table from "antd/es/table";
+import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import EmptyState from "./EmptyState";
 
 export interface DataTableColumn<T = any> {
@@ -19,6 +9,8 @@ export interface DataTableColumn<T = any> {
   sortable?: boolean;
   align?: "left" | "center" | "right";
   width?: number | string;
+  fixed?: "left" | "right";
+  filterOptions?: { text: string; value: string }[];
   render?: (value: any, row: T, index: number) => ReactNode;
 }
 
@@ -35,6 +27,7 @@ interface DataTableProps<T = any> {
   onRowsPerPageChange?: (rowsPerPage: number) => void;
   onRowClick?: (row: T) => void;
   getRowId?: (row: T) => string | number;
+  scrollX?: number | string;
 }
 
 export default function DataTable<T extends Record<string, any>>({
@@ -50,68 +43,67 @@ export default function DataTable<T extends Record<string, any>>({
   onRowsPerPageChange,
   onRowClick,
   getRowId,
+  scrollX,
 }: DataTableProps<T>) {
-  if (loading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const antdColumns: ColumnsType<T> = columns.map((col) => {
+    const colDef: ColumnsType<T>[number] = {
+      key: col.key,
+      dataIndex: col.key,
+      title: col.label,
+      align: col.align || "left",
+      width: col.width,
+      fixed: col.fixed,
+      sorter: col.sortable ? (a: T, b: T) => {
+        const av = a[col.key];
+        const bv = b[col.key];
+        if (av == null && bv == null) return 0;
+        if (av == null) return -1;
+        if (bv == null) return 1;
+        if (typeof av === "number" && typeof bv === "number") return av - bv;
+        return String(av).localeCompare(String(bv));
+      } : undefined,
+      render: col.render
+        ? (value: any, row: T, index: number) => col.render!(value, row, index)
+        : (value: any) => value ?? "-",
+    };
 
-  if (rows.length === 0) {
+    if (col.filterOptions) {
+      colDef.filters = col.filterOptions.map((o) => ({ text: o.text, value: o.value }));
+      colDef.onFilter = (value: any, record: T) => String(record[col.key]) === String(value);
+    }
+
+    return colDef;
+  });
+
+  const pagination: TablePaginationConfig | false = totalCount !== undefined && onPageChange
+    ? {
+        current: page + 1,
+        pageSize: rowsPerPage,
+        total: totalCount,
+        showSizeChanger: true,
+        pageSizeOptions: ["10", "20", "50", "100"],
+        showTotal: (total, range) => `${range[0]}-${range[1]} / ${total}`,
+        onChange: (p: number, ps: number) => {
+          onPageChange(p - 1);
+          onRowsPerPageChange?.(ps);
+        },
+      }
+    : false;
+
+  if (!loading && rows.length === 0) {
     return <EmptyState title={emptyTitle} description={emptyDescription} />;
   }
 
   return (
-    <TableContainer>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            {columns.map((col) => (
-              <TableCell
-                key={col.key}
-                align={col.align || "left"}
-                sx={{ fontWeight: 700, whiteSpace: "nowrap", width: col.width }}
-              >
-                {col.label}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row, index) => (
-            <TableRow
-              key={getRowId ? getRowId(row) : index}
-              hover={!!onRowClick}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              sx={onRowClick ? { cursor: "pointer" } : undefined}
-            >
-              {columns.map((col) => (
-                <TableCell key={col.key} align={col.align || "left"}>
-                  {col.render
-                    ? col.render(row[col.key], row, index)
-                    : row[col.key] ?? "-"}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {totalCount !== undefined && onPageChange && (
-        <TablePagination
-          component="div"
-          count={totalCount}
-          page={page}
-          onPageChange={(_, p) => onPageChange(p)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => onRowsPerPageChange?.(parseInt(e.target.value, 10))}
-          labelRowsPerPage="Hiển thị:"
-          labelDisplayedRows={({ from, to, count }) =>
-            `${from}-${to} / ${count !== -1 ? count : `hơn ${to}`}`
-          }
-        />
-      )}
-    </TableContainer>
+    <Table<T>
+      columns={antdColumns}
+      dataSource={rows}
+      rowKey={getRowId ? (row: T) => getRowId(row) : undefined}
+      loading={loading}
+      size="small"
+      pagination={pagination}
+      scroll={scrollX ? { x: scrollX } : undefined}
+      onRow={onRowClick ? (record: T) => ({ onClick: () => onRowClick(record), style: { cursor: "pointer" } }) : undefined}
+    />
   );
 }

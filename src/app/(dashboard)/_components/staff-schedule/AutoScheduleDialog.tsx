@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, Stack, Typography, Box, Checkbox, IconButton, Tooltip,
-} from "@mui/material";
-import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import DateRangeIcon from "@mui/icons-material/DateRange";
-import YearIcon from "@mui/icons-material/CalendarMonth";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
-import CloseIcon from "@mui/icons-material/Close";
+import Modal from "antd/es/modal";
+import Button from "antd/es/button";
+import Checkbox from "antd/es/checkbox";
+import Steps from "antd/es/steps";
+import DatePicker from "antd/es/date-picker";
+import Tag from "antd/es/tag";
+import dayjs from "dayjs";
+import { useColorMode } from "@/lib/mui-theme";
+
+const { RangePicker } = DatePicker;
 
 function toDateInput(date: Date): string {
   const y = date.getFullYear();
@@ -39,7 +39,6 @@ function getEndOfMonth(year: number, month: number): Date {
 interface QuickOption {
   label: string;
   sub: string;
-  icon: React.ReactNode;
   from: string;
   to: string;
 }
@@ -65,41 +64,11 @@ function getQuickOptions(): QuickOption[] {
   const yearEnd = new Date(now.getFullYear(), 11, 31);
 
   return [
-    {
-      label: "Tuần này",
-      sub: `${monday.getDate()}/${monday.getMonth() + 1} — ${sunday.getDate()}/${sunday.getMonth() + 1}`,
-      icon: <CalendarTodayIcon sx={{ fontSize: 20 }} />,
-      from: toDateInput(monday),
-      to: toDateInput(sunday),
-    },
-    {
-      label: "Tuần sau",
-      sub: `${nextMonday.getDate()}/${nextMonday.getMonth() + 1} — ${nextSunday.getDate()}/${nextSunday.getMonth() + 1}`,
-      icon: <CalendarTodayIcon sx={{ fontSize: 20 }} />,
-      from: toDateInput(nextMonday),
-      to: toDateInput(nextSunday),
-    },
-    {
-      label: "Tháng này",
-      sub: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`,
-      icon: <DateRangeIcon sx={{ fontSize: 20 }} />,
-      from: toDateInput(monthStart),
-      to: toDateInput(monthEnd),
-    },
-    {
-      label: "Tháng sau",
-      sub: `Tháng ${now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2}/${now.getMonth() + 2 > 12 ? now.getFullYear() + 1 : now.getFullYear()}`,
-      icon: <DateRangeIcon sx={{ fontSize: 20 }} />,
-      from: toDateInput(nextMonthStart),
-      to: toDateInput(nextMonthEnd),
-    },
-    {
-      label: "Năm nay",
-      sub: `${now.getFullYear()}`,
-      icon: <YearIcon sx={{ fontSize: 20 }} />,
-      from: toDateInput(yearStart),
-      to: toDateInput(yearEnd),
-    },
+    { label: "Tuần này", sub: `${monday.getDate()}/${monday.getMonth() + 1} — ${sunday.getDate()}/${sunday.getMonth() + 1}`, from: toDateInput(monday), to: toDateInput(sunday) },
+    { label: "Tuần sau", sub: `${nextMonday.getDate()}/${nextMonday.getMonth() + 1} — ${nextSunday.getDate()}/${nextSunday.getMonth() + 1}`, from: toDateInput(nextMonday), to: toDateInput(nextSunday) },
+    { label: "Tháng này", sub: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`, from: toDateInput(monthStart), to: toDateInput(monthEnd) },
+    { label: "Tháng sau", sub: `Tháng ${now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2}/${now.getMonth() + 2 > 12 ? now.getFullYear() + 1 : now.getFullYear()}`, from: toDateInput(nextMonthStart), to: toDateInput(nextMonthEnd) },
+    { label: "Năm nay", sub: `${now.getFullYear()}`, from: toDateInput(yearStart), to: toDateInput(yearEnd) },
   ];
 }
 
@@ -127,10 +96,11 @@ interface Props {
 }
 
 export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirmFinal, loading, step, proposals, skippedCount, actualRange }: Props) {
+  const { effectiveMode } = useColorMode();
+  const isDark = effectiveMode === "dark";
   const [selected, setSelected] = useState<number | null>(0);
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
   const [useCustom, setUseCustom] = useState(false);
+  const [customRange, setCustomRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
   const [checkedSet, setCheckedSet] = useState<Set<number>>(new Set());
   const options = getQuickOptions();
 
@@ -180,8 +150,8 @@ export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirm
 
   const handleSelectConfirm = () => {
     if (useCustom) {
-      if (!customFrom || !customTo) return;
-      onConfirm(customFrom, customTo);
+      if (!customRange || !customRange[0] || !customRange[1]) return;
+      onConfirm(customRange[0].format("YYYY-MM-DD"), customRange[1].format("YYYY-MM-DD"));
     } else if (selected !== null) {
       onConfirm(options[selected].from, options[selected].to);
     }
@@ -200,200 +170,184 @@ export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirm
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth={step === "preview" ? "md" : "sm"} fullWidth>
-      <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1.5 }}>
-        <Box sx={{ width: 32, height: 32, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: step === "select" ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)" }}>
-          {step === "select" ? <CalendarTodayIcon sx={{ fontSize: 18, color: "#f59e0b" }} /> : <CheckCircleIcon sx={{ fontSize: 18, color: "#10b981" }} />}
-        </Box>
-        {step === "select" ? "Gợi ý lịch tự động" : `Xác nhận tạo ${selectedCount} ca`}
-      </DialogTitle>
-      <DialogContent>
-        {step === "select" ? (
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", mb: 1, display: "block" }}>
-                Chọn nhanh:
-              </Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
-                {options.map((opt, i) => (
-                  <Box
-                    key={i}
-                    onClick={() => { setSelected(i); setUseCustom(false); }}
-                    sx={{
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, p: 1.5, borderRadius: 2,
-                      border: "2px solid",
-                      borderColor: !useCustom && selected === i ? "#f59e0b" : "rgba(255,255,255,0.08)",
-                      bgcolor: !useCustom && selected === i ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
-                      cursor: "pointer", transition: "all 0.15s",
-                      "&:hover": { borderColor: "#f59e0b" },
-                    }}
-                  >
-                    <Box sx={{ color: !useCustom && selected === i ? "#f59e0b" : "text.disabled" }}>{opt.icon}</Box>
-                    <Typography variant="caption" sx={{ fontWeight: 600, fontSize: "0.7rem", color: !useCustom && selected === i ? "#f59e0b" : "text.primary" }}>
-                      {opt.label}
-                    </Typography>
-                    <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>
-                      {opt.sub}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
+    <Modal
+      open={open}
+      onCancel={onClose}
+      width={step === "preview" ? 640 : 480}
+      title={step === "select" ? "Gợi ý lịch tự động" : `Xác nhận tạo ${selectedCount} ca`}
+      footer={
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <Button onClick={onClose} disabled={loading}>
+            {step === "preview" ? "Hủy" : "Đóng"}
+          </Button>
+          {step === "select" ? (
+            <Button
+              type="primary"
+              onClick={handleSelectConfirm}
+              disabled={useCustom ? !customRange || !customRange[0] || !customRange[1] : selected === null}
+              style={{ background: "#f59e0b", borderColor: "#f59e0b" }}
+            >
+              Xem đề xuất
+            </Button>
+          ) : (
+            <Button
+              type="primary"
+              onClick={handleConfirmFinal}
+              loading={loading}
+              disabled={selectedCount === 0}
+              style={{ background: "#10b981", borderColor: "#10b981" }}
+            >
+              {loading ? "Đang tạo..." : `Xác nhận tạo ${selectedCount} ca`}
+            </Button>
+          )}
+        </div>
+      }
+      maskClosable={!loading}
+    >
+      {step === "select" ? (
+        <div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: 600, color: isDark ? "#B8B0A4" : "#344054", marginBottom: 8 }}>Chọn nhanh:</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {options.map((opt, i) => (
+                <div
+                  key={i}
+                  onClick={() => { setSelected(i); setUseCustom(false); }}
+                  style={{
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: 12, borderRadius: 8,
+                    border: `2px solid ${!useCustom && selected === i ? "#f59e0b" : isDark ? "#2E3345" : "#D0D7E2"}`,
+                    background: !useCustom && selected === i ? "rgba(245,158,11,0.08)" : isDark ? "rgba(255,255,255,0.03)" : "#F5F7FA",
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: "0.75rem", color: !useCustom && selected === i ? "#f59e0b" : isDark ? "#EDE2DF" : "#101828" }}>
+                    {opt.label}
+                  </div>
+                  <div style={{ fontSize: "0.65rem", color: isDark ? "#B8B0A4" : "#999" }}>
+                    {opt.sub}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", mb: 1, display: "block" }}>
-                Hoặc chọn khoảng ngày:
-              </Typography>
-              <Box
-                onClick={() => { setUseCustom(true); setSelected(null); }}
-                sx={{
-                  display: "flex", alignItems: "center", gap: 1, p: 1.5, borderRadius: 2,
-                  border: "2px solid",
-                  borderColor: useCustom ? "#f59e0b" : "rgba(255,255,255,0.08)",
-                  bgcolor: useCustom ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
-                  cursor: "pointer", transition: "all 0.15s",
+          <div>
+            <div style={{ fontSize: "0.75rem", fontWeight: 600, color: isDark ? "#B8B0A4" : "#344054", marginBottom: 8 }}>Hoặc chọn khoảng ngày:</div>
+            <div
+              onClick={() => { setUseCustom(true); setSelected(null); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: 12, borderRadius: 8,
+                border: `2px solid ${useCustom ? "#f59e0b" : isDark ? "#2E3345" : "#D0D7E2"}`,
+                background: useCustom ? "rgba(245,158,11,0.08)" : isDark ? "rgba(255,255,255,0.03)" : "#F5F7FA",
+                cursor: "pointer", transition: "all 0.15s",
+              }}
+            >
+              <RangePicker
+                value={customRange as any}
+                onChange={(dates) => {
+                  setCustomRange(dates as any);
+                  setUseCustom(true);
+                  setSelected(null);
                 }}
-              >
-                <input
-                  type="date" value={customFrom}
-                  onChange={(e) => { setCustomFrom(e.target.value); setUseCustom(true); setSelected(null); }}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ flex: 1, fontSize: "0.75rem", padding: "4px 8px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "white" }}
-                />
-                <Typography variant="caption" sx={{ color: "text.disabled" }}>—</Typography>
-                <input
-                  type="date" value={customTo}
-                  onChange={(e) => { setCustomTo(e.target.value); setUseCustom(true); setSelected(null); }}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ flex: 1, fontSize: "0.75rem", padding: "4px 8px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "white" }}
-                />
-              </Box>
-            </Box>
-          </Stack>
-        ) : (
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            {proposals.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 3, color: "text.disabled" }}>
-                <AssignmentIndIcon sx={{ fontSize: 32, opacity: 0.3, mb: 1 }} />
-                <Typography variant="caption" sx={{ fontStyle: "italic", display: "block" }}>Không có đề xuất lịch mới</Typography>
-                <Typography variant="caption" sx={{ fontSize: "0.6rem", display: "block", mt: 0.5 }}>Tất cả ca đã đủ nhân viên</Typography>
-              </Box>
-            ) : (
-              <>
-                {actualRange ? (
-                  <Box sx={{ fontSize: "0.7rem", color: "text.disabled", textAlign: "center", py: 0.5, px: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                    Đề xuất từ <Box component="span" sx={{ color: "success.main", fontWeight: 600 }}>{formatDisplayDate(actualRange.from)}</Box> — <Box component="span" sx={{ color: "success.main", fontWeight: 600 }}>{formatDisplayDate(actualRange.to)}</Box>
-                  </Box>
-                ) : null}
-                <Box sx={{ display: "flex", gap: 1.5 }}>
-                  <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(16,185,129,0.1)" }}>
-                    <Typography variant="body1" sx={{ fontWeight: 700, color: "success.main" }}>{selectedCount}</Typography>
-                    <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>Ca đã chọn</Typography>
-                  </Box>
-                  {proposals.length - selectedCount > 0 ? (
-                    <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(245,158,11,0.1)" }}>
-                      <Typography variant="body1" sx={{ fontWeight: 700, color: "warning.main" }}>{proposals.length - selectedCount}</Typography>
-                      <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>Bỏ chọn</Typography>
-                    </Box>
-                  ) : null}
-                  {skippedCount > 0 ? (
-                    <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(245,158,11,0.1)" }}>
-                      <Typography variant="body1" sx={{ fontWeight: 700, color: "warning.main" }}>{skippedCount}</Typography>
-                      <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>Bỏ qua</Typography>
-                    </Box>
-                  ) : null}
-                </Box>
+                format="DD/MM/YYYY"
+                style={{ flex: 1 }}
+                placeholder={["Từ ngày", "Đến ngày"]}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {proposals.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 24, color: isDark ? "#B8B0A4" : "#999" }}>
+              <div style={{ fontSize: "0.875rem", fontStyle: "italic" }}>Không có đề xuất lịch mới</div>
+              <div style={{ fontSize: "0.7rem", marginTop: 4 }}>Tất cả ca đã đủ nhân viên</div>
+            </div>
+          ) : (
+            <>
+              {actualRange && (
+                <div style={{ fontSize: "0.7rem", color: isDark ? "#B8B0A4" : "#999", textAlign: "center", padding: "6px 12px", borderRadius: 6, background: isDark ? "rgba(255,255,255,0.03)" : "#F5F7FA", border: `1px solid ${isDark ? "#2E3345" : "#D0D7E2"}`, marginBottom: 12 }}>
+                  Đề xuất từ <span style={{ color: "#10b981", fontWeight: 600 }}>{formatDisplayDate(actualRange.from)}</span> — <span style={{ color: "#10b981", fontWeight: 600 }}>{formatDisplayDate(actualRange.to)}</span>
+                </div>
+              )}
 
-                <Box sx={{ maxHeight: 280, overflowY: "auto", "&::-webkit-scrollbar": { width: 4 }, "&::-webkit-scrollbar-thumb": { bgcolor: "rgba(255,255,255,0.1)", borderRadius: 2 } }}>
-                  <Box
-                    onClick={toggleAll}
-                    sx={{
-                      display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 0.75, mb: 0.5,
-                      borderRadius: 1, cursor: "pointer",
-                      bgcolor: "rgba(255,255,255,0.03)", border: "1px solid", borderColor: "divider",
-                      "&:hover": { bgcolor: "rgba(99,102,241,0.05)" },
-                    }}
-                  >
-                    <Checkbox checked={allChecked} indeterminate={selectedCount > 0 && !allChecked} size="small" sx={{ p: 0.25 }} />
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", fontSize: "0.7rem" }}>
-                      {allChecked ? "Bỏ chọn tất cả" : "Chọn tất cả"}
-                    </Typography>
-                  </Box>
+              <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                <div style={{ flex: 1, textAlign: "center", padding: 8, borderRadius: 6, background: "rgba(16,185,129,0.1)" }}>
+                  <div style={{ fontWeight: 700, color: "#10b981", fontSize: "1rem" }}>{selectedCount}</div>
+                  <div style={{ fontSize: "0.6rem", color: isDark ? "#B8B0A4" : "#999" }}>Ca đã chọn</div>
+                </div>
+                {proposals.length - selectedCount > 0 && (
+                  <div style={{ flex: 1, textAlign: "center", padding: 8, borderRadius: 6, background: "rgba(245,158,11,0.1)" }}>
+                    <div style={{ fontWeight: 700, color: "#f59e0b", fontSize: "1rem" }}>{proposals.length - selectedCount}</div>
+                    <div style={{ fontSize: "0.6rem", color: isDark ? "#B8B0A4" : "#999" }}>Bỏ chọn</div>
+                  </div>
+                )}
+                {skippedCount > 0 && (
+                  <div style={{ flex: 1, textAlign: "center", padding: 8, borderRadius: 6, background: "rgba(245,158,11,0.1)" }}>
+                    <div style={{ fontWeight: 700, color: "#f59e0b", fontSize: "1rem" }}>{skippedCount}</div>
+                    <div style={{ fontSize: "0.6rem", color: isDark ? "#B8B0A4" : "#999" }}>Bỏ qua</div>
+                  </div>
+                )}
+              </div>
 
-                  {displayProposals.map((p, i) => {
-                    const checked = checkedSet.has(i);
-                    return (
-                      <Box
-                        key={i}
-                        onClick={() => toggleRow(i)}
-                        sx={{
-                          display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, mb: 0.5,
-                          borderRadius: 1, cursor: "pointer", transition: "background 0.1s",
-                          bgcolor: checked ? "rgba(16,185,129,0.05)" : "rgba(255,255,255,0.02)",
-                          border: "1px solid",
-                          borderColor: checked ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.05)",
-                          "&:hover": { bgcolor: checked ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.04)" },
-                        }}
-                      >
-                        <Checkbox checked={checked} size="small" sx={{ p: 0.25 }} />
-                        <Box sx={{
-                          width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "0.6rem", fontWeight: 700, bgcolor: "rgba(16,185,129,0.15)", color: "success.main", flexShrink: 0,
-                        }}>
-                          {i + 1}
-                        </Box>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 500, color: "text.primary", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.7rem" }}>
-                            {p.staffName || p.staffId.slice(0, 8)}
-                          </Typography>
-                          <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled" }}>
-                            {p.shiftName || "Ca"} — {p.zoneName || "Zone"} — {p.workDate}
-                          </Typography>
-                        </Box>
-                        <Box sx={{
-                          fontSize: "0.55rem", px: 0.75, py: 0.25, borderRadius: 0.5,
-                          bgcolor: "rgba(16,185,129,0.1)", color: "success.main", fontWeight: 600, flexShrink: 0,
-                        }}>
-                          {p.note?.includes("template") ? "template" : p.note?.includes("preference") ? "sở thích" : "auto"}
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                  {proposals.length > 50 ? (
-                    <Typography variant="caption" sx={{ textAlign: "center", display: "block", color: "text.disabled", py: 0.5, fontSize: "0.6rem" }}>
-                      ... và {proposals.length - 50} ca nữa (tự động chọn)
-                    </Typography>
-                  ) : null}
-                </Box>
-              </>
-            )}
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={onClose} disabled={loading} sx={{ textTransform: "none" }}>
-          {step === "preview" ? "Hủy" : "Đóng"}
-        </Button>
-        {step === "select" ? (
-          <Button
-            onClick={handleSelectConfirm}
-            variant="contained"
-            disabled={useCustom ? !customFrom || !customTo : selected === null}
-            sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#f59e0b", "&:hover": { bgcolor: "#d97706" } }}
-          >
-            Xem đề xuất
-          </Button>
-        ) : (
-          <Button
-            onClick={handleConfirmFinal}
-            variant="contained"
-            disabled={loading || selectedCount === 0}
-            sx={{ textTransform: "none", fontWeight: 600, bgcolor: "#10b981", "&:hover": { bgcolor: "#059669" } }}
-          >
-            {loading ? "Đang tạo..." : `Xác nhận tạo ${selectedCount} ca`}
-          </Button>
-        )}
-      </DialogActions>
-    </Dialog>
+              <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                <div
+                  onClick={toggleAll}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 4,
+                    borderRadius: 6, cursor: "pointer", background: isDark ? "rgba(255,255,255,0.03)" : "#F5F7FA", border: `1px solid ${isDark ? "#2E3345" : "#D0D7E2"}`,
+                  }}
+                >
+                  <Checkbox checked={allChecked} indeterminate={selectedCount > 0 && !allChecked} />
+                  <span style={{ fontWeight: 600, color: isDark ? "#B8B0A4" : "#344054", fontSize: "0.7rem" }}>
+                    {allChecked ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                  </span>
+                </div>
+
+                {displayProposals.map((p, i) => {
+                  const checked = checkedSet.has(i);
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => toggleRow(i)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 4,
+                        borderRadius: 6, cursor: "pointer", transition: "background 0.1s",
+                        background: checked ? "rgba(16,185,129,0.05)" : isDark ? "rgba(255,255,255,0.03)" : "#F5F7FA",
+                        border: `1px solid ${checked ? "rgba(16,185,129,0.2)" : isDark ? "#2E3345" : "#D0D7E2"}`,
+                      }}
+                    >
+                      <Checkbox checked={checked} />
+                      <div style={{
+                        width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.6rem", fontWeight: 700, background: "rgba(16,185,129,0.15)", color: "#10b981", flexShrink: 0,
+                      }}>
+                        {i + 1}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 500, fontSize: "0.7rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: isDark ? "#EDE2DF" : "#101828" }}>
+                          {p.staffName || p.staffId.slice(0, 8)}
+                        </div>
+                        <div style={{ fontSize: "0.6rem", color: isDark ? "#B8B0A4" : "#999" }}>
+                          {p.shiftName || "Ca"} — {p.zoneName || "Zone"} — {p.workDate}
+                        </div>
+                      </div>
+                      <Tag color={p.note?.includes("template") ? "blue" : p.note?.includes("preference") ? "purple" : "default"} style={{ fontSize: "0.55rem" }}>
+                        {p.note?.includes("template") ? "template" : p.note?.includes("preference") ? "sở thích" : "auto"}
+                      </Tag>
+                    </div>
+                  );
+                })}
+                {proposals.length > 50 && (
+                  <div style={{ textAlign: "center", fontSize: "0.6rem", color: isDark ? "#B8B0A4" : "#999", padding: "6px 0" }}>
+                    ... và {proposals.length - 50} ca nữa (tự động chọn)
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }

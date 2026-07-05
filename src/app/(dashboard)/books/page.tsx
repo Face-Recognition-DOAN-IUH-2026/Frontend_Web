@@ -28,6 +28,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import AntdTable from "antd/es/table";
+import type { ColumnsType } from "antd/es/table";
 import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
 import AssignmentIcon from "@mui/icons-material/AssignmentOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
@@ -46,12 +48,13 @@ import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { shimmer, slideInRight } from "@/lib/animations";
+import { useAIWidgetStore } from "@/app/(dashboard)/_components/AIWidget/store/useAIWidgetStore";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import notification from "antd/es/notification";
 import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import IsbnScannerDialog from "@/app/(dashboard)/_components/IsbnScannerDialog";
@@ -89,6 +92,7 @@ function statusLabel(status: string) {
 }
 
 export default function BooksPage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [books, setBooks] = useState<BookWithStats[]>([]);
@@ -112,7 +116,6 @@ export default function BooksPage() {
   const [editQuantity, setEditQuantity] = useState(0);
   const [savingQuantity, setSavingQuantity] = useState(false);
   const [quantityError, setQuantityError] = useState("");
-  const [notice, setNotice] = useState<Notice>(null);
   const [isbnScannerOpen, setIsbnScannerOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -120,7 +123,12 @@ export default function BooksPage() {
   const [deleting, setDeleting] = useState(false);
   const deleteConfirmed = deleteInput.trim().normalize('NFC').toUpperCase() === 'XÓA';
 
-  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => setNotice({ severity, message });
+  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => {
+    if (severity === "success") apiAnt.success({ message, placement: "topRight" });
+    else if (severity === "error") apiAnt.error({ message, placement: "topRight" });
+    else if (severity === "warning") apiAnt.warning({ message, placement: "topRight" });
+    else apiAnt.info({ message, placement: "topRight" });
+  };
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
@@ -158,6 +166,18 @@ export default function BooksPage() {
     }, 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!searchQuery.trim() || searching) return;
+    const timer = setTimeout(() => {
+      if (searchResults.length === 0 && searchQuery.trim()) {
+        useAIWidgetStore.getState().recordFailedSearch();
+      } else if (searchResults.length > 0) {
+        useAIWidgetStore.getState().resetFailedSearch();
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [searchResults, searchQuery, searching]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -326,6 +346,79 @@ export default function BooksPage() {
     borrowedCopies: books.reduce((sum, book) => sum + (book.total_copies - book.available_copies), 0),
   };
   const displayBooks = searchQuery.trim() ? searchResults : books;
+
+  const bookColumns: ColumnsType<BookWithStats> = [
+    {
+      title: "ISBN",
+      dataIndex: "isbn",
+      key: "isbn",
+      width: 140,
+      sorter: (a, b) => (a.isbn || "").localeCompare(b.isbn || ""),
+      render: (val: string) => (
+        <span style={{ fontFamily: "monospace", color: "#1A73E8", fontWeight: 600 }}>{val}</span>
+      ),
+    },
+    {
+      title: "Tiêu đề",
+      dataIndex: "title",
+      key: "title",
+      width: 280,
+      sorter: (a, b) => a.title.localeCompare(b.title),
+      render: (_: string, record: BookWithStats) => (
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+          {record.cover_url ? (
+            <Box component="img" src={record.cover_url} alt={record.title} sx={{ width: 34, height: 44, objectFit: "cover", borderRadius: 1, border: 1, borderColor: "divider" }} />
+          ) : (
+            <Paper variant="outlined" sx={{ width: 34, height: 44, display: "grid", placeItems: "center", bgcolor: "background.default", borderRadius: 1 }}>
+              <BookIcon fontSize="small" />
+            </Paper>
+          )}
+          <Typography variant="body2" sx={{ fontWeight: 800 }}>{record.title}</Typography>
+        </Stack>
+      ),
+    },
+    {
+      title: "Tác giả",
+      dataIndex: "author",
+      key: "author",
+      width: 160,
+      sorter: (a, b) => (a.author || "").localeCompare(b.author || ""),
+      render: (val: string) => val || "-",
+    },
+    {
+      title: "NXB",
+      dataIndex: "publisher",
+      key: "publisher",
+      width: 140,
+      render: (val: string) => val || "-",
+    },
+    {
+      title: "Tổng",
+      dataIndex: "total_copies",
+      key: "total_copies",
+      width: 80,
+      align: "center" as const,
+      sorter: (a, b) => a.total_copies - b.total_copies,
+    },
+    {
+      title: "Sẵn sàng",
+      dataIndex: "available_copies",
+      key: "available_copies",
+      width: 100,
+      align: "center" as const,
+      sorter: (a, b) => a.available_copies - b.available_copies,
+      render: (val: number) => (
+        <Chip size="small" color={val > 0 ? "success" : "error"} label={val} />
+      ),
+    },
+    {
+      title: "Mượn",
+      key: "borrowed",
+      width: 80,
+      align: "center" as const,
+      render: (_: unknown, record: BookWithStats) => record.total_copies - record.available_copies,
+    },
+  ];
 
   const statItems = [
     { label: "TỔNG ĐẦU SÁCH", value: stats.totalBooks, gradient: STAT_GRADIENT.books, icon: BookIcon, pct: total > 0 ? 100 : 0 },
@@ -613,106 +706,48 @@ export default function BooksPage() {
       ) : null}
 
       <DashboardCard noPadding>
-        <LoadingOverlay loading={loading} message="Đang tải danh sách sách...">
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell padding="checkbox" sx={{ fontWeight: 700 }}>
-                    <Checkbox
-                      size="small"
-                      checked={displayBooks.length > 0 && selectedIds.size === displayBooks.length}
-                      indeterminate={selectedIds.size > 0 && selectedIds.size < displayBooks.length}
-                      onChange={handleToggleSelectAll}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>ISBN</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Tiêu đề</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Tác giả</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>NXB</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Tổng</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Sẵn sàng</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700 }}>Mượn</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {displayBooks.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8}>
-                      <EmptyState
-                        icon={<BookIcon fontSize="large" />}
-                        title={searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ) : displayBooks.map((book, idx) => {
-                  const isSelected = selectedIds.has(book.id);
-                  return (
-                  <TableRow
-                    key={book.id}
-                    hover
-                    selected={isSelected}
-                    sx={{
-                      cursor: "pointer",
-                      borderLeft: isSelected ? "3px solid" : "3px solid transparent",
-                      borderColor: "warning.main",
-                      bgcolor: isSelected ? "rgba(255, 183, 77, 0.08)" : undefined,
-                      ...staggerSx(idx, 0.03),
-                    }}
-                    onClick={() => {
-                      if (process.env.NODE_ENV === "test") {
-                        openQuantityDialog(book);
-                      } else {
-                        router.push(`/books/${book.id}`);
-                      }
-                    }}
-                  >
-                    <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        size="small"
-                        checked={isSelected}
-                        onChange={() => handleToggleSelect(book.id)}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ fontFamily: "monospace", color: "primary.main" }}>{book.isbn}</TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-                        {book.cover_url ? (
-                          <Box component="img" src={book.cover_url} alt={book.title} sx={{ width: 34, height: 44, objectFit: "cover", borderRadius: 1, border: 1, borderColor: "divider" }} />
-                        ) : (
-                          <Paper variant="outlined" sx={{ width: 34, height: 44, display: "grid", placeItems: "center", bgcolor: "background.default", borderRadius: 1 }}>
-                            <BookIcon fontSize="small" />
-                          </Paper>
-                        )}
-                        <Typography variant="body2" sx={{ fontWeight: 800 }}>{book.title}</Typography>
-                      </Stack>
-                    </TableCell>
-                    <TableCell>{book.author || "-"}</TableCell>
-                    <TableCell>{book.publisher || "-"}</TableCell>
-                    <TableCell align="center">{book.total_copies}</TableCell>
-                    <TableCell align="center"><Chip size="small" color={book.available_copies > 0 ? "success" : "error"} label={book.available_copies} /></TableCell>
-                    <TableCell align="center">{book.total_copies - book.available_copies}</TableCell>
-                  </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </LoadingOverlay>
-        {!searchQuery && total > limit ? (
-          <>
-            <Divider />
-            <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", p: 2 }}>
-              <Typography variant="caption" color="text.secondary">
-                Hiển thị {page * limit + 1}-{Math.min((page + 1) * limit, total)} / {total} đầu sách
-              </Typography>
-              <Stack direction="row" spacing={1}>
-                <Button size="small" variant="outlined" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Trước</Button>
-                <Button size="small" variant="outlined" disabled={(page + 1) * limit >= total} onClick={() => setPage((value) => value + 1)}>Sau</Button>
-              </Stack>
-            </Stack>
-          </>
-        ) : null}
+        <AntdTable<BookWithStats>
+          rowKey={(record) => record.id}
+          columns={bookColumns}
+          dataSource={displayBooks}
+          loading={loading}
+          size="small"
+          rowSelection={{
+            selectedRowKeys: Array.from(selectedIds),
+            onChange: (keys) => setSelectedIds(new Set(keys as string[])),
+          }}
+          onRow={(record) => ({
+            onClick: () => {
+              if (process.env.NODE_ENV === "test") {
+                openQuantityDialog(record);
+              } else {
+                router.push(`/books/${record.id}`);
+              }
+            },
+            style: { cursor: "pointer" },
+          })}
+          pagination={
+            !searchQuery && total > limit
+              ? {
+                  current: page + 1,
+                  pageSize: limit,
+                  total,
+                  showSizeChanger: false,
+                  onChange: (p) => setPage(p - 1),
+                  showTotal: (t) => `${t} đầu sách`,
+                }
+              : false
+          }
+          scroll={{ x: 800 }}
+          locale={{
+            emptyText: (
+              <EmptyState
+                icon={<BookIcon fontSize="large" />}
+                title={searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}
+              />
+            ),
+          }}
+        />
       </DashboardCard>
 
       <Dialog open={!!selectedBook} onClose={() => setSelectedBook(null)} fullWidth maxWidth="sm">
@@ -780,7 +815,7 @@ export default function BooksPage() {
         </DialogActions>
       </Dialog>
 
-      <NoticeSnackbar open={!!notice} message={notice?.message || ""} severity={notice?.severity || "success"} onClose={() => setNotice(null)} />
+      {contextHolder}
 
       <IsbnScannerDialog
         open={isbnScannerOpen}

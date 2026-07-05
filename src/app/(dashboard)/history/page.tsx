@@ -12,12 +12,6 @@ import {
   MenuItem,
   Stack,
   Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
   useTheme,
@@ -27,6 +21,10 @@ import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import SensorsOutlinedIcon from "@mui/icons-material/SensorsOutlined";
+import AntdDatePicker from "antd/es/date-picker";
+import dayjs from "dayjs";
+
+const { RangePicker } = AntdDatePicker;
 import {
   Bar,
   BarChart,
@@ -37,6 +35,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import Table from "antd/es/table";
+import Tag from "antd/es/tag";
+import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import api from "@/lib/api-client";
 import { successPop } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
@@ -46,8 +47,6 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
-
-const PAGE_SIZES = [20, 50, 100];
 
 const CAMERA_LABELS: Record<string, string> = {
   entry_gate: "Cổng vào",
@@ -89,7 +88,6 @@ export default function HistoryPage() {
 
   const [skip, setSkip] = useState(0);
   const [limit, setLimit] = useState(50);
-  const totalPages = Math.max(1, Math.ceil(total / limit));
   const currentPage = Math.floor(skip / limit) + 1;
 
   const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
@@ -180,12 +178,118 @@ export default function HistoryPage() {
     }
   };
 
-  const goToPage = (page: number) => {
-    setSkip((page - 1) * limit);
-  };
-
   const entryTotal = useMemo(() => frequency.reduce((sum, day) => sum + day.entry, 0), [frequency]);
   const exitTotal = useMemo(() => frequency.reduce((sum, day) => sum + day.exit, 0), [frequency]);
+
+  const columns: ColumnsType<AccessLogPublic> = [
+    {
+      title: "Thời gian",
+      dataIndex: "access_time",
+      key: "access_time",
+      width: 180,
+      sorter: (a, b) => new Date(a.access_time).getTime() - new Date(b.access_time).getTime(),
+      render: (val: string) => (
+        <span style={{ fontFamily: "monospace", fontSize: "0.82rem", color: "#B8B0A4" }}>
+          {new Date(val).toLocaleString("vi-VN")}
+        </span>
+      ),
+    },
+    {
+      title: "Độc giả",
+      dataIndex: "patron_name",
+      key: "patron_name",
+      width: 160,
+      render: (val: string) => <span style={{ fontWeight: 600 }}>{val || "-"}</span>,
+    },
+    {
+      title: "MSSV",
+      dataIndex: "student_code",
+      key: "student_code",
+      width: 120,
+      render: (val: string) => <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{val || "-"}</span>,
+    },
+    {
+      title: "Loại",
+      dataIndex: "access_type",
+      key: "access_type",
+      width: 80,
+      filters: [
+        { text: "Vào", value: "entry" },
+        { text: "Ra", value: "exit" },
+      ],
+      onFilter: (value, record) => record.access_type === value,
+      render: (val: string) => (
+        <Tag color={val === "entry" ? "green" : "orange"}>
+          {val === "entry" ? "Vào" : "Ra"}
+        </Tag>
+      ),
+    },
+    {
+      title: "Phương thức",
+      dataIndex: "verify_method",
+      key: "verify_method",
+      width: 100,
+      render: (val: string) => <span style={{ color: "#B8B0A4" }}>{val}</span>,
+    },
+    {
+      title: "Cổng",
+      dataIndex: "camera_id",
+      key: "camera_id",
+      width: 120,
+      render: (val: string) => (
+        <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>
+          {CAMERA_LABELS[val] || val}
+        </span>
+      ),
+    },
+    {
+      title: "Độ tin cậy",
+      dataIndex: "confidence",
+      key: "confidence",
+      width: 150,
+      sorter: (a, b) => (a.confidence ?? 0) - (b.confidence ?? 0),
+      render: (val: number | null) => {
+        if (val == null) return <span style={{ color: "#B8B0A4" }}>-</span>;
+        const pct = Math.round(val * 100);
+        return (
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <LinearProgress
+              variant="determinate"
+              value={pct}
+              color={pct >= 80 ? "success" : pct >= 60 ? "warning" : "error"}
+              sx={{ width: 80, height: 7, borderRadius: 99 }}
+            />
+            <span style={{ fontSize: "0.75rem", color: "#B8B0A4" }}>{pct}%</span>
+          </Stack>
+        );
+      },
+    },
+    {
+      title: "Kết quả",
+      dataIndex: "status",
+      key: "status",
+      width: 110,
+      filters: [
+        { text: "Thành công", value: "success" },
+        { text: "Thất bại", value: "failed" },
+        { text: "Hết hạn", value: "expired" },
+        { text: "Giả mạo", value: "spoof" },
+      ],
+      onFilter: (value, record) => record.status === value,
+      render: (val: string) => {
+        const colorMap: Record<string, string> = {
+          success: "green", granted: "green",
+          expired: "orange",
+          spoof: "red", failed: "red",
+        };
+        return (
+          <Tag color={colorMap[val] || "default"}>
+            {getStatusLabel(val)}
+          </Tag>
+        );
+      },
+    },
+  ];
 
   return (
     <Stack spacing={3}>
@@ -242,26 +346,20 @@ export default function HistoryPage() {
               <MenuItem value="spoof">Giả mạo</MenuItem>
             </TextField>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 1.8 }}>
-            <TextField
-              label="Từ ngày"
-              type="date"
-              value={dateFrom}
-              onChange={(event) => setDateFrom(event.target.value)}
-              fullWidth
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <RangePicker
               size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 1.8 }}>
-            <TextField
-              label="Đến ngày"
-              type="date"
-              value={dateTo}
-              onChange={(event) => setDateTo(event.target.value)}
-              fullWidth
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
+              value={[
+                dateFrom ? dayjs(dateFrom) : null,
+                dateTo ? dayjs(dateTo) : null,
+              ]}
+              onChange={(dates) => {
+                setDateFrom(dates?.[0]?.format("YYYY-MM-DD") || "");
+                setDateTo(dates?.[1]?.format("YYYY-MM-DD") || "");
+              }}
+              style={{ width: "100%" }}
+              placeholder={["Từ ngày", "Đến ngày"]}
+              format="DD/MM/YYYY"
             />
           </Grid>
           <Grid size={{ xs: 12, md: 1.3 }}>
@@ -352,116 +450,38 @@ export default function HistoryPage() {
 
       <DashboardCard
         title="Nhật ký truy cập"
-        subtitle={`Trang ${currentPage} / ${totalPages}`}
+        subtitle={`Tổng: ${total} bản ghi`}
         noPadding
       >
         {error ? <Alert severity="error" sx={{ mx: 2.5, mt: 2 }}>{error}</Alert> : null}
 
-        <LoadingOverlay loading={loading && logs.length === 0} message="Đang tải lịch sử...">
-          {logs.length === 0 && !loading ? (
-            <EmptyState
-              title="Không có dữ liệu lịch sử phù hợp"
-            />
-          ) : (
-      <TableContainer sx={{ overflowX: "auto" }}>
-      <Table size="small" sx={{ minWidth: 980 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Thời gian</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Độc giả</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>MSSV</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Loại</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Phương thức</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Cổng</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Độ tin cậy</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Kết quả</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {logs.map((log, idx) => {
-                    const confidence = log.confidence == null ? null : Math.round(log.confidence * 100);
-                    const statusColor = getStatusColor(log.status);
-                    return (
-                      <TableRow key={log.id} hover sx={staggerSx(idx, 0.03)}>
-                        <TableCell sx={{ whiteSpace: "nowrap", fontFamily: "monospace", color: "text.secondary" }}>
-                          {new Date(log.access_time).toLocaleString("vi-VN")}
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>{log.patron_name || "-"}</TableCell>
-                        <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{log.student_code || "-"}</TableCell>
-                        <TableCell>
-                          <Chip
-                            size="small"
-                            color={log.access_type === "entry" ? "success" : "warning"}
-                            label={log.access_type === "entry" ? "Vào" : "Ra"}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ color: "text.secondary" }}>{log.verify_method}</TableCell>
-                        <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>
-                          {CAMERA_LABELS[log.camera_id] || log.camera_id}
-                        </TableCell>
-                        <TableCell sx={{ minWidth: 150 }}>
-                          {confidence == null ? (
-                            <Typography color="text.secondary">-</Typography>
-                          ) : (
-                            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={confidence}
-                                color={confidence >= 80 ? "success" : confidence >= 60 ? "warning" : "error"}
-                                sx={{ width: 80, height: 7, borderRadius: 99 }}
-                              />
-                              <Typography variant="caption" color="text.secondary">{confidence}%</Typography>
-                            </Stack>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Chip size="small" color={statusColor} label={getStatusLabel(log.status)} sx={log.status === "success" || log.status === "granted" ? { animation: `${successPop} 0.35s ease-out` } : {}} />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </LoadingOverlay>
-
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1.5}
-          sx={{ px: 2.5, pb: 2, pt: 1.5, borderTop: `1px solid ${theme.palette.divider}`, alignItems: { sm: "center" }, justifyContent: "space-between" }}
-        >
-          <TextField
-            select
-            label="Số dòng"
-            value={limit}
-            onChange={(event) => { setLimit(Number(event.target.value)); setSkip(0); }}
+        <Box sx={{ px: 1, py: 1 }}>
+          <Table<AccessLogPublic>
+            rowKey={(record) => record.id}
+            columns={columns}
+            dataSource={logs}
+            loading={loading && logs.length === 0}
+            pagination={{
+              current: currentPage,
+              pageSize: limit,
+              total,
+              showSizeChanger: true,
+              pageSizeOptions: ["20", "50", "100"],
+              showTotal: (total, range) => `${range[0]}–${range[1]} / ${total} bản ghi`,
+              onChange: (page: number, pageSize: number) => {
+                setLimit(pageSize);
+                setSkip((page - 1) * pageSize);
+              },
+            }}
+            scroll={{ x: 980 }}
             size="small"
-            sx={{ width: 120 }}
-          >
-            {PAGE_SIZES.map((size) => (
-              <MenuItem key={size} value={size}>{size}</MenuItem>
-            ))}
-          </TextField>
-
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <Button variant="outlined" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-              Đầu
-            </Button>
-            <Button variant="outlined" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-              Trước
-            </Button>
-            <Typography color="text.secondary" sx={{ px: 1 }}>
-              {currentPage} / {totalPages}
-            </Typography>
-            <Button variant="outlined" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}>
-              Sau
-            </Button>
-            <Button variant="outlined" disabled={currentPage >= totalPages} onClick={() => goToPage(totalPages)}>
-              Cuối
-            </Button>
-          </Stack>
-        </Stack>
+            locale={{
+              emptyText: (
+                <EmptyState title="Không có dữ liệu lịch sử phù hợp" />
+              ),
+            }}
+          />
+        </Box>
       </DashboardCard>
     </Stack>
   );

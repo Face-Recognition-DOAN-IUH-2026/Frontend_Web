@@ -32,13 +32,14 @@ import ScheduleIcon from "@mui/icons-material/CalendarTodayOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import AntdButton from "antd/es/button";
 
 import Markdown from "react-markdown";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import NoticeSnackbar from "@/app/(dashboard)/_components/ui/NoticeSnackbar";
+import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api, { getApiAccessToken } from "@/lib/api-client";
 import BookCard, { parseBookCard } from "@/app/(dashboard)/_components/BookCard";
@@ -120,6 +121,7 @@ function MessageContent({ content }: { content: string }) {
 }
 
 export default function AiAssistantPage() {
+  const [apiAnt, contextHolder] = notification.useNotification();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -212,6 +214,7 @@ export default function AiAssistantPage() {
       }
     } catch {
       setError("Không thể kết nối AI. Vui lòng thử lại.");
+      apiAnt.error({ message: "Không thể kết nối AI. Vui lòng thử lại.", placement: "topRight" });
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
     } finally {
       setLoading(false);
@@ -332,22 +335,16 @@ export default function AiAssistantPage() {
                 action={
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, justifyContent: "center", maxWidth: 600, mx: "auto" }}>
                     {SUGGESTIONS.map((s) => (
-                      <Chip
+                      <AntdButton
                         key={s.label}
                         icon={s.icon}
-                        label={s.label}
+                        shape="round"
+                        type="dashed"
                         onClick={() => sendMessage(s.label)}
-                        variant="outlined"
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: "0.78rem",
-                          borderRadius: "20px!important",
-                          borderColor: alpha(s.color, 0.4),
-                          color: s.color,
-                          "&:hover": { bgcolor: alpha(s.color, 0.08), borderColor: s.color },
-                          transition: "all 0.2s",
-                        }}
-                      />
+                        style={{ borderColor: alpha(s.color, 0.4), color: s.color, fontWeight: 600, fontSize: "0.78rem" }}
+                      >
+                        {s.label}
+                      </AntdButton>
                     ))}
                   </Box>
                 }
@@ -428,7 +425,7 @@ export default function AiAssistantPage() {
       </DashboardCard>
       </Box>
 
-      <NoticeSnackbar open={!!error} message={error} severity="error" onClose={() => setError("")} />
+      {contextHolder}
 
       <Dialog open={confirmDialog.open} onClose={() => handleConfirm("reject")} maxWidth="sm" fullWidth>
         <Box sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", p: 2.5, color: "white" }}>

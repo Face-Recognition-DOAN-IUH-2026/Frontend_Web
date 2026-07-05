@@ -1,46 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Alert, Button, Checkbox, LinearProgress, Stack, Typography } from "@mui/material";
+import { Box, Alert, Button, Checkbox, Stack, Typography } from "@mui/material";
+import Progress from "antd/es/progress";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import CameraCapture from "@/app/(dashboard)/_components/camera-capture";
 import JobPoll from "@/app/(dashboard)/_components/job-poll";
 import api, { getErrorMessage } from "@/lib/api-client";
-import type { LivenessBreakdown } from "@/lib/types";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
-const breakdownLabels: Record<keyof LivenessBreakdown, string> = {
-  lbp: "Kết cấu ảnh",
-  color: "Màu sắc",
-  noise: "Nhiễu ảnh",
-  fft: "Tần số ảnh",
-  multi_scale: "Đa tỷ lệ",
-  bbox: "Tỷ lệ khuôn mặt",
-  insightface: "Mô hình học sâu",
-};
-
-function BreakdownBar({ label, score }: { label: string; score: number }) {
-  const percent = Math.round(score * 100);
-  return (
-    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ alignItems: { sm: "center" } }}>
-      <Typography variant="body2" color="text.secondary" sx={{ width: { sm: 150 }, flexShrink: 0 }}>{label}</Typography>
-      <LinearProgress variant="determinate" value={percent} color={score >= 0.7 ? "success" : score >= 0.4 ? "warning" : "error"} sx={{ flex: 1, height: 8, borderRadius: 99, minWidth: 120 }} />
-      <Typography variant="caption" color="text.secondary" sx={{ width: 44, fontFamily: "monospace", textAlign: "right" }}>
-        {percent}%
-      </Typography>
-    </Stack>
-  );
-}
-
 function LivenessResultCard({ result }: { result: any }) {
   const isLive = Boolean(result.is_live);
   const score = Number(result.liveness_score ?? 0);
-  const breakdown: LivenessBreakdown | undefined = result.breakdown;
 
   return (
     <DashboardCard>
@@ -55,18 +31,12 @@ function LivenessResultCard({ result }: { result: any }) {
           </Box>
         </Stack>
 
-        <LinearProgress variant="determinate" value={Math.min(score * 100, 100)} color={isLive ? "success" : "error"} sx={{ height: 9, borderRadius: 99 }} />
-
-        {breakdown ? (
-          <Stack spacing={1.5}>
-            <Typography variant="overline" color="text.secondary">Chi tiết kỹ thuật</Typography>
-            {Object.entries(breakdownLabels).map(([key, label]) => {
-              const value = breakdown[key as keyof LivenessBreakdown];
-              if (value === undefined) return null;
-              return <BreakdownBar key={key} label={label} score={value} />;
-            })}
-          </Stack>
-        ) : null}
+        <Progress
+          percent={Math.min(Math.round(score * 100), 100)}
+          status={isLive ? "success" : "exception"}
+          strokeColor={isLive ? "#10b981" : "#ef4444"}
+          trailColor="rgba(0,0,0,0.06)"
+        />
       </Stack>
     </DashboardCard>
   );

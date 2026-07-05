@@ -13,6 +13,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import AntdDatePicker from "antd/es/date-picker";
+import dayjs from "dayjs";
+
+const { RangePicker } = AntdDatePicker;
 import FilterListIcon from "@mui/icons-material/FilterList";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import FingerprintIcon from "@mui/icons-material/Fingerprint";
@@ -286,25 +290,21 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
             }}
             sx={{ "& .MuiInputBase-root": { fontSize: "0.8rem" } }}
           />
-          <Stack direction="row" spacing={1}>
-            <TextField
-              size="small"
-              type="date"
-              value={fromDate}
-              onChange={(e) => { setFromDate(e.target.value); setPage(1); }}
-              sx={{ flex: 1, "& .MuiInputBase-root": { fontSize: "0.7rem" } }}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>—</Typography>
-            <TextField
-              size="small"
-              type="date"
-              value={toDate}
-              onChange={(e) => { setToDate(e.target.value); setPage(1); }}
-              sx={{ flex: 1, "& .MuiInputBase-root": { fontSize: "0.7rem" } }}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          </Stack>
+          <RangePicker
+            size="small"
+            value={[
+              fromDate ? dayjs(fromDate) : null,
+              toDate ? dayjs(toDate) : null,
+            ]}
+            onChange={(dates) => {
+              setFromDate(dates?.[0]?.format("YYYY-MM-DD") || "");
+              setToDate(dates?.[1]?.format("YYYY-MM-DD") || "");
+              setPage(1);
+            }}
+            style={{ width: "100%" }}
+            placeholder={["Từ ngày", "Đến ngày"]}
+            format="DD/MM/YYYY"
+          />
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", overflowX: "auto", "&::-webkit-scrollbar": { display: "none" } }}>
             <FilterListIcon sx={{ fontSize: 14, color: "text.secondary", flexShrink: 0 }} />
             {CATEGORY_FILTERS.map((cat) => (
