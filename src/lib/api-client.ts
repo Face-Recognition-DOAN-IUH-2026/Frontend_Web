@@ -508,18 +508,18 @@ class ApiClient {
   }
 
   // === Patrons ===
-  async searchPatrons(
-    query?: string,
-    status?: string,
-    skip: number = 0,
-    limit: number = 20
-  ): Promise<PatronPublic[]> {
-    const params: any = { skip, limit };
-    if (query) params.q = query;
-    if (status) params.status = status;
-    const response = await this.client.get<PatronPublic[]>("/api/patrons/search", { params });
-    return response.data;
-  }
+async searchPatrons(
+  query?: string,
+  status?: string,
+  skip: number = 0,
+  limit: number = 20
+): Promise<PatronPublic[]> {
+  const params: any = { skip, limit };
+  if (query) params.q = query;
+  if (status) params.status = status;
+  const response = await this.client.get<{ items: PatronPublic[]; total: number }>("/api/patrons/search", { params });
+  return Array.isArray((response.data as any).items) ? (response.data as any).items : [];
+}
 
   async lookupPatron(
     studentCode?: string,
