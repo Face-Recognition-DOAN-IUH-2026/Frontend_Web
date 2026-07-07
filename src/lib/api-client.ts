@@ -379,9 +379,32 @@ class ApiClient {
     return response.data;
   }
 
-  async listUsers(): Promise<UserListResponse> {
-    const response = await this.client.get<UserListResponse>("/api/users");
-    return response.data;
+  async listUsers(opts?: { skip?: number; limit?: number }): Promise<UserListResponse> {
+    const params: Record<string, string> = {};
+    if (opts?.skip !== undefined)  params.skip  = String(opts.skip);
+    if (opts?.limit !== undefined) params.limit = String(opts.limit);
+    const response = await this.client.get<UserListResponse>("/api/users", { params });
+    const data = response.data as any;
+    return {
+      total: data.total ?? 0,
+      users: (data.users ?? []).map((u: any) => ({
+        ...u,
+        has_face: u.hasFace ?? u.has_face ?? false,
+        full_name: u.full_name ?? u.fullName ?? null,
+        avatar_url: u.avatar_url ?? u.avatarUrl ?? null,
+        student_code: u.student_code ?? u.studentCode ?? null,
+        card_number: u.card_number ?? u.cardNumber ?? null,
+        phone: u.phone ?? null,
+        current_status: u.current_status ?? u.currentStatus ?? null,
+        last_entry_at: u.last_entry_at ?? u.lastEntryAt ?? null,
+        last_entry_camera: u.last_entry_camera ?? u.lastEntryCamera ?? null,
+        membership_expiry: u.membership_expiry ?? u.membershipExpiry ?? null,
+        permanent_address: u.permanent_address ?? u.permanentAddress ?? null,
+        created_at: u.created_at ?? u.createdAt ?? null,
+        identity_number: u.identity_number ?? u.identityNumber ?? null,
+        class_name: u.class_name ?? u.className ?? null,
+      })),
+    };
   }
 
   async getUser(userId: string): Promise<UserPublic> {
