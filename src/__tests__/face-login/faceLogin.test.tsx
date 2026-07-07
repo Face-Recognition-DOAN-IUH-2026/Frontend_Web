@@ -9,7 +9,6 @@ jest.mock("@/lib/api-client", () => {
     login: jest.fn(),
     getTaskStatus: jest.fn(),
     getFaceEnrollmentStatus: jest.fn(),
-    enrollFace: jest.fn(),
     enrollFaceBatch: jest.fn(),
     verifyFace: jest.fn(),
     identifyFace: jest.fn(),

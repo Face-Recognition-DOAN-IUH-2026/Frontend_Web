@@ -1,0 +1,139 @@
+import type { BookWithStats } from "./book";
+
+export interface BorrowRecord {
+  id: string;
+  patron_id: string;
+  book_id: string;
+  copy_id: string | null;
+  borrow_at: string;
+  due_at: string;
+  return_at: string | null;
+  shelf_location: string | null;
+  status: string;
+  note?: string | null;
+  returned_by_user_id?: string | null;
+  returned_by_email?: string | null;
+  return_method?: string | null;
+  slip_id?: string | null;
+  fine_amount?: number;
+  fine_paid?: boolean;
+  renewal_count?: number;
+  created_at?: string;
+  updated_at?: string;
+  book?: import("./book").BookInfo | null;
+}
+
+export interface StaffPatronSummary {
+  id: string;
+  full_name: string | null;
+  student_code: string;
+  email: string | null;
+  card_number: string | null;
+  current_status: string | null;
+}
+
+export interface StaffPatronActiveBorrowsResponse {
+  patron: StaffPatronSummary;
+  records: BorrowRecord[];
+  total: number;
+  overdue_count: number;
+}
+
+export interface StaffActiveBorrowerSummary {
+  patron: StaffPatronSummary;
+  total_borrowed: number;
+  overdue_count: number;
+  latest_borrow_at: string;
+  nearest_due_at: string;
+}
+
+export interface StaffActiveBorrowersResponse {
+  items: StaffActiveBorrowerSummary[];
+  total: number;
+}
+
+export interface BorrowResponse {
+  status: string;
+  message: string;
+  record: BorrowRecord | null;
+  book: import("./book").BookInfo | null;
+}
+
+export interface ReturnResponse {
+  status: string;
+  message: string;
+  record: BorrowRecord | null;
+  note?: string | null;
+}
+
+export interface StaffReturnRequest {
+  barcode: string;
+  note?: string | null;
+}
+
+export interface BorrowSlipItem {
+  barcode: string;
+  isbn?: string;
+}
+
+export interface CreateBorrowSlipRequest {
+  patron_id: string;
+  items: BorrowSlipItem[];
+  note?: string | null;
+}
+
+export interface BorrowSlip {
+  id: string;
+  patron_id: string;
+  borrow_at: string;
+  due_at: string;
+  status: string;
+  created_by_user_id?: string;
+  created_by_email?: string;
+  total_items: number;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+  records?: BorrowRecord[];
+}
+
+export interface CreateBorrowSlipResponse {
+  status: string;
+  message: string;
+  slip?: BorrowSlip;
+  records?: BorrowRecord[];
+}
+
+export interface LookupBorrowSlipRequest {
+  patron_id: string;
+  items: BorrowSlipItem[];
+}
+
+export interface LookupBorrowSlipItem {
+  barcode: string;
+  isbn?: string;
+  can_borrow: boolean;
+  reason: string | null;
+  book: BookWithStats | null;
+  copy: { id: string; book_id: string; barcode: string; is_available: boolean; shelf_location: string | null } | null;
+}
+
+export interface LookupBorrowSlipResponse {
+  can_create: boolean;
+  patron: { id: string; full_name: string | null; student_code: string; email: string | null };
+  items: LookupBorrowSlipItem[];
+  errors: string[];
+  total_items: number;
+  available_items: number;
+}
+
+export interface ConfirmBorrowSlipRequest {
+  patron_id: string;
+  items: {
+    barcode: string;
+    isbn?: string;
+    book_id: string;
+    copy_id: string;
+  }[];
+  note?: string | null;
+}

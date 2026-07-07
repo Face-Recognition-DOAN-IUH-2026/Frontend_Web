@@ -80,7 +80,7 @@ export default function NotificationsPage() {
     try {
       setLoading(true);
       const result = await api.getNotifications({
-        unread: filter === "unread" ? true : undefined,
+        unread_only: filter === "unread" ? true : undefined,
         skip: (page - 1) * pageSize,
         limit: pageSize,
       });
