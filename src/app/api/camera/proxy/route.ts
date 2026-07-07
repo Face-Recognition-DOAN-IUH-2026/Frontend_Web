@@ -7,6 +7,7 @@ const ALLOWED_HOSTS = (process.env.CAMERA_PROXY_ALLOWED_HOSTS || "")
 
 function isHostAllowed(hostname: string): boolean {
   if (ALLOWED_HOSTS.length === 0) return true;
+  if (ALLOWED_HOSTS.includes("*")) return true;
   return ALLOWED_HOSTS.includes(hostname);
 }
 
@@ -35,20 +36,29 @@ export async function GET(request: NextRequest) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(parsed.toString(), { signal: controller.signal });
+    const response = await fetch(parsed.toString(), {
+      signal: controller.signal,
+      headers: { Accept: "image/jpeg, multipart/x-mixed-replace, */*" },
+    });
     clearTimeout(timeout);
+
+    console.error(
+      `[camera-proxy] ${response.status} ${parsed.toString()} content-type=${response.headers.get("content-type")}`,
+    );
 
     const contentType = response.headers.get("Content-Type") || "multipart/x-mixed-replace; boundary=--BoundaryBoundary";
 
     return new Response(response.body, {
+      status: response.status,
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
-  } catch {
-    return new Response("Failed to connect to camera", { status: 502 });
-  }
+} catch (err: unknown) {
+  console.error("[camera-proxy] fetch failed:", parsed.toString(), err);
+  return new Response("Failed to connect to camera", { status: 502 });
+}
 }

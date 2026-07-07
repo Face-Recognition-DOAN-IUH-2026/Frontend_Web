@@ -89,7 +89,7 @@ export default function AdminPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const data = await api.listUsers();
+      const data = await api.listUsers({ skip: 0, limit: 200 });
       setUsers(data.users);
       setTotal(data.total);
     } finally {
