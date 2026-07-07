@@ -263,7 +263,7 @@ export default function LoginPage() {
     setForgotLoading(true);
     setForgotError("");
     try {
-      await api.client.post("/auth/forgot-password", { email: forgotEmail });
+      await api.forgotPassword(forgotEmail);
       setForgotStep(2);
     } catch (err: any) {
       setForgotError(getErrorMessage(err) || "Không thể gửi mã reset");
@@ -280,7 +280,7 @@ export default function LoginPage() {
     setForgotLoading(true);
     setForgotError("");
     try {
-      await api.client.post("/auth/verify-reset-code", { email: forgotEmail, code: forgotCode });
+      await api.verifyResetCode(forgotEmail, forgotCode);
       setForgotStep(3);
     } catch (err: any) {
       setForgotError(getErrorMessage(err) || "Mã xác minh không hợp lệ");
@@ -305,11 +305,7 @@ export default function LoginPage() {
     setForgotLoading(true);
     setForgotError("");
     try {
-      await api.client.post("/auth/reset-password", {
-        email: forgotEmail,
-        code: forgotCode,
-        new_password: forgotPassword,
-      });
+      await api.resetPassword(forgotEmail, forgotCode, forgotPassword);
       setForgotStep(4);
     } catch (err: any) {
       setForgotError(getErrorMessage(err) || "Đặt lại mật khẩu thất bại");

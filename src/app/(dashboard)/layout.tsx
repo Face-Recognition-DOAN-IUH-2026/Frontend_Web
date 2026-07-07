@@ -50,7 +50,7 @@ function Topbar({ user }: { user: any }) {
 
     const fetchCount = async () => {
       try {
-        const count = await api.getUnreadCount();
+        const { count } = await api.getUnreadCount();
         if (mounted) setUnreadCount(count);
       } catch {
         // silently fail
@@ -79,7 +79,7 @@ function Topbar({ user }: { user: any }) {
   const handleBellClose = () => {
     setBellAnchorEl(null);
     // Refresh count after closing
-    api.getUnreadCount().then((count) => setUnreadCount(count)).catch(() => {});
+    api.getUnreadCount().then(({ count }) => setUnreadCount(count)).catch(() => {});
   };
 
   return (

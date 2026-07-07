@@ -83,7 +83,8 @@ export default function PatronsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setPatrons(await api.searchPatrons(query || undefined));
+      const { items } = await api.searchPatrons(query || undefined);
+      setPatrons(items);
     } catch (err) {
       showNotice("error", getErrorMessage(err) || "Không thể tải danh sách độc giả");
     } finally {

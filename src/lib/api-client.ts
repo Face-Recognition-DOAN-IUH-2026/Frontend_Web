@@ -59,34 +59,62 @@ const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80
 const API_BASE_URL = RAW_API_BASE_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
 
 function normalizeAccessLog(log: any): AccessLogPublic {
-  const user = log?.user || {};
   return {
-    ...log,
-    patron_id: log?.patron_id || log?.patronId || user.id || null,
-    patron_name: log?.patron_name || log?.full_name || log?.fullName || user.full_name || user.fullName || null,
-    student_code: log?.student_code || log?.studentCode || user.student_code || user.studentCode || null,
-    access_type: log?.access_type || log?.accessType || "",
-    verify_method: log?.verify_method || log?.verifyMethod || "face",
-    confidence: log?.confidence ?? null,
-    camera_id: log?.camera_id || log?.cameraId || "",
-    access_time: log?.access_time || log?.accessTime || log?.created_at || log?.createdAt || "",
-    status: log?.status === "granted" ? "success" : (log?.status || ""),
-  };
+    id: log.id,
+    patron_id: log.patron_id || log.patronId || null,
+    patron_name: log.patron_name || log.patronName || log.full_name || null,
+    student_code: log.student_code || log.studentCode || null,
+    camera_id: log.camera_id || log.cameraId || null,
+    camera_name: log.camera_name || log.cameraName || null,
+    access_type: log.access_type || log.accessType || "unknown",
+    confidence: log.confidence ?? null,
+    image_url: log.image_url || log.imageUrl || null,
+    timestamp: log.timestamp || log.created_at || log.createdAt,
+    device_id: log.device_id || log.deviceId || null,
+    is_inside: log.is_inside ?? log.isInside ?? null,
+    verify_method: log.verify_method || log.verifyMethod || null,
+    access_time: log.access_time || log.accessTime || log.timestamp || log.created_at || null,
+    status: log.status || null,
+  } as AccessLogPublic;
 }
 
-function setStoredAccessToken(token: string) {
+function getCookieValue(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^| )" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+function setAccessTokenCookie(token: string): void {
+  if (typeof document === "undefined") return;
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `access_token=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Lax${secure}`;
+}
+
+function clearAccessTokenCookie(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+}
+
+let _accessToken: string | null = null;
+
+function setStoredAccessToken(token: string | null) {
   _accessToken = token;
-  setAccessTokenCookie(token);
+  if (token) {
+    setAccessTokenCookie(token);
+  } else {
+    clearAccessTokenCookie();
+  }
 }
 
 function clearStoredAuth() {
   _accessToken = null;
   clearAccessTokenCookie();
   if (typeof window !== "undefined") {
-    document.cookie = "refresh_token=; path=/; max-age=0";
-    localStorage.removeItem("user");
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    try {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+    } catch {}
   }
 }
 
@@ -98,7 +126,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
     const jsonPayload = decodeURIComponent(
       atob(base64)
         .split("")
-        .map((c) => `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`)
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
         .join("")
     );
     return JSON.parse(jsonPayload);
@@ -107,93 +135,57 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-function isTokenExpiringSoon(token: string, skewSeconds = 30): boolean {
+function isTokenExpiringSoon(token: string, skewMs = 30_000): boolean {
   const payload = decodeJwtPayload(token);
-  const exp = typeof payload?.exp === "number" ? payload.exp : null;
-  if (!exp) return false;
-  return Date.now() >= (exp - skewSeconds) * 1000;
+  if (!payload || typeof payload.exp !== "number") return false;
+  return Date.now() >= payload.exp * 1000 - skewMs;
 }
 
+function getErrorMessage(err: unknown): string {
+  if (!err) return "An unknown error occurred";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null) {
+    const ax = err as any;
+    if (ax.response?.data) {
+      const data = ax.response.data;
+      if (typeof data === "string") return data;
+      if (data.error) return typeof data.error === "string" ? data.error : JSON.stringify(data.error);
+      if (data.message) return data.message;
+      if (data.detail) return data.detail;
+      if (Array.isArray(data.errors) && data.errors.length > 0) {
+        return data.errors.map((e: any) => e.msg || e.message || JSON.stringify(e)).join("; ");
+      }
+      return JSON.stringify(data);
+    }
+    if (ax.message) return ax.message;
+  }
+  return String(err);
+}
 
-let _accessToken: string | null = null;
-
-export function setApiAccessToken(token: string | null) {
+function setApiAccessToken(token: string | null) {
   _accessToken = token;
 }
 
-export function getApiAccessToken(): string | null {
+function getApiAccessToken(): string | null {
   return _accessToken;
 }
 
-function getCookieValue(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function setAccessTokenCookie(token: string) {
-  if (typeof document === "undefined") return;
-  const isProduction = typeof process !== "undefined" && process.env.NODE_ENV === "production";
-  const secureFlag = isProduction ? "; Secure" : "";
-  document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${secureFlag}`;
-}
-
-function clearAccessTokenCookie() {
-  if (typeof document === "undefined") return;
-  document.cookie = "access_token=; path=/; max-age=0";
-}
-
-export function getErrorMessage(err: any): string {
-  if (!err) return "Unknown error";
-  if (typeof err === "string") return err;
-  if (err.response?.data?.detail) {
-    const detail = err.response.data.detail;
-    if (typeof detail === "string") return detail;
-    if (Array.isArray(detail)) {
-      return detail.map((d: any) =>
-        typeof d === "string" ? d : `${d.loc?.join(".")}: ${d.msg}`
-      ).join("; ");
-    }
-    if (typeof detail === "object") {
-      return detail.msg || detail.message || JSON.stringify(detail);
-    }
-  }
-  if (err.response?.data?.error) {
-    const errorVal = err.response.data.error;
-    if (typeof errorVal === "string") return errorVal;
-    if (typeof errorVal === "object") return errorVal.msg || errorVal.message || JSON.stringify(errorVal);
-  }
-  return err.message || err.msg || String(err);
-}
-
 class ApiClient {
-  client: AxiosInstance;
-  private refreshPromise: Promise<boolean> | null = null;
-  private _pendingRequests: Array<{ request: any; resolve: (val: any) => void; reject: (err: any) => void }> = [];
-  private _showingReauth = false;
+  private client: AxiosInstance;
+  private refreshPromise: Promise<string | null> | null = null;
+  private pendingRequests: Array<{ resolve: (token: string) => void; reject: (err: any) => void }> = [];
 
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
+      timeout: 30000,
       withCredentials: true,
     });
 
     this.client.interceptors.request.use(
-      async (config) => {
-        let token = _accessToken;
-        if (!token && typeof document !== "undefined") {
-          token = getCookieValue("access_token");
-        }
-        if (token && isTokenExpiringSoon(token) && !config.url?.includes('/auth/')) {
-          if (!this.refreshPromise) {
-            this.refreshPromise = this.refreshToken();
-          }
-          const refreshed = await this.refreshPromise;
-          this.refreshPromise = null;
-          if (refreshed) {
-            token = _accessToken || getCookieValue("access_token");
-          }
-        }
+      (config) => {
+        const token = _accessToken || getCookieValue("access_token");
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -205,132 +197,134 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        const url = error.config?.url || '';
-        const status = error.response?.status;
-        const data = error.response?.data;
-        if (status && status >= 400) {
-          const msg = typeof data === 'object' ? (data as any).detail || (data as any).error || '' : '';
-          console.warn(`[API] ${error.config?.method?.toUpperCase()} ${url} ${status}${msg ? `: ${msg}` : ''}`);
-        }
-        const originalRequest = error.config;
-        if (status === 401 && originalRequest) {
-          if (originalRequest.url?.includes('/auth/') || originalRequest.url?.includes('/camera/')) {
-            return Promise.reject(error);
-          }
-          return this.handleUnauthorized(originalRequest);
+        const originalRequest = error.config as any;
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+          try {
+            const newToken = await this.handleUnauthorized();
+            if (newToken) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              return this.client(originalRequest);
+            }
+          } catch {}
         }
         return Promise.reject(error);
       }
     );
   }
 
-  private async handleUnauthorized(originalRequest: any): Promise<any> {
-    if (originalRequest._retry) {
-      return Promise.reject(new Error("Session expired"));
-    }
-    originalRequest._retry = true;
-
-    if (!this.refreshPromise) {
-      this.refreshPromise = this.refreshToken();
-    }
-
-    const refreshed = await this.refreshPromise;
-    this.refreshPromise = null;
-
-    if (refreshed) {
-      return this.client(originalRequest);
-    }
-
-    bus.emit("auth:required");
-    return Promise.reject(new Error("Session expired"));
-  }
-
-  public retryPendingRequests(newToken: string): void {
-    const token = newToken;
-    _accessToken = token;
-    setAccessTokenCookie(token);
-    const queue = [...this._pendingRequests];
-    this._pendingRequests = [];
-    this._showingReauth = false;
-    queue.forEach(({ request, resolve, reject }) => {
-      request.headers.Authorization = `Bearer ${token}`;
-      this.client(request).then(resolve).catch(reject);
-    });
-  }
-
-  public cancelPendingRequests(): void {
-    const queue = [...this._pendingRequests];
-    this._pendingRequests = [];
-    this._showingReauth = false;
-    queue.forEach(({ reject }) => reject(new Error("Session expired")));
-  }
-
-  private async refreshToken(): Promise<boolean> {
-    let refreshToken = getCookieValue("refresh_token");
-    if (!refreshToken) {
-      refreshToken = _accessToken ? null : null;
-    }
-    if (!refreshToken) return false;
-
+  private async handleUnauthorized(): Promise<string | null> {
     try {
-      const response = await axios.post<TokenResponse>(
-        `${API_BASE_URL}/api/auth/refresh`,
-        { refresh_token: refreshToken }
-      );
-      const { access_token, refresh_token: newRefreshToken } = response.data;
-      if (!access_token) return false;
-      _accessToken = access_token;
-      setAccessTokenCookie(access_token);
-      if (newRefreshToken) {
-        document.cookie = `refresh_token=${newRefreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      const newToken = await this.refreshToken();
+      if (newToken) {
+        this.retryPendingRequests(newToken);
+        return newToken;
       }
-      return true;
-    } catch {
-      return false;
+    } catch (err) {
+      this.cancelPendingRequests();
+      clearStoredAuth();
+      if (typeof window !== "undefined") {
+        bus.emit("auth:required");
+      }
     }
+    return null;
   }
 
-  // === Auth (via face-recognition-api) ===
+  retryPendingRequests(newToken: string) {
+    this.pendingRequests.forEach(({ resolve }) => resolve(newToken));
+    this.pendingRequests = [];
+  }
+
+  cancelPendingRequests() {
+    this.pendingRequests.forEach(({ reject }) => reject(new Error("Request cancelled")));
+    this.pendingRequests = [];
+  }
+
+  private async refreshToken(): Promise<string | null> {
+    if (this.refreshPromise) return this.refreshPromise;
+    this.refreshPromise = (async () => {
+      try {
+        const resp = await axios.post(`${API_BASE_URL}/api/auth/refresh`, null, {
+          withCredentials: true,
+          timeout: 10000,
+        });
+        const data = resp.data;
+        const token = data?.access_token || data?.accessToken;
+        if (token) {
+          setStoredAccessToken(token);
+          return token;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+    return this.refreshPromise;
+  }
+
   async login(data: LoginRequest): Promise<TokenResponse> {
     const response = await this.client.post<TokenResponse>("/api/auth/login", data);
+    if (response.data.access_token) {
+      setStoredAccessToken(response.data.access_token);
+    }
     return response.data;
   }
 
-  async register(data: RegisterRequest): Promise<UserPublic> {
-    const response = await this.client.post<UserPublic>("/api/auth/register", data);
+  async register(data: RegisterRequest): Promise<TokenResponse> {
+    const response = await this.client.post<TokenResponse>("/api/auth/register", data);
+    if (response.data.access_token) {
+      setStoredAccessToken(response.data.access_token);
+    }
     return response.data;
   }
 
-  async verifyEmail(data: { email: string; code: string }): Promise<void> {
-    await this.client.post("/api/auth/verify-email", data);
+  async verifyEmail(data: { email: string; code: string }): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/auth/verify-email", data);
+    return response.data;
   }
 
-  async resendVerification(email: string): Promise<void> {
-    await this.client.post("/api/auth/resend-verification", { email });
+  async resendVerification(email: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/auth/resend-verification", { email });
+    return response.data;
   }
 
-  async requestEmailCorrection(data: { current_email: string; new_email: string }): Promise<void> {
-    await this.client.post("/api/auth/correct-email/request-otp", data);
+  async requestEmailCorrection(data: { current_email: string; new_email: string }): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/auth/correct-email/request-otp", data);
+    return response.data;
   }
 
-  async verifyEmailCorrection(data: { current_email: string; new_email: string; code: string }): Promise<void> {
-    await this.client.post("/api/auth/correct-email/verify", data);
+  async verifyEmailCorrection(data: { otp: string; new_email: string }): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/auth/correct-email/verify", data);
+    return response.data;
   }
 
   async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
     const response = await this.client.post<TokenResponse>("/api/auth/refresh", { refresh_token: refreshToken });
+    if (response.data.access_token) {
+      setStoredAccessToken(response.data.access_token);
+    }
     return response.data;
   }
 
   async logout(): Promise<void> {
-    await this.client.post("/api/auth/logout");
+    try {
+      await this.client.post("/api/auth/logout");
+    } finally {
+      clearStoredAuth();
+    }
   }
 
   async faceLogin(imageFile: File): Promise<TokenResponse> {
     const formData = new FormData();
     formData.append("file", imageFile);
-
-    const response = await this.client.post<TokenResponse>("/api/auth/face-login", formData);
+    const response = await this.client.post<TokenResponse>("/api/auth/face-login", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    if (response.data.access_token) {
+      setStoredAccessToken(response.data.access_token);
+    }
     return response.data;
   }
 
@@ -342,20 +336,23 @@ class ApiClient {
   async uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
     const formData = new FormData();
     formData.append("avatar", file);
-    const response = await this.client.post<{ avatarUrl: string }>("/users/me/avatar", formData);
+    const response = await this.client.post<{ avatarUrl: string }>("/users/me/avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data;
   }
 
-  async deleteAvatar(): Promise<void> {
-    await this.client.delete("/users/me/avatar");
+  async deleteAvatar(): Promise<{ message: string }> {
+    const response = await this.client.delete<{ message: string }>("/users/me/avatar");
+    return response.data;
   }
 
-  async updateProfile(data: { full_name?: string; phone?: string; permanent_address?: string }): Promise<UserPublic> {
+  async updateProfile(data: { full_name?: string; phone?: string; address?: string }): Promise<UserPublic> {
     const response = await this.client.put<UserPublic>("/users/me/profile", data);
     return response.data;
   }
 
-  async changePassword(data: { old_password?: string; new_password?: string }): Promise<{ message: string }> {
+  async changePassword(data: { old_password: string; new_password: string }): Promise<{ message: string }> {
     const response = await this.client.put<{ message: string }>("/users/me/password", data);
     return response.data;
   }
@@ -365,22 +362,20 @@ class ApiClient {
     return response.data;
   }
 
-  async verifyAndChangeEmail(data: { new_email: string; code: string }): Promise<{ message: string }> {
+  async verifyAndChangeEmail(data: { otp: string; new_email: string }): Promise<{ message: string }> {
     const response = await this.client.put<{ message: string }>("/users/me/email", data);
     return response.data;
   }
 
-  // Face enrollment status from face-recognition-api
   async getFaceEnrollmentStatus(): Promise<{ has_face: boolean; full_name: string | null; role: string }> {
-    // /api/users/me routes to face-recognition-api via gateway
     const response = await this.client.get<{ has_face: boolean; full_name: string | null; role: string }>("/api/users/me");
     return response.data;
   }
 
-  // === Tasks ===
   async getTaskStatus(taskId: string, token?: string): Promise<TaskStatusResponse> {
-    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;
-    const response = await this.client.get<TaskStatusResponse>(`/api/tasks/${taskId}`, config);
+    const headers: Record<string, string> = {};
+    if (token) headers["X-Internal-Token"] = token;
+    const response = await this.client.get<TaskStatusResponse>(`/api/tasks/${taskId}`, { headers });
     return response.data;
   }
 
@@ -394,38 +389,24 @@ class ApiClient {
     return response.data;
   }
 
-  async updateUser(userId: string, data: any): Promise<UserPublic> {
+  async updateUser(userId: string, data: Partial<UserPublic>): Promise<UserPublic> {
     const response = await this.client.put<UserPublic>(`/api/users/${userId}`, data);
     return response.data;
   }
 
-  async deleteUser(userId: string): Promise<void> {
-    await this.client.delete(`/api/users/${userId}`);
-  }
-
-  async restoreUser(userId: string): Promise<UserPublic> {
-    const response = await this.client.put<UserPublic>(`/api/users/${userId}/restore`, {});
+  async deleteUser(userId: string): Promise<{ message: string }> {
+    const response = await this.client.delete<{ message: string }>(`/api/users/${userId}`);
     return response.data;
   }
 
-  // === Face Operations ===
-  async enrollFace(
-    imageFile: File,
-    consentGiven: boolean = true,
-    angle: string = "frontal"
-  ): Promise<{ job_id: string }> {
-    const formData = new FormData();
-    formData.append("file", imageFile);
-    formData.append("consent_given", String(consentGiven));
-    formData.append("angle", angle);
-
-    const response = await this.client.post("/api/face/enroll", formData);
+  async restoreUser(userId: string): Promise<{ message: string }> {
+    const response = await this.client.put<{ message: string }>(`/api/users/${userId}/restore`);
     return response.data;
   }
 
   async enrollBatch(
     files: { frontal: File; right: File; left: File; down: File },
-    consentGiven: boolean = true,
+    consent: boolean,
     token?: string
   ): Promise<{ job_id: string }> {
     const formData = new FormData();
@@ -433,98 +414,70 @@ class ApiClient {
     formData.append("right", files.right);
     formData.append("left", files.left);
     formData.append("down", files.down);
-    formData.append("consent_given", String(consentGiven));
-
-    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;
-    const response = await this.client.post("/api/face/enroll-batch", formData, config);
+    formData.append("consent_given", String(consent));
+    const headers: Record<string, string> = { "Content-Type": "multipart/form-data" };
+    if (token) headers["X-Internal-Token"] = token;
+    const response = await this.client.post<{ job_id: string }>("/api/face/enroll-batch", formData, { headers });
     return response.data;
   }
 
-  async verifyFace(
-    imageFile: File,
-    targetUserId: string,
-    consentGiven: boolean = true
-  ): Promise<{ job_id: string }> {
+  async verifyFace(imageFile: File, targetUserId: string, consent: boolean): Promise<{ job_id: string }> {
     const formData = new FormData();
     formData.append("file", imageFile);
     formData.append("target_user_id", targetUserId);
-    formData.append("consent_given", String(consentGiven));
-
-    const response = await this.client.post("/api/face/verify", formData);
-    return response.data;
-  }
-
-  async identifyFace(
-    imageFile: File,
-    consentGiven: boolean = true
-  ): Promise<{ job_id: string }> {
-    const formData = new FormData();
-    formData.append("file", imageFile);
-    formData.append("consent_given", String(consentGiven));
-
-    const response = await this.client.post("/api/face/identify", formData);
-    return response.data;
-  }
-
-  async livenessCheck(
-    imageFile: File,
-    consentGiven: boolean = true
-  ): Promise<{ job_id: string }> {
-    const formData = new FormData();
-    formData.append("file", imageFile);
-    formData.append("consent_given", String(consentGiven));
-
-    const response = await this.client.post("/api/face/liveness", formData);
-    return response.data;
-  }
-
-  async deleteFaceData(userId: string): Promise<{ job_id: string }> {
-    const response = await this.client.delete(`/api/face/${userId}`);
-    return response.data;
-  }
-
-  async processFaceImage(formData: FormData): Promise<{ task_id: string; status: string }> {
-    const response = await this.client.post("/api/face/process", formData, {
+    formData.append("consent_given", String(consent));
+    const response = await this.client.post<{ job_id: string }>("/api/face/verify", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return response.data;
   }
 
-  async processFaceImageSync(data: {
-    image: string;
-    camera_id?: string;
-    process_type?: string;
-    consent_given?: boolean;
-    target_user_id?: string;
-    connection_id?: string;
-  }): Promise<{
-    status: string;
-    process_type: string;
-    result: Record<string, unknown>;
-    processing_time_ms: number;
-  }> {
+  async identifyFace(imageFile: File, consent: boolean): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+    formData.append("consent_given", String(consent));
+    const response = await this.client.post<{ job_id: string }>("/api/face/identify", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async livenessCheck(imageFile: File, consent: boolean): Promise<{ job_id: string }> {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+    formData.append("consent_given", String(consent));
+    const response = await this.client.post<{ job_id: string }>("/api/face/liveness", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async deleteFaceData(userId: string): Promise<{ message: string }> {
+    const response = await this.client.delete<{ message: string }>(`/api/face/${userId}`);
+    return response.data;
+  }
+
+  async processFaceImage(formData: FormData): Promise<{ task_id: string; status: string }> {
+    const response = await this.client.post<{ task_id: string; status: string }>("/api/face/process", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async processFaceImageSync(data: any): Promise<{ status: string; process_type: string; result: Record<string, unknown>; processing_time_ms: number }> {
     const response = await this.client.post("/api/face/process-sync", data);
     return response.data;
   }
 
-  // === Patrons ===
-async searchPatrons(
-  query?: string,
-  status?: string,
-  skip: number = 0,
-  limit: number = 20
-): Promise<PatronPublic[]> {
-  const params: any = { skip, limit };
-  if (query) params.q = query;
-  if (status) params.status = status;
-  const response = await this.client.get<{ items: PatronPublic[]; total: number }>("/api/patrons/search", { params });
-  return Array.isArray((response.data as any).items) ? (response.data as any).items : [];
-}
+  async searchPatrons(query?: string, status?: string, skip = 0, limit = 50): Promise<{ items: PatronPublic[]; total: number }> {
+    const params: any = { skip, limit };
+    if (query) params.q = query;
+    if (status) params.status = status;
+    const response = await this.client.get<{ items: PatronPublic[]; total: number }>("/api/patrons/search", { params });
+    return response.data;
+  }
 
-  async lookupPatron(
-    studentCode?: string,
-    cardNumber?: string
-  ): Promise<PatronLookupResult> {
+  async lookupPatron(studentCode?: string, cardNumber?: string): Promise<PatronLookupResult> {
     const params: any = {};
     if (studentCode) params.student_code = studentCode;
     if (cardNumber) params.card_number = cardNumber;
@@ -543,7 +496,7 @@ async searchPatrons(
   }
 
   async patronRegister(data: PatronRegisterRequest): Promise<{ user: UserPublic; access_token: string; refresh_token?: string }> {
-    const response = await this.client.post("/api/patrons/register", data);
+    const response = await this.client.post<{ user: UserPublic; access_token: string; refresh_token?: string }>("/api/patrons/register", data);
     return response.data;
   }
 
@@ -552,16 +505,16 @@ async searchPatrons(
     return response.data;
   }
 
-  async deletePatron(id: string): Promise<void> {
-    await this.client.delete(`/api/patrons/${id}`);
-  }
-
-  async restorePatron(id: string): Promise<PatronPublic> {
-    const response = await this.client.put<PatronPublic>(`/api/patrons/${id}/restore`, {});
+  async deletePatron(id: string): Promise<{ message: string }> {
+    const response = await this.client.delete<{ message: string }>(`/api/patrons/${id}`);
     return response.data;
   }
 
-  // === Access ===
+  async restorePatron(id: string): Promise<{ message: string }> {
+    const response = await this.client.put<{ message: string }>(`/api/patrons/${id}/restore`);
+    return response.data;
+  }
+
   async getAccessLogs(
     params?: {
       patronId?: string;
@@ -581,12 +534,8 @@ async searchPatrons(
       if (params.cameraId) query.camera_id = params.cameraId;
       if (params.status) query.status = params.status;
       if (params.accessType) query.access_type = params.accessType;
-      if (params.dateFrom) {
-        query.date_from = params.dateFrom;
-      }
-      if (params.dateTo) {
-        query.date_to = params.dateTo;
-      }
+      if (params.dateFrom) query.date_from = params.dateFrom;
+      if (params.dateTo) query.date_to = params.dateTo;
       if (params.search) query.search = params.search;
       query.skip = params.skip ?? 0;
       query.limit = Math.min(params.limit ?? 50, 200);
@@ -676,12 +625,8 @@ async searchPatrons(
 
   async getAccessFrequency(params?: { dateFrom?: string; dateTo?: string }): Promise<AccessFrequencyResponse> {
     const query: any = {};
-    if (params?.dateFrom) {
-      query.date_from = params.dateFrom;
-    }
-    if (params?.dateTo) {
-      query.date_to = params.dateTo;
-    }
+    if (params?.dateFrom) query.date_from = params.dateFrom;
+    if (params?.dateTo) query.date_to = params.dateTo;
     const response = await this.client.get<AccessFrequencyResponse | any[]>("/api/access/frequency", { params: query });
     const data = response.data;
     if (!Array.isArray(data)) {
@@ -738,7 +683,6 @@ async searchPatrons(
     return response.data;
   }
 
-  // === Kiosk ===
   async kioskLookup(
     studentCode?: string,
     cardNumber?: string
@@ -856,52 +800,50 @@ async searchPatrons(
     return response.data;
   }
 
-  // === Camera ===
   async getCameraStatus(): Promise<CameraStatus[]> {
     const response = await this.client.get<CameraStatus[]>("/api/camera/status");
     return response.data;
   }
 
   async reconnectCamera(cameraId: string): Promise<{ message: string }> {
-    const response = await this.client.post(`/api/camera/reconnect/${cameraId}`);
+    const response = await this.client.post<{ message: string }>(`/api/camera/reconnect/${cameraId}`);
     return response.data;
   }
 
   async reconnectAllCameras(): Promise<{ message: string; cameras: string[] }> {
-    const response = await this.client.post("/api/camera/reconnect-all");
+    const response = await this.client.post<{ message: string; cameras: string[] }>("/api/camera/reconnect-all");
     return response.data;
   }
 
-  // === Borrow (via gateway: /api/borrow/* -> borrow-service) ===
   async borrowBook(barcode: string): Promise<BorrowResponse> {
     const response = await this.client.post<BorrowResponse>("/api/borrow/", { barcode });
     return response.data;
   }
 
   async staffReturnBook(barcode: string, note?: string | null): Promise<ReturnResponse> {
-    const response = await this.client.post<ReturnResponse>("/api/borrow/staff-return", { barcode, note } as StaffReturnRequest);
+    const response = await this.client.post<ReturnResponse>("/api/borrow/return", { barcode, note } as StaffReturnRequest);
     return response.data;
   }
 
   async getActiveBorrowers(): Promise<StaffActiveBorrowersResponse> {
-    const response = await this.client.get<StaffActiveBorrowersResponse>("/api/borrow/staff/active-borrowers");
+    const response = await this.client.get<StaffActiveBorrowersResponse>("/api/borrow/active-borrowers");
     return response.data;
   }
 
   async getActiveBorrowsByStudentCode(studentCode: string): Promise<StaffPatronActiveBorrowsResponse> {
     const response = await this.client.get<StaffPatronActiveBorrowsResponse>(
-      `/api/borrow/staff/patrons/${encodeURIComponent(studentCode)}/active`
+      `/api/borrow/patrons/${encodeURIComponent(studentCode)}/active`
     );
     return response.data;
   }
 
   async staffReturnBorrowRecord(recordId: string, note?: string | null): Promise<ReturnResponse> {
-    const response = await this.client.post<ReturnResponse>(`/api/borrow/staff-return/record/${recordId}`, { note });
+    const response = await this.client.post<ReturnResponse>(`/api/borrow/return/record/${recordId}`, { note });
     return response.data;
   }
 
   async getBorrowStats(): Promise<{ total: number; active: number; overdue: number }> {
-    const response = await this.client.get("/api/borrow/staff/stats");
+    const response = await this.client.get("/api/borrow/stats");
     return response.data;
   }
 
@@ -911,7 +853,7 @@ async searchPatrons(
   }
 
   async getAllActiveBorrows(): Promise<BorrowRecord[]> {
-    const response = await this.client.get<BorrowRecord[]>("/api/borrow/staff/active");
+    const response = await this.client.get<BorrowRecord[]>("/api/borrow/active");
     return response.data;
   }
 
@@ -919,7 +861,7 @@ async searchPatrons(
     const query: any = {};
     if (params?.statusFilter) query.status_filter = params.statusFilter;
     const endpoint = params?.patronId
-      ? `/api/borrow/staff/patrons/id/${params.patronId}/history`
+      ? `/api/borrow/patrons/id/${params.patronId}/history`
       : "/api/borrow/history";
     const response = await this.client.get<BorrowRecord[]>(endpoint, { params: query });
     return response.data;
@@ -1037,29 +979,28 @@ async searchPatrons(
   }
 
   async createBorrowSlip(data: CreateBorrowSlipRequest): Promise<CreateBorrowSlipResponse> {
-    const response = await this.client.post<CreateBorrowSlipResponse>("/api/borrow/staff/slip/create", data);
+    const response = await this.client.post<CreateBorrowSlipResponse>("/api/borrow/slip/create", data);
     return response.data;
   }
 
   async lookupBorrowSlip(data: LookupBorrowSlipRequest): Promise<LookupBorrowSlipResponse> {
-    const response = await this.client.post<LookupBorrowSlipResponse>("/api/borrow/staff/slip/lookup", data);
+    const response = await this.client.post<LookupBorrowSlipResponse>("/api/borrow/slip/lookup", data);
     return response.data;
   }
 
   async confirmBorrowSlip(data: ConfirmBorrowSlipRequest): Promise<CreateBorrowSlipResponse> {
-    const response = await this.client.post<CreateBorrowSlipResponse>("/api/borrow/staff/slip/confirm", data);
+    const response = await this.client.post<CreateBorrowSlipResponse>("/api/borrow/slip/confirm", data);
     return response.data;
   }
 
   async getBarcodes(bookId?: string, availableOnly?: boolean): Promise<BookCopyData[]> {
     const params: any = {};
     if (bookId) params.book_id = bookId;
-    if (availableOnly) params.available_only = true;
-    const response = await this.client.get<BookCopyData[]>("/api/borrow/barcodes", { params: params });
+    if (availableOnly !== undefined) params.available_only = String(availableOnly);
+    const response = await this.client.get<BookCopyData[]>("/api/borrow/barcodes", { params });
     return response.data;
   }
 
-  // === Staff schedules ===
   async getScheduleStaffOptions(): Promise<ScheduleStaff[]> {
     const response = await this.client.get<ScheduleStaff[]>("/api/schedules/staff-options");
     return response.data;
@@ -1152,7 +1093,6 @@ async searchPatrons(
     return response.data;
   }
 
-  // === Geofence ===
   async getGeofenceConfigs(): Promise<Array<{ id: string; zoneId: string; latitude: number; longitude: number; radiusMeters: number; addressHint: string | null; isActive: boolean; zone: { id: string; zoneName: string; floor: number } | null }>> {
     const response = await this.client.get<any>("/api/schedules/geofence");
     return response.data;
@@ -1168,7 +1108,6 @@ async searchPatrons(
     return response.data;
   }
 
-  // === Admin Schedule Operations ===
   async adminConfirmAssignment(id: string): Promise<StaffScheduleAssignment> {
     const response = await this.client.post<StaffScheduleAssignment>(`/api/schedules/assignments/${id}/admin-confirm`);
     return response.data;
@@ -1254,25 +1193,28 @@ async searchPatrons(
     return response.data;
   }
 
-
-
   async getAICommandCenterSummary(): Promise<AICommandCenterSummary> {
     const response = await this.client.get<AICommandCenterSummary>("/api/ai/command-center/summary");
     return response.data;
   }
 
-  async refreshAiCommandCenter(): Promise<AICommandCenterSummary> {
-    const response = await this.client.post<AICommandCenterSummary>("/api/ai/command-center/refresh");
+  async refreshAiCommandCenter(): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/ai/command-center/refresh");
     return response.data;
   }
 
-  async getAIInsights(params?: { status?: string; category?: string; severity?: string }): Promise<AIInsightList> {
-    const response = await this.client.get<AIInsightList>("/api/ai/insights", { params });
+  async getAIInsights(params?: { type?: string; status?: string; skip?: number; limit?: number }): Promise<AIInsightList> {
+    const query: any = {};
+    if (params?.type) query.type = params.type;
+    if (params?.status) query.status = params.status;
+    if (params?.skip !== undefined) query.skip = params.skip;
+    if (params?.limit !== undefined) query.limit = params.limit;
+    const response = await this.client.get<AIInsightList>("/api/ai/insights", { params: query });
     return response.data;
   }
 
-  async dismissAIInsight(id: string): Promise<AIInsight> {
-    const response = await this.client.post<AIInsight>(`/api/ai/insights/${id}/dismiss`);
+  async dismissAIInsight(id: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>(`/api/ai/insights/${id}/dismiss`);
     return response.data;
   }
 
@@ -1286,32 +1228,15 @@ async searchPatrons(
     return response.data;
   }
 
-  async askAiChat(message: string, sessionId?: string): Promise<AIChatResponse> {
-    const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
-    const userData = storedUser ? JSON.parse(storedUser) : null;
-    const role = userData?.role || 'staff';
-
-    const endpoint = role === 'patron' ? '/api/ai/patrons/chat'
-                   : role === 'staff' ? '/api/ai/staff/chat'
-                   : '/api/ai/admin/chat';
-
-    const body: Record<string, any> = { message };
-    if (sessionId) body.sessionId = sessionId;
-
-    const response = await this.client.post(endpoint, body);
+  async askAiChat(message: string, sessionId?: string, role?: string): Promise<AIChatResponse> {
+    const r = role || "patron";
+    const response = await this.client.post<AIChatResponse>(`/api/ai/${r}/chat`, { message, session_id: sessionId });
     return response.data;
   }
 
-  async confirmAction(sessionId: string, action: 'approve' | 'reject', role?: string): Promise<AIConfirmResponse> {
-    const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
-    const userData = storedUser ? JSON.parse(storedUser) : null;
-    const effectiveRole = role || userData?.role || 'staff';
-
-    const endpoint = effectiveRole === 'patron' ? '/api/ai/patrons/confirm'
-                   : effectiveRole === 'staff' ? '/api/ai/staff/confirm'
-                   : '/api/ai/admin/confirm';
-
-    const response = await this.client.post(endpoint, { sessionId, action });
+  async confirmAction(sessionId: string, action: string, role?: string): Promise<AIConfirmResponse> {
+    const r = role || "patron";
+    const response = await this.client.post<AIConfirmResponse>(`/api/ai/${r}/confirm`, { session_id: sessionId, action });
     return response.data;
   }
 
@@ -1320,36 +1245,72 @@ async searchPatrons(
     return response.data;
   }
 
-  // === Notifications ===
-  async getNotifications(params?: { unread?: boolean; skip?: number; limit?: number }): Promise<NotificationListResponse> {
-    const query: Record<string, string> = {};
-    if (params?.unread !== undefined) query.unread = String(params.unread);
-    if (params?.skip !== undefined) query.skip = String(params.skip);
-    if (params?.limit !== undefined) query.limit = String(params.limit);
+  async getNotifications(params?: { unread_only?: boolean; skip?: number; limit?: number }): Promise<NotificationListResponse> {
+    const query: any = {};
+    if (params?.unread_only !== undefined) query.unread_only = String(params.unread_only);
+    if (params?.skip !== undefined) query.skip = params.skip;
+    if (params?.limit !== undefined) query.limit = params.limit;
     const response = await this.client.get<NotificationListResponse>("/api/notifications", { params: query });
     return response.data;
   }
 
-  async getUnreadCount(): Promise<number> {
+  async getUnreadCount(): Promise<{ count: number }> {
     const response = await this.client.get<{ count: number }>("/api/notifications/unread-count");
-    return response.data.count;
+    return response.data;
   }
 
-  async markNotificationAsRead(id: string): Promise<void> {
-    await this.client.put(`/api/notifications/${id}/read`);
+  async markNotificationAsRead(id: string): Promise<{ message: string }> {
+    const response = await this.client.put<{ message: string }>(`/api/notifications/${id}/read`);
+    return response.data;
   }
 
-  async markAllNotificationsAsRead(): Promise<void> {
-    await this.client.put("/api/notifications/read-all");
+  async markAllNotificationsAsRead(): Promise<{ message: string }> {
+    const response = await this.client.put<{ message: string }>("/api/notifications/read-all");
+    return response.data;
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/auth/forgot-password", { email });
+    return response.data;
+  }
+
+  async verifyResetCode(email: string, code: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/auth/verify-reset-code", { email, code });
+    return response.data;
+  }
+
+  async resetPassword(email: string, code: string, newPassword: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/auth/reset-password", { email, code, new_password: newPassword });
+    return response.data;
   }
 }
 
-export const api = new ApiClient();
-export default api;
+const api = new ApiClient();
 
-export function retryPendingRequests(token: string) {
+function retryPendingRequests(token: string) {
   api.retryPendingRequests(token);
 }
-export function cancelPendingRequests() {
+
+function cancelPendingRequests() {
   api.cancelPendingRequests();
 }
+
+export {
+  api,
+  ApiClient,
+  normalizeAccessLog,
+  setStoredAccessToken,
+  clearStoredAuth,
+  decodeJwtPayload,
+  isTokenExpiringSoon,
+  getCookieValue,
+  setAccessTokenCookie,
+  clearAccessTokenCookie,
+  getErrorMessage,
+  setApiAccessToken,
+  getApiAccessToken,
+  retryPendingRequests,
+  cancelPendingRequests,
+};
+
+export default api;

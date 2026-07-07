@@ -160,7 +160,7 @@ export default function ProfilePage() {
     if (!emailData.code) return showNotice("error", "Vui lòng nhập mã OTP");
     try {
       setEmailLoading(true);
-      await api.verifyAndChangeEmail({ new_email: emailData.new_email, code: emailData.code });
+      await api.verifyAndChangeEmail({ new_email: emailData.new_email, otp: emailData.code });
       showNotice("success", "Đổi email thành công!");
       setShowEmailModal(false);
       setEmailData({ new_email: "", code: "" });
