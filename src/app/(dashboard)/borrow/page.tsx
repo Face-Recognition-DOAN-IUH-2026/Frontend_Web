@@ -103,13 +103,11 @@ export default function BorrowPage() {
   }, []);
 
   useEffect(() => {
-    if (!patronId && patronCode.trim()) {
-      startWebcam();
-    } else if (patronId) {
+    if (patronId) {
       stopCamera();
     }
     return () => stopCamera();
-  }, [patronId, patronCode, startWebcam, stopCamera]);
+  }, [patronId, stopCamera]);
 
   // Handle SSE result for face verification
   useEffect(() => {
@@ -194,6 +192,37 @@ export default function BorrowPage() {
     setPatronCode("");
   };
 
+  const handleLookupAndOpenCamera = useCallback(async () => {
+    if (!patronCode.trim()) return;
+    setError("");
+    try {
+      const result = await api.lookupPatron(patronCode.trim());
+      if (!result.exists) {
+        setError("Không tìm thấy độc giả với MSSV này.");
+        return;
+      }
+      if (result.is_expired) {
+        setError("Thẻ độc giả đã hết hạn. Vui lòng gia hạn thẻ.");
+        return;
+      }
+      if (result.is_locked) {
+        setError("Thẻ độc giả đang bị khóa. Liên hệ quản trị viên.");
+        return;
+      }
+      if (result.patron?.status === "deleted") {
+        setError("Độc giả đã bị xóa. Không thể mượn sách.");
+        return;
+      }
+      if (result.patron?.status === "inactive") {
+        setError("Thẻ độc giả đang bị tạm khóa. Liên hệ quản trị viên.");
+        return;
+      }
+      startWebcam();
+    } catch (err: any) {
+      setError(getErrorMessage(err) || "Lỗi kiểm tra thông tin độc giả.");
+    }
+  }, [patronCode, startWebcam]);
+
   const faceVerifyDisabled = faceScanning || !patronCode.trim() || !!patronId;
 
   const subtitle = patronId
@@ -249,7 +278,7 @@ export default function BorrowPage() {
                 <Button
                   variant="contained"
                   fullWidth
-                  onClick={() => { if (!patronId) startWebcam(); }}
+                  onClick={handleLookupAndOpenCamera}
                   disabled={faceVerifyDisabled}
                   startIcon={<FaceIcon />}
                   sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)", "&:hover": { background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)", transform: "translateY(-1px)" }, transition: "all 0.2s" }}
