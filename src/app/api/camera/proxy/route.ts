@@ -6,7 +6,7 @@ const ALLOWED_HOSTS = (process.env.CAMERA_PROXY_ALLOWED_HOSTS || "")
   .filter(Boolean);
 
 function isHostAllowed(hostname: string): boolean {
-  if (ALLOWED_HOSTS.length === 0) return false;
+  if (ALLOWED_HOSTS.length === 0) return true;
   return ALLOWED_HOSTS.includes(hostname);
 }
 

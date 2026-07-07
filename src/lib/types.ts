@@ -165,6 +165,7 @@ export interface PatronPublic {
   issue_date: string | null;
   membership_expiry: string;
   status: string;
+  current_status: string | null;
   created_at: string;
   updated_at: string;
   has_face: boolean;
@@ -217,6 +218,15 @@ export interface BorrowRecord {
   shelf_location: string | null;
   status: string;
   note?: string | null;
+  returned_by_user_id?: string | null;
+  returned_by_email?: string | null;
+  return_method?: string | null;
+  slip_id?: string | null;
+  fine_amount?: number;
+  fine_paid?: boolean;
+  renewal_count?: number;
+  created_at?: string;
+  updated_at?: string;
   book?: BookInfo | null;
 }
 
@@ -308,6 +318,9 @@ export interface AccessLogPublic {
   camera_id: string;
   access_time: string;
   status: string;
+  image_url?: string | null;
+  event_id?: string | null;
+  source?: string | null;
 }
 
 export interface AccessLogList {
@@ -392,6 +405,11 @@ export interface BooksListResponse {
   total: number;
   skip: number;
   limit: number;
+  aggregateStats: {
+    totalCopies: number;
+    availableCopies: number;
+    borrowedCopies: number;
+  };
 }
 
 export interface BookCopyData {

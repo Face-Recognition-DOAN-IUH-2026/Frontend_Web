@@ -11,14 +11,16 @@ export function initials(name: string): string {
 }
 
 /** Format date as DD/MM/YYYY. */
-export function formatDate(date: string | Date): string {
+export function formatDate(date: string | Date | null | undefined): string {
+  if (date == null) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
   if (isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 /** Format datetime as DD/MM/YYYY HH:mm. */
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date | null | undefined): string {
+  if (date == null) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
   if (isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("vi-VN", {
@@ -31,7 +33,8 @@ export function formatDateTime(date: string | Date): string {
 }
 
 /** Format time as HH:mm. */
-export function formatTime(date: string | Date): string {
+export function formatTime(date: string | Date | null | undefined): string {
+  if (date == null) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
   if (isNaN(d.getTime())) return "-";
   return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
@@ -45,6 +48,7 @@ export function statusLabel(status: string): string {
     suspended: "Bị đình chỉ",
     unverified: "Chưa xác thực",
     deleted: "Đã xóa",
+    expired: "Hết hạn",
     outside: "Ở ngoài",
     inside: "Ở trong",
     borrowed: "Đang mượn",
@@ -65,6 +69,7 @@ export function statusColor(status: string): "success" | "error" | "warning" | "
     suspended: "error",
     unverified: "warning",
     deleted: "error",
+    expired: "warning",
     outside: "info",
     inside: "success",
     borrowed: "info",

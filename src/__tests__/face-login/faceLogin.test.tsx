@@ -127,6 +127,7 @@ describe("PatronFaceVerify Logic", () => {
         membership_expiry: "2025-12-31",
         created_at: "2024-01-01",
         updated_at: "2024-01-01",
+        current_status: "outside",
         course: null,
         permanent_address: null,
       },
@@ -160,6 +161,7 @@ describe("PatronFaceVerify Logic", () => {
         membership_expiry: "2025-12-31",
         created_at: "2024-01-01",
         updated_at: "2024-01-01",
+        current_status: "outside",
         course: null,
         permanent_address: null,
       },
@@ -360,7 +362,7 @@ describe("Gate Face Recognition Flow", () => {
     // Step 1: Lookup patron
     mockApi.kioskLookup.mockResolvedValueOnce({
       exists: true,
-      patron: { id: "p1", full_name: "Test", student_code: "STU001", has_face: true, status: "active", class_name: null, identity_number: null, email: null, phone: null, card_number: "C001", issue_date: null, membership_expiry: "2025-12-31", created_at: "2024-01-01", updated_at: "2024-01-01", course: null, permanent_address: null },
+      patron: { id: "p1", full_name: "Test", student_code: "STU001", has_face: true, status: "active", class_name: null, identity_number: null, email: null, phone: null, card_number: "C001", issue_date: null, membership_expiry: "2025-12-31", created_at: "2024-01-01", updated_at: "2024-01-01", current_status: "outside", course: null, permanent_address: null },
       has_face: true,
       is_expired: false,
       is_locked: false,

@@ -35,7 +35,6 @@ import notification from "antd/es/notification";
 import ConfirmDialog from "@/app/(dashboard)/_components/ui/ConfirmDialog";
 import PatronStatCards from "@/app/(dashboard)/_components/ui/PatronStatCards";
 import PatronToolbar from "@/app/(dashboard)/_components/ui/PatronToolbar";
-import PatronGridView from "@/app/(dashboard)/_components/ui/PatronGridView";
 import PatronListView from "@/app/(dashboard)/_components/ui/PatronListView";
 import PatronWizard from "@/app/(dashboard)/_components/ui/PatronWizard";
 import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
@@ -56,7 +55,6 @@ export default function PatronsPage() {
   const [patrons, setPatrons] = useState<PatronPublic[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterValue>("all");
-  const [view, setView] = useState<"grid" | "list">("grid");
   const [loading, setLoading] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
@@ -208,8 +206,6 @@ export default function PatronsPage() {
         onQueryChange={setQuery}
         filter={filter}
         onFilterChange={setFilter}
-        view={view}
-        onViewChange={setView}
         onAddPatron={() => setShowCreate(true)}
       />
 
@@ -220,14 +216,6 @@ export default function PatronsPage() {
           icon={<PeopleIcon sx={{ fontSize: 32 }} />}
           title="Không tìm thấy độc giả nào"
           action={<Button size="small" sx={{ textTransform: "none" }} onClick={() => { setQuery(""); setFilter("all"); }}>Xóa bộ lọc</Button>}
-        />
-      ) : view === "grid" ? (
-        <PatronGridView
-          patrons={filtered}
-          onEdit={openEdit}
-          onRenew={(p) => { setRenewTarget(p); setRenewMonths(12); }}
-          onDelete={(p) => { setDeleteTarget(p); setDeleteConfirmText(""); }}
-          onRestore={(p) => { setRestoreTarget(p); setRestoreConfirmText(""); }}
         />
       ) : (
         <PatronListView
