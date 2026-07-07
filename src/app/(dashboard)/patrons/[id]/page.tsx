@@ -16,34 +16,43 @@ import {
   Grid,
   LinearProgress,
   MenuItem,
+  Paper,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
 import AutoStoriesOutlinedIcon from "@mui/icons-material/AutoStoriesOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import CalendarTodayIcon from "@mui/icons-material/CalendarTodayOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import MailIcon from "@mui/icons-material/MailOutlined";
+import PhoneIcon from "@mui/icons-material/PhoneOutlined";
+import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import UpdateOutlinedIcon from "@mui/icons-material/UpdateOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
+import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
+import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import MultiAngleCapture from "@/app/(dashboard)/_components/MultiAngleCapture";
-import { slideInRight } from "@/lib/animations";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { initials, formatDate, formatDateTime, statusLabel, statusColor } from "@/lib/utils";
 import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
 import type { CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
 
@@ -54,36 +63,27 @@ const CAMERA_LABELS: Record<string, string> = {
   web_login: "Đăng nhập web",
 };
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("vi-VN");
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("vi-VN");
-}
-
-function statusLabel(status: string) {
-  if (status === "active") return "Đang hoạt động";
-  if (status === "inactive") return "Tạm khóa";
-  if (status === "expired") return "Hết hạn";
-  if (status === "deleted") return "Đã xóa";
-  return status;
-}
-
 function borrowStatus(record: BorrowRecord) {
   const overdue = record.status === "borrowed" && new Date(record.due_at) < new Date();
   if (record.status === "returned") return { label: "Đã trả", color: "default" as const };
   if (overdue) return { label: "Quá hạn", color: "error" as const };
   return { label: "Đang mượn", color: "success" as const };
+}
+
+function MetaRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", py: 1 }}>
+      <Box sx={{ color: "text.secondary", mt: 0.3, minWidth: 20 }}>{icon}</Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
+          {label}
+        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: "break-word" }}>
+          {value || "-"}
+        </Typography>
+      </Box>
+    </Stack>
+  );
 }
 
 export default function PatronDetailPage() {
@@ -98,6 +98,7 @@ export default function PatronDetailPage() {
   const [logsSkip, setLogsSkip] = useState(0);
   const logsLimit = 20;
   const [borrows, setBorrows] = useState<BorrowRecord[]>([]);
+  const [tab, setTab] = useState(0);
 
   const [editForm, setEditForm] = useState<PatronUpdate>({});
   const [showEdit, setShowEdit] = useState(false);
@@ -110,7 +111,6 @@ export default function PatronDetailPage() {
   const [enrollError, setEnrollError] = useState("");
   const [enrollSuccess, setEnrollSuccess] = useState("");
   const [enrollLoading, setEnrollLoading] = useState(false);
-  const [notice, setNotice] = useState("");
 
   const loadPatron = useCallback(async () => {
     try {
@@ -174,8 +174,8 @@ export default function PatronDetailPage() {
 
   const handleRenew = async () => {
     if (!patron) return;
-    const current = new Date(patron.membership_expiry);
-    const next = new Date(current);
+    const next = new Date(patron.membership_expiry);
+    if (next < new Date()) next.setTime(Date.now());
     next.setFullYear(next.getFullYear() + 1);
     await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
     apiAnt.success({ message: "Đã gia hạn thẻ thêm 1 năm.", placement: "topRight" });
@@ -241,11 +241,10 @@ export default function PatronDetailPage() {
     }
   };
 
-  const pageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
-  const currentPage = Math.floor(logsSkip / logsLimit) + 1;
+  const logsPageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
+  const logsCurrentPage = Math.floor(logsSkip / logsLimit) + 1;
   const activeBorrowCount = useMemo(() => borrows.filter((item) => item.status === "borrowed").length, [borrows]);
   const overdueCount = useMemo(() => borrows.filter((item) => item.status === "borrowed" && new Date(item.due_at) < new Date()).length, [borrows]);
-
   const expired = !patron ? false : new Date(patron.membership_expiry) < new Date();
 
   const headerActions = patron ? (
@@ -256,10 +255,10 @@ export default function PatronDetailPage() {
     ) : (
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
         <Button variant="outlined" startIcon={<EditOutlinedIcon />} onClick={openEdit}>
-          Sửa thông tin
+          Sửa
         </Button>
         <Button variant="outlined" startIcon={<UpdateOutlinedIcon />} onClick={handleRenew}>
-          Gia hạn thẻ
+          Gia hạn
         </Button>
         {!patron.has_face ? (
           <Button variant="contained" startIcon={<FaceRetouchingNaturalOutlinedIcon />} onClick={() => setShowEnroll(true)}>
@@ -291,231 +290,282 @@ export default function PatronDetailPage() {
           <PageHeader
             backHref="/patrons"
             title={patron.full_name}
-            subtitle={`MSSV: ${patron.student_code} · Mã thẻ: ${patron.card_number}`}
+            subtitle={`MSSV: ${patron.student_code} · Mã thẻ: ${patron.card_number || "-"}`}
             icon={PersonIcon}
             actions={headerActions}
           />
 
-          {patron.status === "deleted" ? (
-            <Alert severity="error" sx={{ fontWeight: 600 }}>
-              Độc giả này đã bị xóa. Dữ liệu sẽ được giữ lại và có thể khôi phục.
-            </Alert>
-          ) : null}
-          {patron.status === "inactive" ? (
-            <Alert severity="warning" sx={{ fontWeight: 600 }}>
-              Thẻ độc giả đang bị tạm khóa.
-            </Alert>
-          ) : null}
-          {patron.status === "expired" ? (
-            <Alert severity="warning" sx={{ fontWeight: 600 }}>
-              Thẻ độc giả đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.
-            </Alert>
-          ) : null}
+          {patron.status === "deleted" && <Alert severity="error" sx={{ fontWeight: 600 }}>Độc giả này đã bị xóa. Dữ liệu sẽ được giữ lại và có thể khôi phục.</Alert>}
+          {patron.status === "inactive" && <Alert severity="warning" sx={{ fontWeight: 600 }}>Thẻ độc giả đang bị tạm khóa.</Alert>}
+          {patron.status === "expired" && <Alert severity="warning" sx={{ fontWeight: 600 }}>Thẻ độc giả đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.</Alert>}
+          {enrollSuccess && <Alert severity="success">{enrollSuccess}</Alert>}
 
-          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-            <Chip
-              color={patron.status === "active" ? "success" : patron.status === "deleted" ? "error" : "warning"}
-              label={statusLabel(patron.status)}
-            />
-            <Chip color={patron.has_face ? "success" : "default"} icon={<FaceRetouchingNaturalOutlinedIcon />} label={patron.has_face ? "Đã có khuôn mặt" : "Chưa có khuôn mặt"} />
-            <Chip color={expired ? "error" : "primary"} icon={<EventAvailableOutlinedIcon />} label={`Hạn thẻ: ${formatDate(patron.membership_expiry)}`} />
-          </Stack>
+          <Grid container spacing={3}>
+            {/* Left column — Profile card */}
+            <Grid size={{ xs: 12, md: 4 }} sx={staggerSx(0)}>
+              <DashboardCard noPadding>
+                <Box
+                  sx={{
+                    height: 100,
+                    background: patron.status === "active"
+                      ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                      : patron.status === "expired"
+                        ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                        : "linear-gradient(135deg, #64748b 0%, #475569 100%)",
+                  }}
+                />
+                <Box sx={{ px: 2.5, pb: 2.5, mt: -5, textAlign: "center" }}>
+                  <Avatar
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      mx: "auto",
+                      bgcolor: patron.status === "active" ? "rgba(16,185,129,0.15)" : "rgba(100,116,139,0.15)",
+                      color: patron.status === "active" ? "success.main" : "text.secondary",
+                      fontWeight: 700,
+                      fontSize: 28,
+                      border: "4px solid",
+                      borderColor: "background.paper",
+                      boxShadow: 2,
+                    }}
+                  >
+                    {initials(patron.full_name)}
+                  </Avatar>
 
-          {enrollSuccess ? <Alert severity="success">{enrollSuccess}</Alert> : null}
+                  <Typography variant="h6" sx={{ fontWeight: 800, mt: 1.5 }}>{patron.full_name}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>{patron.student_code}</Typography>
 
-          <Grid container spacing={2}>
-            {[
-              { label: "Đang mượn", value: activeBorrowCount, icon: <AutoStoriesOutlinedIcon />, color: "primary.main" },
-              { label: "Quá hạn", value: overdueCount, icon: <EventAvailableOutlinedIcon />, color: "error.main" },
-              { label: "Lượt ra/vào", value: logsTotal, icon: <HistoryOutlinedIcon />, color: "success.main" },
-            ].map((item, idx) => (
-              <Grid key={item.label} size={{ xs: 12, sm: 4 }} sx={staggerSx(idx)}>
-                <DashboardCard>
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                    <Avatar sx={{ bgcolor: "action.hover", color: item.color }}>{item.icon}</Avatar>
-                    <Box>
-                      <Typography color="text.secondary" variant="body2">{item.label}</Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 850 }}>{item.value}</Typography>
-                    </Box>
+                  <Stack direction="row" spacing={0.75} sx={{ justifyContent: "center", mt: 1.5, flexWrap: "wrap", gap: 0.5 }}>
+                    <Chip label={statusLabel(patron.status)} color={statusColor(patron.status)} size="small" sx={{ fontWeight: 600 }} />
+                    <Chip
+                      icon={<FaceRetouchingNaturalOutlinedIcon sx={{ fontSize: "16px !important" }} />}
+                      label={patron.has_face ? "Đã có khuôn mặt" : "Chưa có khuôn mặt"}
+                      color={patron.has_face ? "success" : "default"}
+                      size="small"
+                      variant="outlined"
+                    />
                   </Stack>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  <Stack spacing={0}>
+                    <MetaRow icon={<SchoolIcon fontSize="small" />} label="Khóa học" value={patron.course} />
+                    <MetaRow icon={<BadgeOutlinedIcon fontSize="small" />} label="Lớp" value={patron.class_name} />
+                    <MetaRow icon={<CalendarTodayIcon fontSize="small" />} label="Hạn thẻ" value={
+                      <span style={{ color: expired ? "#d32f2f" : undefined, fontWeight: 700 }}>
+                        {formatDate(patron.membership_expiry)}{expired ? " (Hết hạn)" : ""}
+                      </span>
+                    } />
+                    <MetaRow icon={<MailIcon fontSize="small" />} label="Email" value={patron.email} />
+                    <MetaRow icon={<PhoneIcon fontSize="small" />} label="Số điện thoại" value={patron.phone} />
+                    <MetaRow icon={<LocationOnIcon fontSize="small" />} label="HKTT" value={patron.permanent_address} />
+                  </Stack>
+                </Box>
+              </DashboardCard>
+            </Grid>
+
+            {/* Right column — Tabs */}
+            <Grid size={{ xs: 12, md: 8 }} sx={staggerSx(1)}>
+              <Stack spacing={3}>
+                {/* Stats row */}
+                <Stack direction="row" spacing={1.5}>
+                  {[
+                    { label: "Đang mượn", value: activeBorrowCount, color: "info" as const, icon: <AutoStoriesOutlinedIcon fontSize="small" /> },
+                    { label: "Quá hạn", value: overdueCount, color: "error" as const, icon: <EventAvailableOutlinedIcon fontSize="small" /> },
+                    { label: "Lượt ra/vào", value: logsTotal, color: "success" as const, icon: <HistoryOutlinedIcon fontSize="small" /> },
+                  ].map((item, idx) => (
+                    <Paper key={item.label} variant="outlined" sx={{
+                      flex: 1,
+                      p: 1.5,
+                      textAlign: "center",
+                      borderColor: `${item.color}.main`,
+                      borderRadius: 2,
+                      background: item.color === "info" ? "rgba(2,136,209,0.08)" : item.color === "error" ? "rgba(211,47,47,0.08)" : "rgba(46,125,50,0.08)",
+                      ...staggerSx(idx),
+                    }}>
+                      <Box sx={{ color: `${item.color}.main`, mb: 0.5 }}>{item.icon}</Box>
+                      <Typography variant="h5" sx={{ fontWeight: 900, color: `${item.color}.main` }}>{item.value}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>{item.label}</Typography>
+                    </Paper>
+                  ))}
+                </Stack>
+
+                {/* Tabs */}
+                <DashboardCard noPadding>
+                  <Box sx={{ borderBottom: 1, borderColor: "divider", px: 2.5 }}>
+                    <Tabs value={tab} onChange={(_, v) => setTab(v)}>
+                      <Tab label="Thông tin chi tiết" />
+                      <Tab label={`Lịch sử mượn (${borrows.length})`} />
+                      <Tab label={`Lịch sử ra/vào (${logsTotal})`} />
+                    </Tabs>
+                  </Box>
+
+                  {/* Tab 0: Info detail */}
+                  {tab === 0 && (
+                    <Box sx={{ p: 2.5 }}>
+                      <Grid container spacing={0.5}>
+                        {[
+                          { label: "Họ tên", value: patron.full_name, icon: <PersonIcon fontSize="small" /> },
+                          { label: "MSSV", value: patron.student_code, icon: <BadgeOutlinedIcon fontSize="small" /> },
+                          { label: "Lớp", value: patron.class_name, icon: <SchoolIcon fontSize="small" /> },
+                          { label: "Khóa học", value: patron.course, icon: <SchoolIcon fontSize="small" /> },
+                          { label: "Mã thẻ", value: patron.card_number, icon: <BadgeOutlinedIcon fontSize="small" /> },
+                          { label: "CCCD/CMND", value: patron.identity_number, icon: <BadgeOutlinedIcon fontSize="small" /> },
+                          { label: "Email", value: patron.email, icon: <MailIcon fontSize="small" /> },
+                          { label: "Số điện thoại", value: patron.phone, icon: <PhoneIcon fontSize="small" /> },
+                          { label: "HKTT", value: patron.permanent_address, icon: <LocationOnIcon fontSize="small" /> },
+                          { label: "Ngày cấp thẻ", value: formatDate(patron.issue_date), icon: <CalendarTodayIcon fontSize="small" /> },
+                          { label: "Ngày tạo", value: formatDateTime(patron.created_at), icon: <CalendarTodayIcon fontSize="small" /> },
+                        ].map((item) => (
+                          <Grid key={item.label} size={{ xs: 12, sm: 6 }}>
+                            <MetaRow icon={item.icon} label={item.label} value={item.value} />
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
+                  )}
+
+                  {/* Tab 1: Borrow history */}
+                  {tab === 1 && (
+                    <Box>
+                      {borrows.length === 0 ? (
+                        <Alert severity="info" sx={{ m: 2 }}>Độc giả này chưa mượn cuốn sách nào.</Alert>
+                      ) : (
+                        <TableContainer sx={{ overflowX: "auto" }}>
+                          <Table sx={{ minWidth: 700 }} size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Sách</TableCell>
+                                <TableCell>Mượn</TableCell>
+                                <TableCell>Hạn trả</TableCell>
+                                <TableCell>Trả</TableCell>
+                                <TableCell>Trạng thái</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {borrows.map((record) => {
+                                const status = borrowStatus(record);
+                                return (
+                                  <TableRow key={record.id} hover>
+                                    <TableCell>
+                                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{record.book?.title || record.book_id}</Typography>
+                                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{record.book?.isbn || ""}</Typography>
+                                    </TableCell>
+                                    <TableCell>{formatDate(record.borrow_at)}</TableCell>
+                                    <TableCell sx={{ color: status.color === "error" ? "error.main" : "inherit", fontWeight: status.color === "error" ? 800 : 400 }}>
+                                      {formatDate(record.due_at)}
+                                    </TableCell>
+                                    <TableCell>{formatDate(record.return_at)}</TableCell>
+                                    <TableCell><Chip size="small" color={status.color} label={status.label} /></TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+                    </Box>
+                  )}
+
+                  {/* Tab 2: Access logs */}
+                  {tab === 2 && (
+                    <Box>
+                      {logs.length === 0 ? (
+                        <Alert severity="info" sx={{ m: 2 }}>Chưa có lịch sử ra/vào.</Alert>
+                      ) : (
+                        <>
+                          <TableContainer sx={{ overflowX: "auto" }}>
+                            <Table sx={{ minWidth: 700 }} size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Thời gian</TableCell>
+                                  <TableCell>Loại</TableCell>
+                                  <TableCell>Cổng</TableCell>
+                                  <TableCell>Phương thức</TableCell>
+                                  <TableCell>Độ tin cậy</TableCell>
+                                  <TableCell>Kết quả</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {logs.map((log) => {
+                                  const confidence = log.confidence == null ? null : Math.round(log.confidence * 100);
+                                  return (
+                                    <TableRow key={log.id} hover>
+                                      <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDateTime(log.access_time)}</TableCell>
+                                      <TableCell>
+                                        <Chip size="small" color={log.access_type === "entry" ? "success" : "warning"} label={log.access_type === "entry" ? "Vào" : "Ra"} />
+                                      </TableCell>
+                                      <TableCell>{CAMERA_LABELS[log.camera_id] || log.camera_id}</TableCell>
+                                      <TableCell>{log.verify_method}</TableCell>
+                                      <TableCell sx={{ minWidth: 120 }}>
+                                        {confidence == null ? (
+                                          <Typography color="text.secondary">-</Typography>
+                                        ) : (
+                                          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                                            <LinearProgress
+                                              variant="determinate"
+                                              value={confidence}
+                                              color={confidence >= 80 ? "success" : confidence >= 60 ? "warning" : "error"}
+                                              sx={{ width: 60, height: 6, borderRadius: 99 }}
+                                            />
+                                            <Typography variant="caption" color="text.secondary">{confidence}%</Typography>
+                                          </Stack>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Chip size="small" color={["success", "granted"].includes(log.status) ? "success" : "error"} label={["success", "granted"].includes(log.status) ? "Thành công" : "Thất bại"} />
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                          {logsTotal > logsLimit && (
+                            <Stack direction="row" spacing={1} sx={{ p: 2, alignItems: "center", justifyContent: "space-between" }}>
+                              <Typography color="text.secondary">Tổng: {logsTotal}</Typography>
+                              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                                <Button variant="outlined" size="small" disabled={logsCurrentPage <= 1} onClick={() => setLogsSkip(0)}>Đầu</Button>
+                                <Typography color="text.secondary" variant="body2">Trang {logsCurrentPage}/{logsPageCount}</Typography>
+                                <Button variant="outlined" size="small" disabled={logsCurrentPage >= logsPageCount} onClick={() => setLogsSkip((logsPageCount - 1) * logsLimit)}>Cuối</Button>
+                              </Stack>
+                            </Stack>
+                          )}
+                        </>
+                      )}
+                    </Box>
+                  )}
                 </DashboardCard>
-              </Grid>
-            ))}
+              </Stack>
+            </Grid>
           </Grid>
 
-          <DashboardCard title="Thông tin thẻ">
-            <Grid container spacing={2}>
-              {[
-                ["Họ tên", patron.full_name],
-                ["MSSV", patron.student_code],
-                ["Lớp", patron.class_name || "-"],
-                ["Khóa học", patron.course || "-"],
-                ["Mã thẻ", patron.card_number],
-                ["CCCD/CMND", patron.identity_number || "-"],
-                ["Email", patron.email || "-"],
-                ["Số điện thoại", patron.phone || "-"],
-                ["HKTT", patron.permanent_address || "-"],
-                ["Ngày cấp thẻ", formatDate(patron.issue_date)],
-                ["Ngày tạo", formatDateTime(patron.created_at)],
-              ].map(([label, value]) => (
-                <Grid key={label} size={{ xs: 12, sm: 6, lg: 4 }}>
-                  <Typography variant="caption" color="text.secondary">{label}</Typography>
-                  <Typography sx={{ fontWeight: 700, wordBreak: "break-word" }}>{value}</Typography>
-                </Grid>
-              ))}
-            </Grid>
-          </DashboardCard>
-
-          <DashboardCard title="Lịch sử mượn sách" subtitle="Các bản ghi mượn/trả của độc giả này" noPadding>
-            {borrows.length === 0 ? (
-              <Alert severity="info" sx={{ m: 2 }}>Độc giả này chưa mượn cuốn sách nào.</Alert>
-            ) : (
-          <TableContainer sx={{ overflowX: "auto" }}>
-          <Table sx={{ minWidth: 760 }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Sách</TableCell>
-                      <TableCell>Ngày mượn</TableCell>
-                      <TableCell>Hạn trả</TableCell>
-                      <TableCell>Ngày trả</TableCell>
-                      <TableCell>Tình trạng</TableCell>
-                      <TableCell>Trạng thái</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {borrows.map((record, idx) => {
-                      const status = borrowStatus(record);
-                      return (
-                        <TableRow key={record.id} hover sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.04}s`, animationFillMode: "both" }}>
-                          <TableCell>
-                            <Typography sx={{ fontWeight: 750 }}>{record.book?.title || record.book_id}</Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-                              {record.book?.isbn || record.book_id}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>{formatDate(record.borrow_at)}</TableCell>
-                          <TableCell sx={{ color: status.color === "error" ? "error.main" : "inherit", fontWeight: status.color === "error" ? 800 : 400 }}>
-                            {formatDate(record.due_at)}
-                          </TableCell>
-                          <TableCell>{formatDate(record.return_at)}</TableCell>
-                          <TableCell>
-                            {record.status === "returned" && record.note ? (
-                              <Chip size="small" variant="outlined" label={record.note} sx={{ fontSize: 11 }} />
-                            ) : (
-                              <Typography variant="body2" color="text.disabled">-</Typography>
-                            )}
-                          </TableCell>
-                          <TableCell><Chip size="small" color={status.color} label={status.label} /></TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </DashboardCard>
-
-          {showEnroll && !patron.has_face ? (
+          {/* Face enrollment */}
+          {showEnroll && !patron.has_face && (
             <DashboardCard
               title="Đăng ký khuôn mặt 4 góc"
               subtitle="Chụp đủ các góc để tăng độ chính xác khi nhận diện."
-              actions={
-                <Button onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}>
-                  Đóng
-                </Button>
-              }
+              actions={<Button onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}>Đóng</Button>}
             >
               <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleEnroll} />
-              {enrollError ? <Alert severity="error" sx={{ mt: 2 }}>{enrollError}</Alert> : null}
-              {enrollLoading ? <Alert severity="info" sx={{ mt: 2 }}>Đang đăng ký khuôn mặt...</Alert> : null}
+              {enrollError && <Alert severity="error" sx={{ mt: 2 }}>{enrollError}</Alert>}
+              {enrollLoading && <Alert severity="info" sx={{ mt: 2 }}>Đang đăng ký khuôn mặt...</Alert>}
             </DashboardCard>
-          ) : null}
+          )}
 
-          <DashboardCard title="Lịch sử ra/vào" subtitle="Các lần hệ thống ghi nhận độc giả tại cổng/kiosk" noPadding>
-            {logs.length === 0 ? (
-              <Alert severity="info" sx={{ m: 2 }}>Chưa có lịch sử ra/vào.</Alert>
-            ) : (
-              <>
-        <TableContainer sx={{ overflowX: "auto" }}>
-        <Table sx={{ minWidth: 900 }}>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Thời gian</TableCell>
-                        <TableCell>Loại</TableCell>
-                        <TableCell>Cổng</TableCell>
-                        <TableCell>Phương thức</TableCell>
-                        <TableCell>Độ tin cậy</TableCell>
-                        <TableCell>Kết quả</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {logs.map((log, idx) => {
-                        const confidence = log.confidence == null ? null : Math.round(log.confidence * 100);
-                        return (
-                          <TableRow key={log.id} hover sx={{ animation: `${slideInRight} 0.3s ease-out`, animationDelay: `${idx * 0.03}s`, animationFillMode: "both" }}>
-                            <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDateTime(log.access_time)}</TableCell>
-                            <TableCell>
-                              <Chip size="small" color={log.access_type === "entry" ? "success" : "warning"} label={log.access_type === "entry" ? "Vào" : "Ra"} />
-                            </TableCell>
-                            <TableCell sx={{ color: "text.secondary" }}>{CAMERA_LABELS[log.camera_id] || log.camera_id}</TableCell>
-                            <TableCell sx={{ color: "text.secondary" }}>{log.verify_method}</TableCell>
-                            <TableCell sx={{ minWidth: 150 }}>
-                              {confidence == null ? (
-                                <Typography color="text.secondary">-</Typography>
-                              ) : (
-                                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                                  <LinearProgress
-                                    variant="determinate"
-                                    value={confidence}
-                                    color={confidence >= 80 ? "success" : confidence >= 60 ? "warning" : "error"}
-                                    sx={{ width: 84, height: 7, borderRadius: 99 }}
-                                  />
-                                  <Typography variant="caption" color="text.secondary">{confidence}%</Typography>
-                                </Stack>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Chip size="small" color={["success", "granted"].includes(log.status) ? "success" : "error"} label={["success", "granted"].includes(log.status) ? "Thành công" : "Thất bại"} />
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                {logsTotal > logsLimit ? (
-                  <Stack direction="row" spacing={1} sx={{ p: 2, alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography color="text.secondary">Tổng: {logsTotal}</Typography>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                      <Button variant="outlined" disabled={currentPage <= 1} onClick={() => setLogsSkip(0)}>Đầu</Button>
-                      <Typography color="text.secondary">Trang {currentPage} / {pageCount}</Typography>
-                      <Button variant="outlined" disabled={currentPage >= pageCount} onClick={() => setLogsSkip((pageCount - 1) * logsLimit)}>Cuối</Button>
-                    </Stack>
-                  </Stack>
-                ) : null}
-              </>
-            )}
-          </DashboardCard>
-
+          {/* Edit dialog */}
           <Dialog open={showEdit} onClose={() => setShowEdit(false)} fullWidth maxWidth="sm">
             <DialogTitle>Sửa độc giả</DialogTitle>
             <DialogContent>
               <Stack spacing={2} sx={{ pt: 1 }}>
-                <TextField label="Họ tên" value={editForm.full_name || ""} onChange={(event) => setEditForm({ ...editForm, full_name: event.target.value })} fullWidth />
-                <TextField label="Lớp" value={editForm.class_name || ""} onChange={(event) => setEditForm({ ...editForm, class_name: event.target.value })} fullWidth />
-                <TextField label="CCCD/CMND" value={editForm.identity_number || ""} onChange={(event) => setEditForm({ ...editForm, identity_number: event.target.value })} fullWidth />
-                <TextField label="Email" value={editForm.email || ""} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} fullWidth />
-                <TextField label="Số điện thoại" value={editForm.phone || ""} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} fullWidth />
-                <TextField label="Khóa học" value={editForm.course || ""} onChange={(event) => setEditForm({ ...editForm, course: event.target.value })} fullWidth />
-                <TextField
-                  label="Hạn thẻ"
-                  type="date"
-                  value={editForm.membership_expiry || ""}
-                  onChange={(event) => setEditForm({ ...editForm, membership_expiry: event.target.value })}
-                  fullWidth
-                  slotProps={{ inputLabel: { shrink: true } }}
-                />
-                <TextField select label="Trạng thái" value={editForm.status || "active"} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} fullWidth>
+                <TextField label="Họ tên" value={editForm.full_name || ""} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} fullWidth />
+                <TextField label="Lớp" value={editForm.class_name || ""} onChange={(e) => setEditForm({ ...editForm, class_name: e.target.value })} fullWidth />
+                <TextField label="Khóa học" value={editForm.course || ""} onChange={(e) => setEditForm({ ...editForm, course: e.target.value })} fullWidth />
+                <TextField label="CCCD/CMND" value={editForm.identity_number || ""} onChange={(e) => setEditForm({ ...editForm, identity_number: e.target.value })} fullWidth />
+                <TextField label="Email" value={editForm.email || ""} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} fullWidth />
+                <TextField label="Số điện thoại" value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} fullWidth />
+                <TextField label="Hạn thẻ" type="date" value={editForm.membership_expiry || ""} onChange={(e) => setEditForm({ ...editForm, membership_expiry: e.target.value })} fullWidth slotProps={{ inputLabel: { shrink: true } }} />
+                <TextField select label="Trạng thái" value={editForm.status || "active"} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} fullWidth>
                   <MenuItem value="active">Đang hoạt động</MenuItem>
                   <MenuItem value="inactive">Tạm khóa</MenuItem>
                   <MenuItem value="expired">Hết hạn</MenuItem>
@@ -528,34 +578,27 @@ export default function PatronDetailPage() {
             </DialogActions>
           </Dialog>
 
+          {/* Delete dialog */}
           <Dialog open={showDelete} onClose={() => { setShowDelete(false); setDeleteConfirmText(""); }} fullWidth maxWidth="xs">
             <DialogTitle>Xóa độc giả?</DialogTitle>
             <DialogContent>
               <Stack spacing={2}>
                 <Typography color="text.secondary">
-                  Hồ sơ <strong>{patron.full_name}</strong> sẽ bị xóa khỏi danh sách độc giả. Dữ liệu liên quan (thông báo, lịch trực) cũng sẽ bị xóa.
+                  Hồ sơ <strong>{patron.full_name}</strong> sẽ bị xóa khỏi danh sách độc giả.
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Nhập <strong>XÓA</strong> để xác nhận:
                 </Typography>
-                <TextField
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  placeholder="Nhập XÓA"
-                  size="small"
-                  autoFocus
-                  fullWidth
-                />
+                <TextField value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} placeholder="Nhập XÓA" size="small" autoFocus fullWidth />
               </Stack>
             </DialogContent>
             <DialogActions>
               <Button onClick={() => { setShowDelete(false); setDeleteConfirmText(""); }}>Hủy</Button>
-              <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>
-                Xóa vĩnh viễn
-              </Button>
+              <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>Xóa vĩnh viễn</Button>
             </DialogActions>
           </Dialog>
 
+          {/* Restore dialog */}
           <Dialog open={showRestore} onClose={() => { setShowRestore(false); setRestoreConfirmText(""); }} fullWidth maxWidth="xs">
             <DialogTitle>Khôi phục độc giả?</DialogTitle>
             <DialogContent>
@@ -566,21 +609,12 @@ export default function PatronDetailPage() {
                 <Typography variant="body2" color="text.secondary">
                   Nhập <strong>KHÔI PHỤC</strong> để xác nhận:
                 </Typography>
-                <TextField
-                  value={restoreConfirmText}
-                  onChange={(e) => setRestoreConfirmText(e.target.value)}
-                  placeholder="Nhập KHÔI PHỤC"
-                  size="small"
-                  autoFocus
-                  fullWidth
-                />
+                <TextField value={restoreConfirmText} onChange={(e) => setRestoreConfirmText(e.target.value)} placeholder="Nhập KHÔI PHỤC" size="small" autoFocus fullWidth />
               </Stack>
             </DialogContent>
             <DialogActions>
               <Button onClick={() => { setShowRestore(false); setRestoreConfirmText(""); }}>Hủy</Button>
-              <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC"}>
-                Khôi phục
-              </Button>
+              <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC"}>Khôi phục</Button>
             </DialogActions>
           </Dialog>
 

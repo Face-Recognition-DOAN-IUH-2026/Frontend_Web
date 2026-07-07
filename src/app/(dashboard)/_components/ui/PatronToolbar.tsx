@@ -1,9 +1,8 @@
 "use client";
 
-import { Box, Button, ToggleButton, ToggleButtonGroup, alpha } from "@mui/material";
+import { Box, Button, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import AddIcon from "@mui/icons-material/AddOutlined";
 import SearchField from "./SearchField";
-import ViewToggle from "./ViewToggle";
 import type { FilterValue } from "@/app/(dashboard)/patrons/page";
 
 interface PatronToolbarProps {
@@ -11,8 +10,6 @@ interface PatronToolbarProps {
   onQueryChange: (q: string) => void;
   filter: FilterValue;
   onFilterChange: (f: FilterValue) => void;
-  view: "grid" | "list";
-  onViewChange: (v: "grid" | "list") => void;
   onAddPatron: () => void;
 }
 
@@ -26,7 +23,7 @@ const FILTERS: { value: FilterValue; label: string }[] = [
   { value: "deleted", label: "Đã xóa" },
 ];
 
-export default function PatronToolbar({ query, onQueryChange, filter, onFilterChange, view, onViewChange, onAddPatron }: PatronToolbarProps) {
+export default function PatronToolbar({ query, onQueryChange, filter, onFilterChange, onAddPatron }: PatronToolbarProps) {
   return (
     <Box
       sx={{
@@ -81,8 +78,6 @@ export default function PatronToolbar({ query, onQueryChange, filter, onFilterCh
           <ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>
         ))}
       </ToggleButtonGroup>
-
-      <ViewToggle value={view} onChange={onViewChange} />
 
       <Button
         variant="contained"

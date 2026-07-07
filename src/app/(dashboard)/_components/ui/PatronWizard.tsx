@@ -132,7 +132,7 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
   const handleSkipFace = async () => {
     setSubmitting(true);
     try {
-      const values = form.getFieldsValue();
+      const values = await form.validateFields();
       const patron = await api.createPatron({
         full_name: values.fullName,
         student_code: values.studentCode,
@@ -150,10 +150,11 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
       onComplete();
     } catch (err: any) {
       if (err?.response?.status === 409) {
-        apiAnt.error({ message: "Trùng dữ liệu", description: "MSSV hoặc mã thẻ đã tồn tại trong hệ thống." });
-      } else {
-        apiAnt.error({ message: "Lỗi tạo độc giả", description: getErrorMessage(err) || "Vui lòng thử lại." });
+        apiAnt.error({ title: "Trùng dữ liệu", description: "MSSV hoặc mã thẻ đã tồn tại trong hệ thống." });
+      } else if (err?.response) {
+        apiAnt.error({ title: "Lỗi tạo độc giả", description: getErrorMessage(err) || "Vui lòng thử lại." });
       }
+      // else: validation error — AntD Form shows inline errors
     } finally {
       setSubmitting(false);
     }
@@ -162,7 +163,7 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
   const handleFaceReady = async (files: Record<CaptureAngle, File>) => {
     setSubmitting(true);
     try {
-      const values = form.getFieldsValue();
+      const values = await form.validateFields();
       const patron = await api.createPatron({
         full_name: values.fullName,
         student_code: values.studentCode,
@@ -181,9 +182,9 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
       onComplete();
     } catch (err: any) {
       if (err?.response?.status === 409) {
-        apiAnt.error({ message: "Trùng dữ liệu", description: "MSSV hoặc mã thẻ đã tồn tại trong hệ thống." });
-      } else {
-        apiAnt.error({ message: "Lỗi tạo độc giả", description: getErrorMessage(err) || "Vui lòng thử lại." });
+        apiAnt.error({ title: "Trùng dữ liệu", description: "MSSV hoặc mã thẻ đã tồn tại trong hệ thống." });
+      } else if (err?.response) {
+        apiAnt.error({ title: "Lỗi tạo độc giả", description: getErrorMessage(err) || "Vui lòng thử lại." });
       }
     } finally {
       setSubmitting(false);
@@ -192,7 +193,7 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
 
   const handleSendEmail = () => {
     apiAnt.info({
-      message: "Tính năng đang phát triển",
+      title: "Tính năng đang phát triển",
       description: "Hệ thống gửi email tự động đang được xây dựng.",
       placement: "bottomRight",
     });
@@ -242,7 +243,7 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
               <Box sx={{ borderRadius: 3, overflow: "hidden", border: "2px dashed", borderColor: "divider", bgcolor: "grey.50" }}>
                 <StudentCardScanner
                   onScanned={handleCardScanned}
-                  onError={(msg) => apiAnt.warning({ message: "Lỗi quét thẻ", description: msg })}
+                  onError={(msg) => apiAnt.warning({ title: "Lỗi quét thẻ", description: msg })}
                   onSkip={() => setCurrentStep(1)}
                   videoSource="ipcamera"
                   ipCameraUrl={CARD_CAM_URL}
@@ -252,7 +253,7 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
           )}
 
           {/* BƯỚC 2: XÁC MINH THÔNG TIN — AntD Form */}
-          {currentStep === 1 && (
+          <Box sx={{ display: currentStep === 1 ? 'block' : 'none' }}>
             <Stack spacing={3}>
               <Box>
                 <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Xác minh thông tin</Typography>
@@ -329,9 +330,9 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
                   <Form.Item name="issueDate" label="Ngày cấp thẻ" style={{ marginBottom: 16 }}>
                     <Input type="date" size="large" />
                   </Form.Item>
-                  <Form.Item name="membershipExpiry" label="Hạn thẻ" style={{ marginBottom: 16 }}>
-                    <Input type="date" size="large" />
-                  </Form.Item>
+<Form.Item name="membershipExpiry" label="Hạn thẻ" rules={[{ required: true, message: "Vui lòng chọn hạn thẻ" }]} style={{ marginBottom: 16 }}>
+  <Input type="date" size="large" />
+</Form.Item>
                 </Box>
 
                 <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end", pt: 2 }}>
@@ -340,7 +341,7 @@ export default function PatronWizard({ open, onClose, onComplete }: PatronWizard
                 </Stack>
               </Form>
             </Stack>
-          )}
+          </Box>
 
           {/* BƯỚC 3: KHUÔN MẶT */}
           {currentStep === 2 && (

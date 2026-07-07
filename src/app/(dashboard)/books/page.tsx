@@ -97,6 +97,7 @@ export default function BooksPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [books, setBooks] = useState<BookWithStats[]>([]);
   const [total, setTotal] = useState(0);
+  const [aggregateStats, setAggregateStats] = useState<{ totalCopies: number; availableCopies: number; borrowedCopies: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<BookWithStats[]>([]);
@@ -136,6 +137,9 @@ export default function BooksPage() {
       const data = await api.listBooks({ skip: page * limit, limit });
       setBooks(data.items ?? []);
       setTotal(data.total ?? 0);
+      if (data.aggregateStats) {
+        setAggregateStats(data.aggregateStats);
+      }
     } catch (err) {
       showNotice("error", getErrorMessage(err) || "Lỗi tải dữ liệu sách");
       setBooks([]);
@@ -339,12 +343,19 @@ export default function BooksPage() {
     }
   };
 
-  const stats = {
-    totalBooks: total,
-    totalCopies: books.reduce((sum, book) => sum + book.total_copies, 0),
-    availableCopies: books.reduce((sum, book) => sum + book.available_copies, 0),
-    borrowedCopies: books.reduce((sum, book) => sum + (book.total_copies - book.available_copies), 0),
-  };
+  const stats = aggregateStats
+    ? {
+        totalBooks: total,
+        totalCopies: aggregateStats.totalCopies,
+        availableCopies: aggregateStats.availableCopies,
+        borrowedCopies: aggregateStats.borrowedCopies,
+      }
+    : {
+        totalBooks: total,
+        totalCopies: books.reduce((sum, book) => sum + book.total_copies, 0),
+        availableCopies: books.reduce((sum, book) => sum + book.available_copies, 0),
+        borrowedCopies: books.reduce((sum, book) => sum + (book.total_copies - book.available_copies), 0),
+      };
   const displayBooks = searchQuery.trim() ? searchResults : books;
 
   const bookColumns: ColumnsType<BookWithStats> = [
