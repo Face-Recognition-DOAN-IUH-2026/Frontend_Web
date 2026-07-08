@@ -181,7 +181,7 @@ export default function UserDetailPage() {
       await loadUser();
     } catch (err: any) {
       const status = err?.response?.status;
-      const msg = err?.response?.data?.error || err?.message || "Lưu thất bại";
+      const msg = getErrorMessage(err) || "Lưu thất bại";
       setEditError(
         status === 409
           ? `${msg} — Số thẻ hoặc mã sinh viên đã tồn tại.`

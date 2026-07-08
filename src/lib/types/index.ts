@@ -9,3 +9,4 @@ export * from "./access";
 export * from "./schedule";
 export * from "./ai";
 export * from "./notification";
+export * from "./settings";

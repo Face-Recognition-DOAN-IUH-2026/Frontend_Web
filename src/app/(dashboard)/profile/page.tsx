@@ -30,7 +30,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import KeyIcon from "@mui/icons-material/KeyOutlined";
 import AtSignIcon from "@mui/icons-material/AlternateEmailOutlined";
 import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 import type { UserPublic } from "@/lib/types";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
@@ -102,7 +102,7 @@ export default function ProfilePage() {
       setUser((prev) => prev ? { ...prev, avatar_url: result.avatarUrl } : prev);
       showNotice("success", "Cập nhật ảnh đại diện thành công!");
     } catch (error: any) {
-      showNotice("error", error.response?.data?.error || "Upload ảnh thất bại");
+      showNotice("error", getErrorMessage(error) || "Upload ảnh thất bại");
     } finally {
       setUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
@@ -117,7 +117,7 @@ export default function ProfilePage() {
       showNotice("success", "Cập nhật hồ sơ thành công!");
       fetchProfile();
     } catch (error: any) {
-      showNotice("error", error.response?.data?.error || "Cập nhật thất bại");
+      showNotice("error", getErrorMessage(error) || "Cập nhật thất bại");
     } finally {
       setSavingProfile(false);
     }
@@ -134,7 +134,7 @@ export default function ProfilePage() {
       setShowPasswordModal(false);
       setPassData({ old_password: "", new_password: "", confirm_password: "" });
     } catch (error: any) {
-      showNotice("error", error.response?.data?.error || "Đổi mật khẩu thất bại");
+      showNotice("error", getErrorMessage(error) || "Đổi mật khẩu thất bại");
     } finally {
       setChangingPass(false);
     }
@@ -149,7 +149,7 @@ export default function ProfilePage() {
       showNotice("success", "Đã gửi mã OTP đến email mới");
       setEmailStep("verify");
     } catch (error: any) {
-      showNotice("error", error.response?.data?.error || "Không thể gửi OTP");
+      showNotice("error", getErrorMessage(error) || "Không thể gửi OTP");
     } finally {
       setEmailLoading(false);
     }
@@ -167,7 +167,7 @@ export default function ProfilePage() {
       setEmailStep("request");
       fetchProfile();
     } catch (error: any) {
-      showNotice("error", error.response?.data?.error || "Xác thực thất bại");
+      showNotice("error", getErrorMessage(error) || "Xác thực thất bại");
     } finally {
       setEmailLoading(false);
     }

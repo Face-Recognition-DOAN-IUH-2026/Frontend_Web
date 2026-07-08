@@ -40,6 +40,7 @@ import SearchIcon from "@mui/icons-material/SearchOutlined";
 import ShieldIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
+import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 
 const drawerWidth = 268;
@@ -76,6 +77,7 @@ const staffAiItems = [
 
 const adminItems = [
   { href: "/dashboard/admin", label: "Quản trị", icon: ShieldIcon },
+  { href: "/settings", label: "Cài đặt", icon: SettingsIcon },
   { href: "/stats", label: "Thống kê", icon: BarChartIcon },
 ];
 

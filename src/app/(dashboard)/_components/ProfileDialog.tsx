@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { getErrorMessage } from "@/lib/api-client";
 import {
   Avatar,
   Box,
@@ -67,7 +68,7 @@ export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
       setAvatarUrl(result.avatarUrl);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Upload failed");
+      setError(getErrorMessage(err) || "Tải ảnh thất bại");
     } finally {
       setUploading(false);
     }
@@ -81,7 +82,7 @@ export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
       setAvatarUrl(null);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Delete failed");
+      setError(getErrorMessage(err) || "Xóa ảnh thất bại");
     } finally {
       setUploading(false);
     }

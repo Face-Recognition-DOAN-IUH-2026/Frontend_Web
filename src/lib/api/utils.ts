@@ -85,7 +85,7 @@ export function clearAccessTokenCookie() {
 }
 
 export function getErrorMessage(err: any): string {
-  if (!err) return "Unknown error";
+  if (!err) return "Lỗi không xác định";
   if (typeof err === "string") return err;
   if (err.response?.data?.detail) {
     const detail = err.response.data.detail;

@@ -217,7 +217,7 @@ export default function BookDetailPage() {
       setEditOpen(false);
       apiAnt.success({ message: "Cập nhật sách thành công", placement: "topRight" });
     } catch (err: any) {
-      apiAnt.error({ message: err?.response?.data?.error || "Cập nhật sách thất bại", placement: "topRight" });
+      apiAnt.error({ message: getErrorMessage(err) || "Cập nhật sách thất bại", placement: "topRight" });
     } finally {
       setEditSaving(false);
     }
