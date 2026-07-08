@@ -44,6 +44,8 @@ import type {
   StaffShift,
   ManualCheckInRequest,
   GeofenceConfig,
+  SystemConfigEntry,
+  SettingsByCategory,
   AICommandCenterSummary,
   AIInsight,
   AIInsightExplanation,
@@ -142,17 +144,16 @@ function isTokenExpiringSoon(token: string, skewMs = 30_000): boolean {
 }
 
 function getErrorMessage(err: unknown): string {
-  if (!err) return "An unknown error occurred";
+  if (!err) return "Lỗi không xác định";
   if (typeof err === "string") return err;
-  if (err instanceof Error) return err.message;
   if (typeof err === "object" && err !== null) {
     const ax = err as any;
     if (ax.response?.data) {
       const data = ax.response.data;
       if (typeof data === "string") return data;
+      if (data.detail) return data.detail;
       if (data.error) return typeof data.error === "string" ? data.error : JSON.stringify(data.error);
       if (data.message) return data.message;
-      if (data.detail) return data.detail;
       if (Array.isArray(data.errors) && data.errors.length > 0) {
         return data.errors.map((e: any) => e.msg || e.message || JSON.stringify(e)).join("; ");
       }
@@ -160,6 +161,7 @@ function getErrorMessage(err: unknown): string {
     }
     if (ax.message) return ax.message;
   }
+  if (err instanceof Error) return err.message;
   return String(err);
 }
 
@@ -1286,6 +1288,26 @@ class ApiClient {
 
   async markAllNotificationsAsRead(): Promise<{ message: string }> {
     const response = await this.client.put<{ message: string }>("/api/notifications/read-all");
+    return response.data;
+  }
+
+  async getAdminSettings(): Promise<SettingsByCategory> {
+    const response = await this.client.get<SettingsByCategory>("/api/borrow/admin/settings");
+    return response.data;
+  }
+
+  async getAdminSettingsByCategory(category: string): Promise<SystemConfigEntry[]> {
+    const response = await this.client.get<SystemConfigEntry[]>(`/api/borrow/admin/settings/${category}`);
+    return response.data;
+  }
+
+  async updateAdminSettings(category: string, values: Record<string, any>): Promise<SystemConfigEntry[]> {
+    const response = await this.client.put<SystemConfigEntry[]>(`/api/borrow/admin/settings/${category}`, { values });
+    return response.data;
+  }
+
+  async testSmtpConfig(config: { to: string; smtp_config: any }): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.post<{ success: boolean; message: string }>("/api/borrow/admin/settings/test-email", config);
     return response.data;
   }
 
