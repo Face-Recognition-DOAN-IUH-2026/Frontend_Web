@@ -214,18 +214,15 @@ class ApiClient {
   }
 
   private async handleUnauthorized(): Promise<string | null> {
-    try {
-      const newToken = await this.refreshToken();
-      if (newToken) {
-        this.retryPendingRequests(newToken);
-        return newToken;
-      }
-    } catch (err) {
-      this.cancelPendingRequests();
-      clearStoredAuth();
-      if (typeof window !== "undefined") {
-        bus.emit("auth:required");
-      }
+    const newToken = await this.refreshToken();
+    if (newToken) {
+      this.retryPendingRequests(newToken);
+      return newToken;
+    }
+    this.cancelPendingRequests();
+    clearStoredAuth();
+    if (typeof window !== "undefined") {
+      bus.emit("auth:required");
     }
     return null;
   }

@@ -42,23 +42,21 @@ export async function GET(request: NextRequest) {
     });
     clearTimeout(timeout);
 
-    console.error(
-      `[camera-proxy] ${response.status} ${parsed.toString()} content-type=${response.headers.get("content-type")}`,
-    );
+    const contentType = response.headers.get("Content-Type") || "image/jpeg";
+    const buffer = Buffer.from(await response.arrayBuffer());
 
-    const contentType = response.headers.get("Content-Type") || "multipart/x-mixed-replace; boundary=--BoundaryBoundary";
-
-    return new Response(response.body, {
+    return new Response(buffer, {
       status: response.status,
       headers: {
         "Content-Type": contentType,
+        "Content-Length": String(buffer.length),
         "Cache-Control": "no-cache, no-store, must-revalidate",
         Pragma: "no-cache",
         Expires: "0",
       },
     });
-} catch (err: unknown) {
-  console.error("[camera-proxy] fetch failed:", parsed.toString(), err);
-  return new Response("Failed to connect to camera", { status: 502 });
-}
+  } catch (err: unknown) {
+    console.error("[camera-proxy] fetch failed:", parsed.toString(), err);
+    return new Response("Failed to connect to camera", { status: 502 });
+  }
 }

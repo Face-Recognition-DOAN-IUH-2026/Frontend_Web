@@ -69,6 +69,7 @@ export default function BorrowIPCameraDialog({
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [manualIsbn, setManualIsbn] = useState("");
+  const [duplicateFlash, setDuplicateFlash] = useState<string | null>(null);
   const lastScannedRef = useRef<string | null>(null);
 
   const lookupItem = useCallback(async (barcode: string, isbn: string) => {
@@ -89,8 +90,7 @@ export default function BorrowIPCameraDialog({
       if (!item.can_borrow) {
         setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
         const msg = item.reason || "Sách không thể mượn";
-        const title = item.book?.title || "";
-        setLookupError(title ? `"${title}": ${msg}` : `${msg} (ISBN: ${barcode})`);
+        setLookupError(msg);
         return;
       }
       setScanned((prev) => prev.map((i) =>
@@ -112,19 +112,22 @@ export default function BorrowIPCameraDialog({
   }, [patronId]);
 
   const addScanned = useCallback((isbn: string) => {
-    if (!/^\d{10,13}$/.test(isbn.replace(/-/g, ""))) return;
+    if (isbn.trim().length < 4) return;
     const normalized = isbn.replace(/-/g, "");
     lastScannedRef.current = normalized;
-    setScanToast(normalized);
     setScanned((prev) => {
-      if (prev.some((item) => item.barcode === normalized)) {
-        setScanToast(`Sách ${normalized} đã có trong danh sách`);
+      const existing = prev.find((item) => item.barcode === normalized);
+      if (existing) {
+        setDuplicateFlash(normalized);
+        setTimeout(() => setDuplicateFlash(null), 1500);
+        setScanToast(`Sách ${existing.book?.title || normalized} đã quét rồi`);
         return prev;
       }
       if (maxItems !== undefined && prev.length >= maxItems) {
         setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
         return prev;
       }
+      setScanToast(`Đã quét: ${normalized}`);
       return [...prev, {
         barcode: normalized,
         isbn: normalized,
@@ -146,6 +149,7 @@ export default function BorrowIPCameraDialog({
       setCreateError("");
       setScanToast("");
       setNote("");
+      setDuplicateFlash(null);
       lastScannedRef.current = null;
     }
   }, [open]);
@@ -176,43 +180,7 @@ export default function BorrowIPCameraDialog({
       }
     } catch (err) {
       const detail = getErrorMessage(err);
-      const removedBarcodes: string[] = [];
-      const toastMsg = detail;
-
-      const matchTitle = detail.match(/^Sach "(.+)" da duoc doc gia nay muon$/);
-      if (matchTitle) {
-        const title = matchTitle[1];
-        setScanned((prev) => {
-          const filtered = prev.filter((item) => {
-            if (item.book?.title === title) {
-              removedBarcodes.push(item.barcode);
-              return false;
-            }
-            return true;
-          });
-          return filtered;
-        });
-      } else {
-        const matchBarcode = detail.match(/^(?:Ban sao|Ma vach) ([^\s]+) (?:dang duoc muon|khong ton tai)/);
-        if (matchBarcode) {
-          const barcode = matchBarcode[1];
-          setScanned((prev) => {
-            const filtered = prev.filter((item) => {
-              if (item.barcode === barcode || item.barcode.includes(barcode)) {
-                removedBarcodes.push(item.barcode);
-                return false;
-              }
-              return true;
-            });
-            return filtered;
-          });
-        } else {
-          setCreateError(detail);
-        }
-      }
-      if (removedBarcodes.length > 0) {
-        setScanToast(toastMsg);
-      }
+      setCreateError(detail);
     }
   };
 
@@ -255,11 +223,11 @@ export default function BorrowIPCameraDialog({
               {createError ? <Alert severity="error" onClose={() => setCreateError("")}>{createError}</Alert> : null}
 
               {lookupError ? (
-                <Paper variant="outlined" sx={{ p: 1.5, borderColor: "error.main", bgcolor: "error.50" }}>
+                <Paper variant="outlined" sx={{ p: 1.5, borderColor: "error.main", bgcolor: (t) => t.palette.mode === "dark" ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.06)" }}>
                   <Stack spacing={1}>
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                       <ErrorIcon color="error" sx={{ fontSize: 20 }} />
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: "error.900", flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: "error.main", flex: 1 }}>
                         {lookupError}
                       </Typography>
                       <IconButton size="small" onClick={() => setLookupError(null)}>
@@ -312,6 +280,7 @@ export default function BorrowIPCameraDialog({
               ) : (
                 scanned.map((item) => {
                   const isLastScanned = item.barcode === lastScannedRef.current;
+                  const isDupeFlash = item.barcode === duplicateFlash;
                   const hasError = !item.loading && !item.can_borrow;
                   const isSuccess = !item.loading && item.can_borrow;
                   return (
@@ -320,10 +289,13 @@ export default function BorrowIPCameraDialog({
                       variant="outlined"
                       sx={{
                         p: 1.5,
-                        borderColor: isLastScanned ? "primary.main" : hasError ? "error.main" : undefined,
-                        bgcolor: isLastScanned ? "action.hover" : hasError ? "error.50" : undefined,
+                        borderColor: isDupeFlash ? "warning.main" : isLastScanned ? "primary.main" : hasError ? "error.main" : undefined,
+                        borderWidth: isDupeFlash ? 2 : undefined,
+                        bgcolor: isDupeFlash ? (t) => t.palette.mode === "dark" ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.08)" : isLastScanned ? "action.hover" : hasError ? (t) => t.palette.mode === "dark" ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.06)" : undefined,
                         animation: isSuccess
                           ? `${successPop} 0.4s ease-out`
+                          : isDupeFlash
+                          ? `${slideInRight} 0.3s ease-out`
                           : isLastScanned
                           ? `${slideInRight} 0.3s ease-out`
                           : undefined,
@@ -415,13 +387,19 @@ export default function BorrowIPCameraDialog({
 
       <Snackbar
         open={!!scanToast}
-        autoHideDuration={2000}
+        autoHideDuration={scanToast?.includes("đã quét rồi") || scanToast?.includes("tối đa") ? 3500 : 2000}
         onClose={() => setScanToast("")}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
         {scanToast ? (
           <Alert
-            severity="success"
+            severity={
+              scanToast.includes("đã quét rồi") || scanToast.includes("tối đa")
+                ? "warning"
+                : scanToast.startsWith("Đã quét")
+                ? "success"
+                : "info"
+            }
             onClose={() => setScanToast("")}
             sx={{
               animation: `${slideInRight} 0.3s ease-out`,

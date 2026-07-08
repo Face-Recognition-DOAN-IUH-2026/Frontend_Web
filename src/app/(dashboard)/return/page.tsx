@@ -33,6 +33,7 @@ import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import ReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
@@ -113,6 +114,7 @@ export default function ReturnPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastScannedRef = useRef<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadBorrowers = useCallback(async () => {
     setLoadingBorrowers(true);
@@ -233,7 +235,7 @@ export default function ReturnPage() {
 
   const handleScanned = useCallback((isbn: string) => {
     const normalized = isbn.replace(/-/g, "");
-    if (!/^\d{10,13}$/.test(normalized)) return;
+    if (normalized.length < 4) return;
     if (normalized === lastScannedRef.current) return;
     lastScannedRef.current = normalized;
 
@@ -251,17 +253,40 @@ export default function ReturnPage() {
         toast = `Đã thêm: ${match.book?.title || normalized}`;
         return [...prev, { isbn: normalized, record: match, condition: "" }];
       }
-      toast = `Không tìm thấy sách đang mượn: ${normalized}`;
+      toast = `Độc giả không mượn sách: ${normalized}`;
       return prev;
     });
     if (toast) {
-      apiAnt[toast.startsWith("Đã thêm") ? "success" : "warning"]({ message: toast, placement: "topRight", duration: 2 });
+      const isDuplicate = toast.includes("đã có trong danh sách");
+      apiAnt[toast.startsWith("Đã thêm") ? "success" : "warning"]({
+        message: toast,
+        placement: "topRight",
+        duration: isDuplicate ? 3.5 : 2,
+      });
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       lastScannedRef.current = null;
-    }, 2000);
+    }, 1200);
   }, [detail, apiAnt]);
+
+  const loadingRef = useRef(false);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadNextFrame = useCallback(() => {
+    if (!imgRef.current || loadingRef.current) return;
+    loadingRef.current = true;
+    const sep = BORROW_CAM_URL.includes("?") ? "&" : "?";
+    imgRef.current.src = `${BORROW_CAM_URL}${sep}_t=${Date.now()}`;
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    loadingRef.current = false;
+  }, []);
 
   const stopScanning = useCallback(() => {
     if (intervalRef.current) {
@@ -269,6 +294,11 @@ export default function ReturnPage() {
       intervalRef.current = null;
     }
   }, []);
+
+  const stopAll = useCallback(() => {
+    stopScanning();
+    stopPolling();
+  }, [stopScanning, stopPolling]);
 
   const stopReader = useCallback(() => {
     if (readerRef.current) {
@@ -279,7 +309,8 @@ export default function ReturnPage() {
 
   useEffect(() => {
     if (!scannerOpen) {
-      stopScanning();
+      stopAll();
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       setCameraError("");
       setImgReady(false);
       setScannedReturns([]);
@@ -287,22 +318,19 @@ export default function ReturnPage() {
     }
     setImgReady(false);
     setCameraError("");
-  }, [scannerOpen, stopScanning]);
+    loadNextFrame();
+  }, [scannerOpen, stopAll, loadNextFrame]);
 
   useEffect(() => {
     if (!imgReady || !imgRef.current) return;
     stopScanning();
-    intervalRef.current = setInterval(async () => {
-      if (!imgRef.current) return;
-      if (!readerRef.current) return;
+    intervalRef.current = setInterval(() => {
+      if (!imgRef.current || !readerRef.current) return;
       const img = imgRef.current;
-      if (!img.complete) return;
-      try {
-        const result = await readerRef.current.decodeFromImageElement(img);
-        if (result) {
-          handleScanned(result.getText());
-        }
-      } catch {}
+      if (!img.complete || !(img.naturalWidth || img.width)) return;
+      readerRef.current.decodeFromImageElement(img)
+        .then((result: any) => { if (result) handleScanned(result.getText()); })
+        .catch(() => {});
     }, 200);
     return () => stopScanning();
   }, [imgReady, handleScanned, stopScanning]);
@@ -586,25 +614,52 @@ export default function ReturnPage() {
           <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
             <Box sx={{ width: { md: "50%" }, flexShrink: 0 }}>
               <Box sx={{ position: "relative", width: "100%", aspectRatio: "4/3", bgcolor: "black", borderRadius: 1, overflow: "hidden" }}>
+                <Box component="img" ref={imgRef} src={BORROW_CAM_URL}
+                  onLoad={() => {
+                    loadingRef.current = false;
+                    setCameraError("");
+                    setImgReady(true);
+                    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+                    pollTimerRef.current = setTimeout(loadNextFrame, 150);
+                  }}
+                  onError={() => {
+                    loadingRef.current = false;
+                    setCameraError("Không thể kết nối IP Camera");
+                    setImgReady(false);
+                    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+                    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                    reconnectTimerRef.current = setTimeout(() => {
+                      setCameraError("");
+                      loadNextFrame();
+                    }, 3000);
+                  }}
+                  alt="IP Camera" sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                {!imgReady && !cameraError ? (
+                  <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+                    <CircularProgress size={28} color="inherit" />
+                    <Typography variant="body2">Đang kết nối camera...</Typography>
+                  </Stack>
+                ) : null}
                 {cameraError ? (
-                  <Stack spacing={1.5} sx={{ alignItems: "center", justifyContent: "center", height: "100%", color: "grey.300", p: 3 }}>
+                  <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.75)", color: "common.white", alignItems: "center", justifyContent: "center", p: 3 }} spacing={1.5}>
                     <CameraAltIcon sx={{ fontSize: 48 }} />
                     <Typography sx={{ textAlign: "center" }}>{cameraError}</Typography>
+                    <Button variant="outlined" color="inherit" startIcon={<RefreshIcon />}
+                      onClick={() => {
+                        setCameraError("");
+                        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+                        if (imgRef.current) {
+                          const sep = BORROW_CAM_URL.includes("?") ? "&" : "?";
+                          imgRef.current.src = `${BORROW_CAM_URL}${sep}_t=${Date.now()}`;
+                        }
+                      }}>
+                      Kết nối lại
+                    </Button>
                   </Stack>
-                ) : (
-                  <>
-                    <Box component="img" ref={imgRef} src={BORROW_CAM_URL} onLoad={() => setImgReady(true)} onError={() => setCameraError("Không thể kết nối IP Camera")} alt="IP Camera" sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                    {!imgReady && !cameraError ? (
-                      <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-                        <CircularProgress size={28} color="inherit" />
-                        <Typography variant="body2">Đang kết nối camera...</Typography>
-                      </Stack>
-                    ) : null}
-                    <Box sx={{ position: "absolute", top: 8, left: 8, px: 1, py: 0.5, bgcolor: "rgba(0,0,0,.6)", borderRadius: 0.5 }}>
-                      <Typography variant="caption" sx={{ color: "common.white", fontSize: 11 }}>IP Camera</Typography>
-                    </Box>
-                  </>
-                )}
+                ) : null}
+                <Box sx={{ position: "absolute", top: 8, left: 8, px: 1, py: 0.5, bgcolor: "rgba(0,0,0,.6)", borderRadius: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: "common.white", fontSize: 11 }}>IP Camera</Typography>
+                </Box>
               </Box>
             </Box>
 
