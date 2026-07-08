@@ -11,22 +11,30 @@ interface Props {
   onError?: (error: string) => void;
 }
 
+const POLL_INTERVAL = 150;
+const DEBOUNCE_MS = 1200;
+
 export default function IPCameraStream({ cameraUrl, onBarcodeDetected, onError }: Props) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const readerRef = useRef<any>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [streamKey, setStreamKey] = useState(0);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [imgReady, setImgReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const lastScannedRef = useRef<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingRef = useRef(false);
 
-  const stopScanning = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
     }
+    if (scanTimerRef.current) {
+      clearInterval(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
+    loadingRef.current = false;
   }, []);
 
   const stopReader = useCallback(() => {
@@ -36,24 +44,44 @@ export default function IPCameraStream({ cameraUrl, onBarcodeDetected, onError }
     }
   }, []);
 
+  const loadNextFrame = useCallback(() => {
+    if (!imgRef.current || loadingRef.current) return;
+    loadingRef.current = true;
+    const sep = cameraUrl.includes("?") ? "&" : "?";
+    imgRef.current.src = `${cameraUrl}${sep}_t=${Date.now()}`;
+  }, [cameraUrl]);
+
   const handleReconnect = useCallback(() => {
-    stopScanning();
+    stopPolling();
     setCameraError("");
     setImgReady(false);
-    setStreamKey((k) => k + 1);
-  }, [stopScanning]);
+    loadNextFrame();
+  }, [loadNextFrame, stopPolling]);
 
   const handleScan = useCallback((code: string) => {
-    const normalized = code.replace(/-/g, "");
-    if (!/^\d{10,13}$/.test(normalized)) return;
+    const normalized = code.trim();
+    if (normalized.length < 4) return;
     if (normalized === lastScannedRef.current) return;
     lastScannedRef.current = normalized;
     onBarcodeDetected(normalized);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       lastScannedRef.current = null;
-    }, 2000);
+    }, DEBOUNCE_MS);
   }, [onBarcodeDetected]);
+
+  const scanCurrentFrame = useCallback(async () => {
+    if (!imgRef.current || !readerRef.current) return;
+    const img = imgRef.current;
+    if (!img.complete || !(img.naturalWidth || img.width)) return;
+
+    try {
+      const result = await readerRef.current.decodeFromImageElement(img);
+      if (result) {
+        handleScan(result.getText());
+      }
+    } catch {}
+  }, [handleScan]);
 
   useEffect(() => {
     let active = true;
@@ -70,48 +98,34 @@ export default function IPCameraStream({ cameraUrl, onBarcodeDetected, onError }
   }, []);
 
   useEffect(() => {
-    if (!imgReady || !imgRef.current || !canvasRef.current) return;
-    stopScanning();
+    loadNextFrame();
+  }, [loadNextFrame]);
 
-    intervalRef.current = setInterval(async () => {
-      if (!imgRef.current || !canvasRef.current) return;
-      if (!readerRef.current) return;
-      const img = imgRef.current;
-      const canvas = canvasRef.current;
-      if (!img.complete) return;
+  useEffect(() => {
+    scanTimerRef.current = setInterval(() => {
+      scanCurrentFrame();
+    }, 100);
+    return () => {
+      if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+    };
+  }, [scanCurrentFrame]);
 
-      try {
-        const w = img.naturalWidth || img.width;
-        const h = img.naturalHeight || img.height;
-        if (!w || !h) return;
-
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        ctx.drawImage(img, 0, 0);
-
-        const result = await readerRef.current.decodeFromCanvas(canvas);
-        if (result) {
-          handleScan(result.getText());
-        }
-      } catch {}
-    }, 500);
-
-    return () => stopScanning();
-  }, [imgReady, handleScan, stopScanning]);
-
-  const handleImgLoad = () => {
+  const handleImgLoad = useCallback(() => {
+    loadingRef.current = false;
     setCameraError("");
     setImgReady(true);
-  };
 
-  const handleImgError = () => {
-    const errorMsg = "Không thể kết nối IP Camera. Vui lòng kiểm tra URL.";
-    setCameraError(errorMsg);
-    onError?.(errorMsg);
-  };
+    scanCurrentFrame();
+
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    pollTimerRef.current = setTimeout(loadNextFrame, POLL_INTERVAL);
+  }, [loadNextFrame, scanCurrentFrame]);
+
+  const handleImgError = useCallback(() => {
+    loadingRef.current = false;
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    pollTimerRef.current = setTimeout(loadNextFrame, 300);
+  }, [loadNextFrame]);
 
   return (
     <Box sx={{ position: "relative", width: "100%", aspectRatio: "4/3", bgcolor: "black", borderRadius: 1, overflow: "hidden" }}>
@@ -129,13 +143,11 @@ export default function IPCameraStream({ cameraUrl, onBarcodeDetected, onError }
           <Box
             component="img"
             ref={imgRef}
-            src={`${cameraUrl}${cameraUrl.includes("?") ? "&" : "?"}_t=${streamKey}`}
             onLoad={handleImgLoad}
             onError={handleImgError}
             alt="IP Camera Stream"
             sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
           />
-          <canvas ref={canvasRef} style={{ display: "none" }} />
           {!imgReady && (
             <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
               <CircularProgress size={28} color="inherit" />
