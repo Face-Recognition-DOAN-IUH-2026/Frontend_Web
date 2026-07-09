@@ -215,9 +215,9 @@ export default function BookDetailPage() {
 
       setBook(updated);
       setEditOpen(false);
-      apiAnt.success({ message: "Cập nhật sách thành công", placement: "topRight" });
+      apiAnt.success({ title: "Cập nhật sách thành công", placement: "topRight" });
     } catch (err: any) {
-      apiAnt.error({ message: getErrorMessage(err) || "Cập nhật sách thất bại", placement: "topRight" });
+      apiAnt.error({ title: getErrorMessage(err) || "Cập nhật sách thất bại", placement: "topRight" });
     } finally {
       setEditSaving(false);
     }
@@ -230,10 +230,10 @@ export default function BookDetailPage() {
       router.push("/books");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        apiAnt.error({ message: "Sách không tồn tại hoặc đã bị xóa.", placement: "topRight" });
+        apiAnt.error({ title: "Sách không tồn tại hoặc đã bị xóa.", placement: "topRight" });
         router.push("/books");
       } else {
-        apiAnt.error({ message: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
+        apiAnt.error({ title: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
       }
     }
   };

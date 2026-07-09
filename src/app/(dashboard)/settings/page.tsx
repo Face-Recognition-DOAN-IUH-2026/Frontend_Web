@@ -51,7 +51,7 @@ import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import SearchOffOutlinedIcon from "@mui/icons-material/SearchOffOutlined";
-import api from "@/lib/api-client";
+import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import type { SystemConfigEntry } from "@/lib/types";
@@ -366,7 +366,7 @@ export default function SettingsPage() {
       load();
       setSnackbar({ open: true, message: "Lưu cài đặt thành công.", severity: "success" });
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || "Lưu cài đặt thất bại.";
+      const msg = getErrorMessage(err) || "Lưu cài đặt thất bại.";
       setSnackbar({ open: true, message: msg, severity: "error" });
     } finally {
       setSaving(false);
@@ -388,7 +388,7 @@ export default function SettingsPage() {
       setTestEmailSending(true);
       const smtpConfig: Record<string, any> = {};
       settings.smtp.forEach((e) => { smtpConfig[e.config_key] = e.config_value; });
-      const res = await api.testSmtpConfig({ to: testEmail, smtp_config: smtpConfig });
+      const res = await api.testSmtpConfig({ to: testEmail, ...smtpConfig } as any);
       if (res.success) {
         setSnackbar({ open: true, message: "Gửi email test thành công.", severity: "success" });
       } else {
@@ -396,7 +396,7 @@ export default function SettingsPage() {
       }
       setTestEmailOpen(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || "Gửi email test thất bại.";
+      const msg = getErrorMessage(err) || "Gửi email test thất bại.";
       setSnackbar({ open: true, message: msg, severity: "error" });
     } finally {
       setTestEmailSending(false);

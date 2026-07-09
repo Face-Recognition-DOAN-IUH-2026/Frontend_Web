@@ -17,13 +17,20 @@ import api from "@/lib/api-client";
 import type { Notification } from "@/lib/types";
 
 const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-  borrow_overdue: { icon: <ErrorOutlined fontSize="small" />, color: "error.main", label: "Quá hạn" },
+  borrow: { icon: <MenuBookOutlined fontSize="small" />, color: "success.main", label: "Mượn sách" },
+  return: { icon: <MenuBookOutlined fontSize="small" />, color: "info.main", label: "Trả sách" },
   book_available: { icon: <MenuBookOutlined fontSize="small" />, color: "success.main", label: "Sách có sẵn" },
+  overdue_reminder: { icon: <ErrorOutlined fontSize="small" />, color: "error.main", label: "Quá hạn" },
+  due_soon_reminder: { icon: <ErrorOutlined fontSize="small" />, color: "warning.main", label: "Sắp đến hạn" },
+  fine_notice: { icon: <ErrorOutlined fontSize="small" />, color: "error.main", label: "Phí phạt" },
   schedule_change: { icon: <CalendarMonthOutlined fontSize="small" />, color: "warning.main", label: "Lịch trực" },
+  shift_reminder: { icon: <CalendarMonthOutlined fontSize="small" />, color: "info.main", label: "Nhắc lịch" },
   membership_expiry: { icon: <BadgeOutlined fontSize="small" />, color: "info.main", label: "Hạn thẻ" },
-  access_anomaly: { icon: <ShieldOutlined fontSize="small" />, color: "error.main", label: "Bất thường" },
-  daily_stats: { icon: <BarChartOutlined fontSize="small" />, color: "primary.main", label: "Thống kê" },
+  anomaly_alert: { icon: <ShieldOutlined fontSize="small" />, color: "error.main", label: "Bất thường" },
+  daily_report: { icon: <BarChartOutlined fontSize="small" />, color: "primary.main", label: "Thống kê" },
   staff_absence: { icon: <PersonOffOutlined fontSize="small" />, color: "warning.main", label: "Vắng mặt" },
+  bid_warning: { icon: <ErrorOutlined fontSize="small" />, color: "warning.main", label: "Đấu giá" },
+  swap_warning: { icon: <ErrorOutlined fontSize="small" />, color: "warning.main", label: "Đổi ca" },
 };
 
 function getConfig(type: string) {

@@ -90,7 +90,7 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
       okButtonProps={result ? {} : { danger: true, loading, onClick: handleConfirm }}
       cancelButtonProps={result ? { style: { display: "none" } } : { disabled: loading }}
       onOk={result ? handleClose : undefined}
-      maskClosable={!loading}
+      mask={{ closable: !loading }}
     >
       {result ? (
         <div>

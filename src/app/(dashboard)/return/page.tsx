@@ -187,13 +187,13 @@ export default function ReturnPage() {
     setError("");
     try {
       await api.staffReturnBorrowRecord(confirmRecord.id, condition || null);
-      apiAnt.success({ message: "Trả sách thành công", placement: "topRight" });
+      apiAnt.success({ title: "Trả sách thành công", placement: "topRight" });
       setCondition("");
       setConfirmRecord(null);
       await loadBorrowers();
       if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
     } catch (err: any) {
-      apiAnt.error({ message: getErrorMessage(err) || "Trả sách thất bại", placement: "topRight" });
+      apiAnt.error({ title: getErrorMessage(err) || "Trả sách thất bại", placement: "topRight" });
     } finally {
       setReturningId(null);
     }

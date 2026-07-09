@@ -206,11 +206,11 @@ export default function ActivePage() {
     setExiting(true);
     try {
       await api.forceExitPatron(exitPatron.id);
-      apiAnt.success({ message: `Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra`, placement: "topRight" });
+      apiAnt.success({ title: `Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra`, placement: "topRight" });
       setExitPatron(null);
       await load();
     } catch (err) {
-      apiAnt.error({ message: getErrorMessage(err) || "Lỗi khi đánh dấu ra", placement: "topRight" });
+      apiAnt.error({ title: getErrorMessage(err) || "Lỗi khi đánh dấu ra", placement: "topRight" });
     } finally {
       setExiting(false);
     }

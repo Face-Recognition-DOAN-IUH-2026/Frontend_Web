@@ -214,7 +214,7 @@ export default function AiAssistantPage() {
       }
     } catch {
       setError("Không thể kết nối AI. Vui lòng thử lại.");
-      apiAnt.error({ message: "Không thể kết nối AI. Vui lòng thử lại.", placement: "topRight" });
+      apiAnt.error({ title: "Không thể kết nối AI. Vui lòng thử lại.", placement: "topRight" });
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
     } finally {
       setLoading(false);

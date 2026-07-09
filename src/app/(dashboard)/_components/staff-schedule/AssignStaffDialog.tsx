@@ -106,7 +106,7 @@ export default function AssignStaffDialog({
       const params: any = { staffId: values.staffId, shiftId, zoneId: values.zoneId, workDate: date };
       if (forceSave && w.length > 0) params.force = true;
       await api.createScheduleAssignment(params);
-      apiAnt.success({ message: "Phân ca thành công", placement: "topRight" });
+      apiAnt.success({ title: "Phân ca thành công", placement: "topRight" });
       reset();
       onAssigned();
     } catch (err: any) {

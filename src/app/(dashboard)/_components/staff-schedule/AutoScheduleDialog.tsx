@@ -202,7 +202,7 @@ export default function AutoScheduleDialog({ open, onClose, onConfirm, onConfirm
           )}
         </div>
       }
-      maskClosable={!loading}
+      mask={{ closable: !loading }}
     >
       {step === "select" ? (
         <div>
