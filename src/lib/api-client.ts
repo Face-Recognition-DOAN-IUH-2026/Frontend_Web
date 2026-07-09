@@ -335,9 +335,7 @@ class ApiClient {
   async uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
     const formData = new FormData();
     formData.append("avatar", file);
-    const response = await this.client.post<{ avatarUrl: string }>("/users/me/avatar", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await this.client.post<{ avatarUrl: string }>("/users/me/avatar", formData);
     return response.data;
   }
 
