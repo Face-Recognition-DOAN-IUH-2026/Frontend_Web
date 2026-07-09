@@ -177,7 +177,7 @@ export default function UserDetailPage() {
       const updated = await api.updateUser(id, data);
       setUser(updated);
       setShowEdit(false);
-      apiAnt.success({ message: "Đã cập nhật thông tin người dùng.", placement: "topRight" });
+      apiAnt.success({ title: "Đã cập nhật thông tin người dùng.", placement: "topRight" });
       await loadUser();
     } catch (err: any) {
       const status = err?.response?.status;
@@ -196,10 +196,10 @@ export default function UserDetailPage() {
     if (!user || deleteConfirmText !== "XÓA") return;
     try {
       await api.deleteUser(user.id);
-      apiAnt.success({ message: "Đã xóa người dùng.", placement: "topRight" });
+      apiAnt.success({ title: "Đã xóa người dùng.", placement: "topRight" });
       router.push("/dashboard/admin");
     } catch (err: any) {
-      apiAnt.error({ message: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
+      apiAnt.error({ title: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
     }
   };
 

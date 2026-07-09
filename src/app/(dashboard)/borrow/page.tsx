@@ -120,7 +120,7 @@ export default function BorrowPage() {
             setPatron(patronCode.trim(), data.patron.id, data.patron.full_name || data.patron.student_code);
             setActiveCount(data.total);
             setOverdueCount(data.overdue_count);
-            apiAnt.success({ message: `Đã xác minh: ${data.patron.full_name || data.patron.student_code}`, placement: "topRight" });
+            apiAnt.success({ title: `Đã xác minh: ${data.patron.full_name || data.patron.student_code}`, placement: "topRight" });
             setFaceScanning(false);
           })
           .catch((err: any) => {
@@ -180,7 +180,7 @@ export default function BorrowPage() {
   }, [patronCode, stopCamera, setPatron, startSSE, apiAnt]);
 
   const handleScanSuccess = useCallback((message: string) => {
-    apiAnt.success({ message, placement: "topRight" });
+    apiAnt.success({ title: message, placement: "topRight" });
     setTimeout(() => window.location.reload(), 1500);
   }, [apiAnt]);
 

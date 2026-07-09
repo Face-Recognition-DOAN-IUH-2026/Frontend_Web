@@ -31,13 +31,20 @@ import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-  borrow_overdue: { icon: <ErrorOutlined />, color: "error.main", label: "Quá hạn mượn" },
+  borrow: { icon: <MenuBookOutlined />, color: "success.main", label: "Mượn sách" },
+  return: { icon: <MenuBookOutlined />, color: "info.main", label: "Trả sách" },
   book_available: { icon: <MenuBookOutlined />, color: "success.main", label: "Sách có sẵn" },
-  schedule_change: { icon: <CalendarMonthOutlined />, color: "warning.main", label: "Thay đổi lịch" },
+  overdue_reminder: { icon: <ErrorOutlined />, color: "error.main", label: "Quá hạn" },
+  due_soon_reminder: { icon: <ErrorOutlined />, color: "warning.main", label: "Sắp đến hạn" },
+  fine_notice: { icon: <ErrorOutlined />, color: "error.main", label: "Phí phạt" },
+  schedule_change: { icon: <CalendarMonthOutlined />, color: "warning.main", label: "Lịch trực" },
+  shift_reminder: { icon: <CalendarMonthOutlined />, color: "info.main", label: "Nhắc lịch" },
   membership_expiry: { icon: <BadgeOutlined />, color: "info.main", label: "Hạn thẻ" },
-  access_anomaly: { icon: <ShieldOutlined />, color: "error.main", label: "Bất thường truy cập" },
-  daily_stats: { icon: <BarChartOutlined />, color: "primary.main", label: "Báo cáo thống kê" },
-  staff_absence: { icon: <PersonOffOutlined />, color: "warning.main", label: "Nhân viên vắng mặt" },
+  anomaly_alert: { icon: <ShieldOutlined />, color: "error.main", label: "Bất thường" },
+  daily_report: { icon: <BarChartOutlined />, color: "primary.main", label: "Thống kê" },
+  staff_absence: { icon: <PersonOffOutlined />, color: "warning.main", label: "Vắng mặt" },
+  bid_warning: { icon: <ErrorOutlined />, color: "warning.main", label: "Đấu giá" },
+  swap_warning: { icon: <ErrorOutlined />, color: "warning.main", label: "Đổi ca" },
 };
 
 function getConfig(type: string) {

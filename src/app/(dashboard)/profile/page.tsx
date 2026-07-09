@@ -66,10 +66,10 @@ export default function ProfilePage() {
 
   const [notice, setNotice] = useState<Notice>(null);
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => {
-    if (severity === "success") apiAnt.success({ message, placement: "topRight" });
-    else if (severity === "error") apiAnt.error({ message, placement: "topRight" });
-    else if (severity === "warning") apiAnt.warning({ message, placement: "topRight" });
-    else apiAnt.info({ message, placement: "topRight" });
+    if (severity === "success") apiAnt.success({ title: message, placement: "topRight" });
+    else if (severity === "error") apiAnt.error({ title: message, placement: "topRight" });
+    else if (severity === "warning") apiAnt.warning({ title: message, placement: "topRight" });
+    else apiAnt.info({ title: message, placement: "topRight" });
   };
 
   useEffect(() => { fetchProfile(); }, []);

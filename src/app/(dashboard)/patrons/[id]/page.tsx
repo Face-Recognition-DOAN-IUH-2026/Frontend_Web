@@ -168,7 +168,7 @@ export default function PatronDetailPage() {
     if (!patron) return;
     await api.updatePatron(patron.id, editForm);
     setShowEdit(false);
-    apiAnt.success({ message: "Đã cập nhật thông tin độc giả.", placement: "topRight" });
+    apiAnt.success({ title: "Đã cập nhật thông tin độc giả.", placement: "topRight" });
     await loadPatron();
   };
 
@@ -178,7 +178,7 @@ export default function PatronDetailPage() {
     if (next < new Date()) next.setTime(Date.now());
     next.setFullYear(next.getFullYear() + 1);
     await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
-    apiAnt.success({ message: "Đã gia hạn thẻ thêm 1 năm.", placement: "topRight" });
+    apiAnt.success({ title: "Đã gia hạn thẻ thêm 1 năm.", placement: "topRight" });
     await loadPatron();
   };
 
@@ -189,10 +189,10 @@ export default function PatronDetailPage() {
       router.push("/patrons");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        apiAnt.error({ message: "Độc giả không tồn tại hoặc đã bị xóa.", placement: "topRight" });
+        apiAnt.error({ title: "Độc giả không tồn tại hoặc đã bị xóa.", placement: "topRight" });
         router.push("/patrons");
       } else {
-        apiAnt.error({ message: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
+        apiAnt.error({ title: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
       }
     }
   };
@@ -203,10 +203,10 @@ export default function PatronDetailPage() {
       await api.restorePatron(patron.id);
       setShowRestore(false);
       setRestoreConfirmText("");
-      apiAnt.success({ message: "Đã khôi phục độc giả.", placement: "topRight" });
+      apiAnt.success({ title: "Đã khôi phục độc giả.", placement: "topRight" });
       await loadPatron();
     } catch (err: any) {
-      apiAnt.error({ message: `Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
+      apiAnt.error({ title: `Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
     }
   };
 

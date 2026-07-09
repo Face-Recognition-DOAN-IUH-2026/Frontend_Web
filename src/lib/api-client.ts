@@ -1269,7 +1269,7 @@ class ApiClient {
 
   async getNotifications(params?: { unread_only?: boolean; skip?: number; limit?: number }): Promise<NotificationListResponse> {
     const query: any = {};
-    if (params?.unread_only !== undefined) query.unread_only = String(params.unread_only);
+    if (params?.unread_only !== undefined) query.unread = String(params.unread_only);
     if (params?.skip !== undefined) query.skip = params.skip;
     if (params?.limit !== undefined) query.limit = params.limit;
     const response = await this.client.get<NotificationListResponse>("/api/notifications", { params: query });
@@ -1306,7 +1306,7 @@ class ApiClient {
     return response.data;
   }
 
-  async testSmtpConfig(config: { to: string; smtp_config: any }): Promise<{ success: boolean; message: string }> {
+  async testSmtpConfig(config: { to: string; host: string; port: number; secure: boolean; user: string; pass: string; from: string }): Promise<{ success: boolean; message: string }> {
     const response = await this.client.post<{ success: boolean; message: string }>("/api/borrow/admin/settings/test-email", config);
     return response.data;
   }

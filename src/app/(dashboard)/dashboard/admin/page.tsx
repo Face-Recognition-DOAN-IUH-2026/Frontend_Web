@@ -124,7 +124,7 @@ export default function AdminPage() {
       setShowCreate(false);
       setCreateForm({ email: "", password: "", role: "staff" });
       setNotice("Tạo người dùng thành công. Tài khoản đã active.");
-      apiAnt.success({ message: "Tạo người dùng thành công. Tài khoản đã active.", placement: "topRight" });
+      apiAnt.success({ title: "Tạo người dùng thành công. Tài khoản đã active.", placement: "topRight" });
       load();
     } catch (err: any) {
       setCreateError(err?.response?.data?.detail || "Tạo người dùng thất bại.");
