@@ -40,18 +40,21 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
   const [ok, setOk] = useState<boolean | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const isStream = src.includes("/video") || src.includes("/mjpeg");
+
   useEffect(() => {
     onStatusChange?.(ok === true);
   }, [ok, onStatusChange]);
 
   const snapshotUrl = cameraId
-    ? `/api/camera/snapshot/${cameraId}?_t=`
-    : `${src}?_t=`;
+    ? `/api/camera/snapshot/${cameraId}`
+    : src;
 
   const scheduleNext = useCallback((success: boolean) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (isStream) return;
     timerRef.current = setTimeout(() => setTs(Date.now()), success ? ONLINE_INTERVAL : OFFLINE_INTERVAL);
-  }, []);
+  }, [isStream]);
 
   useEffect(() => {
     if (!cameraId) return;
@@ -114,7 +117,7 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
         <Box
           component="img"
           ref={imgRef}
-          src={`${snapshotUrl}${ts}`}
+          src={isStream ? snapshotUrl : `${snapshotUrl}?_t=${ts}`}
           onLoad={() => { setOk(true); scheduleNext(true); }}
           onError={() => { setOk(false); scheduleNext(false); }}
           alt={label}

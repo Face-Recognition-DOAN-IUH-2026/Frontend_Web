@@ -260,6 +260,7 @@ export default function StatsPage() {
     const countMap = new Map<string, { name: string; code: string; count: number; lastTime: string }>();
     todayLogs.forEach((log) => {
       if (!log.patron_id) return;
+      if (log.access_type !== "entry") return;
       const existing = countMap.get(log.patron_id);
       if (existing) {
         existing.count += 1;

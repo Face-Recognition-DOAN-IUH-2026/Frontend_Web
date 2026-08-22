@@ -43,6 +43,20 @@ export async function GET(request: NextRequest) {
     clearTimeout(timeout);
 
     const contentType = response.headers.get("Content-Type") || "image/jpeg";
+    const isStream = contentType.includes("multipart");
+
+    if (isStream) {
+      return new Response(response.body, {
+        status: response.status,
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      });
+    }
+
     const buffer = Buffer.from(await response.arrayBuffer());
 
     return new Response(buffer, {
