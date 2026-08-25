@@ -7,18 +7,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import AIWidgetTrigger from "./AIWidgetTrigger";
 import AIWidgetPanel from "./AIWidgetPanel";
 import { useAIWidgetStore } from "./store/useAIWidgetStore";
+import { useAuth } from "@/lib/auth-context";
 
 const BLACKLIST_PATHS = ["/login", "/register", "/gate", "/liveness", "/identify"];
 
 export default function AIWidget() {
   const pathname = usePathname();
   const { isOpen, close, proactiveMessage } = useAIWidgetStore();
+  const { isAuthenticated, isLoading, user: authUser } = useAuth();
+
+  // Hide while auth is loading or when not authenticated
+  if (isLoading) return null;
+  if (!isAuthenticated || !authUser) return null;
 
   const isBlacklisted = BLACKLIST_PATHS.some((p) => pathname?.startsWith(p));
 
-  const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
-  const userData = storedUser ? JSON.parse(storedUser) : null;
-  const role = userData?.role || 'staff';
+  const role = authUser?.role || 'staff';
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

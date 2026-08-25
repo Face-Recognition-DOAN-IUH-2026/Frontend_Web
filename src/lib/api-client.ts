@@ -1250,19 +1250,94 @@ class ApiClient {
 
   async askAiChat(message: string, sessionId?: string, role?: string): Promise<AIChatResponse> {
     const r = role || "patron";
-    const response = await this.client.post<AIChatResponse>(`/api/ai/${r}/chat`, { message, session_id: sessionId });
+    const endpoint =
+      r === "patron"
+        ? "/api/ai/patrons/chat"
+        : r === "staff"
+          ? "/api/ai/staff/chat"
+          : r === "admin"
+            ? "/api/ai/admin/chat"
+            : "/api/ai/chat";
+    const response = await this.client.post<AIChatResponse>(endpoint, { message, session_id: sessionId });
     return response.data;
   }
 
   async confirmAction(sessionId: string, action: string, role?: string): Promise<AIConfirmResponse> {
     const r = role || "patron";
-    const response = await this.client.post<AIConfirmResponse>(`/api/ai/${r}/confirm`, { session_id: sessionId, action });
+    const endpoint =
+      r === "patron"
+        ? "/api/ai/patrons/confirm"
+        : r === "staff"
+          ? "/api/ai/staff/confirm"
+          : r === "admin"
+            ? "/api/ai/admin/confirm"
+            : "/api/ai/confirm";
+    const response = await this.client.post<AIConfirmResponse>(endpoint, { session_id: sessionId, action });
     return response.data;
   }
 
   async getBookRecommendations(studentCode: string): Promise<AIBookRecommendationResponse> {
     const response = await this.client.get<AIBookRecommendationResponse>(`/api/ai/recommendations/patron/${studentCode}`);
     return response.data;
+  }
+
+  async streamCompanionChat(
+    message: string | undefined,
+    audioBase64: string | undefined,
+    sessionId: string | undefined,
+    onChunk: (chunk: any) => void,
+    onError?: (error: Error) => void,
+  ): Promise<void> {
+    const token =
+      _accessToken ||
+      getCookieValue("access_token") ||
+      (typeof window !== "undefined" ? localStorage.getItem("accessToken") || localStorage.getItem("token") : null);
+
+    const body: Record<string, any> = {};
+    if (message) body.message = message;
+    if (audioBase64) body.audioBase64 = audioBase64;
+    if (sessionId) body.sessionId = sessionId;
+
+    try {
+      const response = await fetch("/api/ai/companion/stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              onChunk(data);
+            } catch {}
+          }
+        }
+      }
+    } catch (error) {
+      onError?.(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
   async getNotifications(params?: { unread_only?: boolean; skip?: number; limit?: number }): Promise<NotificationListResponse> {

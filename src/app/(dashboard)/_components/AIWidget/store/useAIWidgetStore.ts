@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '@/lib/api-client';
+import type { CompanionChunk, CompanionState, VisemeData } from '@/lib/types/ai';
 
 export interface CommandCenterSummary {
   operational_score: number;
@@ -17,6 +18,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  isVoice?: boolean;
 }
 
 interface AIWidgetStore {
@@ -30,6 +32,12 @@ interface AIWidgetStore {
   proactiveMessage: string | null;
   failedSearchCount: number;
 
+  companionState: CompanionState;
+  isVoiceActive: boolean;
+  visemeData: VisemeData[];
+  audioQueue: string[];
+  currentAudio: string | null;
+
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -37,6 +45,11 @@ interface AIWidgetStore {
   setActiveTab: (tab: 'score' | 'chat' | 'actions') => void;
   updateSummary: (summary: CommandCenterSummary) => void;
   sendMessage: (message: string) => Promise<void>;
+  sendVoiceMessage: (audioBase64: string) => Promise<void>;
+  setCompanionState: (state: CompanionState) => void;
+  setVoiceActive: (active: boolean) => void;
+  setVisemeData: (visemes: VisemeData[]) => void;
+  setCurrentAudio: (audio: string | null) => void;
   clearMessages: () => void;
   recordFailedSearch: () => void;
   resetFailedSearch: () => void;
@@ -56,6 +69,12 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
       proactiveMessage: null,
       failedSearchCount: 0,
 
+      companionState: 'idle',
+      isVoiceActive: false,
+      visemeData: [],
+      audioQueue: [],
+      currentAudio: null,
+
       open: () => set({ isOpen: true }),
       close: () => set({ isOpen: false }),
       toggle: () => set((state) => ({ isOpen: !state.isOpen })),
@@ -64,6 +83,11 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
 
       updateSummary: (summary) => set({ lastSummary: summary }),
+
+      setCompanionState: (state) => set({ companionState: state }),
+      setVoiceActive: (active) => set({ isVoiceActive: active }),
+      setVisemeData: (visemes) => set({ visemeData: visemes }),
+      setCurrentAudio: (audio) => set({ currentAudio: audio }),
 
       recordFailedSearch: () => set((state) => {
         const next = state.failedSearchCount + 1;
@@ -91,24 +115,68 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
         set((state) => ({
           messages: [...state.messages, userMessage],
           isLoadingChat: true,
+          companionState: 'thinking',
         }));
 
         try {
           const { chatSessionId } = get();
-          const data = await api.askAiChat(message, chatSessionId);
 
-          const assistantMessage: ChatMessage = {
-            id: `assistant-${Date.now()}`,
-            role: 'assistant',
-            content: data.response || 'Xin lỗi, tôi không thể trả lời lúc này.',
-            timestamp: Date.now(),
-          };
-
-          set((state) => ({
-            messages: [...state.messages, assistantMessage],
-            isLoadingChat: false,
-            chatSessionId: data.sessionId || state.chatSessionId,
-          }));
+          let accumulatedText = '';
+          await api.streamCompanionChat(
+            message,
+            undefined,
+            chatSessionId,
+            (chunk: CompanionChunk) => {
+              switch (chunk.type) {
+                case 'text':
+                  accumulatedText += chunk.data.content;
+                  set((state) => ({
+                    messages: [
+                      ...state.messages.filter((m) => m.id !== 'streaming'),
+                      {
+                        id: 'streaming',
+                        role: 'assistant',
+                        content: accumulatedText,
+                        timestamp: Date.now(),
+                      },
+                    ],
+                  }));
+                  break;
+                case 'audio':
+                  set({ currentAudio: chunk.data.audioBase64, companionState: 'speaking' });
+                  break;
+                case 'viseme':
+                  set({ visemeData: chunk.data.visemes });
+                  break;
+                case 'companion_done':
+                  set((state) => ({
+                    messages: state.messages.map((m) =>
+                      m.id === 'streaming' ? { ...m, id: `assistant-${Date.now()}` } : m
+                    ),
+                    isLoadingChat: false,
+                    companionState: 'idle',
+                    chatSessionId: chunk.data.sessionId || state.chatSessionId,
+                  }));
+                  break;
+              }
+            },
+            (error) => {
+              console.error('Companion stream error:', error);
+              set((state) => ({
+                messages: [
+                  ...state.messages,
+                  {
+                    id: `error-${Date.now()}`,
+                    role: 'assistant',
+                    content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+                    timestamp: Date.now(),
+                  },
+                ],
+                isLoadingChat: false,
+                companionState: 'error',
+              }));
+            }
+          );
         } catch {
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
@@ -120,6 +188,97 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
           set((state) => ({
             messages: [...state.messages, errorMessage],
             isLoadingChat: false,
+            companionState: 'error',
+          }));
+        }
+      },
+
+      sendVoiceMessage: async (audioBase64: string) => {
+        const userMessage: ChatMessage = {
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content: '[Voice message]',
+          timestamp: Date.now(),
+          isVoice: true,
+        };
+
+        set((state) => ({
+          messages: [...state.messages, userMessage],
+          isLoadingChat: true,
+          companionState: 'listening',
+        }));
+
+        try {
+          const { chatSessionId } = get();
+
+          let accumulatedText = '';
+          await api.streamCompanionChat(
+            undefined,
+            audioBase64,
+            chatSessionId,
+            (chunk: CompanionChunk) => {
+              switch (chunk.type) {
+                case 'text':
+                  accumulatedText += chunk.data.content;
+                  set((state) => ({
+                    messages: [
+                      ...state.messages.filter((m) => m.id !== 'streaming'),
+                      {
+                        id: 'streaming',
+                        role: 'assistant',
+                        content: accumulatedText,
+                        timestamp: Date.now(),
+                      },
+                    ],
+                  }));
+                  break;
+                case 'audio':
+                  set({ currentAudio: chunk.data.audioBase64, companionState: 'speaking' });
+                  break;
+                case 'viseme':
+                  set({ visemeData: chunk.data.visemes });
+                  break;
+                case 'companion_done':
+                  set((state) => ({
+                    messages: state.messages.map((m) =>
+                      m.id === 'streaming' ? { ...m, id: `assistant-${Date.now()}` } : m
+                    ),
+                    isLoadingChat: false,
+                    companionState: 'idle',
+                    chatSessionId: chunk.data.sessionId || state.chatSessionId,
+                  }));
+                  break;
+              }
+            },
+            (error) => {
+              console.error('Companion stream error:', error);
+              set((state) => ({
+                messages: [
+                  ...state.messages,
+                  {
+                    id: `error-${Date.now()}`,
+                    role: 'assistant',
+                    content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+                    timestamp: Date.now(),
+                  },
+                ],
+                isLoadingChat: false,
+                companionState: 'error',
+              }));
+            }
+          );
+        } catch {
+          const errorMessage: ChatMessage = {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+            timestamp: Date.now(),
+          };
+
+          set((state) => ({
+            messages: [...state.messages, errorMessage],
+            isLoadingChat: false,
+            companionState: 'error',
           }));
         }
       },
