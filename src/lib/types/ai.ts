@@ -101,3 +101,15 @@ export interface AIPendingAction {
   description: string;
   params: Record<string, any>;
 }
+
+export interface CompanionChunk {
+  type: 'text' | 'audio' | 'viseme' | 'tool_result' | 'book_card' | 'companion_done';
+  data: any;
+}
+
+export interface VisemeData {
+  time: number;
+  value: number;
+}
+
+export type CompanionState = 'idle' | 'listening' | 'speaking' | 'thinking' | 'error';

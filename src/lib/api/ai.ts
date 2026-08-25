@@ -7,6 +7,7 @@ import type {
   AIChatResponse,
   AIConfirmResponse,
   AIBookRecommendationResponse,
+  CompanionChunk,
 } from "../types";
 
 export function createAIMethods(client: AxiosInstance) {
@@ -85,6 +86,64 @@ export function createAIMethods(client: AxiosInstance) {
         `/api/ai/recommendations/patron/${studentCode}`
       );
       return response.data;
+    },
+
+    async streamCompanionChat(
+      message: string | undefined,
+      audioBase64: string | undefined,
+      sessionId: string | undefined,
+      onChunk: (chunk: CompanionChunk) => void,
+      onError?: (error: Error) => void,
+    ): Promise<void> {
+      const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      const userData = storedUser ? JSON.parse(storedUser) : null;
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+
+      const body: Record<string, any> = {};
+      if (message) body.message = message;
+      if (audioBase64) body.audioBase64 = audioBase64;
+      if (sessionId) body.sessionId = sessionId;
+
+      try {
+        const response = await fetch("/api/ai/companion/stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No response body");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                onChunk(data);
+              } catch {}
+            }
+          }
+        }
+      } catch (error) {
+        onError?.(error instanceof Error ? error : new Error(String(error)));
+      }
     },
   };
 }
