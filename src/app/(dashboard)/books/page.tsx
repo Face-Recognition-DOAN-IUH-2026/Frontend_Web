@@ -63,10 +63,10 @@ import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 const STAT_GRADIENT = {
-  books: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-  copies: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-  available: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  borrowed: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+  books: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  copies: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+  available: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+  borrowed: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
 };
 
 function statusColor(status: string): "success" | "info" | "warning" | "error" | "default" {

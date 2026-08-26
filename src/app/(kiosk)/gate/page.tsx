@@ -446,9 +446,8 @@ export default function GatePage() {
             sx={{
               p: 3,
               borderRadius: 3,
-              background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
-              border: "1px solid",
-              borderColor: "rgba(99,102,241,0.3)",
+              background: "linear-gradient(135deg, #0F3C5C 0%, #1E6091 50%, #2980B9 100%)",
+              border: "1px solid rgba(255,255,255,0.12)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -458,17 +457,17 @@ export default function GatePage() {
               overflow: "hidden",
             }}
           >
-            <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-            <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+            <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.06)", pointerEvents: "none" }} />
+            <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
 
             <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-              <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-                <GateIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+              <Avatar sx={{ bgcolor: "rgba(255,255,255,0.15)", width: 52, height: 52, border: "1px solid rgba(255,255,255,0.25)" }}>
+                <GateIcon sx={{ color: "#FFFFFF", fontSize: 28 }} />
               </Avatar>
               <Box>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Cổng Thư Viện</Typography>
-                <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
-                  Theo dõi camera vào/ra và xác thực độc giả tại kiosk
+                <Typography variant="h5" sx={{ fontWeight: 800, color: "#FFFFFF" }}>CỔNG KIỂM SOÁT THƯ VIỆN IUH</Typography>
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)", mt: 0.3 }}>
+                  Hệ thống camera nhận diện AI và xác thực độc giả ra/vào tự động
                 </Typography>
               </Box>
             </Stack>

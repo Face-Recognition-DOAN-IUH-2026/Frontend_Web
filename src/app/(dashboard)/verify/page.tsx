@@ -284,7 +284,6 @@ export default function VerifyPage() {
           title="Xác minh khuôn mặt"
           subtitle="So khớp ảnh hiện tại với hồ sơ khuôn mặt của một người dùng cụ thể."
           icon={VerifiedUserOutlinedIcon}
-          gradient="linear-gradient(135deg, #134e4a 0%, #0d9488 50%, #14b8a6 100%)"
         />
       </Box>
 

@@ -157,7 +157,6 @@ export default function IdentifyPage() {
           title="Nhận diện khuôn mặt"
           subtitle="Tìm người dùng gần nhất trong kho khuôn mặt đã đăng ký."
           icon={FaceRetouchingNaturalOutlinedIcon}
-          gradient="linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #3b82f6 100%)"
         />
       </Box>
 

@@ -82,10 +82,10 @@ export default function DashboardPage() {
       />
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
-        <MuiStatCard label="Tổng độc giả" value={stats?.total_patrons ?? "—"} icon={UsersIcon} gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" pct={100} index={0} />
-        <MuiStatCard label="Đang có mặt" value={stats?.active_patrons ?? "—"} icon={UserCheckIcon} gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)" pct={stats?.total_patrons ? (stats.active_patrons / stats.total_patrons) * 100 : 0} index={1} />
-        <MuiStatCard label="Lượt vào hôm nay" value={stats?.today_entries ?? "—"} icon={LoginIcon} gradient="linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" pct={100} index={2} />
-        <MuiStatCard label="Lượt ra hôm nay" value={stats?.today_exits ?? "—"} icon={LogoutIcon} gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" pct={100} index={3} />
+        <MuiStatCard label="Tổng độc giả" value={stats?.total_patrons ?? "—"} icon={UsersIcon} gradient="linear-gradient(135deg, #1E6091 0%, #154E78 100%)" pct={100} index={0} />
+        <MuiStatCard label="Đang có mặt" value={stats?.active_patrons ?? "—"} icon={UserCheckIcon} gradient="linear-gradient(135deg, #059669 0%, #047857 100%)" pct={stats?.total_patrons ? (stats.active_patrons / stats.total_patrons) * 100 : 0} index={1} />
+        <MuiStatCard label="Lượt vào hôm nay" value={stats?.today_entries ?? "—"} icon={LoginIcon} gradient="linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" pct={100} index={2} />
+        <MuiStatCard label="Lượt ra hôm nay" value={stats?.today_exits ?? "—"} icon={LogoutIcon} gradient="linear-gradient(135deg, #D97706 0%, #B45309 100%)" pct={100} index={3} />
       </Box>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>

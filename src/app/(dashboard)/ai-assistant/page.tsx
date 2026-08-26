@@ -69,12 +69,12 @@ interface PendingAction {
 const STORAGE_KEY = "ai-assistant-session";
 
 const SUGGESTIONS = [
-  { label: "Tìm sách về AI", icon: <SearchIcon sx={{ fontSize: 16 }} />, color: "#6366f1" },
-  { label: "Lịch trực hôm nay", icon: <ScheduleIcon sx={{ fontSize: 16 }} />, color: "#3b82f6" },
-  { label: "Sách quá hạn", icon: <WarningIcon sx={{ fontSize: 16 }} />, color: "#ef4444" },
-  { label: "Giờ mở cửa", icon: <AccessTimeIcon sx={{ fontSize: 16 }} />, color: "#10b981" },
-  { label: "Quy định mượn trả", icon: <RuleIcon sx={{ fontSize: 16 }} />, color: "#f59e0b" },
-  { label: "Độc giả trong thư viện", icon: <GroupsIcon sx={{ fontSize: 16 }} />, color: "#8b5cf6" },
+  { label: "Tìm sách về AI", icon: <SearchIcon sx={{ fontSize: 16 }} />, color: "#1E6091" },
+  { label: "Lịch trực hôm nay", icon: <ScheduleIcon sx={{ fontSize: 16 }} />, color: "#2563EB" },
+  { label: "Sách quá hạn", icon: <WarningIcon sx={{ fontSize: 16 }} />, color: "#DC2626" },
+  { label: "Giờ mở cửa", icon: <AccessTimeIcon sx={{ fontSize: 16 }} />, color: "#059669" },
+  { label: "Quy định mượn trả", icon: <RuleIcon sx={{ fontSize: 16 }} />, color: "#D97706" },
+  { label: "Độc giả trong thư viện", icon: <GroupsIcon sx={{ fontSize: 16 }} />, color: "#154E78" },
 ];
 
 function buildApiUrl(path: string) {
@@ -90,10 +90,11 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 async function chat(message: string, sessionId?: string, patronId?: string) {
+  const body: Record<string, any> = { message, sessionId, patronId };
   const res = await fetch(buildApiUrl("/chat"), {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ message, sessionId, patronId }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
@@ -288,10 +289,10 @@ export default function AiAssistantPage() {
   }, [messages]);
 
   const stats = [
-    { key: "msg", label: "Tin nhắn", value: messages.length, gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" },
-    { key: "tool", label: "Công cụ", value: toolCount, gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" },
-    { key: "session", label: "Phiên", value: sessionId ? sessionId.slice(0, 6) : "Mới", gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
-    { key: "status", label: "Trạng thái", value: loading ? "Xử lý..." : "Sẵn sàng", gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" },
+    { key: "msg", label: "Tin nhắn", value: messages.length, gradient: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)" },
+    { key: "tool", label: "Công cụ", value: toolCount, gradient: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" },
+    { key: "session", label: "Phiên", value: sessionId ? sessionId.slice(0, 6) : "Mới", gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)" },
+    { key: "status", label: "Trạng thái", value: loading ? "Xử lý..." : "Sẵn sàng", gradient: "linear-gradient(135deg, #D97706 0%, #B45309 100%)" },
   ];
 
   const showEmpty = messages.length <= 1 && messages[0]?.role === "assistant";
@@ -309,14 +310,17 @@ export default function AiAssistantPage() {
         statBadges={statBadges}
         onRefresh={clearChat}
         actions={
-          sessionId ? (
-            <Chip
-              label={`Phiên: ${sessionId.slice(0, 8)}...`}
-              size="small"
-              sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", fontWeight: 600, fontSize: "0.72rem" }}
-              variant="outlined"
-            />
-          ) : null}
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            {sessionId ? (
+              <Chip
+                label={`Phiên: ${sessionId.slice(0, 8)}...`}
+                size="small"
+                sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", fontWeight: 600, fontSize: "0.72rem" }}
+                variant="outlined"
+              />
+            ) : null}
+          </Stack>
+        }
       />
 
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", m: 0, borderRadius: 0 }}>

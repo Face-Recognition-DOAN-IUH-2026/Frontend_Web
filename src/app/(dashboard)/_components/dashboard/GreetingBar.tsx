@@ -38,19 +38,19 @@ export default function GreetingBar({ userName, onRefresh, liveConnected }: Gree
       </Typography>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
         <Chip
-          icon={<SensorIcon />}
-          label={liveConnected ? "Live" : "Auto-refresh"}
+          icon={<SensorIcon sx={{ fontSize: 16 }} />}
+          label={liveConnected ? "Trực tiếp" : "Tự làm mới"}
           size="small"
           sx={{
-            bgcolor: liveConnected ? "rgba(16,185,129,0.15)" : "action.hover",
-            color: liveConnected ? "#6ee7b7" : "text.secondary",
+            bgcolor: liveConnected ? "rgba(5, 150, 105, 0.12)" : "action.hover",
+            color: liveConnected ? "success.main" : "text.secondary",
             border: "1px solid",
-            borderColor: liveConnected ? "rgba(16,185,129,0.3)" : "divider",
+            borderColor: liveConnected ? "rgba(5, 150, 105, 0.3)" : "divider",
             fontWeight: 600,
           }}
         />
-        <Tooltip title="Tải lại">
-          <IconButton onClick={onRefresh} size="small">
+        <Tooltip title="Tải lại dữ liệu">
+          <IconButton onClick={onRefresh} size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
             <RefreshIcon fontSize="small" />
           </IconButton>
         </Tooltip>

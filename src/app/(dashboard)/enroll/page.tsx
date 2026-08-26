@@ -70,9 +70,8 @@ export default function EnrollPage() {
       <Box sx={staggerSx(0)}>
         <PageHeader
           title="Đăng ký khuôn mặt"
-          subtitle="Chụp đủ 4 góc để hệ thống tạo hồ sơ nhận diện ổn định hơn."
+          subtitle="Chụp các góc để hệ thống tạo hồ sơ nhận diện khuôn mặt ổn định hơn."
           icon={FaceOutlinedIcon}
-          gradient="linear-gradient(135deg, #312e81 0%, #4338ca 50%, #6366f1 100%)"
         />
       </Box>
 

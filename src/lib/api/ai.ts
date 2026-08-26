@@ -145,5 +145,6 @@ export function createAIMethods(client: AxiosInstance) {
         onError?.(error instanceof Error ? error : new Error(String(error)));
       }
     },
+
   };
 }

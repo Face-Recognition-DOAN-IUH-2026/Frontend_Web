@@ -173,12 +173,17 @@ export default function RegisterPage() {
         p: 2,
       }}
     >
-      <Card sx={{ maxWidth: 560, width: "100%" }}>
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <Card elevation={0} sx={{ maxWidth: 560, width: "100%", borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
           <Stack spacing={3}>
-            <Typography variant="h5" sx={{ fontWeight: 700, textAlign: "center" }}>
-              Đăng ký thẻ thư viện
-            </Typography>
+            <Stack spacing={1} sx={{ alignItems: "center", textAlign: "center" }}>
+              <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                ĐĂNG KÝ THẺ THƯ VIỆN IUH
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Trường Đại học Công nghiệp TP.HCM
+              </Typography>
+            </Stack>
 
             {phase !== "done" && (
               <Stepper activeStep={activeStep} alternativeLabel>

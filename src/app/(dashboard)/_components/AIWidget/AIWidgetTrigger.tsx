@@ -7,13 +7,13 @@ import { useAIWidgetStore } from "./store/useAIWidgetStore";
 
 export default function AIWidgetTrigger() {
   const theme = useTheme();
-  const { isOpen, toggle, isMinimized, activeTab, proactiveMessage } = useAIWidgetStore();
+  const { isOpen, toggle, isMinimized, activeTab } = useAIWidgetStore();
 
-  const shouldShow = isOpen || proactiveMessage;
+  const shouldShow = !isOpen && !isMinimized;
 
   return (
     <AnimatePresence>
-      {shouldShow && !isMinimized && (
+      {shouldShow && (
         <Box
           sx={{
             position: "fixed",

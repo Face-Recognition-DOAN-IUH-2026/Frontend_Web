@@ -175,7 +175,7 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
                 isLoadingChat: false,
                 companionState: 'error',
               }));
-            }
+            },
           );
         } catch {
           const errorMessage: ChatMessage = {
@@ -265,7 +265,7 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
                 isLoadingChat: false,
                 companionState: 'error',
               }));
-            }
+            },
           );
         } catch {
           const errorMessage: ChatMessage = {
@@ -291,6 +291,7 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
         isMinimized: state.isMinimized,
         activeTab: state.activeTab,
         messages: state.messages,
+        chatSessionId: state.chatSessionId,
       }),
     }
   )

@@ -93,7 +93,6 @@ export default function LivenessPage() {
           title="Kiểm tra sống"
           subtitle="Đánh giá ảnh khuôn mặt thật hay ảnh giả mạo trước khi xử lý nhận diện."
           icon={VisibilityOutlinedIcon}
-          gradient="linear-gradient(135deg, #581c87 0%, #7c3aed 50%, #a78bfa 100%)"
         />
       </Box>
 

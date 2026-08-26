@@ -294,25 +294,35 @@ export default function HistoryPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Lịch sử mượn trả"
+        title="Lịch sử ra vào cổng"
+        subtitle={`Theo dõi lượt quét thẻ, nhận diện khuôn mặt và thời gian ra vào`}
         icon={HistoryOutlinedIcon}
-        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
-        statBadges={`${live ? "Live · " : ""}Tổng: ${total}`}
+        statBadges={`Tổng: ${total} lượt`}
         onRefresh={load}
         actions={
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <Chip icon={<SensorsOutlinedIcon />} label={live ? "Live đang bật" : "Live đang tắt"} sx={{ bgcolor: live ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.08)", color: live ? "#6ee7b7" : "#a5b4fc", border: "1px solid", borderColor: live ? "rgba(16,185,129,0.3)" : "rgba(165,180,252,0.3)", fontWeight: 600 }} />
-            <Chip label={`Tổng: ${total}`} sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "#e0e7ff", border: "1px solid rgba(165,180,252,0.3)", fontWeight: 600 }} />
+            <Chip
+              icon={<SensorsOutlinedIcon sx={{ fontSize: 16 }} />}
+              label={live ? "Trực tiếp" : "Tự làm mới"}
+              size="small"
+              sx={{
+                bgcolor: live ? "rgba(5, 150, 105, 0.12)" : "action.hover",
+                color: live ? "success.main" : "text.secondary",
+                border: "1px solid",
+                borderColor: live ? "rgba(5, 150, 105, 0.3)" : "divider",
+                fontWeight: 600,
+              }}
+            />
           </Stack>
         }
       />
 
-      <DashboardCard title="Bộ lọc">
+      <DashboardCard title="Bộ lọc tìm kiếm">
         <Grid container spacing={1.5} sx={{ alignItems: "center" }}>
           <Grid size={{ xs: 12, md: 3 }}>
             <TextField
               label="Tìm kiếm"
-              placeholder="MSSV hoặc tên..."
+              placeholder="MSSV hoặc tên độc giả..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" ? handleFilter() : undefined}
@@ -327,7 +337,6 @@ export default function HistoryPage() {
                   ),
                 },
               }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 1.7 }}>
@@ -357,7 +366,7 @@ export default function HistoryPage() {
                 setDateFrom(dates?.[0]?.format("YYYY-MM-DD") || "");
                 setDateTo(dates?.[1]?.format("YYYY-MM-DD") || "");
               }}
-              style={{ width: "100%" }}
+              style={{ width: "100%", height: 40 }}
               placeholder={["Từ ngày", "Đến ngày"]}
               format="DD/MM/YYYY"
             />
@@ -368,7 +377,7 @@ export default function HistoryPage() {
               onClick={handleFilter}
               disabled={loading}
               fullWidth
-              sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}
+              sx={{ borderRadius: 2, fontWeight: 700, height: 40 }}
             >
               Lọc
             </Button>
@@ -432,7 +441,7 @@ export default function HistoryPage() {
               label="Lượt vào trong biểu đồ"
               value={entryTotal}
               icon={LoginOutlinedIcon}
-              gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)"
+              gradient="linear-gradient(135deg, #059669 0%, #047857 100%)"
               pct={100}
               index={0}
             />
@@ -440,7 +449,7 @@ export default function HistoryPage() {
               label="Lượt ra trong biểu đồ"
               value={exitTotal}
               icon={LogoutOutlinedIcon}
-              gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+              gradient="linear-gradient(135deg, #D97706 0%, #B45309 100%)"
               pct={100}
               index={1}
             />
