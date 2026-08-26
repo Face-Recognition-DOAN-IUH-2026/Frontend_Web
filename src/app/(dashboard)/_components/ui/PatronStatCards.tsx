@@ -15,10 +15,10 @@ interface PatronStatCardsProps {
 }
 
 const STAT_GRADIENT = {
-  total: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-  active: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  expired: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-  face: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+  total: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  active: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+  expired: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
+  face: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
 };
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
@@ -54,10 +54,10 @@ export default function PatronStatCards({ patrons }: PatronStatCardsProps) {
   }, [patrons]);
 
   const items = [
-    { label: "Tổng độc giả", value: patrons.length, gradient: STAT_GRADIENT.total, icon: PeopleIcon, pct: 100, sparkColor: "#6366f1" },
-    { label: "Hoạt động", value: stats.activeCount, gradient: STAT_GRADIENT.active, icon: PersonIcon, pct: patrons.length ? Math.round((stats.activeCount / patrons.length) * 100) : 0, sparkColor: "#10b981" },
-    { label: "Hết hạn / Khóa", value: stats.expiredCount, gradient: STAT_GRADIENT.expired, icon: UpdateIcon, pct: patrons.length ? Math.round((stats.expiredCount / patrons.length) * 100) : 0, sparkColor: "#f59e0b" },
-    { label: "Có khuôn mặt", value: stats.faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((stats.faceCount / patrons.length) * 100) : 0, sparkColor: "#3b82f6" },
+    { label: "Tổng độc giả", value: patrons.length, gradient: STAT_GRADIENT.total, icon: PeopleIcon, pct: 100, sparkColor: "#1E6091" },
+    { label: "Hoạt động", value: stats.activeCount, gradient: STAT_GRADIENT.active, icon: PersonIcon, pct: patrons.length ? Math.round((stats.activeCount / patrons.length) * 100) : 0, sparkColor: "#059669" },
+    { label: "Hết hạn / Khóa", value: stats.expiredCount, gradient: STAT_GRADIENT.expired, icon: UpdateIcon, pct: patrons.length ? Math.round((stats.expiredCount / patrons.length) * 100) : 0, sparkColor: "#D97706" },
+    { label: "Có khuôn mặt", value: stats.faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((stats.faceCount / patrons.length) * 100) : 0, sparkColor: "#2563EB" },
   ];
 
   return (

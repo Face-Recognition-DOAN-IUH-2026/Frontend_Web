@@ -82,9 +82,9 @@ function normalizeQuery(value: string) {
 }
 
 const STAT_CARDS = [
-  { key: "entry_gate", label: "Cổng vào", icon: DoorFrontOutlinedIcon, gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
-  { key: "exit_gate", label: "Cổng ra", icon: ExitToAppOutlinedIcon, gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" },
-  { key: "kiosk", label: "Kiosk", icon: TerminalOutlinedIcon, gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" },
+  { key: "entry_gate", label: "Cổng vào", icon: DoorFrontOutlinedIcon, gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)" },
+  { key: "exit_gate", label: "Cổng ra", icon: ExitToAppOutlinedIcon, gradient: "linear-gradient(135deg, #D97706 0%, #B45309 100%)" },
+  { key: "kiosk", label: "Kiosk", icon: TerminalOutlinedIcon, gradient: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)" },
 ] as const;
 
 export default function ActivePage() {

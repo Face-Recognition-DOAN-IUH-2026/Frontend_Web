@@ -1,7 +1,6 @@
 "use client";
 
-import { Box, IconButton, Typography, Tabs, Tab, useTheme, useMediaQuery } from "@mui/material";
-import { motion, AnimatePresence } from "framer-motion";
+import { Box, IconButton, Typography, useTheme, useMediaQuery } from "@mui/material";
 import CloseIcon from "@mui/icons-material/CloseOutlined";
 import MinimizeIcon from "@mui/icons-material/MinimizeOutlined";
 import { useAIWidgetStore } from "./store/useAIWidgetStore";
@@ -32,12 +31,8 @@ export default function AIWidgetHeader({ onMinimize }: AIWidgetHeaderProps) {
         bgcolor: "background.paper",
       }}
     >
-      <Typography
-        variant="subtitle1"
-        sx={{ fontWeight: 800, color: "text.primary", display: "flex", alignItems: "center", gap: 1 }}
-      >
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
         <Box
-          component="span"
           sx={{
             width: 28,
             height: 28,
@@ -47,14 +42,20 @@ export default function AIWidgetHeader({ onMinimize }: AIWidgetHeaderProps) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
           }}
         >
           🤖
         </Box>
-        AI Library Helper
-      </Typography>
+        <Typography
+          variant="subtitle1"
+          sx={{ fontWeight: 800, color: "text.primary", whiteSpace: "nowrap" }}
+        >
+          AI Library Helper
+        </Typography>
+      </Box>
 
-      <Box sx={{ display: "flex", gap: 0.5 }}>
+      <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
         <IconButton size="small" onClick={onMinimize} sx={{ color: "text.secondary" }}>
           <MinimizeIcon fontSize="small" />
         </IconButton>

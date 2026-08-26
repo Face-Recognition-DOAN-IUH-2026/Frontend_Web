@@ -84,20 +84,11 @@ export default function PatronToolbar({ query, onQueryChange, filter, onFilterCh
         startIcon={<AddIcon />}
         onClick={onAddPatron}
         sx={{
-          background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
           borderRadius: 2,
           fontWeight: 700,
-          textTransform: "none",
-          boxShadow: "0 4px 14px rgba(99,102,241,0.4)",
-          animation: "glow 2s ease-in-out infinite alternate",
-          "@keyframes glow": {
-            "0%": { boxShadow: "0 4px 14px rgba(99,102,241,0.4)" },
-            "100%": { boxShadow: "0 4px 24px rgba(99,102,241,0.6)" },
-          },
-          "&:hover": {
-            background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
-            boxShadow: "0 6px 20px rgba(99,102,241,0.5)",
-          },
+          px: 2.5,
+          py: 1,
+          boxShadow: "0 2px 8px rgba(30,96,145,0.25)",
         }}
       >
         Thêm độc giả

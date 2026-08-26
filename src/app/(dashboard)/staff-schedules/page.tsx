@@ -48,12 +48,10 @@ const FILTERS = [
 ] as const;
 
 const STAT_GRADIENT = {
-  total: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-  active: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  staff: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+  total: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  active: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+  staff: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
 };
-
-const HEADER_GRADIENT = "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)";
 
 export default function StaffSchedulesPage() {
   const { user } = useAuth();
@@ -210,9 +208,8 @@ export default function StaffSchedulesPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Lịch trực theo tuần"
+        subtitle={formatDateRange(days)}
         icon={ScheduleOutlined}
-        gradient={HEADER_GRADIENT}
-        statBadges={formatDateRange(days)}
         onRefresh={loadData}
         actions={headerActions}
       />

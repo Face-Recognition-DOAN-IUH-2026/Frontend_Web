@@ -7,6 +7,7 @@ import {
   Avatar,
   Box,
   ButtonBase,
+  Chip,
   Divider,
   Drawer,
   IconButton,
@@ -15,6 +16,7 @@ import {
   ListItemIcon,
   ListItemText,
   Stack,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
@@ -24,7 +26,6 @@ import { useRouter } from "next/navigation";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import BarChartIcon from "@mui/icons-material/BarChartOutlined";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import BookPlusIcon from "@mui/icons-material/BookmarkAddOutlined";
@@ -42,8 +43,9 @@ import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
-const drawerWidth = 268;
+const drawerWidth = 264;
 
 const libraryItems = [
   { href: "/dashboard", label: "Tổng quan", icon: DashboardIcon },
@@ -81,46 +83,95 @@ const adminItems = [
   { href: "/stats", label: "Thống kê", icon: BarChartIcon },
 ];
 
-function NavSection({ title, items }: { title: string; items: Array<{ href: string; label: string; icon: any }> }) {
+function NavSection({
+  title,
+  items,
+  onClose,
+}: {
+  title: string;
+  items: Array<{ href: string; label: string; icon: any }>;
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
     <Box>
-      <Typography variant="caption" color="text.secondary" sx={{ px: 1.5, fontWeight: 800, letterSpacing: 0.5 }}>
+      {/* Section label */}
+      <Typography
+        variant="overline"
+        sx={{
+          px: 1.5,
+          fontSize: "0.68rem",
+          fontWeight: 700,
+          letterSpacing: "0.09em",
+          color: "text.disabled",
+          display: "block",
+          mb: 0.5,
+        }}
+      >
         {title}
       </Typography>
-      <List dense disablePadding sx={{ mt: 0.75 }}>
+      <List dense disablePadding>
         {items.map((item) => {
           const Icon = item.icon;
-          const selected = pathname === item.href;
+          const selected =
+            item.href === "/dashboard"
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
+
           return (
             <ListItemButton
               key={item.href}
               component={Link}
               href={item.href}
               selected={selected}
+              onClick={onClose}
               sx={{
-                mb: 0.5,
-                borderRadius: 1,
+                mb: 0.25,
+                borderRadius: 2,
+                py: 0.8,
+                px: 1.25,
                 color: selected ? "primary.main" : "text.secondary",
+                transition: "all 0.15s ease",
                 "&.Mui-selected": {
-                  bgcolor: "primary.main",
-                  color: "primary.contrastText",
-                  "& .MuiListItemIcon-root": { color: "primary.contrastText" },
+                  bgcolor: "action.selected",
+                  color: "primary.main",
+                  "& .MuiListItemIcon-root": { color: "primary.main" },
+                  "&:hover": { bgcolor: "action.selected" },
+                  // Left accent bar
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    left: 0,
+                    top: "20%",
+                    bottom: "20%",
+                    width: 3,
+                    borderRadius: "0 2px 2px 0",
+                    bgcolor: "primary.main",
+                  },
                 },
-                "&.Mui-selected:hover": { bgcolor: "primary.dark" },
+                "&:hover": { bgcolor: "action.hover", color: "text.primary" },
+                position: "relative",
               }}
             >
-              <ListItemIcon sx={{ minWidth: 38, color: selected ? "primary.contrastText" : "text.secondary" }}>
-                <Icon fontSize="small" />
+              <ListItemIcon
+                sx={{ minWidth: 34, color: selected ? "primary.main" : "text.disabled" }}
+              >
+                <Icon sx={{ fontSize: 18 }} />
               </ListItemIcon>
               <ListItemText
                 primary={
-                  <Typography variant="body2" sx={{ fontWeight: selected ? 800 : 600 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: selected ? 700 : 500, fontSize: "0.875rem" }}
+                  >
                     {item.label}
                   </Typography>
                 }
               />
+              {selected && (
+                <ChevronRightIcon sx={{ fontSize: 14, color: "primary.main", opacity: 0.5 }} />
+              )}
             </ListItemButton>
           );
         })}
@@ -140,70 +191,143 @@ export default function Sidebar() {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const handleClose = () => setMobileOpen(false);
+
   const drawerContent = (
-    <Stack sx={{ minHeight: "100%" }}>
-      <Box sx={{ p: 2.25 }}>
-        <ButtonBase component={Link} href="/dashboard" sx={{ width: "100%", justifyContent: "flex-start", borderRadius: 1 }} onClick={() => setMobileOpen(false)}>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-            <Avatar sx={{ width: 42, height: 42, bgcolor: "primary.main", color: "primary.contrastText", borderRadius: 2 }}>
-              <LibraryIcon />
-            </Avatar>
-            <Box sx={{ minWidth: 0, textAlign: "left" }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 900 }} noWrap>THƯ VIỆN IUH</Typography>
-              <Typography variant="caption" color="text.secondary">Hệ thống quản lý</Typography>
+    <Stack sx={{ height: "100%" }}>
+      {/* ── Logo / Brand ─────────────────────────────────── */}
+      <Box sx={{ px: 2, py: 2 }}>
+        <ButtonBase
+          component={Link}
+          href="/dashboard"
+          onClick={handleClose}
+          sx={{ width: "100%", justifyContent: "flex-start", borderRadius: 2 }}
+        >
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", py: 0.5 }}>
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: 2,
+                bgcolor: "primary.main",
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+              }}
+            >
+              <LibraryIcon sx={{ color: "white", fontSize: 20 }} />
+            </Box>
+            <Box sx={{ textAlign: "left", minWidth: 0 }}>
+              <Typography
+                variant="subtitle2"
+                sx={{ fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.2 }}
+                noWrap
+              >
+                THƯ VIỆN IUH
+              </Typography>
+              <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.7rem" }}>
+                Hệ thống quản lý
+              </Typography>
             </Box>
           </Stack>
         </ButtonBase>
       </Box>
-      <Divider />
-      <Stack spacing={2.25} sx={{ flex: 1, p: 1.5, overflowY: "auto" }}>
-        <NavSection title="Thư viện" items={libraryItems} />
-        {isAdminOrStaff ? <NavSection title="Mượn / Trả" items={circulationItems} /> : null}
-        {isAdminOrStaff ? <NavSection title="Nhân sự" items={staffItems} /> : null}
-        {isAdmin ? <NavSection title="Chẩn đoán AI" items={aiItems} /> : null}
-        {isAdminOrStaff ? <NavSection title="AI" items={staffAiItems} /> : null}
-        {isAdmin ? <NavSection title="Quản trị" items={adminItems} /> : null}
+
+      <Divider sx={{ mx: 1.5 }} />
+
+      {/* ── Navigation ───────────────────────────────────── */}
+      <Stack
+        spacing={2}
+        sx={{ flex: 1, px: 1, py: 1.5, overflowY: "auto" }}
+      >
+        <NavSection title="Thư viện" items={libraryItems} onClose={handleClose} />
+        {isAdminOrStaff && (
+          <NavSection title="Mượn / Trả" items={circulationItems} onClose={handleClose} />
+        )}
+        {isAdminOrStaff && (
+          <NavSection title="Nhân sự" items={staffItems} onClose={handleClose} />
+        )}
+        {isAdminOrStaff && (
+          <NavSection title="AI" items={staffAiItems} onClose={handleClose} />
+        )}
+        {isAdmin && (
+          <NavSection title="Chẩn đoán AI" items={aiItems} onClose={handleClose} />
+        )}
+        {isAdmin && (
+          <NavSection title="Quản trị" items={adminItems} onClose={handleClose} />
+        )}
       </Stack>
-      <Divider />
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center", p: 1.5 }}>
-        <ButtonBase
-          onClick={() => router.push("/profile")}
+
+      <Divider sx={{ mx: 1.5 }} />
+
+      {/* ── User footer ──────────────────────────────────── */}
+      <Box sx={{ p: 1.25 }}>
+        <Stack
+          direction="row"
+          spacing={1}
           sx={{
-            borderRadius: 2,
+            alignItems: "center",
             px: 1,
-            py: 0.5,
-            flex: 1,
-            minWidth: 0,
-            justifyContent: "flex-start",
+            py: 0.75,
+            borderRadius: 2,
+            cursor: "pointer",
+            transition: "background-color 0.15s ease",
             "&:hover": { bgcolor: "action.hover" },
           }}
+          onClick={() => router.push("/profile")}
         >
           <Avatar
             src={user?.avatar_url || undefined}
             sx={{
-              width: 38,
-              height: 38,
+              width: 34,
+              height: 34,
               flexShrink: 0,
               bgcolor: "primary.main",
-              color: "primary.contrastText",
-              fontWeight: 900,
+              color: "white",
+              fontSize: "0.85rem",
+              fontWeight: 700,
             }}
           >
             {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
           </Avatar>
-          <Box sx={{ minWidth: 0, flex: 1, textAlign: "left", ml: 0.75, overflow: "hidden" }}>
-            <Typography variant="body2" sx={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 700,
+                fontSize: "0.82rem",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
-              {role === "admin" ? "Quản trị viên" : "Nhân viên"}
-            </Typography>
+            <Chip
+              label={role === "admin" ? "Admin" : "Nhân viên"}
+              size="small"
+              sx={{
+                height: 16,
+                fontSize: "0.62rem",
+                fontWeight: 700,
+                bgcolor: role === "admin" ? "secondary.main" : "action.selected",
+                color: role === "admin" ? "white" : "primary.main",
+                "& .MuiChip-label": { px: 0.75 },
+              }}
+            />
           </Box>
-        </ButtonBase>
-        <IconButton onClick={logout} title="Đăng xuất" color="error" size="small" sx={{ flexShrink: 0 }}>
-          <LogoutIcon fontSize="small" />
-        </IconButton>
-      </Stack>
+          <Tooltip title="Đăng xuất">
+            <IconButton
+              onClick={(e) => { e.stopPropagation(); logout(); }}
+              size="small"
+              color="error"
+              sx={{ opacity: 0.7, "&:hover": { opacity: 1 } }}
+            >
+              <LogoutIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
     </Stack>
   );
 
@@ -212,14 +336,23 @@ export default function Sidebar() {
       <>
         <IconButton
           onClick={() => setMobileOpen(true)}
-          sx={{ position: "fixed", top: 12, left: 12, zIndex: 1400, bgcolor: "background.paper", boxShadow: 1 }}
+          sx={{
+            position: "fixed",
+            top: 12,
+            left: 12,
+            zIndex: 1400,
+            bgcolor: "background.paper",
+            boxShadow: "0 2px 8px rgba(30,96,145,0.12)",
+            border: "1px solid",
+            borderColor: "divider",
+          }}
         >
           <MenuIcon />
         </IconButton>
         <Drawer
           variant="temporary"
           open={mobileOpen}
-          onClose={() => setMobileOpen(false)}
+          onClose={handleClose}
           ModalProps={{ keepMounted: true }}
           sx={{ "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth } }}
         >

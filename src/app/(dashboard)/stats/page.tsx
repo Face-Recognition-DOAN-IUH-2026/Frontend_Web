@@ -61,16 +61,16 @@ import type {
 type RealtimeState = "connecting" | "connected" | "disconnected";
 
 const STAT_GRADIENT: Record<string, string> = {
-  active:    "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  entry:     "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-  exit:      "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-  activity:  "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-  borrow:    "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
-  borrow_ok: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-  overdue:   "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-  camera:    "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-  top:       "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-  week:      "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)",
+  active:    "linear-gradient(135deg, #059669 0%, #047857 100%)",
+  entry:     "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+  exit:      "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
+  activity:  "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  borrow:    "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  borrow_ok: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+  overdue:   "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)",
+  camera:    "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  top:       "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
+  week:      "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
 };
 
 function toDateStr(d: Date) {
@@ -300,19 +300,18 @@ export default function StatsPage() {
         <Stack spacing={3}>
           <PageHeader
             title="Thống kê vận hành"
+            subtitle={`${todayLabel} — Theo dõi ra/vào, hiện diện và mượn trả`}
             icon={ChartIcon}
-            gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
-            statBadges={`${todayLabel} — Theo dõi ra/vào, hiện diện và mượn trả`}
             actions={
-              <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap" }}>
+              <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", alignItems: "center" }}>
                 <Chip
                   variant="outlined"
                   label={`Tổng độc giả: ${(stats.total_patrons ?? 0).toLocaleString("vi-VN")}`}
-                  sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", fontWeight: 600 }}
+                  sx={{ fontWeight: 600 }}
                 />
                 <Chip
                   color={realtimeColor as any}
-                  icon={<RadioIcon />}
+                  icon={<RadioIcon sx={{ fontSize: 16 }} />}
                   label={realtimeLabel}
                   sx={{ fontWeight: 600 }}
                 />

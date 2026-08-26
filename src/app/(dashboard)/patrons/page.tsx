@@ -43,10 +43,10 @@ export type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face"
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 const STAT_GRADIENT = {
-  total: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-  active: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  expired: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-  face: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+  total: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  active: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+  expired: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
+  face: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
 };
 
 export default function PatronsPage() {

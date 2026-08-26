@@ -6,6 +6,7 @@ import ConfigProvider from "antd/es/config-provider";
 import { setupGlobalErrorHandlers } from "@/lib/error-reporter";
 import { useColorMode } from "@/lib/mui-theme";
 import { getAntdTheme } from "@/lib/antd-theme";
+import AIWidget from "@/app/(dashboard)/_components/AIWidget";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { effectiveMode } = useColorMode();
@@ -17,7 +18,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <AntdRegistry>
-      <ConfigProvider theme={getAntdTheme(isDark)}>{children}</ConfigProvider>
+      <ConfigProvider theme={getAntdTheme(isDark)}>
+        {children}
+        <AIWidget />
+      </ConfigProvider>
     </AntdRegistry>
   );
 }

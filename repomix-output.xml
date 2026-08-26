@@ -108,6 +108,11 @@ src/
             AIActionCard.tsx
             AIScoreCard.tsx
             BookLocationCard.tsx
+          components/
+            CompanionAvatar.tsx
+          hooks/
+            useAudioPlayer.ts
+            useVoiceRecorder.ts
           store/
             useAIWidgetStore.ts
           tabs/
@@ -3298,6 +3303,308 @@ export default function AIScoreCard() {
       </Card>
     </Stack>
   );
+}
+</file>
+
+<file path="src/app/(dashboard)/_components/AIWidget/components/CompanionAvatar.tsx">
+'use client';
+
+import React from 'react';
+import { Box, keyframes } from '@mui/material';
+import type { CompanionState, VisemeData } from '@/lib/types/ai';
+
+interface CompanionAvatarProps {
+  state: CompanionState;
+  visemeData?: VisemeData[];
+  size?: number;
+}
+
+const pulse = keyframes`
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+`;
+
+const speaking = keyframes`
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.1); }
+`;
+
+const glow = keyframes`
+  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.6); }
+`;
+
+const getStateColor = (state: CompanionState): string => {
+  switch (state) {
+    case 'idle':
+      return '#6366f1';
+    case 'listening':
+      return '#3b82f6';
+    case 'speaking':
+      return '#10b981';
+    case 'thinking':
+      return '#f59e0b';
+    case 'error':
+      return '#ef4444';
+    default:
+      return '#6366f1';
+  }
+};
+
+const getStateAnimation = (state: CompanionState) => {
+  switch (state) {
+    case 'idle':
+      return `${pulse} 2s ease-in-out infinite`;
+    case 'listening':
+      return `${pulse} 1s ease-in-out infinite`;
+    case 'speaking':
+      return `${speaking} 0.3s ease-in-out infinite`;
+    case 'thinking':
+      return `${pulse} 1.5s ease-in-out infinite`;
+    default:
+      return 'none';
+  }
+};
+
+export default function CompanionAvatar({
+  state,
+  visemeData = [],
+  size = 120,
+}: CompanionAvatarProps) {
+  const color = getStateColor(state);
+  const animation = getStateAnimation(state);
+
+  return (
+    <Box
+      sx={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        animation,
+        transition: 'all 0.3s ease',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          inset: -4,
+          borderRadius: '50%',
+          border: `2px solid ${color}40`,
+          animation: state === 'speaking' ? `${glow} 1s ease-in-out infinite` : 'none',
+        },
+      }}
+    >
+      <Box
+        sx={{
+          width: size * 0.6,
+          height: size * 0.6,
+          borderRadius: '50%',
+          background: 'rgba(255, 255, 255, 0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: size * 0.3,
+          fontWeight: 'bold',
+          color,
+        }}
+      >
+        {state === 'thinking' ? '...' : state === 'error' ? '!' : 'AI'}
+      </Box>
+
+      {state === 'speaking' && visemeData.length > 0 && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: -8,
+            display: 'flex',
+            gap: 0.5,
+            alignItems: 'flex-end',
+            height: 20,
+          }}
+        >
+          {visemeData.slice(0, 5).map((viseme, index) => (
+            <Box
+              key={index}
+              sx={{
+                width: 4,
+                height: Math.max(4, viseme.value * 2),
+                background: color,
+                borderRadius: 1,
+                transition: 'height 0.1s ease',
+              }}
+            />
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/_components/AIWidget/hooks/useAudioPlayer.ts">
+'use client';
+
+import { useState, useRef, useCallback } from 'react';
+
+interface UseAudioPlayerReturn {
+  isPlaying: boolean;
+  play: (audioBase64: string) => Promise<void>;
+  stop: () => void;
+  error: string | null;
+}
+
+export function useAudioPlayer(): UseAudioPlayerReturn {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  const play = useCallback(async (audioBase64: string) => {
+    try {
+      setError(null);
+      stop();
+
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      const audioContext = audioContextRef.current;
+
+      const binaryString = atob(audioBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const audioBuffer = await audioContext.decodeAudioData(bytes.buffer);
+
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+
+      source.onended = () => {
+        setIsPlaying(false);
+        sourceRef.current = null;
+      };
+
+      source.start(0);
+      sourceRef.current = source;
+      setIsPlaying(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to play audio');
+      setIsPlaying(false);
+    }
+  }, []);
+
+  const stop = useCallback(() => {
+    if (sourceRef.current) {
+      sourceRef.current.stop();
+      sourceRef.current = null;
+    }
+    setIsPlaying(false);
+  }, []);
+
+  return {
+    isPlaying,
+    play,
+    stop,
+    error,
+  };
+}
+</file>
+
+<file path="src/app/(dashboard)/_components/AIWidget/hooks/useVoiceRecorder.ts">
+'use client';
+
+import { useState, useRef, useCallback } from 'react';
+
+interface UseVoiceRecorderReturn {
+  isRecording: boolean;
+  audioBase64: string | null;
+  startRecording: () => Promise<void>;
+  stopRecording: () => Promise<void>;
+  error: string | null;
+}
+
+export function useVoiceRecorder(): UseVoiceRecorderReturn {
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBase64, setAudioBase64] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const startRecording = useCallback(async () => {
+    try {
+      setError(null);
+      setAudioBase64(null);
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus',
+      });
+
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          setAudioBase64(base64);
+        };
+        reader.readAsDataURL(blob);
+
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start recording');
+      setIsRecording(false);
+    }
+  }, []);
+
+  const stopRecording = useCallback(async () => {
+    return new Promise<void>((resolve) => {
+      if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.onstop = () => {
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            setAudioBase64(base64);
+            setIsRecording(false);
+            resolve();
+          };
+          reader.readAsDataURL(blob);
+
+          mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+        };
+        mediaRecorderRef.current.stop();
+      } else {
+        setIsRecording(false);
+        resolve();
+      }
+    });
+  }, [isRecording]);
+
+  return {
+    isRecording,
+    audioBase64,
+    startRecording,
+    stopRecording,
+    error,
+  };
 }
 </file>
 
@@ -8569,99 +8876,6 @@ export function createAccessMethods(client: AxiosInstance) {
 }
 </file>
 
-<file path="src/lib/api/ai.ts">
-import { AxiosInstance } from "axios";
-import type {
-  AICommandCenterSummary,
-  AIInsight,
-  AIInsightExplanation,
-  AIInsightList,
-  AIChatResponse,
-  AIConfirmResponse,
-  AIBookRecommendationResponse,
-} from "../types";
-
-export function createAIMethods(client: AxiosInstance) {
-  return {
-    async getAICommandCenterSummary(): Promise<AICommandCenterSummary> {
-      const response = await client.get<AICommandCenterSummary>("/api/ai/command-center/summary");
-      return response.data;
-    },
-
-    async refreshAiCommandCenter(): Promise<AICommandCenterSummary> {
-      const response = await client.post<AICommandCenterSummary>("/api/ai/command-center/refresh");
-      return response.data;
-    },
-
-    async getAIInsights(params?: { status?: string; category?: string; severity?: string }): Promise<AIInsightList> {
-      const response = await client.get<AIInsightList>("/api/ai/insights", { params });
-      return response.data;
-    },
-
-    async dismissAIInsight(id: string): Promise<AIInsight> {
-      const response = await client.post<AIInsight>(`/api/ai/insights/${id}/dismiss`);
-      return response.data;
-    },
-
-    async explainAIInsight(id: string): Promise<AIInsightExplanation> {
-      const response = await client.get<AIInsightExplanation>(`/api/ai/insights/${id}/explain`);
-      return response.data;
-    },
-
-    async askAiCommandCenter(question: string): Promise<AIChatResponse> {
-      const response = await client.post<AIChatResponse>("/api/ai/command-center/chat", { question });
-      return response.data;
-    },
-
-    async askAiChat(message: string, sessionId?: string): Promise<AIChatResponse> {
-      const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-      const userData = storedUser ? JSON.parse(storedUser) : null;
-      const role = userData?.role || "staff";
-
-      const endpoint =
-        role === "patron"
-          ? "/api/ai/patrons/chat"
-          : role === "staff"
-            ? "/api/ai/staff/chat"
-            : "/api/ai/admin/chat";
-
-      const body: Record<string, any> = { message };
-      if (sessionId) body.sessionId = sessionId;
-
-      const response = await client.post(endpoint, body);
-      return response.data;
-    },
-
-    async confirmAction(
-      sessionId: string,
-      action: "approve" | "reject",
-      role?: string
-    ): Promise<AIConfirmResponse> {
-      const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-      const userData = storedUser ? JSON.parse(storedUser) : null;
-      const effectiveRole = role || userData?.role || "staff";
-
-      const endpoint =
-        effectiveRole === "patron"
-          ? "/api/ai/patrons/confirm"
-          : effectiveRole === "staff"
-            ? "/api/ai/staff/confirm"
-            : "/api/ai/admin/confirm";
-
-      const response = await client.post(endpoint, { sessionId, action });
-      return response.data;
-    },
-
-    async getBookRecommendations(studentCode: string): Promise<AIBookRecommendationResponse> {
-      const response = await client.get<AIBookRecommendationResponse>(
-        `/api/ai/recommendations/patron/${studentCode}`
-      );
-      return response.data;
-    },
-  };
-}
-</file>
-
 <file path="src/lib/api/auth.ts">
 import { AxiosInstance } from "axios";
 import type {
@@ -10587,112 +10801,6 @@ export interface FaceResultEvent {
 }
 </file>
 
-<file path="src/lib/types/ai.ts">
-export type AIInsightCategory = "access" | "borrow" | "schedule" | "inventory" | "risk";
-export type AIInsightSeverity = "info" | "warning" | "critical";
-export type AIInsightStatus = "open" | "dismissed" | "resolved";
-
-export interface AIInsight {
-  id: string;
-  category: AIInsightCategory;
-  severity: AIInsightSeverity;
-  title: string;
-  summary: string;
-  evidence: Array<{ label: string; value: string | number }>;
-  recommended_actions: string[];
-  reason: string;
-  confidence: number;
-  alternatives: string[];
-  status: AIInsightStatus;
-  generated_at: string;
-}
-
-export interface AIInsightExplanation extends AIInsight {
-  reasoning_trace: string;
-}
-
-export interface AICommandCenterSummary {
-  generated_at: string;
-  model: string;
-  headline: string;
-  operational_score: number;
-  insights: AIInsight[];
-  snapshot: {
-    active_patrons: number;
-    today_entries: number;
-    today_exits: number;
-    active_borrows: number;
-    overdue_borrows: number;
-    scheduled_staff_today: number;
-  };
-}
-
-export interface AIInsightList {
-  items: AIInsight[];
-  total: number;
-}
-
-export interface AIBookRecommendation {
-  book_id: string;
-  isbn: string;
-  title: string;
-  author: string;
-  cover_url: string;
-  category: string;
-  reason: string;
-  relevance_score: number;
-}
-
-export interface AIBookRecommendationResponse {
-  patron_id: string;
-  patron_name: string;
-  recommendations: AIBookRecommendation[];
-  generated_at: string;
-  model: string;
-}
-
-export interface AIChatResponse {
-  response: string;
-  sessionId: string;
-  toolResults?: AIToolResult[];
-  requiresConfirmation?: boolean;
-  pendingAction?: AIPendingAction;
-  userRole?: string;
-}
-
-export interface AIConfirmResponse {
-  success: boolean;
-  message?: string;
-}
-
-export interface AICommandCenterChatResponse {
-  answer: string;
-  model: string;
-  generated_at: string;
-}
-
-export interface AIMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  toolResults?: AIToolResult[];
-  requiresConfirmation?: boolean;
-  pendingAction?: AIPendingAction;
-  timestamp: string;
-}
-
-export interface AIToolResult {
-  name: string;
-  result: { success: boolean; data?: any; error?: string };
-}
-
-export interface AIPendingAction {
-  action: string;
-  description: string;
-  params: Record<string, any>;
-}
-</file>
-
 <file path="src/lib/types/auth.ts">
 export interface LoginRequest {
   email: string;
@@ -12614,147 +12722,6 @@ export default function BookLocationCard({ data }: BookLocationCardProps) {
     </>
   );
 }
-</file>
-
-<file path="src/app/(dashboard)/_components/AIWidget/store/useAIWidgetStore.ts">
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import api from '@/lib/api-client';
-
-export interface CommandCenterSummary {
-  operational_score: number;
-  active_patrons: number;
-  overdue_borrows: number;
-  scheduled_staff_today: number;
-  today_entries: number;
-  today_exits: number;
-  generated_at: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-}
-
-interface AIWidgetStore {
-  isOpen: boolean;
-  isMinimized: boolean;
-  activeTab: 'score' | 'chat' | 'actions';
-  lastSummary: CommandCenterSummary | null;
-  messages: ChatMessage[];
-  isLoadingChat: boolean;
-  chatSessionId?: string;
-  proactiveMessage: string | null;
-  failedSearchCount: number;
-
-  open: () => void;
-  close: () => void;
-  toggle: () => void;
-  minimize: () => void;
-  setActiveTab: (tab: 'score' | 'chat' | 'actions') => void;
-  updateSummary: (summary: CommandCenterSummary) => void;
-  sendMessage: (message: string) => Promise<void>;
-  clearMessages: () => void;
-  recordFailedSearch: () => void;
-  resetFailedSearch: () => void;
-  dismissProactive: () => void;
-}
-
-export const useAIWidgetStore = create<AIWidgetStore>()(
-  persist(
-    (set, get) => ({
-      isOpen: false,
-      isMinimized: false,
-      activeTab: 'score',
-      lastSummary: null,
-      messages: [],
-      isLoadingChat: false,
-      chatSessionId: undefined,
-      proactiveMessage: null,
-      failedSearchCount: 0,
-
-      open: () => set({ isOpen: true }),
-      close: () => set({ isOpen: false }),
-      toggle: () => set((state) => ({ isOpen: !state.isOpen })),
-      minimize: () => set((state) => ({ isMinimized: !state.isMinimized })),
-
-      setActiveTab: (tab) => set({ activeTab: tab }),
-
-      updateSummary: (summary) => set({ lastSummary: summary }),
-
-      recordFailedSearch: () => set((state) => {
-        const next = state.failedSearchCount + 1;
-        if (next >= 3 && !state.proactiveMessage) {
-          return {
-            failedSearchCount: next,
-            proactiveMessage: "Bạn đang tìm sách? Tôi có thể giúp bạn tìm kiếm hoặc gợi ý sách phù hợp.",
-          };
-        }
-        return { failedSearchCount: next };
-      }),
-
-      resetFailedSearch: () => set({ failedSearchCount: 0 }),
-
-      dismissProactive: () => set({ proactiveMessage: null }),
-
-      sendMessage: async (message: string) => {
-        const userMessage: ChatMessage = {
-          id: `user-${Date.now()}`,
-          role: 'user',
-          content: message,
-          timestamp: Date.now(),
-        };
-
-        set((state) => ({
-          messages: [...state.messages, userMessage],
-          isLoadingChat: true,
-        }));
-
-        try {
-          const { chatSessionId } = get();
-          const data = await api.askAiChat(message, chatSessionId);
-
-          const assistantMessage: ChatMessage = {
-            id: `assistant-${Date.now()}`,
-            role: 'assistant',
-            content: data.response || 'Xin lỗi, tôi không thể trả lời lúc này.',
-            timestamp: Date.now(),
-          };
-
-          set((state) => ({
-            messages: [...state.messages, assistantMessage],
-            isLoadingChat: false,
-            chatSessionId: data.sessionId || state.chatSessionId,
-          }));
-        } catch {
-          const errorMessage: ChatMessage = {
-            id: `error-${Date.now()}`,
-            role: 'assistant',
-            content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
-            timestamp: Date.now(),
-          };
-
-          set((state) => ({
-            messages: [...state.messages, errorMessage],
-            isLoadingChat: false,
-          }));
-        }
-      },
-
-      clearMessages: () => set({ messages: [], chatSessionId: undefined }),
-    }),
-    {
-      name: 'ai-widget-storage',
-      partialize: (state) => ({
-        isMinimized: state.isMinimized,
-        activeTab: state.activeTab,
-        messages: state.messages,
-      }),
-    }
-  )
-);
 </file>
 
 <file path="src/app/(dashboard)/_components/AIWidget/tabs/ChatTab.tsx">
@@ -18544,151 +18511,6 @@ export default function DashboardError({
 }
 </file>
 
-<file path="src/app/(kiosk)/gate/_components/CameraFeed.tsx">
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Box,
-  Chip,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
-import Spin from "antd/es/spin";
-import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
-
-interface CameraFeedProps {
-  src: string;
-  cameraId?: string;
-  label: string;
-  overlay?: {
-    bbox?: [number, number, number, number];
-    landmarks?: [number, number][];
-    status?: string;
-  } | null;
-  onStatusChange?: (ok: boolean) => void;
-}
-
-const OVERLAY_COLORS: Record<string, string> = {
-  granted: "#22c55e",
-  wrong_direction: "#eab308",
-  expired: "#f97316",
-  spoof: "#ef4444",
-};
-
-const ONLINE_INTERVAL = 1000;
-const OFFLINE_INTERVAL = 5000;
-
-export default function CameraFeed({ src, cameraId, label, overlay, onStatusChange }: CameraFeedProps) {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [ts, setTs] = useState(() => Date.now());
-  const [ok, setOk] = useState<boolean | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const isStream = src.includes("/video") || src.includes("/mjpeg");
-
-  useEffect(() => {
-    onStatusChange?.(ok === true);
-  }, [ok, onStatusChange]);
-
-  const snapshotUrl = cameraId
-    ? `/api/camera/snapshot/${cameraId}`
-    : src;
-
-  const scheduleNext = useCallback((success: boolean) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (isStream) return;
-    timerRef.current = setTimeout(() => setTs(Date.now()), success ? ONLINE_INTERVAL : OFFLINE_INTERVAL);
-  }, [isStream]);
-
-  useEffect(() => {
-    if (!cameraId) return;
-    scheduleNext(true);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [cameraId, ts, scheduleNext]);
-
-  useEffect(() => {
-    if (!overlay?.bbox && !overlay?.landmarks) return;
-    const img = imgRef.current;
-    const canvas = canvasRef.current;
-    if (!img || !canvas) return;
-
-    const rect = img.getBoundingClientRect();
-    const scaleX = rect.width / (img.naturalWidth || 1);
-    const scaleY = rect.height / (img.naturalHeight || 1);
-
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (overlay.bbox) {
-      const [x1, y1, x2, y2] = overlay.bbox;
-      ctx.strokeStyle = OVERLAY_COLORS[overlay.status || "granted"] || "#22c55e";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
-    }
-
-    if (overlay.landmarks) {
-      overlay.landmarks.forEach(([x, y]) => {
-        ctx.beginPath();
-        ctx.arc(x * scaleX, y * scaleY, 4, 0, 2 * Math.PI);
-        ctx.fillStyle = "#ef4444";
-        ctx.fill();
-      });
-    }
-  }, [overlay]);
-
-  return (
-    <Paper variant="outlined" sx={{ overflow: "hidden", height: "100%" }}>
-      <Stack
-        direction="row"
-        spacing={1.25}
-        sx={{ alignItems: "center", justifyContent: "space-between", px: 2, py: 1.25, borderBottom: 1, borderColor: "divider" }}
-      >
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <VideocamOutlinedIcon color="disabled" fontSize="small" />
-          <Typography sx={{ fontWeight: 800 }}>{label}</Typography>
-        </Stack>
-        <Chip
-          size="small"
-          color={ok === null ? "warning" : ok ? "success" : "error"}
-          label={ok === null ? "Đang nối" : ok ? "Online" : "Mất tín hiệu"}
-        />
-      </Stack>
-
-      <Box sx={{ position: "relative", aspectRatio: "16 / 9", bgcolor: "common.black" }}>
-        <Box
-          component="img"
-          ref={imgRef}
-          src={isStream ? snapshotUrl : `${snapshotUrl}?_t=${ts}`}
-          onLoad={() => { setOk(true); scheduleNext(true); }}
-          onError={() => { setOk(false); scheduleNext(false); }}
-          alt={label}
-          sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-        />
-        <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
-        {ok === null && (
-          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-            <Spin size="small" />
-            <Typography variant="body2">Đang kết nối...</Typography>
-          </Stack>
-        )}
-        {ok === false && (
-          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.70)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-            <VideocamOutlinedIcon sx={{ fontSize: 48, opacity: 0.4 }} />
-            <Typography variant="body2" color="rgba(255,255,255,0.6)">Camera ngoại tuyến</Typography>
-          </Stack>
-        )}
-      </Box>
-    </Paper>
-  );
-}
-</file>
-
 <file path="src/app/(kiosk)/gate/_components/ResultCard.tsx">
 'use client';
 
@@ -20415,6 +20237,158 @@ export function useScheduleFilters(
 }
 </file>
 
+<file path="src/lib/api/ai.ts">
+import { AxiosInstance } from "axios";
+import type {
+  AICommandCenterSummary,
+  AIInsight,
+  AIInsightExplanation,
+  AIInsightList,
+  AIChatResponse,
+  AIConfirmResponse,
+  AIBookRecommendationResponse,
+  CompanionChunk,
+} from "../types";
+
+export function createAIMethods(client: AxiosInstance) {
+  return {
+    async getAICommandCenterSummary(): Promise<AICommandCenterSummary> {
+      const response = await client.get<AICommandCenterSummary>("/api/ai/command-center/summary");
+      return response.data;
+    },
+
+    async refreshAiCommandCenter(): Promise<AICommandCenterSummary> {
+      const response = await client.post<AICommandCenterSummary>("/api/ai/command-center/refresh");
+      return response.data;
+    },
+
+    async getAIInsights(params?: { status?: string; category?: string; severity?: string }): Promise<AIInsightList> {
+      const response = await client.get<AIInsightList>("/api/ai/insights", { params });
+      return response.data;
+    },
+
+    async dismissAIInsight(id: string): Promise<AIInsight> {
+      const response = await client.post<AIInsight>(`/api/ai/insights/${id}/dismiss`);
+      return response.data;
+    },
+
+    async explainAIInsight(id: string): Promise<AIInsightExplanation> {
+      const response = await client.get<AIInsightExplanation>(`/api/ai/insights/${id}/explain`);
+      return response.data;
+    },
+
+    async askAiCommandCenter(question: string): Promise<AIChatResponse> {
+      const response = await client.post<AIChatResponse>("/api/ai/command-center/chat", { question });
+      return response.data;
+    },
+
+    async askAiChat(message: string, sessionId?: string): Promise<AIChatResponse> {
+      const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      const userData = storedUser ? JSON.parse(storedUser) : null;
+      const role = userData?.role || "staff";
+
+      const endpoint =
+        role === "patron"
+          ? "/api/ai/patrons/chat"
+          : role === "staff"
+            ? "/api/ai/staff/chat"
+            : "/api/ai/admin/chat";
+
+      const body: Record<string, any> = { message };
+      if (sessionId) body.sessionId = sessionId;
+
+      const response = await client.post(endpoint, body);
+      return response.data;
+    },
+
+    async confirmAction(
+      sessionId: string,
+      action: "approve" | "reject",
+      role?: string
+    ): Promise<AIConfirmResponse> {
+      const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      const userData = storedUser ? JSON.parse(storedUser) : null;
+      const effectiveRole = role || userData?.role || "staff";
+
+      const endpoint =
+        effectiveRole === "patron"
+          ? "/api/ai/patrons/confirm"
+          : effectiveRole === "staff"
+            ? "/api/ai/staff/confirm"
+            : "/api/ai/admin/confirm";
+
+      const response = await client.post(endpoint, { sessionId, action });
+      return response.data;
+    },
+
+    async getBookRecommendations(studentCode: string): Promise<AIBookRecommendationResponse> {
+      const response = await client.get<AIBookRecommendationResponse>(
+        `/api/ai/recommendations/patron/${studentCode}`
+      );
+      return response.data;
+    },
+
+    async streamCompanionChat(
+      message: string | undefined,
+      audioBase64: string | undefined,
+      sessionId: string | undefined,
+      onChunk: (chunk: CompanionChunk) => void,
+      onError?: (error: Error) => void,
+    ): Promise<void> {
+      const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      const userData = storedUser ? JSON.parse(storedUser) : null;
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+
+      const body: Record<string, any> = {};
+      if (message) body.message = message;
+      if (audioBase64) body.audioBase64 = audioBase64;
+      if (sessionId) body.sessionId = sessionId;
+
+      try {
+        const response = await fetch("/api/ai/companion/stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No response body");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                onChunk(data);
+              } catch {}
+            }
+          }
+        }
+      } catch (error) {
+        onError?.(error instanceof Error ? error : new Error(String(error)));
+      }
+    },
+  };
+}
+</file>
+
 <file path="src/lib/api/utils.ts">
 import type { AccessLogPublic } from "../types";
 
@@ -20533,6 +20507,124 @@ export function retryPendingRequests(token: string) {
 export function cancelPendingRequests() {
   import("./client").then((m) => m.api.cancelPendingRequests());
 }
+</file>
+
+<file path="src/lib/types/ai.ts">
+export type AIInsightCategory = "access" | "borrow" | "schedule" | "inventory" | "risk";
+export type AIInsightSeverity = "info" | "warning" | "critical";
+export type AIInsightStatus = "open" | "dismissed" | "resolved";
+
+export interface AIInsight {
+  id: string;
+  category: AIInsightCategory;
+  severity: AIInsightSeverity;
+  title: string;
+  summary: string;
+  evidence: Array<{ label: string; value: string | number }>;
+  recommended_actions: string[];
+  reason: string;
+  confidence: number;
+  alternatives: string[];
+  status: AIInsightStatus;
+  generated_at: string;
+}
+
+export interface AIInsightExplanation extends AIInsight {
+  reasoning_trace: string;
+}
+
+export interface AICommandCenterSummary {
+  generated_at: string;
+  model: string;
+  headline: string;
+  operational_score: number;
+  insights: AIInsight[];
+  snapshot: {
+    active_patrons: number;
+    today_entries: number;
+    today_exits: number;
+    active_borrows: number;
+    overdue_borrows: number;
+    scheduled_staff_today: number;
+  };
+}
+
+export interface AIInsightList {
+  items: AIInsight[];
+  total: number;
+}
+
+export interface AIBookRecommendation {
+  book_id: string;
+  isbn: string;
+  title: string;
+  author: string;
+  cover_url: string;
+  category: string;
+  reason: string;
+  relevance_score: number;
+}
+
+export interface AIBookRecommendationResponse {
+  patron_id: string;
+  patron_name: string;
+  recommendations: AIBookRecommendation[];
+  generated_at: string;
+  model: string;
+}
+
+export interface AIChatResponse {
+  response: string;
+  sessionId: string;
+  toolResults?: AIToolResult[];
+  requiresConfirmation?: boolean;
+  pendingAction?: AIPendingAction;
+  userRole?: string;
+}
+
+export interface AIConfirmResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface AICommandCenterChatResponse {
+  answer: string;
+  model: string;
+  generated_at: string;
+}
+
+export interface AIMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  toolResults?: AIToolResult[];
+  requiresConfirmation?: boolean;
+  pendingAction?: AIPendingAction;
+  timestamp: string;
+}
+
+export interface AIToolResult {
+  name: string;
+  result: { success: boolean; data?: any; error?: string };
+}
+
+export interface AIPendingAction {
+  action: string;
+  description: string;
+  params: Record<string, any>;
+}
+
+export interface CompanionChunk {
+  type: 'text' | 'audio' | 'viseme' | 'tool_result' | 'book_card' | 'companion_done';
+  data: any;
+}
+
+export interface VisemeData {
+  time: number;
+  value: number;
+}
+
+export type CompanionState = 'idle' | 'listening' | 'speaking' | 'thinking' | 'error';
 </file>
 
 <file path="src/lib/types/index.ts">
@@ -21271,108 +21363,304 @@ self.onmessage = async (e: MessageEvent<PreprocessMessage>) => {
 };
 </file>
 
-<file path="src/app/_components/ClientLayout.tsx">
-"use client";
+<file path="src/app/(dashboard)/_components/AIWidget/store/useAIWidgetStore.ts">
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import api from '@/lib/api-client';
+import type { CompanionChunk, CompanionState, VisemeData } from '@/lib/types/ai';
 
-import { useEffect } from "react";
-import { usePathname } from "next/navigation";
-import { AntdRegistry } from "@ant-design/nextjs-registry";
-import ConfigProvider from "antd/es/config-provider";
-import { setupGlobalErrorHandlers } from "@/lib/error-reporter";
-import { useColorMode } from "@/lib/mui-theme";
-import { getAntdTheme } from "@/lib/antd-theme";
-import AIWidget from "@/app/(dashboard)/_components/AIWidget";
-
-const PUBLIC_PAGES = ["/library/vr-tour"];
-
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const showChatbot = !PUBLIC_PAGES.includes(pathname);
-  const { effectiveMode } = useColorMode();
-  const isDark = effectiveMode === "dark";
-
-  useEffect(() => {
-    setupGlobalErrorHandlers();
-  }, []);
-
-  return (
-    <AntdRegistry>
-      <ConfigProvider theme={getAntdTheme(isDark)}>
-        {children}
-        {showChatbot && <AIWidget />}
-      </ConfigProvider>
-    </AntdRegistry>
-  );
+export interface CommandCenterSummary {
+  operational_score: number;
+  active_patrons: number;
+  overdue_borrows: number;
+  scheduled_staff_today: number;
+  today_entries: number;
+  today_exits: number;
+  generated_at: string;
 }
-</file>
 
-<file path="src/app/(dashboard)/_components/AIWidget/AIWidget.tsx">
-"use client";
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  isVoice?: boolean;
+}
 
-import { useEffect } from "react";
-import { usePathname } from "next/navigation";
-import { Box, Backdrop } from "@mui/material";
-import { motion, AnimatePresence } from "framer-motion";
-import AIWidgetTrigger from "./AIWidgetTrigger";
-import AIWidgetPanel from "./AIWidgetPanel";
-import { useAIWidgetStore } from "./store/useAIWidgetStore";
+interface AIWidgetStore {
+  isOpen: boolean;
+  isMinimized: boolean;
+  activeTab: 'score' | 'chat' | 'actions';
+  lastSummary: CommandCenterSummary | null;
+  messages: ChatMessage[];
+  isLoadingChat: boolean;
+  chatSessionId?: string;
+  proactiveMessage: string | null;
+  failedSearchCount: number;
 
-const BLACKLIST_PATHS = ["/login", "/register", "/gate", "/liveness", "/identify"];
+  companionState: CompanionState;
+  isVoiceActive: boolean;
+  visemeData: VisemeData[];
+  audioQueue: string[];
+  currentAudio: string | null;
 
-export default function AIWidget() {
-  const pathname = usePathname();
-  const { isOpen, close, proactiveMessage } = useAIWidgetStore();
+  open: () => void;
+  close: () => void;
+  toggle: () => void;
+  minimize: () => void;
+  setActiveTab: (tab: 'score' | 'chat' | 'actions') => void;
+  updateSummary: (summary: CommandCenterSummary) => void;
+  sendMessage: (message: string) => Promise<void>;
+  sendVoiceMessage: (audioBase64: string) => Promise<void>;
+  setCompanionState: (state: CompanionState) => void;
+  setVoiceActive: (active: boolean) => void;
+  setVisemeData: (visemes: VisemeData[]) => void;
+  setCurrentAudio: (audio: string | null) => void;
+  clearMessages: () => void;
+  recordFailedSearch: () => void;
+  resetFailedSearch: () => void;
+  dismissProactive: () => void;
+}
 
-  const isBlacklisted = BLACKLIST_PATHS.some((p) => pathname?.startsWith(p));
+export const useAIWidgetStore = create<AIWidgetStore>()(
+  persist(
+    (set, get) => ({
+      isOpen: false,
+      isMinimized: false,
+      activeTab: 'score',
+      lastSummary: null,
+      messages: [],
+      isLoadingChat: false,
+      chatSessionId: undefined,
+      proactiveMessage: null,
+      failedSearchCount: 0,
 
-  const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
-  const userData = storedUser ? JSON.parse(storedUser) : null;
-  const role = userData?.role || 'staff';
+      companionState: 'idle',
+      isVoiceActive: false,
+      visemeData: [],
+      audioQueue: [],
+      currentAudio: null,
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        close();
-      }
-    };
+      open: () => set({ isOpen: true }),
+      close: () => set({ isOpen: false }),
+      toggle: () => set((state) => ({ isOpen: !state.isOpen })),
+      minimize: () => set((state) => ({ isMinimized: !state.isMinimized })),
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, close]);
+      setActiveTab: (tab) => set({ activeTab: tab }),
 
-  useEffect(() => {
-    if (proactiveMessage && !isOpen) {
-      const timer = setTimeout(() => {
-        useAIWidgetStore.getState().open();
-      }, 500);
-      return () => clearTimeout(timer);
+      updateSummary: (summary) => set({ lastSummary: summary }),
+
+      setCompanionState: (state) => set({ companionState: state }),
+      setVoiceActive: (active) => set({ isVoiceActive: active }),
+      setVisemeData: (visemes) => set({ visemeData: visemes }),
+      setCurrentAudio: (audio) => set({ currentAudio: audio }),
+
+      recordFailedSearch: () => set((state) => {
+        const next = state.failedSearchCount + 1;
+        if (next >= 3 && !state.proactiveMessage) {
+          return {
+            failedSearchCount: next,
+            proactiveMessage: "Bạn đang tìm sách? Tôi có thể giúp bạn tìm kiếm hoặc gợi ý sách phù hợp.",
+          };
+        }
+        return { failedSearchCount: next };
+      }),
+
+      resetFailedSearch: () => set({ failedSearchCount: 0 }),
+
+      dismissProactive: () => set({ proactiveMessage: null }),
+
+      sendMessage: async (message: string) => {
+        const userMessage: ChatMessage = {
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content: message,
+          timestamp: Date.now(),
+        };
+
+        set((state) => ({
+          messages: [...state.messages, userMessage],
+          isLoadingChat: true,
+          companionState: 'thinking',
+        }));
+
+        try {
+          const { chatSessionId } = get();
+
+          let accumulatedText = '';
+          await api.streamCompanionChat(
+            message,
+            undefined,
+            chatSessionId,
+            (chunk: CompanionChunk) => {
+              switch (chunk.type) {
+                case 'text':
+                  accumulatedText += chunk.data.content;
+                  set((state) => ({
+                    messages: [
+                      ...state.messages.filter((m) => m.id !== 'streaming'),
+                      {
+                        id: 'streaming',
+                        role: 'assistant',
+                        content: accumulatedText,
+                        timestamp: Date.now(),
+                      },
+                    ],
+                  }));
+                  break;
+                case 'audio':
+                  set({ currentAudio: chunk.data.audioBase64, companionState: 'speaking' });
+                  break;
+                case 'viseme':
+                  set({ visemeData: chunk.data.visemes });
+                  break;
+                case 'companion_done':
+                  set((state) => ({
+                    messages: state.messages.map((m) =>
+                      m.id === 'streaming' ? { ...m, id: `assistant-${Date.now()}` } : m
+                    ),
+                    isLoadingChat: false,
+                    companionState: 'idle',
+                    chatSessionId: chunk.data.sessionId || state.chatSessionId,
+                  }));
+                  break;
+              }
+            },
+            (error) => {
+              console.error('Companion stream error:', error);
+              set((state) => ({
+                messages: [
+                  ...state.messages,
+                  {
+                    id: `error-${Date.now()}`,
+                    role: 'assistant',
+                    content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+                    timestamp: Date.now(),
+                  },
+                ],
+                isLoadingChat: false,
+                companionState: 'error',
+              }));
+            }
+          );
+        } catch {
+          const errorMessage: ChatMessage = {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+            timestamp: Date.now(),
+          };
+
+          set((state) => ({
+            messages: [...state.messages, errorMessage],
+            isLoadingChat: false,
+            companionState: 'error',
+          }));
+        }
+      },
+
+      sendVoiceMessage: async (audioBase64: string) => {
+        const userMessage: ChatMessage = {
+          id: `user-${Date.now()}`,
+          role: 'user',
+          content: '[Voice message]',
+          timestamp: Date.now(),
+          isVoice: true,
+        };
+
+        set((state) => ({
+          messages: [...state.messages, userMessage],
+          isLoadingChat: true,
+          companionState: 'listening',
+        }));
+
+        try {
+          const { chatSessionId } = get();
+
+          let accumulatedText = '';
+          await api.streamCompanionChat(
+            undefined,
+            audioBase64,
+            chatSessionId,
+            (chunk: CompanionChunk) => {
+              switch (chunk.type) {
+                case 'text':
+                  accumulatedText += chunk.data.content;
+                  set((state) => ({
+                    messages: [
+                      ...state.messages.filter((m) => m.id !== 'streaming'),
+                      {
+                        id: 'streaming',
+                        role: 'assistant',
+                        content: accumulatedText,
+                        timestamp: Date.now(),
+                      },
+                    ],
+                  }));
+                  break;
+                case 'audio':
+                  set({ currentAudio: chunk.data.audioBase64, companionState: 'speaking' });
+                  break;
+                case 'viseme':
+                  set({ visemeData: chunk.data.visemes });
+                  break;
+                case 'companion_done':
+                  set((state) => ({
+                    messages: state.messages.map((m) =>
+                      m.id === 'streaming' ? { ...m, id: `assistant-${Date.now()}` } : m
+                    ),
+                    isLoadingChat: false,
+                    companionState: 'idle',
+                    chatSessionId: chunk.data.sessionId || state.chatSessionId,
+                  }));
+                  break;
+              }
+            },
+            (error) => {
+              console.error('Companion stream error:', error);
+              set((state) => ({
+                messages: [
+                  ...state.messages,
+                  {
+                    id: `error-${Date.now()}`,
+                    role: 'assistant',
+                    content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+                    timestamp: Date.now(),
+                  },
+                ],
+                isLoadingChat: false,
+                companionState: 'error',
+              }));
+            }
+          );
+        } catch {
+          const errorMessage: ChatMessage = {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: 'Xin lỗi, đã xảy ra lỗi khi kết nối AI. Vui lòng thử lại.',
+            timestamp: Date.now(),
+          };
+
+          set((state) => ({
+            messages: [...state.messages, errorMessage],
+            isLoadingChat: false,
+            companionState: 'error',
+          }));
+        }
+      },
+
+      clearMessages: () => set({ messages: [], chatSessionId: undefined }),
+    }),
+    {
+      name: 'ai-widget-storage',
+      partialize: (state) => ({
+        isMinimized: state.isMinimized,
+        activeTab: state.activeTab,
+        messages: state.messages,
+      }),
     }
-  }, [proactiveMessage, isOpen]);
-
-  if (isBlacklisted) return null;
-
-  return (
-    <>
-      <AIWidgetTrigger />
-      <AnimatePresence>
-        {isOpen && (
-          <Backdrop
-            open
-            onClick={close}
-            sx={{
-              position: "fixed",
-              inset: 0,
-              bgcolor: "rgba(0,0,0,0.3)",
-              zIndex: 99998,
-              backdropFilter: "blur(2px)",
-            }}
-          />
-        )}
-      </AnimatePresence>
-      <AIWidgetPanel role={role} />
-    </>
-  );
-}
+  )
+);
 </file>
 
 <file path="src/app/(dashboard)/_components/staff-schedule/AssignStaffDialog.tsx">
@@ -23195,6 +23483,151 @@ export default function EnrollPage() {
 }
 </file>
 
+<file path="src/app/(kiosk)/gate/_components/CameraFeed.tsx">
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Box,
+  Chip,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import Spin from "antd/es/spin";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+
+interface CameraFeedProps {
+  src: string;
+  cameraId?: string;
+  label: string;
+  overlay?: {
+    bbox?: [number, number, number, number];
+    landmarks?: [number, number][];
+    status?: string;
+  } | null;
+  onStatusChange?: (ok: boolean) => void;
+}
+
+const OVERLAY_COLORS: Record<string, string> = {
+  granted: "#22c55e",
+  wrong_direction: "#eab308",
+  expired: "#f97316",
+  spoof: "#ef4444",
+};
+
+const ONLINE_INTERVAL = 1000;
+const OFFLINE_INTERVAL = 5000;
+
+export default function CameraFeed({ src, cameraId, label, overlay, onStatusChange }: CameraFeedProps) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [ts, setTs] = useState(() => Date.now());
+  const [ok, setOk] = useState<boolean | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isStream = src.includes("/video") || src.includes("/mjpeg");
+
+  useEffect(() => {
+    onStatusChange?.(ok === true);
+  }, [ok, onStatusChange]);
+
+  const snapshotUrl = cameraId
+    ? `/api/camera/snapshot/${cameraId}`
+    : src;
+
+  const scheduleNext = useCallback((success: boolean) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (isStream) return;
+    timerRef.current = setTimeout(() => setTs(Date.now()), success ? ONLINE_INTERVAL : OFFLINE_INTERVAL);
+  }, [isStream]);
+
+  useEffect(() => {
+    if (!cameraId) return;
+    scheduleNext(true);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [cameraId, ts, scheduleNext]);
+
+  useEffect(() => {
+    if (!overlay?.bbox && !overlay?.landmarks) return;
+    const img = imgRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas) return;
+
+    const rect = img.getBoundingClientRect();
+    const scaleX = rect.width / (img.naturalWidth || 1);
+    const scaleY = rect.height / (img.naturalHeight || 1);
+
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (overlay.bbox) {
+      const [x1, y1, x2, y2] = overlay.bbox;
+      ctx.strokeStyle = OVERLAY_COLORS[overlay.status || "granted"] || "#22c55e";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
+    }
+
+    if (overlay.landmarks) {
+      overlay.landmarks.forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.arc(x * scaleX, y * scaleY, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ef4444";
+        ctx.fill();
+      });
+    }
+  }, [overlay]);
+
+  return (
+    <Paper variant="outlined" sx={{ overflow: "hidden", height: "100%" }}>
+      <Stack
+        direction="row"
+        spacing={1.25}
+        sx={{ alignItems: "center", justifyContent: "space-between", px: 2, py: 1.25, borderBottom: 1, borderColor: "divider" }}
+      >
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <VideocamOutlinedIcon color="disabled" fontSize="small" />
+          <Typography sx={{ fontWeight: 800 }}>{label}</Typography>
+        </Stack>
+        <Chip
+          size="small"
+          color={ok === null ? "warning" : ok ? "success" : "error"}
+          label={ok === null ? "Đang nối" : ok ? "Online" : "Mất tín hiệu"}
+        />
+      </Stack>
+
+      <Box sx={{ position: "relative", aspectRatio: "16 / 9", bgcolor: "common.black" }}>
+        <Box
+          component="img"
+          ref={imgRef}
+          src={isStream ? snapshotUrl : `${snapshotUrl}?_t=${ts}`}
+          onLoad={() => { setOk(true); scheduleNext(true); }}
+          onError={() => { setOk(false); scheduleNext(false); }}
+          alt={label}
+          sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+        />
+        <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
+        {ok === null && (
+          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+            <Spin size="small" />
+            <Typography variant="body2">Đang kết nối...</Typography>
+          </Stack>
+        )}
+        {ok === false && (
+          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.70)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
+            <VideocamOutlinedIcon sx={{ fontSize: 48, opacity: 0.4 }} />
+            <Typography variant="body2" color="rgba(255,255,255,0.6)">Camera ngoại tuyến</Typography>
+          </Stack>
+        )}
+      </Box>
+    </Paper>
+  );
+}
+</file>
+
 <file path="src/app/layout.tsx">
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth-context";
@@ -23501,46 +23934,6 @@ NEXT_PUBLIC_ENTRY_CAM_ID=entry_gate
 NEXT_PUBLIC_EXIT_CAM_ID=exit_gate
 NEXT_PUBLIC_BORROW_CAM_URL=http://192.168.1.7:8080/shot.jpg
 NEXT_PUBLIC_PARTYKIT_HOST=localhost:1999
-</file>
-
-<file path="next.config.js">
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  experimental: {
-    optimizePackageImports: [
-      '@mui/icons-material',
-      '@mui/material',
-      'lucide-react',
-      'recharts',
-    ],
-  },
-  async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: '/api/camera/proxy',
-          destination: '/api/camera/proxy',
-        },
-        {
-          source: '/api/camera/snapshot/:path*',
-          destination: '/api/camera/snapshot/:path*',
-        },
-      ],
-      fallback: [
-        {
-          source: '/api/:path*',
-          destination: 'http://127.0.0.1:80/api/:path*',
-        },
-        {
-          source: '/users/:path*',
-          destination: 'http://127.0.0.1:80/users/:path*',
-        },
-      ],
-    };
-  },
-};
-
-module.exports = nextConfig;
 </file>
 
 <file path="README.md">
@@ -24357,6 +24750,105 @@ describe("Gate Face Recognition Flow", () => {
 });
 </file>
 
+<file path="src/app/_components/ClientLayout.tsx">
+"use client";
+
+import { useEffect } from "react";
+import { AntdRegistry } from "@ant-design/nextjs-registry";
+import ConfigProvider from "antd/es/config-provider";
+import { setupGlobalErrorHandlers } from "@/lib/error-reporter";
+import { useColorMode } from "@/lib/mui-theme";
+import { getAntdTheme } from "@/lib/antd-theme";
+
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const { effectiveMode } = useColorMode();
+  const isDark = effectiveMode === "dark";
+
+  useEffect(() => {
+    setupGlobalErrorHandlers();
+  }, []);
+
+  return (
+    <AntdRegistry>
+      <ConfigProvider theme={getAntdTheme(isDark)}>{children}</ConfigProvider>
+    </AntdRegistry>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/_components/AIWidget/AIWidget.tsx">
+"use client";
+
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { Box, Backdrop } from "@mui/material";
+import { motion, AnimatePresence } from "framer-motion";
+import AIWidgetTrigger from "./AIWidgetTrigger";
+import AIWidgetPanel from "./AIWidgetPanel";
+import { useAIWidgetStore } from "./store/useAIWidgetStore";
+import { useAuth } from "@/lib/auth-context";
+
+const BLACKLIST_PATHS = ["/login", "/register", "/gate", "/liveness", "/identify"];
+
+export default function AIWidget() {
+  const pathname = usePathname();
+  const { isOpen, close, proactiveMessage } = useAIWidgetStore();
+  const { isAuthenticated, isLoading, user: authUser } = useAuth();
+
+  // Hide while auth is loading or when not authenticated
+  if (isLoading) return null;
+  if (!isAuthenticated || !authUser) return null;
+
+  const isBlacklisted = BLACKLIST_PATHS.some((p) => pathname?.startsWith(p));
+
+  const role = authUser?.role || 'staff';
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        close();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, close]);
+
+  useEffect(() => {
+    if (proactiveMessage && !isOpen) {
+      const timer = setTimeout(() => {
+        useAIWidgetStore.getState().open();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [proactiveMessage, isOpen]);
+
+  if (isBlacklisted) return null;
+
+  return (
+    <>
+      <AIWidgetTrigger />
+      <AnimatePresence>
+        {isOpen && (
+          <Backdrop
+            open
+            onClick={close}
+            sx={{
+              position: "fixed",
+              inset: 0,
+              bgcolor: "rgba(0,0,0,0.3)",
+              zIndex: 99998,
+              backdropFilter: "blur(2px)",
+            }}
+          />
+        )}
+      </AnimatePresence>
+      <AIWidgetPanel role={role} />
+    </>
+  );
+}
+</file>
+
 <file path="src/app/(dashboard)/dashboard/page.tsx">
 "use client";
 
@@ -24516,6 +25008,1185 @@ export default function DashboardPage() {
         <TodayScheduleCard assignments={data.todaySchedule} loading={data.loading} />
         <RecentNotificationsCard notifications={data.notifications} loading={data.loading} />
       </Box>
+    </Stack>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/layout.tsx">
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  AppBar,
+  Avatar,
+  Badge,
+  Box,
+  CircularProgress,
+  IconButton,
+  Stack,
+  Toolbar,
+  Tooltip,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import BellIcon from "@mui/icons-material/NotificationsOutlined";
+import Brightness6Icon from "@mui/icons-material/Brightness6Outlined";
+import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
+import LightModeIcon from "@mui/icons-material/LightModeOutlined";
+import UserIcon from "@mui/icons-material/PersonOutlined";
+import { useAuth } from "@/lib/auth-context";
+import { useColorMode } from "@/lib/mui-theme";
+import api from "@/lib/api-client";
+import Sidebar from "@/app/(dashboard)/_components/Sidebar";
+import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationDropdown";
+
+function Topbar({ user }: { user: any }) {
+  const theme = useTheme();
+  const { mode, effectiveMode, preference, reducedMotion, toggleMode } = useColorMode();
+  const [bellAnchorEl, setBellAnchorEl] = useState<HTMLElement | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const bellOpen = Boolean(bellAnchorEl);
+
+  const modeIcon = useMemo(() => {
+    if (preference === "auto") return <Brightness6Icon fontSize="small" />;
+    return preference === "dark" ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />;
+  }, [preference]);
+
+  const modeTooltip = useMemo(() => {
+    if (reducedMotion === "reduce") return "Chế độ hiển thị (Đã bật giảm chuyển động)";
+    if (preference === "auto") return `Chế độ tự động (${effectiveMode === "dark" ? "Tối" : "Sáng"}) - Nhấn để thay đổi`;
+    if (preference === "dark") return "Chế độ tối - Nhấn để chuyển";
+    return "Chế độ sáng - Nhấn để chuyển";
+  }, [preference, effectiveMode, reducedMotion]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchCount = async () => {
+      try {
+        const { count } = await api.getUnreadCount();
+        if (mounted) setUnreadCount(count);
+      } catch {
+        // silently fail
+      }
+    };
+
+    fetchCount();
+
+    // Poll every 30 seconds as fallback
+    const interval = setInterval(fetchCount, 30000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleBellClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (bellAnchorEl) {
+      setBellAnchorEl(null);
+    } else {
+      setBellAnchorEl(event.currentTarget);
+    }
+  };
+
+  const handleBellClose = () => {
+    setBellAnchorEl(null);
+    // Refresh count after closing
+    api.getUnreadCount().then(({ count }) => setUnreadCount(count)).catch(() => {});
+  };
+
+  return (
+    <>
+      <AppBar
+        position="sticky"
+        color="default"
+        elevation={0}
+        sx={{
+          borderBottom: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Toolbar sx={{ justifyContent: "flex-end", gap: 1.5, minHeight: 64 }}>
+          <Box sx={{ position: "relative" }}>
+            <Tooltip title="Thông báo">
+              <IconButton color="inherit" onClick={handleBellClick}>
+                <Badge badgeContent={unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : 0} color="error" invisible={unreadCount === 0}>
+                  <BellIcon fontSize="small" />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+            <NotificationDropdown anchorEl={bellAnchorEl} open={bellOpen} onClose={handleBellClose} />
+          </Box>
+          <Tooltip title={modeTooltip} arrow>
+            <IconButton color="inherit" onClick={toggleMode}>
+              {modeIcon}
+            </IconButton>
+          </Tooltip>
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", pl: 1.5, borderLeft: `1px solid ${theme.palette.divider}` }}>
+            <Avatar sx={{ width: 34, height: 34, flexShrink: 0, bgcolor: "primary.main", color: "primary.contrastText" }}>
+              <UserIcon fontSize="small" />
+            </Avatar>
+            <Box sx={{ display: { xs: "none", sm: "block" }, minWidth: 0, maxWidth: 160 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {user?.full_name || "Admin"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: "capitalize", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {user?.role || "staff"}
+              </Typography>
+            </Box>
+          </Stack>
+        </Toolbar>
+      </AppBar>
+    </>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "background.default", display: "grid", placeItems: "center" }}>
+        <Stack spacing={2} sx={{ alignItems: "center" }}>
+          <CircularProgress color="primary" />
+          <Typography variant="body2" color="text.secondary">Đang tải...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  if (!isAuthenticated) return null;
+
+  return (
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+      <Sidebar />
+      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <Topbar user={user} />
+        <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 2, md: 3 } }}>
+          {children}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+</file>
+
+<file path="src/app/library/vr-tour/page.tsx">
+'use client';
+
+import React from 'react';
+import dynamic from 'next/dynamic';
+import { Box, CircularProgress, Typography } from '@mui/material';
+
+const VRViewer = dynamic(() => import('@/app/library/vr-tour/_components/VRViewer'), {
+  ssr: false,
+  loading: () => (
+    <Box
+      sx={{
+        width: "100vw",
+        height: "100vh",
+        bgcolor: "#020617",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <CircularProgress size={48} sx={{ color: "info.light", mb: 2 }} />
+      <Typography variant="h6" color="common.white" sx={{ fontWeight: 700 }}>
+        Đang tải không gian tham quan 3D...
+      </Typography>
+      <Typography variant="body2" sx={{ color: "grey.500", mt: 0.5 }}>
+        Vui lòng chờ trong giây lát
+      </Typography>
+    </Box>
+  ),
+});
+
+export default function VRTourPage() {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <Box
+        sx={{
+          width: "100vw",
+          height: "100vh",
+          bgcolor: "#020617",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <CircularProgress size={48} sx={{ color: "info.light", mb: 2 }} />
+        <Typography variant="h6" color="common.white" sx={{ fontWeight: 700 }}>
+          Đang tải không gian tham quan 3D...
+        </Typography>
+        <Typography variant="body2" sx={{ color: "grey.500", mt: 0.5 }}>
+          Vui lòng chờ trong giây lát
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box component="main" sx={{ width: "100vw", height: "100vh", overflow: "hidden", bgcolor: "common.black" }}>
+      <VRViewer />
+    </Box>
+  );
+}
+</file>
+
+<file path="next.config.js">
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    optimizePackageImports: [
+      '@mui/icons-material',
+      '@mui/material',
+      'lucide-react',
+      'recharts',
+    ],
+  },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: '/api/camera/proxy',
+          destination: '/api/camera/proxy',
+        },
+        {
+          source: '/api/camera/snapshot/:path*',
+          destination: '/api/camera/snapshot/:path*',
+        },
+      ],
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: 'http://127.0.0.1:80/api/:path*',
+        },
+        {
+          source: '/users/:path*',
+          destination: 'http://127.0.0.1:80/users/:path*',
+        },
+      ],
+    };
+  },
+};
+
+module.exports = nextConfig;
+</file>
+
+<file path="src/app/(dashboard)/history/page.tsx">
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Grid,
+  InputAdornment,
+  LinearProgress,
+  MenuItem,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
+import SensorsOutlinedIcon from "@mui/icons-material/SensorsOutlined";
+import AntdDatePicker from "antd/es/date-picker";
+import dayjs from "dayjs";
+
+const { RangePicker } = AntdDatePicker;
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import Table from "antd/es/table";
+import Tag from "antd/es/tag";
+import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
+import api from "@/lib/api-client";
+import { successPop } from "@/lib/animations";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
+import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+
+const CAMERA_LABELS: Record<string, string> = {
+  entry_gate: "Cổng vào",
+  exit_gate: "Cổng ra",
+  kiosk: "Kiosk",
+  web_login: "Đăng nhập web",
+};
+
+function getStatusLabel(status: string) {
+  if (status === "success" || status === "granted") return "Thành công";
+  if (status === "expired") return "Hết hạn";
+  if (status === "spoof") return "Giả mạo";
+  return "Thất bại";
+}
+
+function getStatusColor(status: string): "success" | "warning" | "error" {
+  if (status === "success" || status === "granted") return "success";
+  if (status === "expired") return "warning";
+  return "error";
+}
+
+function mapEventStatus(status: CameraEvent["status"]) {
+  return status === "granted" ? "success" : status;
+}
+
+export default function HistoryPage() {
+  const theme = useTheme();
+  const [logs, setLogs] = useState<AccessLogPublic[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [accessType, setAccessType] = useState("");
+  const [status, setStatus] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const [skip, setSkip] = useState(0);
+  const [limit, setLimit] = useState(50);
+  const currentPage = Math.floor(skip / limit) + 1;
+
+  const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
+  const [freqLoading, setFreqLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setError(null);
+      const data = await api.getAccessLogs({
+        search: search || undefined,
+        accessType: accessType || undefined,
+        status: status || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        skip,
+        limit,
+      });
+      setLogs(data.items);
+      setTotal(data.total);
+    } catch {
+      setError("Không thể tải lịch sử ra/vào.");
+    } finally {
+      setLoading(false);
+    }
+  }, [search, accessType, status, dateFrom, dateTo, skip, limit]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    (async () => {
+      setFreqLoading(true);
+      try {
+        const data = await api.getAccessFrequency({
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        });
+        setFrequency(Array.isArray(data.daily) ? data.daily : []);
+      } finally {
+        setFreqLoading(false);
+      }
+    })();
+  }, [dateFrom, dateTo]);
+
+  const liveCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!live || skip !== 0) {
+      if (liveCleanup.current) {
+        liveCleanup.current();
+        liveCleanup.current = null;
+      }
+      return;
+    }
+
+    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
+      const mappedStatus = mapEventStatus(event.status);
+      if (search) {
+        const q = search.toLowerCase();
+        if (!event.full_name?.toLowerCase().includes(q) && !event.student_code?.toLowerCase().includes(q)) return;
+      }
+      if (status && mappedStatus !== status) return;
+      if (accessType && event.access_type !== accessType) return;
+
+      const newLog: AccessLogPublic = {
+        id: `sse-${Date.now()}`,
+        patron_id: event.patron_id || null,
+        patron_name: event.full_name || null,
+        student_code: event.student_code || null,
+        access_type: event.access_type || "entry",
+        verify_method: "face",
+        confidence: event.score || null,
+        camera_id: event.camera_id,
+        access_time: new Date().toISOString(),
+        status: mappedStatus,
+      };
+      setLogs((prev) => [newLog, ...prev.filter((log) => !log.id.startsWith("sse-")).slice(0, limit - 1)]);
+      setTotal((prev) => prev + 1);
+    });
+    liveCleanup.current = cleanup;
+    return cleanup;
+  }, [live, skip, search, status, accessType, limit]);
+
+  const handleFilter = () => {
+    if (skip === 0) {
+      load();
+    } else {
+      setSkip(0);
+    }
+  };
+
+  const entryTotal = useMemo(() => frequency.reduce((sum, day) => sum + day.entry, 0), [frequency]);
+  const exitTotal = useMemo(() => frequency.reduce((sum, day) => sum + day.exit, 0), [frequency]);
+
+  const columns: ColumnsType<AccessLogPublic> = [
+    {
+      title: "Thời gian",
+      dataIndex: "access_time",
+      key: "access_time",
+      width: 180,
+      sorter: (a, b) => new Date(a.access_time).getTime() - new Date(b.access_time).getTime(),
+      render: (val: string) => (
+        <span style={{ fontFamily: "monospace", fontSize: "0.82rem", color: "#B8B0A4" }}>
+          {new Date(val).toLocaleString("vi-VN")}
+        </span>
+      ),
+    },
+    {
+      title: "Độc giả",
+      dataIndex: "patron_name",
+      key: "patron_name",
+      width: 160,
+      render: (val: string) => <span style={{ fontWeight: 600 }}>{val || "-"}</span>,
+    },
+    {
+      title: "MSSV",
+      dataIndex: "student_code",
+      key: "student_code",
+      width: 120,
+      render: (val: string) => <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{val || "-"}</span>,
+    },
+    {
+      title: "Loại",
+      dataIndex: "access_type",
+      key: "access_type",
+      width: 80,
+      filters: [
+        { text: "Vào", value: "entry" },
+        { text: "Ra", value: "exit" },
+      ],
+      onFilter: (value, record) => record.access_type === value,
+      render: (val: string) => (
+        <Tag color={val === "entry" ? "green" : "orange"}>
+          {val === "entry" ? "Vào" : "Ra"}
+        </Tag>
+      ),
+    },
+    {
+      title: "Phương thức",
+      dataIndex: "verify_method",
+      key: "verify_method",
+      width: 100,
+      render: (val: string) => <span style={{ color: "#B8B0A4" }}>{val}</span>,
+    },
+    {
+      title: "Cổng",
+      dataIndex: "camera_id",
+      key: "camera_id",
+      width: 120,
+      render: (val: string) => (
+        <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>
+          {CAMERA_LABELS[val] || val}
+        </span>
+      ),
+    },
+    {
+      title: "Độ tin cậy",
+      dataIndex: "confidence",
+      key: "confidence",
+      width: 150,
+      sorter: (a, b) => (a.confidence ?? 0) - (b.confidence ?? 0),
+      render: (val: number | null) => {
+        if (val == null) return <span style={{ color: "#B8B0A4" }}>-</span>;
+        const pct = Math.round(val * 100);
+        return (
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <LinearProgress
+              variant="determinate"
+              value={pct}
+              color={pct >= 80 ? "success" : pct >= 60 ? "warning" : "error"}
+              sx={{ width: 80, height: 7, borderRadius: 99 }}
+            />
+            <span style={{ fontSize: "0.75rem", color: "#B8B0A4" }}>{pct}%</span>
+          </Stack>
+        );
+      },
+    },
+    {
+      title: "Kết quả",
+      dataIndex: "status",
+      key: "status",
+      width: 110,
+      filters: [
+        { text: "Thành công", value: "success" },
+        { text: "Thất bại", value: "failed" },
+        { text: "Hết hạn", value: "expired" },
+        { text: "Giả mạo", value: "spoof" },
+      ],
+      onFilter: (value, record) => record.status === value,
+      render: (val: string) => {
+        const colorMap: Record<string, string> = {
+          success: "green", granted: "green",
+          expired: "orange",
+          spoof: "red", failed: "red",
+        };
+        return (
+          <Tag color={colorMap[val] || "default"}>
+            {getStatusLabel(val)}
+          </Tag>
+        );
+      },
+    },
+  ];
+
+  return (
+    <Stack spacing={3}>
+      <PageHeader
+        title="Lịch sử mượn trả"
+        icon={HistoryOutlinedIcon}
+        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
+        statBadges={`${live ? "Live · " : ""}Tổng: ${total}`}
+        onRefresh={load}
+        actions={
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Chip icon={<SensorsOutlinedIcon />} label={live ? "Live đang bật" : "Live đang tắt"} sx={{ bgcolor: live ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.08)", color: live ? "#6ee7b7" : "#a5b4fc", border: "1px solid", borderColor: live ? "rgba(16,185,129,0.3)" : "rgba(165,180,252,0.3)", fontWeight: 600 }} />
+            <Chip label={`Tổng: ${total}`} sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "#e0e7ff", border: "1px solid rgba(165,180,252,0.3)", fontWeight: 600 }} />
+          </Stack>
+        }
+      />
+
+      <DashboardCard title="Bộ lọc">
+        <Grid container spacing={1.5} sx={{ alignItems: "center" }}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              label="Tìm kiếm"
+              placeholder="MSSV hoặc tên..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" ? handleFilter() : undefined}
+              fullWidth
+              size="small"
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchOutlinedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 1.7 }}>
+            <TextField select label="Loại" value={accessType} onChange={(event) => setAccessType(event.target.value)} fullWidth size="small">
+              <MenuItem value="">Tất cả</MenuItem>
+              <MenuItem value="entry">Vào</MenuItem>
+              <MenuItem value="exit">Ra</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 1.9 }}>
+            <TextField select label="Kết quả" value={status} onChange={(event) => setStatus(event.target.value)} fullWidth size="small">
+              <MenuItem value="">Tất cả</MenuItem>
+              <MenuItem value="success">Thành công</MenuItem>
+              <MenuItem value="failed">Thất bại</MenuItem>
+              <MenuItem value="expired">Hết hạn</MenuItem>
+              <MenuItem value="spoof">Giả mạo</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <RangePicker
+              size="small"
+              value={[
+                dateFrom ? dayjs(dateFrom) : null,
+                dateTo ? dayjs(dateTo) : null,
+              ]}
+              onChange={(dates) => {
+                setDateFrom(dates?.[0]?.format("YYYY-MM-DD") || "");
+                setDateTo(dates?.[1]?.format("YYYY-MM-DD") || "");
+              }}
+              style={{ width: "100%" }}
+              placeholder={["Từ ngày", "Đến ngày"]}
+              format="DD/MM/YYYY"
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 1.3 }}>
+            <Button
+              variant="contained"
+              onClick={handleFilter}
+              disabled={loading}
+              fullWidth
+              sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}
+            >
+              Lọc
+            </Button>
+          </Grid>
+          <Grid size={{ xs: 12, md: 1.5 }}>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", justifyContent: { xs: "flex-start", md: "flex-end" } }}>
+              <Typography variant="body2" color="text.secondary">Live</Typography>
+              <Switch checked={live} onChange={(event) => setLive(event.target.checked)} />
+            </Stack>
+          </Grid>
+        </Grid>
+      </DashboardCard>
+
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <DashboardCard title="Tần suất ra/vào theo ngày">
+            <LoadingOverlay loading={freqLoading} message="Đang tải biểu đồ...">
+              {frequency.length === 0 ? (
+                <Alert severity="info">Chưa có dữ liệu tần suất trong khoảng thời gian đã chọn.</Alert>
+              ) : (
+                <Box sx={{ height: 270 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={frequency} margin={{ top: 8, right: 20, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                      <XAxis
+                        dataKey="date"
+                        fontSize={12}
+                        tick={{ fill: theme.palette.text.secondary }}
+                        tickFormatter={(value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                      />
+                      <YAxis allowDecimals={false} fontSize={12} tick={{ fill: theme.palette.text.secondary }} />
+                      <Tooltip
+                        cursor={{ fill: theme.palette.action.hover }}
+                        contentStyle={{
+                          background: theme.palette.background.paper,
+                          border: `1px solid ${theme.palette.divider}`,
+                          borderRadius: 8,
+                          color: theme.palette.text.primary,
+                        }}
+                        labelFormatter={(value) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      />
+                      <Legend />
+                      <Bar dataKey="entry" fill={theme.palette.success.main} name="Vào" radius={[5, 5, 0, 0]} />
+                      <Bar dataKey="exit" fill={theme.palette.warning.main} name="Ra" radius={[5, 5, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+              )}
+            </LoadingOverlay>
+          </DashboardCard>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Stack spacing={2} sx={{ height: "100%" }}>
+            <MuiStatCard
+              label="Lượt vào trong biểu đồ"
+              value={entryTotal}
+              icon={LoginOutlinedIcon}
+              gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)"
+              pct={100}
+              index={0}
+            />
+            <MuiStatCard
+              label="Lượt ra trong biểu đồ"
+              value={exitTotal}
+              icon={LogoutOutlinedIcon}
+              gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+              pct={100}
+              index={1}
+            />
+          </Stack>
+        </Grid>
+      </Grid>
+
+      <DashboardCard
+        title="Nhật ký truy cập"
+        subtitle={`Tổng: ${total} bản ghi`}
+        noPadding
+      >
+        {error ? <Alert severity="error" sx={{ mx: 2.5, mt: 2 }}>{error}</Alert> : null}
+
+        <Box sx={{ px: 1, py: 1 }}>
+          <Table<AccessLogPublic>
+            rowKey={(record) => record.id}
+            columns={columns}
+            dataSource={logs}
+            loading={loading && logs.length === 0}
+            pagination={{
+              current: currentPage,
+              pageSize: limit,
+              total,
+              showSizeChanger: true,
+              pageSizeOptions: ["20", "50", "100"],
+              showTotal: (total, range) => `${range[0]}–${range[1]} / ${total} bản ghi`,
+              onChange: (page: number, pageSize: number) => {
+                setLimit(pageSize);
+                setSkip((page - 1) * pageSize);
+              },
+            }}
+            scroll={{ x: 980 }}
+            size="small"
+            locale={{
+              emptyText: (
+                <EmptyState title="Không có dữ liệu lịch sử phù hợp" />
+              ),
+            }}
+          />
+        </Box>
+      </DashboardCard>
+    </Stack>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/liveness/page.tsx">
+"use client";
+
+import { useState } from "react";
+import { Box, Alert, Button, Checkbox, Stack, Typography } from "@mui/material";
+import Progress from "antd/es/progress";
+import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import CameraCapture from "@/app/(dashboard)/_components/camera-capture";
+import JobPoll from "@/app/(dashboard)/_components/job-poll";
+import api, { getErrorMessage } from "@/lib/api-client";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
+
+function LivenessResultCard({ result }: { result: any }) {
+  const isLive = Boolean(result.is_live);
+  const score = Number(result.liveness_score ?? 0);
+
+  return (
+    <DashboardCard>
+      <Stack spacing={2.5}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+          {isLive ? <VisibilityOutlinedIcon color="success" sx={{ fontSize: 48 }} /> : <VisibilityOffOutlinedIcon color="error" sx={{ fontSize: 48 }} />}
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 900 }}>
+              {isLive ? "Khuôn mặt thật" : "Phát hiện giả mạo"}
+            </Typography>
+            <Typography color="text.secondary">Điểm liveness: {(score * 100).toFixed(1)}%</Typography>
+          </Box>
+        </Stack>
+
+        <Progress
+          percent={Math.min(Math.round(score * 100), 100)}
+          status={isLive ? "success" : "exception"}
+          strokeColor={isLive ? "#10b981" : "#ef4444"}
+          trailColor="rgba(0,0,0,0.06)"
+        />
+      </Stack>
+    </DashboardCard>
+  );
+}
+
+export default function LivenessPage() {
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState("");
+
+  const handleCapture = (file: File) => {
+    setImageFile(file);
+    setResult(null);
+    setError("");
+  };
+
+  const handleFileUpload = (file: File) => {
+    setImageFile(file);
+    setResult(null);
+    setError("");
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!imageFile) return;
+    setError("");
+    setIsLoading(true);
+    setJobId(null);
+    setResult(null);
+    try {
+      const data = await api.livenessCheck(imageFile, consent);
+      setJobId(data.job_id);
+    } catch (err: any) {
+      setError(getErrorMessage(err) || "Kiểm tra liveness thất bại.");
+      setIsLoading(false);
+    }
+  };
+
+  const reset = () => {
+    setImageFile(null);
+    setJobId(null);
+    setResult(null);
+    setError("");
+    setIsLoading(false);
+  };
+
+  return (
+    <Stack spacing={3} sx={{ maxWidth: 920, mx: "auto" }}>
+      <Box sx={staggerSx(0)}>
+        <PageHeader
+          title="Kiểm tra sống"
+          subtitle="Đánh giá ảnh khuôn mặt thật hay ảnh giả mạo trước khi xử lý nhận diện."
+          icon={VisibilityOutlinedIcon}
+          gradient="linear-gradient(135deg, #581c87 0%, #7c3aed 50%, #a78bfa 100%)"
+        />
+      </Box>
+
+      {error ? (
+        <Box sx={staggerSx(1)}>
+          <Alert severity="error">{error}</Alert>
+        </Box>
+      ) : null}
+
+      {result ? (
+        <Stack spacing={2} sx={staggerSx(1)}>
+          <LivenessResultCard result={result} />
+          <Button startIcon={<RestartAltOutlinedIcon />} variant="outlined" onClick={reset} sx={{ alignSelf: "center" }}>
+            Thử lại
+          </Button>
+        </Stack>
+      ) : jobId ? (
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
+            <JobPoll
+              jobId={jobId}
+              onComplete={(value) => { setResult(value); setIsLoading(false); setJobId(null); }}
+              onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
+            />
+          </DashboardCard>
+        </Box>
+      ) : (
+        <Box sx={staggerSx(1)}>
+          <DashboardCard>
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={2.5}>
+                <CameraCapture onCapture={handleCapture} onFileUpload={handleFileUpload} />
+       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
+         <Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+         <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, mt: { xs: -0.5, sm: 0 } }}>
+           Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để kiểm tra liveness.
+         </Typography>
+       </Stack>
+                <Button type="submit" variant="contained" disabled={!imageFile || !consent || isLoading} fullWidth>
+                  {isLoading ? "Đang gửi..." : "Kiểm tra liveness"}
+                </Button>
+              </Stack>
+            </Box>
+          </DashboardCard>
+        </Box>
+      )}
+    </Stack>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/notifications/page.tsx">
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Box,
+  Pagination,
+  Paper,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from "@mui/material";
+import {
+  NotificationsOutlined,
+  ErrorOutlined,
+  CalendarMonthOutlined,
+  BadgeOutlined,
+  ShieldOutlined,
+  BarChartOutlined,
+  PersonOffOutlined,
+  MenuBookOutlined,
+} from "@mui/icons-material";
+import api from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
+import type { Notification } from "@/lib/types";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import { staggerSx } from "@/lib/useStaggeredAnimation";
+
+const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+  borrow: { icon: <MenuBookOutlined />, color: "success.main", label: "Mượn sách" },
+  return: { icon: <MenuBookOutlined />, color: "info.main", label: "Trả sách" },
+  book_available: { icon: <MenuBookOutlined />, color: "success.main", label: "Sách có sẵn" },
+  overdue_reminder: { icon: <ErrorOutlined />, color: "error.main", label: "Quá hạn" },
+  due_soon_reminder: { icon: <ErrorOutlined />, color: "warning.main", label: "Sắp đến hạn" },
+  fine_notice: { icon: <ErrorOutlined />, color: "error.main", label: "Phí phạt" },
+  schedule_change: { icon: <CalendarMonthOutlined />, color: "warning.main", label: "Lịch trực" },
+  shift_reminder: { icon: <CalendarMonthOutlined />, color: "info.main", label: "Nhắc lịch" },
+  membership_expiry: { icon: <BadgeOutlined />, color: "info.main", label: "Hạn thẻ" },
+  anomaly_alert: { icon: <ShieldOutlined />, color: "error.main", label: "Bất thường" },
+  daily_report: { icon: <BarChartOutlined />, color: "primary.main", label: "Thống kê" },
+  staff_absence: { icon: <PersonOffOutlined />, color: "warning.main", label: "Vắng mặt" },
+  bid_warning: { icon: <ErrorOutlined />, color: "warning.main", label: "Đấu giá" },
+  swap_warning: { icon: <ErrorOutlined />, color: "warning.main", label: "Đổi ca" },
+};
+
+function getConfig(type: string) {
+  return NOTIFICATION_CONFIG[type] || { icon: <NotificationsOutlined />, color: "primary.main", label: "Thông báo" };
+}
+
+function formatRelativeTime(isoString: string): string {
+  const now = new Date();
+  const date = new Date(isoString);
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return "Vừa xong";
+  if (diffMin < 60) return `${diffMin} phút trước`;
+  if (diffHour < 24) return `${diffHour} giờ trước`;
+  if (diffDay < 7) return `${diffDay} ngày trước`;
+  return date.toLocaleDateString("vi-VN");
+}
+
+export default function NotificationsPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const pageSize = 20;
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) router.push("/login");
+  }, [isAuthenticated, authLoading, router]);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      setLoading(true);
+      const result = await api.getNotifications({
+        unread_only: filter === "unread" ? true : undefined,
+        skip: (page - 1) * pageSize,
+        limit: pageSize,
+      });
+      setNotifications(result.items);
+      setTotal(result.total);
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, filter, page]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.markAllNotificationsAsRead();
+      fetchNotifications();
+    } catch {
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.isRead) {
+      try {
+        await api.markNotificationAsRead(notification.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
+        );
+      } catch {
+      }
+    }
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const totalPages = Math.ceil(total / pageSize);
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  if (authLoading) {
+    return <LoadingOverlay loading message="Đang tải..." />;
+  }
+
+  return (
+    <Stack spacing={3} sx={{ maxWidth: 800, mx: "auto" }}>
+      <PageHeader
+        title="Thông báo"
+        icon={NotificationsOutlined}
+        gradient="linear-gradient(135deg, #4338ca 0%, #6366f1 50%, #818cf8 100%)"
+        statBadges={unreadCount > 0 ? `${unreadCount} chưa đọc` : undefined}
+        onRefresh={fetchNotifications}
+        actions={
+          <Typography
+            variant="body2"
+            sx={{ color: "#c7d2fe", cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}
+            onClick={handleMarkAllRead}
+          >
+            Đánh dấu đã đọc tất cả
+          </Typography>
+        }
+      />
+
+      <DashboardCard
+        title="Danh sách thông báo"
+        actions={
+          <ToggleButtonGroup
+            value={filter}
+            exclusive
+            onChange={(_, v) => { if (v) { setFilter(v); setPage(1); } }}
+            size="small"
+          >
+            <ToggleButton value="all">Tất cả</ToggleButton>
+            <ToggleButton value="unread">Chưa đọc</ToggleButton>
+          </ToggleButtonGroup>
+        }
+      >
+        <LoadingOverlay loading={loading} message="Đang tải thông báo...">
+          {notifications.length === 0 ? (
+            <EmptyState
+              icon={<NotificationsOutlined />}
+              title={filter === "unread" ? "Không có thông báo chưa đọc" : "Không có thông báo"}
+            />
+          ) : (
+            <Box>
+              {notifications.map((notification, index) => {
+                const config = getConfig(notification.type);
+                return (
+                  <Paper
+                    key={notification.id}
+                    variant="outlined"
+                    onClick={() => handleNotificationClick(notification)}
+                    sx={{
+                      p: 2,
+                      mb: 1,
+                      display: "flex",
+                      gap: 2,
+                      cursor: "pointer",
+                      bgcolor: notification.isRead ? "transparent" : "action.hover",
+                      borderColor: notification.isRead ? "divider" : "primary.light",
+                      "&:hover": { bgcolor: "action.selected" },
+                      ...staggerSx(index),
+                    }}
+                  >
+                    <Box sx={{ color: config.color, mt: 0.5 }}>{config.icon}</Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: notification.isRead ? 400 : 700 }} noWrap>
+                          {notification.title}
+                        </Typography>
+                        {!notification.isRead ? (
+                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", flexShrink: 0 }} />
+                        ) : null}
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: expandedIds.has(notification.id) ? "unset" : 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: expandedIds.has(notification.id) ? "visible" : "hidden",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {notification.body}
+                      </Typography>
+                      {(notification.body?.length ?? 0) > 100 ? (
+                        <Typography
+                          variant="caption"
+                          color="primary.main"
+                          sx={{ cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(notification.id);
+                          }}
+                        >
+                          {expandedIds.has(notification.id) ? "Thu gọn" : "Xem thêm"}
+                        </Typography>
+                      ) : null}
+                      <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
+                        {formatRelativeTime(notification.createdAt)}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                );
+              })}
+              {totalPages > 1 ? (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+                  <Pagination count={totalPages} page={page} onChange={(_, p) => setPage(p)} color="primary" />
+                </Box>
+              ) : null}
+            </Box>
+          )}
+        </LoadingOverlay>
+      </DashboardCard>
     </Stack>
   );
 }
@@ -25295,716 +26966,6 @@ export default function StatsPage() {
 }
 </file>
 
-<file path="src/app/library/vr-tour/page.tsx">
-'use client';
-
-import React from 'react';
-import dynamic from 'next/dynamic';
-import { Box, CircularProgress, Typography } from '@mui/material';
-
-const VRViewer = dynamic(() => import('@/app/library/vr-tour/_components/VRViewer'), {
-  ssr: false,
-  loading: () => (
-    <Box
-      sx={{
-        width: "100vw",
-        height: "100vh",
-        bgcolor: "#020617",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <CircularProgress size={48} sx={{ color: "info.light", mb: 2 }} />
-      <Typography variant="h6" color="common.white" sx={{ fontWeight: 700 }}>
-        Đang tải không gian tham quan 3D...
-      </Typography>
-      <Typography variant="body2" sx={{ color: "grey.500", mt: 0.5 }}>
-        Vui lòng chờ trong giây lát
-      </Typography>
-    </Box>
-  ),
-});
-
-export default function VRTourPage() {
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <Box
-        sx={{
-          width: "100vw",
-          height: "100vh",
-          bgcolor: "#020617",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <CircularProgress size={48} sx={{ color: "info.light", mb: 2 }} />
-        <Typography variant="h6" color="common.white" sx={{ fontWeight: 700 }}>
-          Đang tải không gian tham quan 3D...
-        </Typography>
-        <Typography variant="body2" sx={{ color: "grey.500", mt: 0.5 }}>
-          Vui lòng chờ trong giây lát
-        </Typography>
-      </Box>
-    );
-  }
-
-  return (
-    <Box component="main" sx={{ width: "100vw", height: "100vh", overflow: "hidden", bgcolor: "common.black" }}>
-      <VRViewer />
-    </Box>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/history/page.tsx">
-"use client";
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Grid,
-  InputAdornment,
-  LinearProgress,
-  MenuItem,
-  Stack,
-  Switch,
-  TextField,
-  Typography,
-  useTheme,
-} from "@mui/material";
-import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
-import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
-import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
-import SensorsOutlinedIcon from "@mui/icons-material/SensorsOutlined";
-import AntdDatePicker from "antd/es/date-picker";
-import dayjs from "dayjs";
-
-const { RangePicker } = AntdDatePicker;
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import Table from "antd/es/table";
-import Tag from "antd/es/tag";
-import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
-import api from "@/lib/api-client";
-import { successPop } from "@/lib/animations";
-import { staggerSx } from "@/lib/useStaggeredAnimation";
-import type { AccessFrequencyDay, AccessLogPublic, CameraEvent } from "@/lib/types";
-import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
-import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
-import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
-import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
-
-const CAMERA_LABELS: Record<string, string> = {
-  entry_gate: "Cổng vào",
-  exit_gate: "Cổng ra",
-  kiosk: "Kiosk",
-  web_login: "Đăng nhập web",
-};
-
-function getStatusLabel(status: string) {
-  if (status === "success" || status === "granted") return "Thành công";
-  if (status === "expired") return "Hết hạn";
-  if (status === "spoof") return "Giả mạo";
-  return "Thất bại";
-}
-
-function getStatusColor(status: string): "success" | "warning" | "error" {
-  if (status === "success" || status === "granted") return "success";
-  if (status === "expired") return "warning";
-  return "error";
-}
-
-function mapEventStatus(status: CameraEvent["status"]) {
-  return status === "granted" ? "success" : status;
-}
-
-export default function HistoryPage() {
-  const theme = useTheme();
-  const [logs, setLogs] = useState<AccessLogPublic[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [live, setLive] = useState(true);
-
-  const [search, setSearch] = useState("");
-  const [accessType, setAccessType] = useState("");
-  const [status, setStatus] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
-  const [skip, setSkip] = useState(0);
-  const [limit, setLimit] = useState(50);
-  const currentPage = Math.floor(skip / limit) + 1;
-
-  const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
-  const [freqLoading, setFreqLoading] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setError(null);
-      const data = await api.getAccessLogs({
-        search: search || undefined,
-        accessType: accessType || undefined,
-        status: status || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        skip,
-        limit,
-      });
-      setLogs(data.items);
-      setTotal(data.total);
-    } catch {
-      setError("Không thể tải lịch sử ra/vào.");
-    } finally {
-      setLoading(false);
-    }
-  }, [search, accessType, status, dateFrom, dateTo, skip, limit]);
-
-  useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    (async () => {
-      setFreqLoading(true);
-      try {
-        const data = await api.getAccessFrequency({
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-        });
-        setFrequency(Array.isArray(data.daily) ? data.daily : []);
-      } finally {
-        setFreqLoading(false);
-      }
-    })();
-  }, [dateFrom, dateTo]);
-
-  const liveCleanup = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    if (!live || skip !== 0) {
-      if (liveCleanup.current) {
-        liveCleanup.current();
-        liveCleanup.current = null;
-      }
-      return;
-    }
-
-    const cleanup = api.connectAccessSSE((event: CameraEvent) => {
-      const mappedStatus = mapEventStatus(event.status);
-      if (search) {
-        const q = search.toLowerCase();
-        if (!event.full_name?.toLowerCase().includes(q) && !event.student_code?.toLowerCase().includes(q)) return;
-      }
-      if (status && mappedStatus !== status) return;
-      if (accessType && event.access_type !== accessType) return;
-
-      const newLog: AccessLogPublic = {
-        id: `sse-${Date.now()}`,
-        patron_id: event.patron_id || null,
-        patron_name: event.full_name || null,
-        student_code: event.student_code || null,
-        access_type: event.access_type || "entry",
-        verify_method: "face",
-        confidence: event.score || null,
-        camera_id: event.camera_id,
-        access_time: new Date().toISOString(),
-        status: mappedStatus,
-      };
-      setLogs((prev) => [newLog, ...prev.filter((log) => !log.id.startsWith("sse-")).slice(0, limit - 1)]);
-      setTotal((prev) => prev + 1);
-    });
-    liveCleanup.current = cleanup;
-    return cleanup;
-  }, [live, skip, search, status, accessType, limit]);
-
-  const handleFilter = () => {
-    if (skip === 0) {
-      load();
-    } else {
-      setSkip(0);
-    }
-  };
-
-  const entryTotal = useMemo(() => frequency.reduce((sum, day) => sum + day.entry, 0), [frequency]);
-  const exitTotal = useMemo(() => frequency.reduce((sum, day) => sum + day.exit, 0), [frequency]);
-
-  const columns: ColumnsType<AccessLogPublic> = [
-    {
-      title: "Thời gian",
-      dataIndex: "access_time",
-      key: "access_time",
-      width: 180,
-      sorter: (a, b) => new Date(a.access_time).getTime() - new Date(b.access_time).getTime(),
-      render: (val: string) => (
-        <span style={{ fontFamily: "monospace", fontSize: "0.82rem", color: "#B8B0A4" }}>
-          {new Date(val).toLocaleString("vi-VN")}
-        </span>
-      ),
-    },
-    {
-      title: "Độc giả",
-      dataIndex: "patron_name",
-      key: "patron_name",
-      width: 160,
-      render: (val: string) => <span style={{ fontWeight: 600 }}>{val || "-"}</span>,
-    },
-    {
-      title: "MSSV",
-      dataIndex: "student_code",
-      key: "student_code",
-      width: 120,
-      render: (val: string) => <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>{val || "-"}</span>,
-    },
-    {
-      title: "Loại",
-      dataIndex: "access_type",
-      key: "access_type",
-      width: 80,
-      filters: [
-        { text: "Vào", value: "entry" },
-        { text: "Ra", value: "exit" },
-      ],
-      onFilter: (value, record) => record.access_type === value,
-      render: (val: string) => (
-        <Tag color={val === "entry" ? "green" : "orange"}>
-          {val === "entry" ? "Vào" : "Ra"}
-        </Tag>
-      ),
-    },
-    {
-      title: "Phương thức",
-      dataIndex: "verify_method",
-      key: "verify_method",
-      width: 100,
-      render: (val: string) => <span style={{ color: "#B8B0A4" }}>{val}</span>,
-    },
-    {
-      title: "Cổng",
-      dataIndex: "camera_id",
-      key: "camera_id",
-      width: 120,
-      render: (val: string) => (
-        <span style={{ fontFamily: "monospace", fontSize: "0.82rem" }}>
-          {CAMERA_LABELS[val] || val}
-        </span>
-      ),
-    },
-    {
-      title: "Độ tin cậy",
-      dataIndex: "confidence",
-      key: "confidence",
-      width: 150,
-      sorter: (a, b) => (a.confidence ?? 0) - (b.confidence ?? 0),
-      render: (val: number | null) => {
-        if (val == null) return <span style={{ color: "#B8B0A4" }}>-</span>;
-        const pct = Math.round(val * 100);
-        return (
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <LinearProgress
-              variant="determinate"
-              value={pct}
-              color={pct >= 80 ? "success" : pct >= 60 ? "warning" : "error"}
-              sx={{ width: 80, height: 7, borderRadius: 99 }}
-            />
-            <span style={{ fontSize: "0.75rem", color: "#B8B0A4" }}>{pct}%</span>
-          </Stack>
-        );
-      },
-    },
-    {
-      title: "Kết quả",
-      dataIndex: "status",
-      key: "status",
-      width: 110,
-      filters: [
-        { text: "Thành công", value: "success" },
-        { text: "Thất bại", value: "failed" },
-        { text: "Hết hạn", value: "expired" },
-        { text: "Giả mạo", value: "spoof" },
-      ],
-      onFilter: (value, record) => record.status === value,
-      render: (val: string) => {
-        const colorMap: Record<string, string> = {
-          success: "green", granted: "green",
-          expired: "orange",
-          spoof: "red", failed: "red",
-        };
-        return (
-          <Tag color={colorMap[val] || "default"}>
-            {getStatusLabel(val)}
-          </Tag>
-        );
-      },
-    },
-  ];
-
-  return (
-    <Stack spacing={3}>
-      <PageHeader
-        title="Lịch sử mượn trả"
-        icon={HistoryOutlinedIcon}
-        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
-        statBadges={`${live ? "Live · " : ""}Tổng: ${total}`}
-        onRefresh={load}
-        actions={
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <Chip icon={<SensorsOutlinedIcon />} label={live ? "Live đang bật" : "Live đang tắt"} sx={{ bgcolor: live ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.08)", color: live ? "#6ee7b7" : "#a5b4fc", border: "1px solid", borderColor: live ? "rgba(16,185,129,0.3)" : "rgba(165,180,252,0.3)", fontWeight: 600 }} />
-            <Chip label={`Tổng: ${total}`} sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "#e0e7ff", border: "1px solid rgba(165,180,252,0.3)", fontWeight: 600 }} />
-          </Stack>
-        }
-      />
-
-      <DashboardCard title="Bộ lọc">
-        <Grid container spacing={1.5} sx={{ alignItems: "center" }}>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <TextField
-              label="Tìm kiếm"
-              placeholder="MSSV hoặc tên..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" ? handleFilter() : undefined}
-              fullWidth
-              size="small"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchOutlinedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 1.7 }}>
-            <TextField select label="Loại" value={accessType} onChange={(event) => setAccessType(event.target.value)} fullWidth size="small">
-              <MenuItem value="">Tất cả</MenuItem>
-              <MenuItem value="entry">Vào</MenuItem>
-              <MenuItem value="exit">Ra</MenuItem>
-            </TextField>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 1.9 }}>
-            <TextField select label="Kết quả" value={status} onChange={(event) => setStatus(event.target.value)} fullWidth size="small">
-              <MenuItem value="">Tất cả</MenuItem>
-              <MenuItem value="success">Thành công</MenuItem>
-              <MenuItem value="failed">Thất bại</MenuItem>
-              <MenuItem value="expired">Hết hạn</MenuItem>
-              <MenuItem value="spoof">Giả mạo</MenuItem>
-            </TextField>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <RangePicker
-              size="small"
-              value={[
-                dateFrom ? dayjs(dateFrom) : null,
-                dateTo ? dayjs(dateTo) : null,
-              ]}
-              onChange={(dates) => {
-                setDateFrom(dates?.[0]?.format("YYYY-MM-DD") || "");
-                setDateTo(dates?.[1]?.format("YYYY-MM-DD") || "");
-              }}
-              style={{ width: "100%" }}
-              placeholder={["Từ ngày", "Đến ngày"]}
-              format="DD/MM/YYYY"
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 1.3 }}>
-            <Button
-              variant="contained"
-              onClick={handleFilter}
-              disabled={loading}
-              fullWidth
-              sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}
-            >
-              Lọc
-            </Button>
-          </Grid>
-          <Grid size={{ xs: 12, md: 1.5 }}>
-            <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", justifyContent: { xs: "flex-start", md: "flex-end" } }}>
-              <Typography variant="body2" color="text.secondary">Live</Typography>
-              <Switch checked={live} onChange={(event) => setLive(event.target.checked)} />
-            </Stack>
-          </Grid>
-        </Grid>
-      </DashboardCard>
-
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 8 }}>
-          <DashboardCard title="Tần suất ra/vào theo ngày">
-            <LoadingOverlay loading={freqLoading} message="Đang tải biểu đồ...">
-              {frequency.length === 0 ? (
-                <Alert severity="info">Chưa có dữ liệu tần suất trong khoảng thời gian đã chọn.</Alert>
-              ) : (
-                <Box sx={{ height: 270 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={frequency} margin={{ top: 8, right: 20, left: -10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                      <XAxis
-                        dataKey="date"
-                        fontSize={12}
-                        tick={{ fill: theme.palette.text.secondary }}
-                        tickFormatter={(value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
-                      />
-                      <YAxis allowDecimals={false} fontSize={12} tick={{ fill: theme.palette.text.secondary }} />
-                      <Tooltip
-                        cursor={{ fill: theme.palette.action.hover }}
-                        contentStyle={{
-                          background: theme.palette.background.paper,
-                          border: `1px solid ${theme.palette.divider}`,
-                          borderRadius: 8,
-                          color: theme.palette.text.primary,
-                        }}
-                        labelFormatter={(value) => new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", {
-                          weekday: "long",
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}
-                      />
-                      <Legend />
-                      <Bar dataKey="entry" fill={theme.palette.success.main} name="Vào" radius={[5, 5, 0, 0]} />
-                      <Bar dataKey="exit" fill={theme.palette.warning.main} name="Ra" radius={[5, 5, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Box>
-              )}
-            </LoadingOverlay>
-          </DashboardCard>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Stack spacing={2} sx={{ height: "100%" }}>
-            <MuiStatCard
-              label="Lượt vào trong biểu đồ"
-              value={entryTotal}
-              icon={LoginOutlinedIcon}
-              gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)"
-              pct={100}
-              index={0}
-            />
-            <MuiStatCard
-              label="Lượt ra trong biểu đồ"
-              value={exitTotal}
-              icon={LogoutOutlinedIcon}
-              gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
-              pct={100}
-              index={1}
-            />
-          </Stack>
-        </Grid>
-      </Grid>
-
-      <DashboardCard
-        title="Nhật ký truy cập"
-        subtitle={`Tổng: ${total} bản ghi`}
-        noPadding
-      >
-        {error ? <Alert severity="error" sx={{ mx: 2.5, mt: 2 }}>{error}</Alert> : null}
-
-        <Box sx={{ px: 1, py: 1 }}>
-          <Table<AccessLogPublic>
-            rowKey={(record) => record.id}
-            columns={columns}
-            dataSource={logs}
-            loading={loading && logs.length === 0}
-            pagination={{
-              current: currentPage,
-              pageSize: limit,
-              total,
-              showSizeChanger: true,
-              pageSizeOptions: ["20", "50", "100"],
-              showTotal: (total, range) => `${range[0]}–${range[1]} / ${total} bản ghi`,
-              onChange: (page: number, pageSize: number) => {
-                setLimit(pageSize);
-                setSkip((page - 1) * pageSize);
-              },
-            }}
-            scroll={{ x: 980 }}
-            size="small"
-            locale={{
-              emptyText: (
-                <EmptyState title="Không có dữ liệu lịch sử phù hợp" />
-              ),
-            }}
-          />
-        </Box>
-      </DashboardCard>
-    </Stack>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/liveness/page.tsx">
-"use client";
-
-import { useState } from "react";
-import { Box, Alert, Button, Checkbox, Stack, Typography } from "@mui/material";
-import Progress from "antd/es/progress";
-import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
-import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import CameraCapture from "@/app/(dashboard)/_components/camera-capture";
-import JobPoll from "@/app/(dashboard)/_components/job-poll";
-import api, { getErrorMessage } from "@/lib/api-client";
-import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
-import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
-import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
-import { staggerSx } from "@/lib/useStaggeredAnimation";
-
-function LivenessResultCard({ result }: { result: any }) {
-  const isLive = Boolean(result.is_live);
-  const score = Number(result.liveness_score ?? 0);
-
-  return (
-    <DashboardCard>
-      <Stack spacing={2.5}>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-          {isLive ? <VisibilityOutlinedIcon color="success" sx={{ fontSize: 48 }} /> : <VisibilityOffOutlinedIcon color="error" sx={{ fontSize: 48 }} />}
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 900 }}>
-              {isLive ? "Khuôn mặt thật" : "Phát hiện giả mạo"}
-            </Typography>
-            <Typography color="text.secondary">Điểm liveness: {(score * 100).toFixed(1)}%</Typography>
-          </Box>
-        </Stack>
-
-        <Progress
-          percent={Math.min(Math.round(score * 100), 100)}
-          status={isLive ? "success" : "exception"}
-          strokeColor={isLive ? "#10b981" : "#ef4444"}
-          trailColor="rgba(0,0,0,0.06)"
-        />
-      </Stack>
-    </DashboardCard>
-  );
-}
-
-export default function LivenessPage() {
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [consent, setConsent] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState("");
-
-  const handleCapture = (file: File) => {
-    setImageFile(file);
-    setResult(null);
-    setError("");
-  };
-
-  const handleFileUpload = (file: File) => {
-    setImageFile(file);
-    setResult(null);
-    setError("");
-  };
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!imageFile) return;
-    setError("");
-    setIsLoading(true);
-    setJobId(null);
-    setResult(null);
-    try {
-      const data = await api.livenessCheck(imageFile, consent);
-      setJobId(data.job_id);
-    } catch (err: any) {
-      setError(getErrorMessage(err) || "Kiểm tra liveness thất bại.");
-      setIsLoading(false);
-    }
-  };
-
-  const reset = () => {
-    setImageFile(null);
-    setJobId(null);
-    setResult(null);
-    setError("");
-    setIsLoading(false);
-  };
-
-  return (
-    <Stack spacing={3} sx={{ maxWidth: 920, mx: "auto" }}>
-      <Box sx={staggerSx(0)}>
-        <PageHeader
-          title="Kiểm tra sống"
-          subtitle="Đánh giá ảnh khuôn mặt thật hay ảnh giả mạo trước khi xử lý nhận diện."
-          icon={VisibilityOutlinedIcon}
-          gradient="linear-gradient(135deg, #581c87 0%, #7c3aed 50%, #a78bfa 100%)"
-        />
-      </Box>
-
-      {error ? (
-        <Box sx={staggerSx(1)}>
-          <Alert severity="error">{error}</Alert>
-        </Box>
-      ) : null}
-
-      {result ? (
-        <Stack spacing={2} sx={staggerSx(1)}>
-          <LivenessResultCard result={result} />
-          <Button startIcon={<RestartAltOutlinedIcon />} variant="outlined" onClick={reset} sx={{ alignSelf: "center" }}>
-            Thử lại
-          </Button>
-        </Stack>
-      ) : jobId ? (
-        <Box sx={staggerSx(1)}>
-          <DashboardCard>
-            <JobPoll
-              jobId={jobId}
-              onComplete={(value) => { setResult(value); setIsLoading(false); setJobId(null); }}
-              onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
-            />
-          </DashboardCard>
-        </Box>
-      ) : (
-        <Box sx={staggerSx(1)}>
-          <DashboardCard>
-            <Box component="form" onSubmit={handleSubmit}>
-              <Stack spacing={2.5}>
-                <CameraCapture onCapture={handleCapture} onFileUpload={handleFileUpload} />
-       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" } }}>
-         <Checkbox checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-         <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, mt: { xs: -0.5, sm: 0 } }}>
-           Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để kiểm tra liveness.
-         </Typography>
-       </Stack>
-                <Button type="submit" variant="contained" disabled={!imageFile || !consent || isLoading} fullWidth>
-                  {isLoading ? "Đang gửi..." : "Kiểm tra liveness"}
-                </Button>
-              </Stack>
-            </Box>
-          </DashboardCard>
-        </Box>
-      )}
-    </Stack>
-  );
-}
-</file>
-
 <file path="src/app/(dashboard)/verify/page.tsx">
 "use client";
 
@@ -26367,175 +27328,6 @@ export default function VerifyPage() {
         </Box>
       )}
     </Stack>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/layout.tsx">
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  AppBar,
-  Avatar,
-  Badge,
-  Box,
-  CircularProgress,
-  IconButton,
-  Stack,
-  Toolbar,
-  Tooltip,
-  Typography,
-  useTheme,
-} from "@mui/material";
-import BellIcon from "@mui/icons-material/NotificationsOutlined";
-import Brightness6Icon from "@mui/icons-material/Brightness6Outlined";
-import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
-import LightModeIcon from "@mui/icons-material/LightModeOutlined";
-import UserIcon from "@mui/icons-material/PersonOutlined";
-import { useAuth } from "@/lib/auth-context";
-import { useColorMode } from "@/lib/mui-theme";
-import api from "@/lib/api-client";
-import Sidebar from "@/app/(dashboard)/_components/Sidebar";
-import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationDropdown";
-
-function Topbar({ user }: { user: any }) {
-  const theme = useTheme();
-  const { mode, effectiveMode, preference, reducedMotion, toggleMode } = useColorMode();
-  const [bellAnchorEl, setBellAnchorEl] = useState<HTMLElement | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const bellOpen = Boolean(bellAnchorEl);
-
-  const modeIcon = useMemo(() => {
-    if (preference === "auto") return <Brightness6Icon fontSize="small" />;
-    return preference === "dark" ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />;
-  }, [preference]);
-
-  const modeTooltip = useMemo(() => {
-    if (reducedMotion === "reduce") return "Chế độ hiển thị (Đã bật giảm chuyển động)";
-    if (preference === "auto") return `Chế độ tự động (${effectiveMode === "dark" ? "Tối" : "Sáng"}) - Nhấn để thay đổi`;
-    if (preference === "dark") return "Chế độ tối - Nhấn để chuyển";
-    return "Chế độ sáng - Nhấn để chuyển";
-  }, [preference, effectiveMode, reducedMotion]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchCount = async () => {
-      try {
-        const { count } = await api.getUnreadCount();
-        if (mounted) setUnreadCount(count);
-      } catch {
-        // silently fail
-      }
-    };
-
-    fetchCount();
-
-    // Poll every 30 seconds as fallback
-    const interval = setInterval(fetchCount, 30000);
-
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const handleBellClick = (event: React.MouseEvent<HTMLElement>) => {
-    if (bellAnchorEl) {
-      setBellAnchorEl(null);
-    } else {
-      setBellAnchorEl(event.currentTarget);
-    }
-  };
-
-  const handleBellClose = () => {
-    setBellAnchorEl(null);
-    // Refresh count after closing
-    api.getUnreadCount().then(({ count }) => setUnreadCount(count)).catch(() => {});
-  };
-
-  return (
-    <>
-      <AppBar
-        position="sticky"
-        color="default"
-        elevation={0}
-        sx={{
-          borderBottom: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
-        <Toolbar sx={{ justifyContent: "flex-end", gap: 1.5, minHeight: 64 }}>
-          <Box sx={{ position: "relative" }}>
-            <Tooltip title="Thông báo">
-              <IconButton color="inherit" onClick={handleBellClick}>
-                <Badge badgeContent={unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : 0} color="error" invisible={unreadCount === 0}>
-                  <BellIcon fontSize="small" />
-                </Badge>
-              </IconButton>
-            </Tooltip>
-            <NotificationDropdown anchorEl={bellAnchorEl} open={bellOpen} onClose={handleBellClose} />
-          </Box>
-          <Tooltip title={modeTooltip} arrow>
-            <IconButton color="inherit" onClick={toggleMode}>
-              {modeIcon}
-            </IconButton>
-          </Tooltip>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", pl: 1.5, borderLeft: `1px solid ${theme.palette.divider}` }}>
-            <Avatar sx={{ width: 34, height: 34, flexShrink: 0, bgcolor: "primary.main", color: "primary.contrastText" }}>
-              <UserIcon fontSize="small" />
-            </Avatar>
-            <Box sx={{ display: { xs: "none", sm: "block" }, minWidth: 0, maxWidth: 160 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user?.full_name || "Admin"}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ textTransform: "capitalize", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user?.role || "staff"}
-              </Typography>
-            </Box>
-          </Stack>
-        </Toolbar>
-      </AppBar>
-    </>
-  );
-}
-
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isAuthenticated, isLoading, router]);
-
-  if (isLoading) {
-    return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "background.default", display: "grid", placeItems: "center" }}>
-        <Stack spacing={2} sx={{ alignItems: "center" }}>
-          <CircularProgress color="primary" />
-          <Typography variant="body2" color="text.secondary">Đang tải...</Typography>
-        </Stack>
-      </Box>
-    );
-  }
-
-  if (!isAuthenticated) return null;
-
-  return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
-      <Sidebar />
-      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <Topbar user={user} />
-        <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 2, md: 3 } }}>
-          {children}
-        </Box>
-      </Box>
-    </Box>
   );
 }
 </file>
@@ -27797,345 +28589,6 @@ function MessageBubble({ msg }: { msg: Message }) {
 }
 </file>
 
-<file path="src/app/(dashboard)/notifications/page.tsx">
-"use client";
-
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Box,
-  Pagination,
-  Paper,
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-} from "@mui/material";
-import {
-  NotificationsOutlined,
-  ErrorOutlined,
-  CalendarMonthOutlined,
-  BadgeOutlined,
-  ShieldOutlined,
-  BarChartOutlined,
-  PersonOffOutlined,
-  MenuBookOutlined,
-} from "@mui/icons-material";
-import api from "@/lib/api-client";
-import { useAuth } from "@/lib/auth-context";
-import type { Notification } from "@/lib/types";
-import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
-import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
-import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
-import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import { staggerSx } from "@/lib/useStaggeredAnimation";
-
-const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-  borrow: { icon: <MenuBookOutlined />, color: "success.main", label: "Mượn sách" },
-  return: { icon: <MenuBookOutlined />, color: "info.main", label: "Trả sách" },
-  book_available: { icon: <MenuBookOutlined />, color: "success.main", label: "Sách có sẵn" },
-  overdue_reminder: { icon: <ErrorOutlined />, color: "error.main", label: "Quá hạn" },
-  due_soon_reminder: { icon: <ErrorOutlined />, color: "warning.main", label: "Sắp đến hạn" },
-  fine_notice: { icon: <ErrorOutlined />, color: "error.main", label: "Phí phạt" },
-  schedule_change: { icon: <CalendarMonthOutlined />, color: "warning.main", label: "Lịch trực" },
-  shift_reminder: { icon: <CalendarMonthOutlined />, color: "info.main", label: "Nhắc lịch" },
-  membership_expiry: { icon: <BadgeOutlined />, color: "info.main", label: "Hạn thẻ" },
-  anomaly_alert: { icon: <ShieldOutlined />, color: "error.main", label: "Bất thường" },
-  daily_report: { icon: <BarChartOutlined />, color: "primary.main", label: "Thống kê" },
-  staff_absence: { icon: <PersonOffOutlined />, color: "warning.main", label: "Vắng mặt" },
-  bid_warning: { icon: <ErrorOutlined />, color: "warning.main", label: "Đấu giá" },
-  swap_warning: { icon: <ErrorOutlined />, color: "warning.main", label: "Đổi ca" },
-};
-
-function getConfig(type: string) {
-  return NOTIFICATION_CONFIG[type] || { icon: <NotificationsOutlined />, color: "primary.main", label: "Thông báo" };
-}
-
-function formatRelativeTime(isoString: string): string {
-  const now = new Date();
-  const date = new Date(isoString);
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
-
-  if (diffSec < 60) return "Vừa xong";
-  if (diffMin < 60) return `${diffMin} phút trước`;
-  if (diffHour < 24) return `${diffHour} giờ trước`;
-  if (diffDay < 7) return `${diffDay} ngày trước`;
-  return date.toLocaleDateString("vi-VN");
-}
-
-export default function NotificationsPage() {
-  const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "unread">("all");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const pageSize = 20;
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) router.push("/login");
-  }, [isAuthenticated, authLoading, router]);
-
-  const fetchNotifications = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      setLoading(true);
-      const result = await api.getNotifications({
-        unread_only: filter === "unread" ? true : undefined,
-        skip: (page - 1) * pageSize,
-        limit: pageSize,
-      });
-      setNotifications(result.items);
-      setTotal(result.total);
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated, filter, page]);
-
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  const handleMarkAllRead = async () => {
-    try {
-      await api.markAllNotificationsAsRead();
-      fetchNotifications();
-    } catch {
-    }
-  };
-
-  const handleNotificationClick = async (notification: Notification) => {
-    if (!notification.isRead) {
-      try {
-        await api.markNotificationAsRead(notification.id);
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
-        );
-      } catch {
-      }
-    }
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const totalPages = Math.ceil(total / pageSize);
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-
-  if (authLoading) {
-    return <LoadingOverlay loading message="Đang tải..." />;
-  }
-
-  return (
-    <Stack spacing={3} sx={{ maxWidth: 800, mx: "auto" }}>
-      <PageHeader
-        title="Thông báo"
-        icon={NotificationsOutlined}
-        gradient="linear-gradient(135deg, #4338ca 0%, #6366f1 50%, #818cf8 100%)"
-        statBadges={unreadCount > 0 ? `${unreadCount} chưa đọc` : undefined}
-        onRefresh={fetchNotifications}
-        actions={
-          <Typography
-            variant="body2"
-            sx={{ color: "#c7d2fe", cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}
-            onClick={handleMarkAllRead}
-          >
-            Đánh dấu đã đọc tất cả
-          </Typography>
-        }
-      />
-
-      <DashboardCard
-        title="Danh sách thông báo"
-        actions={
-          <ToggleButtonGroup
-            value={filter}
-            exclusive
-            onChange={(_, v) => { if (v) { setFilter(v); setPage(1); } }}
-            size="small"
-          >
-            <ToggleButton value="all">Tất cả</ToggleButton>
-            <ToggleButton value="unread">Chưa đọc</ToggleButton>
-          </ToggleButtonGroup>
-        }
-      >
-        <LoadingOverlay loading={loading} message="Đang tải thông báo...">
-          {notifications.length === 0 ? (
-            <EmptyState
-              icon={<NotificationsOutlined />}
-              title={filter === "unread" ? "Không có thông báo chưa đọc" : "Không có thông báo"}
-            />
-          ) : (
-            <Box>
-              {notifications.map((notification, index) => {
-                const config = getConfig(notification.type);
-                return (
-                  <Paper
-                    key={notification.id}
-                    variant="outlined"
-                    onClick={() => handleNotificationClick(notification)}
-                    sx={{
-                      p: 2,
-                      mb: 1,
-                      display: "flex",
-                      gap: 2,
-                      cursor: "pointer",
-                      bgcolor: notification.isRead ? "transparent" : "action.hover",
-                      borderColor: notification.isRead ? "divider" : "primary.light",
-                      "&:hover": { bgcolor: "action.selected" },
-                      ...staggerSx(index),
-                    }}
-                  >
-                    <Box sx={{ color: config.color, mt: 0.5 }}>{config.icon}</Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                        <Typography variant="body2" sx={{ fontWeight: notification.isRead ? 400 : 700 }} noWrap>
-                          {notification.title}
-                        </Typography>
-                        {!notification.isRead ? (
-                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "error.main", flexShrink: 0 }} />
-                        ) : null}
-                      </Box>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          display: "-webkit-box",
-                          WebkitLineClamp: expandedIds.has(notification.id) ? "unset" : 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: expandedIds.has(notification.id) ? "visible" : "hidden",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        {notification.body}
-                      </Typography>
-                      {(notification.body?.length ?? 0) > 100 ? (
-                        <Typography
-                          variant="caption"
-                          color="primary.main"
-                          sx={{ cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleExpand(notification.id);
-                          }}
-                        >
-                          {expandedIds.has(notification.id) ? "Thu gọn" : "Xem thêm"}
-                        </Typography>
-                      ) : null}
-                      <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
-                        {formatRelativeTime(notification.createdAt)}
-                      </Typography>
-                    </Box>
-                  </Paper>
-                );
-              })}
-              {totalPages > 1 ? (
-                <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
-                  <Pagination count={totalPages} page={page} onChange={(_, p) => setPage(p)} color="primary" />
-                </Box>
-              ) : null}
-            </Box>
-          )}
-        </LoadingOverlay>
-      </DashboardCard>
-    </Stack>
-  );
-}
-</file>
-
-<file path="src/app/api/camera/proxy/route.ts">
-import { NextRequest } from "next/server";
-
-const ALLOWED_HOSTS = (process.env.CAMERA_PROXY_ALLOWED_HOSTS || "")
-  .split(",")
-  .map((h) => h.trim())
-  .filter(Boolean);
-
-function isHostAllowed(hostname: string): boolean {
-  if (ALLOWED_HOSTS.length === 0) return true;
-  if (ALLOWED_HOSTS.includes("*")) return true;
-  return ALLOWED_HOSTS.includes(hostname);
-}
-
-export async function GET(request: NextRequest) {
-  const url = request.nextUrl.searchParams.get("url");
-  if (!url) {
-    return new Response("Missing url parameter", { status: 400 });
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return new Response("Invalid URL", { status: 400 });
-  }
-
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    return new Response("Protocol not allowed", { status: 403 });
-  }
-
-  if (!isHostAllowed(parsed.hostname)) {
-    return new Response("Host not allowed", { status: 403 });
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    const response = await fetch(parsed.toString(), {
-      signal: controller.signal,
-      headers: { Accept: "image/jpeg, multipart/x-mixed-replace, */*" },
-    });
-    clearTimeout(timeout);
-
-    const contentType = response.headers.get("Content-Type") || "image/jpeg";
-    const isStream = contentType.includes("multipart");
-
-    if (isStream) {
-      return new Response(response.body, {
-        status: response.status,
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      });
-    }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-
-    return new Response(buffer, {
-      status: response.status,
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": String(buffer.length),
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
-  } catch (err: unknown) {
-    console.error("[camera-proxy] fetch failed:", parsed.toString(), err);
-    return new Response("Failed to connect to camera", { status: 502 });
-  }
-}
-</file>
-
 <file path="src/lib/auth-context.tsx">
 "use client";
 
@@ -29120,6 +29573,85 @@ export default function IdentifyPage() {
       )}
     </Stack>
   );
+}
+</file>
+
+<file path="src/app/api/camera/proxy/route.ts">
+import { NextRequest } from "next/server";
+
+const ALLOWED_HOSTS = (process.env.CAMERA_PROXY_ALLOWED_HOSTS || "")
+  .split(",")
+  .map((h) => h.trim())
+  .filter(Boolean);
+
+function isHostAllowed(hostname: string): boolean {
+  if (ALLOWED_HOSTS.length === 0) return true;
+  if (ALLOWED_HOSTS.includes("*")) return true;
+  return ALLOWED_HOSTS.includes(hostname);
+}
+
+export async function GET(request: NextRequest) {
+  const url = request.nextUrl.searchParams.get("url");
+  if (!url) {
+    return new Response("Missing url parameter", { status: 400 });
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return new Response("Invalid URL", { status: 400 });
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return new Response("Protocol not allowed", { status: 403 });
+  }
+
+  if (!isHostAllowed(parsed.hostname)) {
+    return new Response("Host not allowed", { status: 403 });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(parsed.toString(), {
+      signal: controller.signal,
+      headers: { Accept: "image/jpeg, multipart/x-mixed-replace, */*" },
+    });
+    clearTimeout(timeout);
+
+    const contentType = response.headers.get("Content-Type") || "image/jpeg";
+    const isStream = contentType.includes("multipart");
+
+    if (isStream) {
+      return new Response(response.body, {
+        status: response.status,
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      });
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    return new Response(buffer, {
+      status: response.status,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(buffer.length),
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+  } catch (err: unknown) {
+    console.error("[camera-proxy] fetch failed:", parsed.toString(), err);
+    return new Response("Failed to connect to camera", { status: 502 });
+  }
 }
 </file>
 
@@ -33833,6 +34365,10 @@ export default function ReturnPage() {
 }
 </file>
 
+<file path="src/lib/types.ts">
+export * from "./types/index";
+</file>
+
 <file path="src/app/(dashboard)/borrow/page.tsx">
 "use client";
 
@@ -34301,10 +34837,6 @@ export default function BorrowPage() {
     </Stack>
   );
 }
-</file>
-
-<file path="src/lib/types.ts">
-export * from "./types/index";
 </file>
 
 <file path="src/app/(dashboard)/books/[id]/page.tsx">
@@ -37470,19 +38002,94 @@ class ApiClient {
 
   async askAiChat(message: string, sessionId?: string, role?: string): Promise<AIChatResponse> {
     const r = role || "patron";
-    const response = await this.client.post<AIChatResponse>(`/api/ai/${r}/chat`, { message, session_id: sessionId });
+    const endpoint =
+      r === "patron"
+        ? "/api/ai/patrons/chat"
+        : r === "staff"
+          ? "/api/ai/staff/chat"
+          : r === "admin"
+            ? "/api/ai/admin/chat"
+            : "/api/ai/chat";
+    const response = await this.client.post<AIChatResponse>(endpoint, { message, session_id: sessionId });
     return response.data;
   }
 
   async confirmAction(sessionId: string, action: string, role?: string): Promise<AIConfirmResponse> {
     const r = role || "patron";
-    const response = await this.client.post<AIConfirmResponse>(`/api/ai/${r}/confirm`, { session_id: sessionId, action });
+    const endpoint =
+      r === "patron"
+        ? "/api/ai/patrons/confirm"
+        : r === "staff"
+          ? "/api/ai/staff/confirm"
+          : r === "admin"
+            ? "/api/ai/admin/confirm"
+            : "/api/ai/confirm";
+    const response = await this.client.post<AIConfirmResponse>(endpoint, { session_id: sessionId, action });
     return response.data;
   }
 
   async getBookRecommendations(studentCode: string): Promise<AIBookRecommendationResponse> {
     const response = await this.client.get<AIBookRecommendationResponse>(`/api/ai/recommendations/patron/${studentCode}`);
     return response.data;
+  }
+
+  async streamCompanionChat(
+    message: string | undefined,
+    audioBase64: string | undefined,
+    sessionId: string | undefined,
+    onChunk: (chunk: any) => void,
+    onError?: (error: Error) => void,
+  ): Promise<void> {
+    const token =
+      _accessToken ||
+      getCookieValue("access_token") ||
+      (typeof window !== "undefined" ? localStorage.getItem("accessToken") || localStorage.getItem("token") : null);
+
+    const body: Record<string, any> = {};
+    if (message) body.message = message;
+    if (audioBase64) body.audioBase64 = audioBase64;
+    if (sessionId) body.sessionId = sessionId;
+
+    try {
+      const response = await fetch("/api/ai/companion/stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              onChunk(data);
+            } catch {}
+          }
+        }
+      }
+    } catch (error) {
+      onError?.(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 
   async getNotifications(params?: { unread_only?: boolean; skip?: number; limit?: number }): Promise<NotificationListResponse> {

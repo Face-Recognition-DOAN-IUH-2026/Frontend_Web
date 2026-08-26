@@ -16,10 +16,6 @@ export default function AIWidget() {
   const { isOpen, close, proactiveMessage } = useAIWidgetStore();
   const { isAuthenticated, isLoading, user: authUser } = useAuth();
 
-  // Hide while auth is loading or when not authenticated
-  if (isLoading) return null;
-  if (!isAuthenticated || !authUser) return null;
-
   const isBlacklisted = BLACKLIST_PATHS.some((p) => pathname?.startsWith(p));
 
   const role = authUser?.role || 'staff';
@@ -44,6 +40,9 @@ export default function AIWidget() {
     }
   }, [proactiveMessage, isOpen]);
 
+  // Hide while auth is loading or when not authenticated
+  if (isLoading) return null;
+  if (!isAuthenticated || !authUser) return null;
   if (isBlacklisted) return null;
 
   return (

@@ -8,17 +8,19 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
-  FormControlLabel,
   Grid,
   Paper,
   Stack,
   Typography,
-  useTheme,
 } from "@mui/material";
 import AddAPhotoOutlinedIcon from "@mui/icons-material/AddAPhotoOutlined";
 import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import Webcam from "react-webcam";
+import { FilesetResolver, FaceLandmarker } from "@mediapipe/tasks-vision";
 
 export type CaptureAngle = "frontal" | "right" | "left" | "down";
 export type MultiAngleCaptureStatus = "pending" | "capturing" | "done";
@@ -27,6 +29,7 @@ export interface AngleConfig {
   angle: CaptureAngle;
   instruction: string;
   tip: string;
+  requirements: { yaw: [number, number]; pitch: [number, number] };
 }
 
 export interface CapturedAngle {
@@ -37,53 +40,18 @@ export interface CapturedAngle {
 }
 
 export interface MultiAngleCaptureProps {
-  angles?: AngleConfig[];
   consent: boolean;
   setConsent?: (v: boolean) => void;
   onFilesReady: (files: Record<CaptureAngle, File>) => Promise<void> | void;
   className?: string;
 }
 
-function captureFromVideo(video: HTMLVideoElement, cameraReady: boolean) {
-  return new Promise<{ file: File; dataUrl: string }>((resolve, reject) => {
-    if (!cameraReady) return reject(new Error("Camera chưa sẵn sàng"));
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      return reject(new Error("Camera chưa khởi tạo"));
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return reject(new Error("Không thể tạo canvas"));
-
-    ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg");
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return reject(new Error("Không thể tạo ảnh"));
-        resolve({ file: new File([blob], "face_capture.jpg", { type: "image/jpeg" }), dataUrl });
-      },
-      "image/jpeg",
-      0.9
-    );
-  });
-}
-
-function getCameraErrorMessage(err: unknown) {
-  const name = err instanceof DOMException ? err.name : "";
-  if (name === "NotAllowedError" || name === "SecurityError") {
-    return "Không có quyền truy cập camera. Hãy cấp quyền camera cho trình duyệt rồi thử lại.";
-  }
-  if (name === "NotFoundError" || name === "OverconstrainedError") {
-    return "Không tìm thấy camera phù hợp. Hãy kiểm tra thiết bị camera rồi thử lại.";
-  }
-  if (name === "NotReadableError" || name === "AbortError") {
-    return "Camera đang được ứng dụng khác sử dụng hoặc không mở được. Hãy đóng ứng dụng khác rồi thử lại.";
-  }
-  return "Không thể mở camera. Hãy kiểm tra quyền truy cập, thiết bị camera và thử lại.";
-}
+const DEFAULT_ANGLES: AngleConfig[] = [
+  { angle: "frontal", instruction: "Nhìn thẳng", tip: "Mắt nhìn thẳng vào camera", requirements: { yaw: [-12, 12], pitch: [-12, 12] } },
+  { angle: "right", instruction: "Quay mặt sang PHẢI", tip: "Xoay mặt sang phải khoảng 30 độ", requirements: { yaw: [20, 50], pitch: [-15, 15] } },
+  { angle: "left", instruction: "Quay mặt sang TRÁI", tip: "Xoay mặt sang trái khoảng 30 độ", requirements: { yaw: [-50, -20], pitch: [-15, 15] } },
+  { angle: "down", instruction: "Cúi XUỐNG", tip: "Cúi nhẹ cằm xuống", requirements: { yaw: [-15, 15], pitch: [15, 45] } },
+];
 
 const ANGLE_LABELS: Record<CaptureAngle, string> = {
   frontal: "Nhìn thẳng",
@@ -92,194 +60,212 @@ const ANGLE_LABELS: Record<CaptureAngle, string> = {
   down: "Cúi xuống",
 };
 
+// Hàm tiện ích chuyển DataURI sang File
+function dataURItoFile(dataURI: string, filename: string): File {
+  const byteString = atob(dataURI.split(",")[1]);
+  const mimeString = dataURI.split(",")[0].split(":")[1].split(";")[0];
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new File([ab], filename, { type: mimeString });
+}
+
 export default function MultiAngleCapture({
-  angles,
   consent,
   setConsent,
   onFilesReady,
   className,
 }: MultiAngleCaptureProps) {
-  const theme = useTheme();
-  const defaultAngles = useMemo<AngleConfig[]>(
-    () =>
-      angles ?? [
-        { angle: "frontal", instruction: "Nhìn thẳng", tip: "Giữ mặt thẳng, mắt mở tự nhiên" },
-        { angle: "right", instruction: "Quay phải", tip: "Xoay đầu sang phải khoảng 30 độ" },
-        { angle: "left", instruction: "Quay trái", tip: "Xoay đầu sang trái khoảng 30 độ" },
-        { angle: "down", instruction: "Cúi xuống", tip: "Cúi nhẹ cằm xuống ngực" },
-      ],
-    [angles]
+  const [captures, setCaptures] = useState<CapturedAngle[]>(
+    DEFAULT_ANGLES.map((item) => ({ angle: item.angle, status: "pending", file: null, dataUrl: null }))
   );
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const [cameraReady, setCameraReady] = useState(false);
-  const [isCameraOn, setIsCameraOn] = useState(false);
-  const [cameraError, setCameraError] = useState("");
+  
   const [isSequenceRunning, setIsSequenceRunning] = useState(false);
   const [currentAngleIdx, setCurrentAngleIdx] = useState(-1);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [captures, setCaptures] = useState<CapturedAngle[]>(
-    defaultAngles.map((item) => ({ angle: item.angle, status: "pending", file: null, dataUrl: null }))
-  );
+  
+  // Model state
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
+  const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
+  const [feedback, setFeedback] = useState<string>("Đang khởi tạo AI...");
+  const [isHold, setIsHold] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0); // 0 to 100
+  
+  const webcamRef = useRef<Webcam>(null);
+  const requestRef = useRef<number | null>(null);
+  const poseHoldStartRef = useRef<number>(0);
+  
+  const HOLD_DURATION = 1500; // Giữ 1.5 giây
 
-  useEffect(() => {
-    setCaptures(defaultAngles.map((item) => ({ angle: item.angle, status: "pending", file: null, dataUrl: null })));
-  }, [defaultAngles]);
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setIsCameraOn(false);
-    setCameraReady(false);
-  }, []);
-
-  const startCamera = useCallback(async () => {
+  // --- Khởi tạo Model ---
+  const loadModel = async () => {
     try {
-      setCameraError("");
-      setCameraReady(false);
-      setIsCameraOn(false);
-      stopCamera();
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 640, min: 320 },
-          height: { ideal: 480, min: 240 },
+      setFeedback("Đang tải model nhận diện khuôn mặt (lần đầu có thể mất vài giây)...");
+      const filesetResolver = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
+      );
+      faceLandmarkerRef.current = await FaceLandmarker.createFromOptions(filesetResolver, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate: "GPU",
         },
-        audio: false,
+        outputFaceBlendshapes: false,
+        outputFacialTransformationMatrixes: true,
+        runningMode: "VIDEO",
+        numFaces: 1,
       });
-
-      streamRef.current = stream;
-      setIsCameraOn(true);
-      return true;
-    } catch (err) {
-      setIsCameraOn(false);
-      setCameraReady(false);
-      setCameraError(getCameraErrorMessage(err));
-      return false;
+      setIsModelLoaded(true);
+      setFeedback("Camera sẵn sàng. Vui lòng làm theo hướng dẫn.");
+    } catch (error) {
+      console.error("Failed to load FaceLandmarker:", error);
+      setFeedback("Lỗi tải model nhận diện khuôn mặt. Hãy tải lại trang.");
     }
-  }, [stopCamera]);
+  };
 
   useEffect(() => {
-    if (!isCameraOn || !videoRef.current || !streamRef.current) return;
-
-    const video = videoRef.current;
-    const onReady = () => setCameraReady(true);
-    const handleError = () => setCameraReady(false);
-
-    video.onloadedmetadata = onReady;
-    video.onplaying = onReady;
-    video.onerror = handleError;
-    video.srcObject = streamRef.current;
-
-    if (video.readyState >= 2) onReady();
-    const timer = setTimeout(() => setCameraReady(true), 3000);
-
-    return () => {
-      clearTimeout(timer);
-      video.onloadedmetadata = null;
-      video.onplaying = null;
-      video.onerror = null;
-      video.srcObject = null;
-    };
-  }, [isCameraOn]);
-
-  useEffect(() => () => stopCamera(), [stopCamera]);
-
-  const retakeAngle = useCallback(
-    async (idx: number) => {
-      setCaptures((prev) =>
-        prev.map((item, index) => (index === idx ? { ...item, status: "pending", file: null, dataUrl: null } : item))
-      );
-      const opened = await startCamera();
-      if (!opened) return;
-      setIsSequenceRunning(true);
-      setTimeout(() => setCurrentAngleIdx(idx), 500);
-    },
-    [startCamera]
-  );
-
-  const startSequence = useCallback(async () => {
-    setCaptures(defaultAngles.map((item) => ({ angle: item.angle, status: "pending", file: null, dataUrl: null })));
-    setCountdown(null);
-    const opened = await startCamera();
-    if (!opened) {
-      setCurrentAngleIdx(-1);
-      setIsSequenceRunning(false);
-      return;
+    if (isSequenceRunning && !isModelLoaded) {
+      loadModel();
     }
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (faceLandmarkerRef.current) faceLandmarkerRef.current.close();
+    };
+  }, [isSequenceRunning]);
+
+  // --- Bắt đầu chuỗi ---
+  const startSequence = useCallback(() => {
+    setCaptures(DEFAULT_ANGLES.map((item) => ({ angle: item.angle, status: "pending", file: null, dataUrl: null })));
     setCurrentAngleIdx(0);
     setIsSequenceRunning(true);
-  }, [defaultAngles, startCamera]);
+  }, []);
 
-  useEffect(() => {
-    if (currentAngleIdx < 0 || currentAngleIdx >= defaultAngles.length) return;
-    if (!cameraReady || !isSequenceRunning) return;
+  const retakeAngle = useCallback((idx: number) => {
+    setCaptures((prev) =>
+      prev.map((item, index) => (index === idx ? { ...item, status: "pending", file: null, dataUrl: null } : item))
+    );
+    setCurrentAngleIdx(idx);
+    setIsSequenceRunning(true);
+  }, []);
 
-    let cancelled = false;
-    let currentCountdown = 5;
-
-    setCountdown(currentCountdown);
-    setCaptures((prev) => prev.map((item, index) => (index === currentAngleIdx ? { ...item, status: "capturing" } : item)));
-
-    const timer = window.setInterval(async () => {
-      currentCountdown--;
-      if (cancelled) {
-        clearInterval(timer);
-        return;
-      }
-
-      if (currentCountdown <= 0) {
-        clearInterval(timer);
-        setCountdown(null);
-
-        try {
-          const video = videoRef.current;
-          if (!video) throw new Error("Không tìm thấy video");
-
-          const { file, dataUrl } = await captureFromVideo(video, cameraReady);
-          if (cancelled) return;
-
-          setCaptures((prev) =>
-            prev.map((item, index) => (index === currentAngleIdx ? { ...item, status: "done", file, dataUrl } : item))
-          );
-
-          const nextIdx = currentAngleIdx + 1;
-          if (nextIdx >= defaultAngles.length) {
+  // --- Logic Auto Capture ---
+  const captureCurrentPose = useCallback(() => {
+    if (webcamRef.current) {
+      const dataUrl = webcamRef.current.getScreenshot();
+      if (dataUrl) {
+        const file = dataURItoFile(dataUrl, `face_${DEFAULT_ANGLES[currentAngleIdx].angle}.jpg`);
+        setCaptures((prev) =>
+          prev.map((item, index) => (index === currentAngleIdx ? { ...item, status: "done", file, dataUrl } : item))
+        );
+        
+        // Find next pending angle
+        setCaptures((currentCaptures) => {
+          let nextIdx = -1;
+          for (let i = 0; i < currentCaptures.length; i++) {
+            if (currentCaptures[i].status !== "done" && i !== currentAngleIdx) {
+              nextIdx = i;
+              break;
+            }
+          }
+          
+          if (nextIdx === -1) {
+            // Done all
             setIsSequenceRunning(false);
             setCurrentAngleIdx(-1);
-            stopCamera();
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
           } else {
-            setTimeout(() => {
-              if (!cancelled) setCurrentAngleIdx(nextIdx);
-            }, 800);
+            setCurrentAngleIdx(nextIdx);
           }
-        } catch (err) {
-          if (cancelled) return;
-          setCameraError(getCameraErrorMessage(err));
-          setCaptures((prev) => prev.map((item, index) => (index === currentAngleIdx ? { ...item, status: "pending" } : item)));
-          setIsSequenceRunning(false);
-          setCurrentAngleIdx(-1);
-          stopCamera();
-        }
-      } else {
-        setCountdown(currentCountdown);
+          return currentCaptures;
+        });
       }
-    }, 1000);
+    }
+  }, [currentAngleIdx]);
 
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [currentAngleIdx, cameraReady, isSequenceRunning, defaultAngles.length, stopCamera]);
+  const detectFace = useCallback(() => {
+    if (!faceLandmarkerRef.current || !webcamRef.current?.video || currentAngleIdx < 0) return;
+    
+    const video = webcamRef.current.video;
+    if (video.readyState !== 4) {
+      requestRef.current = requestAnimationFrame(detectFace);
+      return;
+    }
+
+    try {
+      const startTimeMs = performance.now();
+      const results = faceLandmarkerRef.current.detectForVideo(video, startTimeMs);
+
+      if (results.faceLandmarks.length === 0) {
+        setFeedback("Không tìm thấy khuôn mặt trong khung hình");
+        setIsHold(false);
+        setHoldProgress(0);
+        poseHoldStartRef.current = 0;
+      } else if (results.faceLandmarks.length > 1) {
+        setFeedback("Chỉ cho phép 1 khuôn mặt trong khung hình");
+        setIsHold(false);
+        setHoldProgress(0);
+        poseHoldStartRef.current = 0;
+      } else {
+        // Compute yaw, pitch from matrix
+        const matrix = results.facialTransformationMatrixes?.[0];
+        if (matrix) {
+          // matrix is 4x4, row-major (16 elements)
+          // Rotation extraction
+          const pitch = -Math.asin(matrix.data[9]) * (180 / Math.PI); 
+          const yaw = Math.atan2(matrix.data[8], matrix.data[10]) * (180 / Math.PI);
+
+          const req = DEFAULT_ANGLES[currentAngleIdx].requirements;
+          const isYawOk = yaw >= req.yaw[0] && yaw <= req.yaw[1];
+          const isPitchOk = pitch >= req.pitch[0] && pitch <= req.pitch[1];
+
+          if (isYawOk && isPitchOk) {
+            setFeedback("Tuyệt vời! Giữ nguyên tư thế...");
+            setIsHold(true);
+            
+            if (poseHoldStartRef.current === 0) {
+              poseHoldStartRef.current = performance.now();
+            } else {
+              const elapsed = performance.now() - poseHoldStartRef.current;
+              const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+              setHoldProgress(progress);
+              
+              if (elapsed >= HOLD_DURATION) {
+                captureCurrentPose();
+                poseHoldStartRef.current = 0;
+                setIsHold(false);
+                setHoldProgress(0);
+                return; // Ngừng phát hiện để chờ pose tiếp theo
+              }
+            }
+          } else {
+            setFeedback(DEFAULT_ANGLES[currentAngleIdx].instruction);
+            setIsHold(false);
+            setHoldProgress(0);
+            poseHoldStartRef.current = 0;
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    
+    if (isSequenceRunning) {
+      requestRef.current = requestAnimationFrame(detectFace);
+    }
+  }, [currentAngleIdx, captureCurrentPose, isSequenceRunning]);
+
+  useEffect(() => {
+    if (isModelLoaded && isSequenceRunning) {
+      poseHoldStartRef.current = 0;
+      setHoldProgress(0);
+      setIsHold(false);
+      requestRef.current = requestAnimationFrame(detectFace);
+    }
+  }, [isModelLoaded, isSequenceRunning, currentAngleIdx, detectFace]);
 
   const allCaptured = captures.every((item) => item.status === "done" && Boolean(item.file));
   const doneCount = captures.filter((item) => item.status === "done").length;
-
+  
   const capturedFiles = useMemo(() => {
     const result = {} as Record<CaptureAngle, File>;
     for (const item of captures) {
@@ -295,32 +281,22 @@ export default function MultiAngleCapture({
     await onFilesReady(capturedFiles);
   }, [allCaptured, capturedFiles, consent, onFilesReady]);
 
-  const currentConfig = currentAngleIdx >= 0 ? defaultAngles[currentAngleIdx] : null;
+  const currentConfig = currentAngleIdx >= 0 ? DEFAULT_ANGLES[currentAngleIdx] : null;
 
   return (
     <Box className={className}>
       {!allCaptured && !isSequenceRunning && currentAngleIdx < 0 && (
         <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
           <Stack spacing={2} sx={{ alignItems: "center" }}>
-            <Box
-              sx={{
-                width: 64,
-                height: 64,
-                borderRadius: "50%",
-                display: "grid",
-                placeItems: "center",
-                bgcolor: "primary.main",
-                color: "primary.contrastText",
-              }}
-            >
+            <Box sx={{ width: 64, height: 64, borderRadius: "50%", display: "grid", placeItems: "center", bgcolor: "primary.main", color: "primary.contrastText" }}>
               <PhotoCameraOutlinedIcon fontSize="large" />
             </Box>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 850 }}>
-                Chụp khuôn mặt từ 4 góc
+                Đăng ký khuôn mặt tự động (eKYC)
               </Typography>
               <Typography color="text.secondary">
-                Nhận diện nhanh hơn, chính xác hơn tại cổng.
+                Hệ thống sẽ tự động phát hiện và chụp khi bạn quay đúng góc yêu cầu.
               </Typography>
             </Box>
 
@@ -329,131 +305,109 @@ export default function MultiAngleCapture({
                 Lưu ý khi chụp
               </Typography>
               <Stack spacing={0.5}>
-                <Typography variant="body2" color="text.secondary">- Đủ ánh sáng, không ngược sáng.</Typography>
-                <Typography variant="body2" color="text.secondary">- Giữ yên khi đếm ngược về 0.</Typography>
-                <Typography variant="body2" color="text.secondary">- Mặt vừa đủ trong khung tròn.</Typography>
+                <Typography variant="body2" color="text.secondary">- Bỏ kính râm, khẩu trang.</Typography>
+                <Typography variant="body2" color="text.secondary">- Ánh sáng rõ, không bị lóa từ phía sau.</Typography>
+                <Typography variant="body2" color="text.secondary">- Làm theo hướng dẫn trên màn hình.</Typography>
               </Stack>
             </Paper>
 
-            {cameraError && <Alert severity="warning" sx={{ width: "100%" }}>{cameraError}</Alert>}
-
             <Button variant="contained" size="large" startIcon={<PhotoCameraOutlinedIcon />} onClick={startSequence}>
-              Bắt đầu chụp
+              Bắt đầu quá trình chụp
             </Button>
           </Stack>
         </Paper>
       )}
 
       {(isSequenceRunning || currentAngleIdx >= 0) && (
-        <Paper
-          variant="outlined"
-          sx={{
-            position: "relative",
-            aspectRatio: "16 / 9",
-            overflow: "hidden",
-            bgcolor: "black",
-          }}
-        >
-          <Box component="video" ref={videoRef} autoPlay playsInline muted sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
-          <Box
-            sx={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              pointerEvents: "none",
-            }}
-          >
-            <Box sx={{ width: 150, height: 150, border: 2, borderColor: "primary.main", borderRadius: "50%", opacity: 0.75 }} />
+        <Paper variant="outlined" sx={{ position: "relative", aspectRatio: "4 / 3", overflow: "hidden", bgcolor: "black", maxWidth: 640, mx: "auto" }}>
+          <Webcam
+            ref={webcamRef}
+            audio={false}
+            screenshotFormat="image/jpeg"
+            videoConstraints={{ facingMode: "user" }}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+          
+          {/* Hướng dẫn hình Oval */}
+          <Box sx={{ position: "absolute", inset: 0, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Box
+              sx={{
+                width: "55%", height: "70%",
+                border: `4px solid ${isHold ? "#4caf50" : "rgba(255,255,255,0.4)"}`,
+                borderRadius: "50%",
+                boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.65)", // Darken background outside oval
+                transition: "border-color 0.3s",
+                position: "relative"
+              }}
+            >
+              {/* Progress Ring khi Hold */}
+              {isHold && (
+                <CircularProgress
+                  variant="determinate"
+                  value={holdProgress}
+                  size="100%"
+                  sx={{
+                    position: "absolute", top: -4, left: -4, right: -4, bottom: -4,
+                    color: "#4caf50", zIndex: 1,
+                    '& .MuiCircularProgress-svg': { width: 'calc(100% + 8px)', height: 'calc(100% + 8px)' }
+                  }}
+                  thickness={2}
+                />
+              )}
+            </Box>
           </Box>
 
-          {!cameraReady && (
-            <Stack
-              spacing={1}
-              sx={{
-                position: "absolute",
-                inset: 0,
-                alignItems: "center",
-                justifyContent: "center",
-                bgcolor: "rgba(0,0,0,.65)",
-                color: "common.white",
-              }}
-            >
-              <CircularProgress color="inherit" size={30} />
-              <Typography variant="body2">{cameraError || "Đang mở camera..."}</Typography>
+          {!isModelLoaded && (
+            <Stack spacing={1} sx={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", bgcolor: "rgba(0,0,0,.8)", color: "common.white" }}>
+              <CircularProgress color="primary" size={40} />
+              <Typography variant="body2">{feedback}</Typography>
             </Stack>
           )}
 
-          {countdown !== null && currentConfig && (
-            <Stack
-              spacing={2}
-              sx={{
-                position: "absolute",
-                inset: 0,
-                alignItems: "center",
-                justifyContent: "center",
-                bgcolor: "rgba(0,0,0,.78)",
-                color: "common.white",
-                textAlign: "center",
-                p: 2,
-              }}
-            >
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 850 }}>{currentConfig.instruction}</Typography>
-                <Typography variant="body2" sx={{ color: "grey.300", mt: 0.5 }}>{currentConfig.tip}</Typography>
-              </Box>
-              <Stack direction="row" spacing={1}>
-                {defaultAngles.map((item, index) => (
-                  <Box
-                    key={item.angle}
-                    sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      bgcolor: index < doneCount ? "success.main" : index === currentAngleIdx ? "primary.main" : "grey.600",
-                    }}
-                  />
-                ))}
-              </Stack>
-              {countdown === 1 && <Chip color="error" label="GIỮ YÊN!" />}
-              <Typography sx={{ fontSize: 64, fontWeight: 900, lineHeight: 1 }}>{countdown}</Typography>
+          {isModelLoaded && currentConfig && (
+            <Stack spacing={1} sx={{ position: "absolute", top: 16, left: 0, right: 0, alignItems: "center" }}>
+              <Paper sx={{ px: 3, py: 1.5, borderRadius: 10, bgcolor: isHold ? "success.main" : "rgba(0,0,0,0.6)", color: "white", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 1 }}>
+                {isHold ? <CheckCircleOutlineOutlinedIcon /> : <WarningAmberOutlinedIcon color="warning" />}
+                <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+                  {feedback}
+                </Typography>
+              </Paper>
             </Stack>
           )}
+
+          {/* Dots Indicator */}
+          <Stack direction="row" spacing={1} sx={{ position: "absolute", bottom: 20, left: 0, right: 0, justifyContent: "center" }}>
+            {DEFAULT_ANGLES.map((item, index) => (
+              <Box
+                key={item.angle}
+                sx={{
+                  width: 12, height: 12, borderRadius: "50%",
+                  bgcolor: captures[index].status === "done" ? "success.main" : index === currentAngleIdx ? "primary.main" : "grey.600",
+                  border: index === currentAngleIdx ? "2px solid white" : "none"
+                }}
+              />
+            ))}
+          </Stack>
         </Paper>
       )}
 
       {allCaptured && (
-        <Stack spacing={2}>
+        <Stack spacing={2} sx={{ mt: isSequenceRunning ? 2 : 0 }}>
+          <Alert severity="success" icon={<CheckCircleOutlineOutlinedIcon />}>
+            Đã chụp đủ 4 góc khuôn mặt thành công. Vui lòng xác nhận để hoàn tất.
+          </Alert>
+          
           <Grid container spacing={1.5}>
             {captures.map((item, index) => (
               <Grid key={item.angle} size={{ xs: 6, sm: 3 }}>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    position: "relative",
-                    aspectRatio: "1 / 1",
-                    overflow: "hidden",
-                    borderColor: item.status === "done" ? "success.main" : "divider",
-                  }}
-                >
-                  {item.dataUrl ? (
+                <Paper variant="outlined" sx={{ position: "relative", aspectRatio: "1 / 1", overflow: "hidden", borderColor: "success.main" }}>
+                  {item.dataUrl && (
                     <Box component="img" src={item.dataUrl} alt={item.angle} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <Stack sx={{ height: "100%", alignItems: "center", justifyContent: "center", bgcolor: "action.hover", color: "text.secondary" }}>
-                      <PhotoCameraOutlinedIcon />
-                    </Stack>
                   )}
-                  <Chip
-                    size="small"
-                    label={ANGLE_LABELS[item.angle]}
-                    sx={{ position: "absolute", left: 6, bottom: 6, bgcolor: "rgba(0,0,0,.72)", color: "common.white" }}
-                  />
-                  {item.status === "done" && (
-                    <Box sx={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", bgcolor: "success.main", color: "success.contrastText", display: "grid", placeItems: "center" }}>
-                      <CheckOutlinedIcon sx={{ fontSize: 16 }} />
-                    </Box>
-                  )}
+                  <Chip size="small" label={ANGLE_LABELS[item.angle]} sx={{ position: "absolute", left: 6, bottom: 6, bgcolor: "rgba(0,0,0,.72)", color: "common.white" }} />
+                  <Box sx={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", bgcolor: "success.main", color: "success.contrastText", display: "grid", placeItems: "center" }}>
+                    <CheckOutlinedIcon sx={{ fontSize: 16 }} />
+                  </Box>
                 </Paper>
               </Grid>
             ))}
@@ -461,51 +415,21 @@ export default function MultiAngleCapture({
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             {captures.map((item, index) => (
-              <Button
-                key={item.angle}
-                variant="outlined"
-                size="small"
-                startIcon={<RestartAltOutlinedIcon />}
-                onClick={() => retakeAngle(index)}
-                sx={{ flex: 1 }}
-              >
-                {ANGLE_LABELS[item.angle]}
+              <Button key={item.angle} variant="outlined" size="small" startIcon={<RestartAltOutlinedIcon />} onClick={() => retakeAngle(index)} sx={{ flex: 1 }}>
+                Chụp lại {ANGLE_LABELS[item.angle]}
               </Button>
             ))}
           </Stack>
 
-  <Paper
-    variant="outlined"
-    sx={{
-      p: 1.5,
-      bgcolor: "action.hover",
-      display: "flex",
-      flexDirection: { xs: "column", sm: "row" },
-      alignItems: { xs: "flex-start", sm: "center" },
-      gap: 1,
-    }}
-  >
-    <Checkbox
-      checked={consent}
-      onChange={(event) => setConsent?.(event.target.checked)}
-      disabled={!setConsent}
-      sx={{ flexShrink: 0, mt: { xs: 0.25, sm: 0 } }}
-    />
-    <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5, whiteSpace: "normal", mt: { xs: -0.5, sm: 0 } }}>
-      Tôi đồng ý cho hệ thống xử lý dữ liệu khuôn mặt để nhận diện tại cổng.
-    </Typography>
-  </Paper>
+          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "action.hover", display: "flex", alignItems: "center", gap: 1 }}>
+            <Checkbox checked={consent} onChange={(event) => setConsent?.(event.target.checked)} disabled={!setConsent} />
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Tôi đồng ý cho hệ thống xử lý và lưu trữ dữ liệu khuôn mặt để nhận diện tại cổng.
+            </Typography>
+          </Paper>
 
-          <Button
-            variant="contained"
-            color="success"
-            size="large"
-            startIcon={<AddAPhotoOutlinedIcon />}
-            onClick={submit}
-            disabled={!consent}
-            fullWidth
-          >
-            Xác nhận {doneCount} góc ảnh
+          <Button variant="contained" color="success" size="large" startIcon={<AddAPhotoOutlinedIcon />} onClick={submit} disabled={!consent} fullWidth>
+            Xác nhận đăng ký khuôn mặt
           </Button>
         </Stack>
       )}

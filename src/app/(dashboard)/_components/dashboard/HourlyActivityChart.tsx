@@ -49,8 +49,8 @@ export default function HourlyActivityChart({ logs, loading }: HourlyActivityCha
                 formatter={(value: any, name: any) => [value, name === "entry" ? "Vào" : "Ra"]}
               />
               <Legend wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 12 }} />
-              <Bar dataKey="entry" name="Vào" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="exit" name="Ra" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="entry" name="Vào" fill={theme.palette.primary.main} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="exit" name="Ra" fill={theme.palette.secondary.main} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Box>
