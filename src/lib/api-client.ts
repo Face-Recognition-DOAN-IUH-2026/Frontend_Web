@@ -98,24 +98,70 @@ function clearAccessTokenCookie(): void {
   document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
 }
 
-let _accessToken: string | null = null;
+function setRefreshTokenCookie(token: string): void {
+  if (typeof document === "undefined") return;
+  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `refresh_token=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Lax${secure}`;
+}
 
-function setStoredAccessToken(token: string | null) {
+function clearRefreshTokenCookie(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = "refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+}
+
+let _accessToken: string | null = null;
+let _refreshToken: string | null = null;
+
+function setStoredAccessToken(token: string | null, refreshToken?: string | null) {
   _accessToken = token;
   if (token) {
     setAccessTokenCookie(token);
+    if (typeof window !== "undefined") {
+      try { localStorage.setItem("token", token); } catch {}
+    }
   } else {
     clearAccessTokenCookie();
   }
+
+  if (refreshToken !== undefined) {
+    _refreshToken = refreshToken;
+    if (refreshToken) {
+      setRefreshTokenCookie(refreshToken);
+      if (typeof window !== "undefined") {
+        try { localStorage.setItem("refresh_token", refreshToken); } catch {}
+      }
+    } else {
+      clearRefreshTokenCookie();
+      if (typeof window !== "undefined") {
+        try { localStorage.removeItem("refresh_token"); } catch {}
+      }
+    }
+  }
+}
+
+function getStoredRefreshToken(): string | null {
+  if (_refreshToken) return _refreshToken;
+  const cookieVal = getCookieValue("refresh_token");
+  if (cookieVal) return cookieVal;
+  if (typeof window !== "undefined") {
+    try {
+      return localStorage.getItem("refresh_token");
+    } catch {}
+  }
+  return null;
 }
 
 function clearStoredAuth() {
   _accessToken = null;
+  _refreshToken = null;
   clearAccessTokenCookie();
+  clearRefreshTokenCookie();
   if (typeof window !== "undefined") {
     try {
       localStorage.removeItem("user");
       localStorage.removeItem("token");
+      localStorage.removeItem("refresh_token");
     } catch {}
   }
 }
@@ -243,14 +289,18 @@ class ApiClient {
     if (this.refreshPromise) return this.refreshPromise;
     this.refreshPromise = (async () => {
       try {
-        const resp = await axios.post(`${API_BASE_URL}/api/auth/refresh`, null, {
+        const storedRefreshToken = getStoredRefreshToken();
+        const resp = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+          refresh_token: storedRefreshToken,
+        }, {
           withCredentials: true,
           timeout: 10000,
         });
         const data = resp.data;
         const token = data?.access_token || data?.accessToken;
+        const newRefreshToken = data?.refresh_token || data?.refreshToken;
         if (token) {
-          setStoredAccessToken(token);
+          setStoredAccessToken(token, newRefreshToken || storedRefreshToken);
           return token;
         }
         return null;
@@ -266,7 +316,7 @@ class ApiClient {
   async login(data: LoginRequest): Promise<TokenResponse> {
     const response = await this.client.post<TokenResponse>("/api/auth/login", data);
     if (response.data.access_token) {
-      setStoredAccessToken(response.data.access_token);
+      setStoredAccessToken(response.data.access_token, response.data.refresh_token);
     }
     return response.data;
   }
@@ -274,7 +324,7 @@ class ApiClient {
   async register(data: RegisterRequest): Promise<TokenResponse> {
     const response = await this.client.post<TokenResponse>("/api/auth/register", data);
     if (response.data.access_token) {
-      setStoredAccessToken(response.data.access_token);
+      setStoredAccessToken(response.data.access_token, response.data.refresh_token);
     }
     return response.data;
   }
@@ -302,7 +352,7 @@ class ApiClient {
   async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
     const response = await this.client.post<TokenResponse>("/api/auth/refresh", { refresh_token: refreshToken });
     if (response.data.access_token) {
-      setStoredAccessToken(response.data.access_token);
+      setStoredAccessToken(response.data.access_token, response.data.refresh_token);
     }
     return response.data;
   }
@@ -322,7 +372,7 @@ class ApiClient {
       headers: { "Content-Type": "multipart/form-data" },
     });
     if (response.data.access_token) {
-      setStoredAccessToken(response.data.access_token);
+      setStoredAccessToken(response.data.access_token, response.data.refresh_token);
     }
     return response.data;
   }

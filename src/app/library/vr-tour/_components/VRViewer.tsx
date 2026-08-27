@@ -525,20 +525,12 @@ export default function VRViewer() {
         }`}
       >
         {/* Phần Logo Header Trắng */}
-        <div className="bg-white h-[110px] w-full flex items-center justify-center p-4 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-12 flex flex-col justify-between">
-              <div className="w-full h-[45%] bg-[#1a2f6c] rounded-sm" />
-              <div className="w-full h-[45%] bg-[#1a2f6c] rounded-sm flex items-end">
-                <div className="w-full h-1/2 bg-[#f4b315] rounded-b-sm" />
-              </div>
-            </div>
-            <div className="flex flex-col text-[#1a2f6c] font-bold text-[15px] leading-tight">
-              <span>Industrial</span>
-              <span>University of</span>
-              <span>Ho Chi Minh City</span>
-            </div>
-          </div>
+        <div className="bg-white h-[100px] w-full flex items-center justify-center p-4 shrink-0">
+          <img
+            src="/logo.png"
+            alt="IUH Logo"
+            className="h-14 w-auto object-contain"
+          />
         </div>
 
         {/* Dải phân cách màu vàng */}

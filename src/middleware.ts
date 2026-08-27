@@ -61,5 +61,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|VRLIB/).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for:
+     * - api (API routes)
+     * - _next/static, _next/image (Next.js internals)
+     * - static files with extensions (.png, .jpg, .jpeg, .svg, .ico, .webp, .mp4, etc.)
+     * - VRLIB (VR Tour assets)
+     */
+    "/((?!api|_next/static|_next/image|favicon\\.ico|favicon\\.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|webm)|VRLIB/).*)",
+  ],
 };

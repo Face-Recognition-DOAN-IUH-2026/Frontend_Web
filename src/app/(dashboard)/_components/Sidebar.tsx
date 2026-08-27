@@ -193,6 +193,8 @@ export default function Sidebar() {
 
   const handleClose = () => setMobileOpen(false);
 
+  const isDark = theme.palette.mode === "dark";
+
   const drawerContent = (
     <Stack sx={{ height: "100%" }}>
       {/* ── Logo / Brand ─────────────────────────────────── */}
@@ -205,30 +207,16 @@ export default function Sidebar() {
         >
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", py: 0.5 }}>
             <Box
+              component="img"
+              src={isDark ? "/logo-white.png" : "/logo.png"}
+              alt="IUH Logo"
               sx={{
-                width: 38,
                 height: 38,
-                borderRadius: 2,
-                bgcolor: "primary.main",
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0,
+                width: "auto",
+                maxWidth: 190,
+                objectFit: "contain",
               }}
-            >
-              <LibraryIcon sx={{ color: "white", fontSize: 20 }} />
-            </Box>
-            <Box sx={{ textAlign: "left", minWidth: 0 }}>
-              <Typography
-                variant="subtitle2"
-                sx={{ fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.2 }}
-                noWrap
-              >
-                THƯ VIỆN IUH
-              </Typography>
-              <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.7rem" }}>
-                Hệ thống quản lý
-              </Typography>
-            </Box>
+            />
           </Stack>
         </ButtonBase>
       </Box>

@@ -82,6 +82,6 @@ describe("getErrorMessage", () => {
   });
 
   it("returns Unknown error for null", () => {
-    expect(apiClient.getErrorMessage(null)).toBe("Unknown error");
+    expect(apiClient.getErrorMessage(null)).toBe("Lỗi không xác định");
   });
 });
