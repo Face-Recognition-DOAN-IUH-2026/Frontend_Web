@@ -19,6 +19,7 @@ import {
   TextField,
   Typography,
   alpha,
+  useTheme,
 } from "@mui/material";
 import LibraryBooksIcon from "@mui/icons-material/LocalLibrary";
 import SearchIcon from "@mui/icons-material/Search";
@@ -100,6 +101,8 @@ const steps = [
 ];
 
 export default function LandingOverlay() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -133,24 +136,21 @@ export default function LandingOverlay() {
             {/* Logo */}
             <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", textDecoration: "none" }} component={Link} href="/">
               <Box
+                component="img"
+                src={isDark ? "/logo-white.png" : "/logo.png"}
+                alt="IUH Logo"
                 sx={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 2,
-                  bgcolor: "primary.main",
-                  display: "grid",
-                  placeItems: "center",
-                  boxShadow: "0 2px 8px rgba(30,96,145,0.3)",
+                  height: { xs: 36, sm: 42 },
+                  width: "auto",
+                  objectFit: "contain",
                 }}
-              >
-                <LibraryBooksIcon sx={{ color: "#FFFFFF", fontSize: 24 }} />
-              </Box>
-              <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 850, color: "primary.main", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
-                  THƯ VIỆN IUH
+              />
+              <Box sx={{ borderLeft: "1.5px solid", borderColor: "divider", pl: 1.5, display: { xs: "none", sm: "block" } }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main", lineHeight: 1.1 }}>
+                  THƯ VIỆN THÔNG MINH
                 </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", fontWeight: 500 }}>
-                  Đại học Công nghiệp TP.HCM
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.7rem", fontWeight: 500 }}>
+                  Smart Library System
                 </Typography>
               </Box>
             </Stack>

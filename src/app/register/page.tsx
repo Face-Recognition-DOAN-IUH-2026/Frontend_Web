@@ -5,7 +5,7 @@ import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import {
   Alert, Box, Button, Card, CardContent, Checkbox, CircularProgress,
   FormControlLabel, Paper, Stack, Step, StepLabel, Stepper,
-  TextField, Typography, alpha,
+  TextField, Typography, alpha, useTheme,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -18,6 +18,7 @@ const steps = ["Quét thẻ", "Xác nhận thông tin", "Đăng ký", "Khuôn m�
 type RegisterPhase = "scan" | "confirm" | "form" | "face" | "face-enrolling" | "done";
 
 export default function RegisterPage() {
+  const theme = useTheme();
   const router = useRouter();
   const [phase, setPhase] = useState<RegisterPhase>("scan");
   const [activeStep, setActiveStep] = useState(0);
@@ -176,7 +177,13 @@ export default function RegisterPage() {
       <Card elevation={0} sx={{ maxWidth: 560, width: "100%", borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
         <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
           <Stack spacing={3}>
-            <Stack spacing={1} sx={{ alignItems: "center", textAlign: "center" }}>
+            <Stack spacing={1.5} sx={{ alignItems: "center", textAlign: "center" }}>
+              <Box
+                component="img"
+                src={theme.palette.mode === "dark" ? "/logo-white.png" : "/logo.png"}
+                alt="IUH Logo"
+                sx={{ height: 44, width: "auto", objectFit: "contain", mb: 0.5 }}
+              />
               <Typography variant="h5" sx={{ fontWeight: 800 }}>
                 ĐĂNG KÝ THẺ THƯ VIỆN IUH
               </Typography>

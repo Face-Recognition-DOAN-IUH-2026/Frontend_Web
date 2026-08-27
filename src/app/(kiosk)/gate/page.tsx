@@ -461,9 +461,19 @@ export default function GatePage() {
             <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
 
             <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-              <Avatar sx={{ bgcolor: "rgba(255,255,255,0.15)", width: 52, height: 52, border: "1px solid rgba(255,255,255,0.25)" }}>
-                <GateIcon sx={{ color: "#FFFFFF", fontSize: 28 }} />
-              </Avatar>
+              <Box
+                component="img"
+                src="/logo.png"
+                alt="IUH Logo"
+                sx={{
+                  height: 48,
+                  bgcolor: "white",
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 2,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                }}
+              />
               <Box>
                 <Typography variant="h5" sx={{ fontWeight: 800, color: "#FFFFFF" }}>CỔNG KIỂM SOÁT THƯ VIỆN IUH</Typography>
                 <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)", mt: 0.3 }}>

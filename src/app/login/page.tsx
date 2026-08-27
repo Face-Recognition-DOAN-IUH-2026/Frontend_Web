@@ -378,15 +378,12 @@ export default function LoginPage() {
 
           {/* Logo + Brand */}
           <Box sx={{ position: "relative", zIndex: 1 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: "rgba(255,255,255,0.15)", display: "grid", placeItems: "center", backdropFilter: "blur(8px)" }}>
-                <AutoStoriesOutlinedIcon sx={{ color: "white", fontSize: 24 }} />
-              </Box>
-              <Box>
-                <Typography sx={{ color: "white", fontWeight: 800, fontSize: "1rem", lineHeight: 1.2 }}>THƯ VIỆN IUH</Typography>
-                <Typography sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.72rem" }}>Đại học Công nghiệp TP.HCM</Typography>
-              </Box>
-            </Box>
+            <Box
+              component="img"
+              src="/logo-white.png"
+              alt="IUH Logo"
+              sx={{ height: 42, width: "auto", objectFit: "contain" }}
+            />
           </Box>
 
           {/* Main hero content */}
@@ -438,14 +435,13 @@ export default function LoginPage() {
           }}
         >
           {/* Mobile-only logo */}
-          <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center", gap: 1.5, mb: 4 }}>
-            <Box sx={{ width: 42, height: 42, borderRadius: 2, bgcolor: "primary.main", display: "grid", placeItems: "center" }}>
-              <AutoStoriesOutlinedIcon sx={{ color: "white" }} />
-            </Box>
-            <Box>
-              <Typography sx={{ fontWeight: 800, fontSize: "1rem" }}>THƯ VIỆN IUH</Typography>
-              <Typography variant="caption" color="text.secondary">Hệ thống quản lý thư viện</Typography>
-            </Box>
+          <Box sx={{ display: { xs: "flex", md: "none" }, alignItems: "center", justifyContent: "center", mb: 4 }}>
+            <Box
+              component="img"
+              src={theme.palette.mode === "dark" ? "/logo-white.png" : "/logo.png"}
+              alt="IUH Logo"
+              sx={{ height: 44, width: "auto", objectFit: "contain" }}
+            />
           </Box>
 
           <Box sx={{ width: "100%", maxWidth: 420 }}>
