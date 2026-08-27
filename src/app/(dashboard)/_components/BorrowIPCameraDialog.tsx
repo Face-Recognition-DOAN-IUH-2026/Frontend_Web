@@ -28,6 +28,7 @@ import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
+import { getAlertSeverity } from "@/lib/alert-utils";
 import { slideInRight, successPop } from "@/lib/animations";
 import IPCameraStream from "./IPCameraStream";
 
@@ -220,7 +221,7 @@ export default function BorrowIPCameraDialog({
                 </Typography>
               </Stack>
 
-              {createError ? <Alert severity="error" onClose={() => setCreateError("")}>{createError}</Alert> : null}
+              {createError ? <Alert severity={getAlertSeverity(createError)} onClose={() => setCreateError("")}>{createError}</Alert> : null}
 
               {lookupError ? (
                 <Paper variant="outlined" sx={{ p: 1.5, borderColor: "error.main", bgcolor: (t) => t.palette.mode === "dark" ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.06)" }}>

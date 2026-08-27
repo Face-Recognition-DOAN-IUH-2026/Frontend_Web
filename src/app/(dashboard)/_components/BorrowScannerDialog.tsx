@@ -16,6 +16,8 @@ import {
   Paper,
   Stack,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import Input from "antd/es/input";
 import Result from "antd/es/result";
@@ -30,6 +32,7 @@ import ErrorIcon from "@mui/icons-material/ReportOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
+import { getAlertSeverity } from "@/lib/alert-utils";
 import { slideInRight, successPop } from "@/lib/animations";
 
 interface ScannedBorrowItem {
@@ -280,13 +283,16 @@ export default function BorrowScannerDialog({
     }
   };
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   const validCount = scanned.filter((item) => item.can_borrow).length;
   const totalScanned = scanned.length;
   const currentStep = successResult ? 2 : lookingUp ? 1 : 0;
 
   return (
     <>
-      <Dialog open={open} onClose={lookingUp ? undefined : onClose} fullWidth maxWidth="xl">
+      <Dialog open={open} onClose={lookingUp ? undefined : onClose} fullWidth maxWidth="xl" fullScreen={isMobile}>
         <DialogTitle>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -374,7 +380,7 @@ export default function BorrowScannerDialog({
                 </Typography>
               </Stack>
 
-              {createError ? <Alert severity="error" onClose={() => setCreateError("")}>{createError}</Alert> : null}
+              {createError ? <Alert severity={getAlertSeverity(createError)} onClose={() => setCreateError("")}>{createError}</Alert> : null}
 
               {lookupError ? (
                 <Paper variant="outlined" sx={{ p: 1.5, borderColor: "error.main", bgcolor: "error.50" }}>

@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import { bus } from "./event-bus";
+import { translateError } from "./error-messages";
 import type {
   AccessLogList,
   AccessLogPublic,
@@ -190,25 +191,27 @@ function isTokenExpiringSoon(token: string, skewMs = 30_000): boolean {
 }
 
 function getErrorMessage(err: unknown): string {
-  if (!err) return "Lỗi không xác định";
-  if (typeof err === "string") return err;
+  if (!err) return "Đã xảy ra lỗi không xác định. Vui lòng thử lại.";
+  if (typeof err === "string") return translateError(err);
   if (typeof err === "object" && err !== null) {
     const ax = err as any;
     if (ax.response?.data) {
       const data = ax.response.data;
-      if (typeof data === "string") return data;
-      if (data.detail) return data.detail;
-      if (data.error) return typeof data.error === "string" ? data.error : JSON.stringify(data.error);
-      if (data.message) return data.message;
+      if (typeof data === "string") return translateError(data);
+      if (data.detail) return translateError(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+      if (data.error) return translateError(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
+      if (data.message) return translateError(data.message);
       if (Array.isArray(data.errors) && data.errors.length > 0) {
-        return data.errors.map((e: any) => e.msg || e.message || JSON.stringify(e)).join("; ");
+        const raw = data.errors.map((e: any) => e.msg || e.message || JSON.stringify(e)).join("; ");
+        return translateError(raw);
       }
-      return JSON.stringify(data);
+      // Last resort: hide raw JSON from the user
+      return "Máy chủ trả về dữ liệu không hợp lệ. Vui lòng thử lại.";
     }
-    if (ax.message) return ax.message;
+    if (ax.message) return translateError(ax.message);
   }
-  if (err instanceof Error) return err.message;
-  return String(err);
+  if (err instanceof Error) return translateError(err.message);
+  return translateError(String(err));
 }
 
 function setApiAccessToken(token: string | null) {
@@ -227,7 +230,7 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 30000,
+      timeout: 10000, // 10s — was 30s; long-running uploads override per-request
       withCredentials: true,
     });
 

@@ -12,6 +12,7 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { getAlertSeverity } from "@/lib/alert-utils";
 import type { FaceResultEvent } from "@/lib/types";
 import { preprocessImage, isImageTooDark, getImageSizeReduction } from "@/lib/image-preprocessor";
 
@@ -162,7 +163,7 @@ export default function IdentifyPage() {
 
       {error ? (
         <Box sx={staggerSx(1)}>
-          <Alert severity="error">{error}</Alert>
+          <Alert severity={getAlertSeverity(error)}>{error}</Alert>
         </Box>
       ) : null}
 

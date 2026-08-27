@@ -86,6 +86,40 @@ function buildLogFromEvent(event: CameraEvent): AccessLogPublic {
   };
 }
 
+function playGateSound(type: "granted" | "denied") {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === "granted") {
+      // Pleasant double ding (880Hz -> 1320Hz)
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } else {
+      // Gentle warning beep (300Hz -> 180Hz)
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(300, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.25);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    }
+  } catch {
+    // AudioContext autoplay blocked or unsupported
+  }
+}
+
 function resultStatus(result: KioskResult | null) {
   if (!result) return "processing";
   if (result.success) return "success";
@@ -331,6 +365,8 @@ export default function GatePage() {
     localStorage.setItem("gate_today_counts", JSON.stringify(todayCounts));
   }, [todayCounts]);
 
+  const recentEventTimestamps = useRef<Map<string, number>>(new Map());
+
   useEffect(() => {
     const cleanup = api.connectAccessSSE((event: CameraEvent) => {
       if (event.bbox || event.landmarks) {
@@ -349,6 +385,16 @@ export default function GatePage() {
 
       if (event.status === "granted") {
         const type = event.access_type === "entry" ? "entry" : "exit";
+        const key = `${event.patron_id || event.student_code || event.full_name || "unknown"}-${type}`;
+        const now = Date.now();
+        const lastTime = recentEventTimestamps.current.get(key) || 0;
+        if (now - lastTime < 5000) {
+          // Debounce duplicate scans within 5s
+          return;
+        }
+        recentEventTimestamps.current.set(key, now);
+
+        playGateSound("granted");
         addRecentLog(buildLogFromEvent(event));
         showToast(
           type === "entry" ? "success" : "warning",
@@ -362,6 +408,7 @@ export default function GatePage() {
         setTodayCounts((prev) => ({ ...prev, no_match: prev.no_match + 1 }));
         showToast("info", "Khuôn mặt mới - không nhận diện được.");
       } else if (event.status === "spoof") {
+        playGateSound("denied");
         setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
         showToast("error", "Phát hiện giả mạo!");
       }

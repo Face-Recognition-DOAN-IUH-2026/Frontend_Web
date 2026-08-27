@@ -81,6 +81,7 @@ export default function HistoryPage() {
   const [live, setLive] = useState(true);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [accessType, setAccessType] = useState("");
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -93,12 +94,20 @@ export default function HistoryPage() {
   const [frequency, setFrequency] = useState<AccessFrequencyDay[]>([]);
   const [freqLoading, setFreqLoading] = useState(false);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setSkip(0);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setError(null);
       const data = await api.getAccessLogs({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         accessType: accessType || undefined,
         status: status || undefined,
         dateFrom: dateFrom || undefined,
@@ -113,7 +122,7 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, accessType, status, dateFrom, dateTo, skip, limit]);
+  }, [debouncedSearch, accessType, status, dateFrom, dateTo, skip, limit]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -398,8 +407,8 @@ export default function HistoryPage() {
               {frequency.length === 0 ? (
                 <Alert severity="info">Chưa có dữ liệu tần suất trong khoảng thời gian đã chọn.</Alert>
               ) : (
-                <Box sx={{ height: 270 }}>
-                  <ResponsiveContainer width="100%" height="100%">
+                <Box sx={{ height: 270, width: "100%", minWidth: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={270}>
                     <BarChart data={frequency} margin={{ top: 8, right: 20, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                       <XAxis

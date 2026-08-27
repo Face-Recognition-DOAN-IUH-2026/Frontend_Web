@@ -40,12 +40,15 @@ export default function MuiStatCard({
         p: 2.5,
         position: "relative",
         overflow: "hidden",
-        transition: "box-shadow 0.2s ease, transform 0.2s ease",
+        transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         animation: `${fadeInUp} 0.45s ease-out both`,
         animationDelay: `${index * 0.06}s`,
         "&:hover": {
-          transform: "translateY(-2px)",
-          boxShadow: "0 6px 20px rgba(30,96,145,0.12)",
+          transform: "translateY(-3px)",
+          boxShadow: "0 12px 24px -6px rgba(0, 0, 0, 0.12)",
+          "& .stat-icon-avatar": {
+            transform: "scale(1.1) rotate(-4deg)",
+          },
         },
       }}
     >
@@ -67,11 +70,13 @@ export default function MuiStatCard({
       {/* Icon + Label row */}
       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 2 }}>
         <Avatar
+          className="stat-icon-avatar"
           sx={{
             background: gradient,
             width: 40,
             height: 40,
             borderRadius: 2,
+            transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
           <Icon sx={{ color: "#fff", fontSize: 20 }} />

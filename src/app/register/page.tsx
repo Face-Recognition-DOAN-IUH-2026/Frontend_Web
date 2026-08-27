@@ -168,27 +168,83 @@ export default function RegisterPage() {
       sx={{
         minHeight: "100vh",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         bgcolor: "background.default",
-        p: 2,
       }}
     >
+      {/* ── Left hero panel (hidden on xs) ── */}
+      <Box
+        sx={{
+          display: { xs: "none", md: "flex" },
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          flex: "0 0 420px",
+          background: theme.palette.mode === "dark"
+            ? "linear-gradient(160deg, #1a237e 0%, #283593 50%, #1565c0 100%)"
+            : "linear-gradient(160deg, #1565c0 0%, #1976d2 55%, #42a5f5 100%)",
+          p: 5,
+          color: "#fff",
+          gap: 3,
+        }}
+      >
+        <Box
+          component="img"
+          src="/logo-white.png"
+          alt="IUH Logo"
+          sx={{ height: 72, width: "auto", objectFit: "contain" }}
+        />
+        <Typography variant="h4" sx={{ fontWeight: 800, textAlign: "center", lineHeight: 1.3 }}>
+          Thư Viện IUH
+        </Typography>
+        <Typography variant="body1" sx={{ textAlign: "center", opacity: 0.85, maxWidth: 280 }}>
+          Đăng ký thẻ thư viện để mượn sách, tra cứu tài liệu và sử dụng các dịch vụ thông minh của Trường Đại học Công nghiệp TP.HCM.
+        </Typography>
+        <Box sx={{ mt: 2, p: 2.5, borderRadius: 3, bgcolor: "rgba(255,255,255,0.12)", width: "100%", maxWidth: 300 }}>
+          {[
+            { icon: "📚", text: "Mượn tối đa 5 cuốn sách" },
+            { icon: "🤖", text: "Ra vào bằng nhận diện khuôn mặt" },
+            { icon: "🔔", text: "Nhắc hạn trả sách qua email" },
+          ].map((item) => (
+            <Stack key={item.text} direction="row" spacing={1.5} sx={{ mb: 1.5, alignItems: "center" }}>
+              <Typography sx={{ fontSize: 20 }}>{item.icon}</Typography>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.9)" }}>{item.text}</Typography>
+            </Stack>
+          ))}
+        </Box>
+        <Typography variant="caption" sx={{ opacity: 0.6, textAlign: "center" }}>
+          © {new Date().getFullYear()} Thư Viện IUH
+        </Typography>
+      </Box>
+
+      {/* ── Right form panel ── */}
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          p: { xs: 2, sm: 4 },
+          overflowY: "auto",
+          minHeight: "100vh",
+        }}
+      >
       <Card elevation={0} sx={{ maxWidth: 560, width: "100%", borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
-        <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 4 } }}>
           <Stack spacing={3}>
-            <Stack spacing={1.5} sx={{ alignItems: "center", textAlign: "center" }}>
+            <Stack spacing={1} sx={{ alignItems: { xs: "center", md: "flex-start" }, textAlign: { xs: "center", md: "left" } }}>
+              {/* Show logo on mobile (hidden on md+ because hero panel shows it) */}
               <Box
                 component="img"
                 src={theme.palette.mode === "dark" ? "/logo-white.png" : "/logo.png"}
                 alt="IUH Logo"
-                sx={{ height: 44, width: "auto", objectFit: "contain", mb: 0.5 }}
+                sx={{ height: 40, width: "auto", objectFit: "contain", mb: 0.5, display: { xs: "block", md: "none" } }}
               />
               <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                ĐĂNG KÝ THẺ THƯ VIỆN IUH
+                Đăng ký thẻ thư viện
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Trường Đại học Công nghiệp TP.HCM
+                Tạo tài khoản để sử dụng dịch vụ thư viện IUH
               </Typography>
             </Stack>
 
@@ -412,6 +468,14 @@ export default function RegisterPage() {
           </Stack>
         </CardContent>
       </Card>
+      {/* Login link below card */}
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: "center" }}>
+        Đã có tài khoản?{" "}
+        <Link href="/login" style={{ color: "inherit", fontWeight: 600, textDecorationColor: "currentcolor" }}>
+          Đăng nhập ngay
+        </Link>
+      </Typography>
+      </Box>{/* end right panel */}
     </Box>
   );
 }

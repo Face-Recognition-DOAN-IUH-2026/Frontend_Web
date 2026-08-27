@@ -40,6 +40,7 @@ import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { slideInRight } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { getAlertSeverity, getAlertTitle } from "@/lib/alert-utils";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
@@ -398,8 +399,12 @@ export default function ReturnPage() {
 
       {error ? (
         <Slide direction="down" in={!!error} timeout={250}>
-          <Alert severity="error" onClose={() => setError("")} sx={{ animation: `${slideInRight} 0.25s ease-out` }}>
-            <AlertTitle>Lỗi</AlertTitle>
+          <Alert
+            severity={getAlertSeverity(error)}
+            onClose={() => setError("")}
+            sx={{ animation: `${slideInRight} 0.25s ease-out`, borderRadius: 2 }}
+          >
+            <AlertTitle>{getAlertTitle(error)}</AlertTitle>
             {error}
           </Alert>
         </Slide>
@@ -727,12 +732,28 @@ export default function ReturnPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!confirmRecord} onClose={() => { setConfirmRecord(null); setCondition(""); }}>
-        <DialogTitle>Xác nhận trả sách</DialogTitle>
+      <Dialog open={!!confirmRecord} onClose={() => { setConfirmRecord(null); setCondition(""); }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>Xác nhận trả sách</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            Trả sách "{confirmRecord?.book?.title || confirmRecord?.book_id}" cho độc giả {detail?.patron.full_name || detail?.patron.student_code}?
+            Xác nhận nhận lại sách "<strong>{confirmRecord?.book?.title || confirmRecord?.book_id}</strong>" từ độc giả {detail?.patron.full_name || detail?.patron.student_code}?
           </DialogContentText>
+
+          {confirmRecord && confirmRecord.due_at && new Date(confirmRecord.due_at).getTime() < Date.now() ? (() => {
+            const days = Math.max(1, Math.ceil((Date.now() - new Date(confirmRecord.due_at).getTime()) / (1000 * 60 * 60 * 24)));
+            const fine = days * 5000;
+            return (
+              <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  Sách đã quá hạn {days} ngày
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: "0.82rem", mt: 0.5 }}>
+                  Phí phạt trễ hạn ước tính: <strong>{fine.toLocaleString("vi-VN")} đ</strong> (5.000 đ/ngày). Thủ thư vui lòng kiểm tra và thu phí (nếu có) trước khi hoàn tất.
+                </Typography>
+              </Alert>
+            );
+          })() : null}
+
           <Select value={condition} onChange={(e) => setCondition(e.target.value)} displayEmpty fullWidth size="small">
             <MenuItem value="">Tình trạng sách (tuỳ chọn)</MenuItem>
             <MenuItem value="Còn mới">Còn mới</MenuItem>

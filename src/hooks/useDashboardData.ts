@@ -81,28 +81,13 @@ const fetchDashboardData = async (): Promise<DashboardSnapshot> => {
   const [statsResult, recentResult, hourlyResult, cameraResult, borrowStatsResult, borrowsResult, scheduleResult, notifResult] = await Promise.allSettled([
     api.getStats(),
     api.getRecentLogs(),
-    api.getAccessLogs({ dateFrom: today, limit: 200 }),
+    api.getAccessLogs({ dateFrom: today, limit: 50 }),
     api.getCameraStatus(),
     api.getBorrowStats(),
     api.getAllActiveBorrows(),
     api.getScheduleAssignments({ from: today, to: today }),
     api.getNotifications({ limit: 5 }),
   ]);
-
-  console.log("[Dashboard] API results:", {
-    stats: statsResult.status,
-    recent: recentResult.status,
-    hourly: hourlyResult.status,
-    camera: cameraResult.status,
-    borrowStats: borrowStatsResult.status,
-    borrows: borrowsResult.status,
-    schedule: scheduleResult.status,
-    notif: notifResult.status,
-  });
-
-  if (statsResult.status === "rejected") console.warn("[Dashboard] stats failed:", statsResult.reason);
-  if (cameraResult.status === "rejected") console.warn("[Dashboard] camera failed:", cameraResult.reason);
-  if (scheduleResult.status === "rejected") console.warn("[Dashboard] schedule failed:", scheduleResult.reason);
 
   return {
     stats: statsResult.status === "fulfilled" ? statsResult.value : null,
@@ -141,8 +126,6 @@ export function useDashboardData(): DashboardData {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push("/login");
   }, [authLoading, isAuthenticated, router]);
-
-  console.log("[Dashboard] auth state:", { isAuthenticated, authLoading });
 
   const { data: cachedData, mutate } = useSWR<DashboardSnapshot>(
     isAuthenticated ? CACHE_KEY : null,
