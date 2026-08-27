@@ -18,6 +18,8 @@ import {
   Stack,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
@@ -187,12 +189,15 @@ export default function IsbnScannerDialog({
     }
   };
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   const validCount = scanned.filter((item) => item.lookup).length;
   const isNew = (item: ScannedItem) => item.lookup && item.lookup.total_copies === 0;
 
   return (
     <>
-      <Dialog open={open} onClose={importing ? undefined : onClose} fullWidth maxWidth="xl">
+      <Dialog open={open} onClose={importing ? undefined : onClose} fullWidth maxWidth="xl" fullScreen={isMobile}>
         <DialogTitle>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>

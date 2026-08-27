@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Avatar, Box, LinearProgress, Paper, Stack, Typography } from "@mui/material";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { fadeInUp } from "@/lib/animations";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import PersonIcon from "@mui/icons-material/PersonOutlined";
@@ -21,14 +21,28 @@ const STAT_GRADIENT = {
   face: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
 };
 
-function Sparkline({ data, color }: { data: number[]; color: string }) {
+function Sparkline({ data, color, id }: { data: number[]; color: string; id: string }) {
   if (data.every((v) => v === 0)) return null;
   return (
-    <Box sx={{ height: 32, mt: 1 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data.map((v) => ({ v }))}>
-          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2} dot={false} />
-        </LineChart>
+    <Box sx={{ height: 36, width: "100%", minWidth: 0, mt: 1, mx: -0.5 }}>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={36}>
+        <AreaChart data={data.map((v) => ({ v }))} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`spark-${id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+              <stop offset="100%" stopColor={color} stopOpacity={0.0} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="v"
+            stroke={color}
+            strokeWidth={2}
+            fill={`url(#spark-${id})`}
+            fillOpacity={1}
+            dot={false}
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </Box>
   );
@@ -95,7 +109,7 @@ export default function PatronStatCards({ patrons }: PatronStatCardsProps) {
               "& .MuiLinearProgress-bar": { background: item.gradient, borderRadius: 2 },
             }}
           />
-          <Sparkline data={stats.dailyData} color={item.sparkColor} />
+          <Sparkline data={stats.dailyData} color={item.sparkColor} id={`card-${idx}`} />
         </Paper>
       ))}
     </Box>

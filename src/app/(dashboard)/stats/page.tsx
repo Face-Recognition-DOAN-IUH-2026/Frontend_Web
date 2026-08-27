@@ -163,21 +163,6 @@ export default function StatsPage() {
     (async () => {
       try {
         const today = toDateStr(new Date());
-        const [s, logs, active, bStats, allActive, cameras] = await Promise.all([
-          api.getStats(),
-          api.getAccessLogs({ dateFrom: today, limit: 200 }),
-          api.getActivePatrons(),
-          api.getBorrowStats(),
-          api.getAllActiveBorrows(),
-          api.getCameraStatus(),
-        ]);
-        setStats(s);
-        setTodayLogs(logs.items.filter(isPhysicalAccessLog));
-        setActivePatrons(active.items);
-        setBorrowStats(bStats);
-        setActiveBorrows(allActive || []);
-        setCameraStatuses(cameras);
-
         const now = new Date();
         const thisMonday = new Date(now);
         thisMonday.setDate(now.getDate() - now.getDay() + 1);
@@ -186,13 +171,36 @@ export default function StatsPage() {
         const lastSunday = new Date(lastMonday);
         lastSunday.setDate(lastMonday.getDate() + 6);
 
-        const [thisWeekResp, lastWeekResp] = await Promise.all([
+        // Fetch all data in a single parallel batch to eliminate sequential waterfall
+        const [
+          sRes,
+          logsRes,
+          activeRes,
+          bStatsRes,
+          allActiveRes,
+          camerasRes,
+          thisWeekRes,
+          lastWeekRes,
+        ] = await Promise.allSettled([
+          api.getStats(),
+          api.getAccessLogs({ dateFrom: today, limit: 100 }),
+          api.getActivePatrons(),
+          api.getBorrowStats(),
+          api.getAllActiveBorrows(),
+          api.getCameraStatus(),
           api.getAccessFrequency({ dateFrom: toDateStr(thisMonday), dateTo: today }),
           api.getAccessFrequency({ dateFrom: toDateStr(lastMonday), dateTo: toDateStr(lastSunday) }),
         ]);
 
-        const thisWeekDaily = thisWeekResp.daily || [];
-        const lastWeekDaily = lastWeekResp.daily || [];
+        if (sRes.status === "fulfilled") setStats(sRes.value);
+        if (logsRes.status === "fulfilled") setTodayLogs(logsRes.value.items.filter(isPhysicalAccessLog));
+        if (activeRes.status === "fulfilled") setActivePatrons(activeRes.value.items);
+        if (bStatsRes.status === "fulfilled") setBorrowStats(bStatsRes.value);
+        if (allActiveRes.status === "fulfilled") setActiveBorrows(allActiveRes.value || []);
+        if (camerasRes.status === "fulfilled") setCameraStatuses(camerasRes.value);
+
+        const thisWeekDaily = thisWeekRes.status === "fulfilled" ? thisWeekRes.value.daily || [] : [];
+        const lastWeekDaily = lastWeekRes.status === "fulfilled" ? lastWeekRes.value.daily || [] : [];
 
         const thisWeekTotals = thisWeekDaily.reduce(
           (acc, d) => { acc.push(d.entry + d.exit); return acc; },
@@ -372,8 +380,8 @@ export default function StatsPage() {
 
           <DashboardCard title="So sánh tuần" subtitle="Tổng lượt ra/vào theo ngày — Tuần này vs Tuần trước">
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" }, gap: 0 }}>
-              <Box sx={{ height: 220, p: 2 }}>
-                <ResponsiveContainer width="100%" height="100%">
+              <Box sx={{ height: 220, width: "100%", minWidth: 0, p: 2 }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={220}>
                   <BarChart data={weeklyDayLabels.map((day, i) => ({
                     day,
                     thisWeek: weeklyData.thisWeek[i] || 0,
@@ -434,8 +442,8 @@ export default function StatsPage() {
                   title="Chưa có lượt ra/vào hôm nay"
                 />
               ) : (
-                <Box sx={{ height: 288, px: 1 }}>
-                  <ResponsiveContainer width="100%" height="100%">
+                <Box sx={{ height: 288, width: "100%", minWidth: 0, px: 1 }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={288}>
                     <BarChart data={hourlyData} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                       <XAxis dataKey="hour" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} interval={1} />

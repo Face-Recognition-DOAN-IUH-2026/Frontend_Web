@@ -21,6 +21,7 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { getAlertSeverity } from "@/lib/alert-utils";
 
 function decodeJwt(token: string): { sub: string } | null {
   try {
@@ -166,7 +167,7 @@ function BorrowVerifyFlow({ studentCode, onDone }: { studentCode: string; onDone
 
       {error ? (
         <Box sx={staggerSx(1)}>
-          <Alert severity="error" sx={{ width: "100%" }} onClose={() => setError("")}>{error}</Alert>
+          <Alert severity={getAlertSeverity(error)} sx={{ width: "100%" }} onClose={() => setError("")}>{error}</Alert>
         </Box>
       ) : null}
 
@@ -289,7 +290,7 @@ export default function VerifyPage() {
 
       {error ? (
         <Box sx={staggerSx(1)}>
-          <Alert severity="error">{error}</Alert>
+          <Alert severity={getAlertSeverity(error)}>{error}</Alert>
         </Box>
       ) : null}
 
@@ -321,7 +322,7 @@ export default function VerifyPage() {
               {result.score != null ? (
                 <LinearProgress variant="determinate" value={Math.min(Number(result.score) * 100, 100)} color={result.verified ? "success" : "error"} sx={{ height: 8, borderRadius: 99 }} />
               ) : null}
-              {result.error ? <Alert severity="error">{result.error}</Alert> : null}
+              {result.error ? <Alert severity={getAlertSeverity(result.error)}>{result.error}</Alert> : null}
               <Button startIcon={<RestartAltOutlinedIcon />} variant="outlined" onClick={reset} sx={{ alignSelf: "flex-start" }}>
                 Thử lại
               </Button>

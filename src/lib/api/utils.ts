@@ -1,4 +1,5 @@
 import type { AccessLogPublic } from "../types";
+import { translateError } from "../error-messages";
 
 let _accessToken: string | null = null;
 
@@ -85,26 +86,32 @@ export function clearAccessTokenCookie() {
 }
 
 export function getErrorMessage(err: any): string {
-  if (!err) return "Lỗi không xác định";
-  if (typeof err === "string") return err;
+  if (!err) return "Đã xảy ra lỗi không xác định. Vui lòng thử lại.";
+  if (typeof err === "string") return translateError(err);
   if (err.response?.data?.detail) {
     const detail = err.response.data.detail;
-    if (typeof detail === "string") return detail;
+    if (typeof detail === "string") return translateError(detail);
     if (Array.isArray(detail)) {
-      return detail.map((d: any) =>
+      const raw = detail.map((d: any) =>
         typeof d === "string" ? d : `${d.loc?.join(".")}: ${d.msg}`
       ).join("; ");
+      return translateError(raw);
     }
     if (typeof detail === "object") {
-      return detail.msg || detail.message || JSON.stringify(detail);
+      const raw = detail.msg || detail.message || JSON.stringify(detail);
+      return translateError(raw);
     }
   }
   if (err.response?.data?.error) {
     const errorVal = err.response.data.error;
-    if (typeof errorVal === "string") return errorVal;
-    if (typeof errorVal === "object") return errorVal.msg || errorVal.message || JSON.stringify(errorVal);
+    if (typeof errorVal === "string") return translateError(errorVal);
+    if (typeof errorVal === "object") {
+      const raw = errorVal.msg || errorVal.message || JSON.stringify(errorVal);
+      return translateError(raw);
+    }
   }
-  return err.message || err.msg || String(err);
+  const raw = err.message || err.msg || String(err);
+  return translateError(raw);
 }
 
 // Convenience functions that delegate to the ApiClient singleton.

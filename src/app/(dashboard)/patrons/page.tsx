@@ -54,8 +54,16 @@ export default function PatronsPage() {
   const router = useRouter();
   const [patrons, setPatrons] = useState<PatronPublic[]>([]);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [filter, setFilter] = useState<FilterValue>("all");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const [showCreate, setShowCreate] = useState(false);
 
@@ -83,14 +91,14 @@ export default function PatronsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { items } = await api.searchPatrons(query || undefined);
+      const { items } = await api.searchPatrons(debouncedQuery || undefined);
       setPatrons(items);
     } catch (err) {
       showNotice("error", getErrorMessage(err) || "Không thể tải danh sách độc giả");
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [debouncedQuery]);
 
   useEffect(() => { load(); }, [load]);
 
