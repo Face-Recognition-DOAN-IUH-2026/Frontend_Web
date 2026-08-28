@@ -78,10 +78,10 @@ describe("getErrorMessage", () => {
 
   it("returns message for generic errors", () => {
     const err = new Error("Network error");
-    expect(apiClient.getErrorMessage(err)).toBe("Network error");
+    expect(apiClient.getErrorMessage(err)).toBe("Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng và thử lại.");
   });
 
   it("returns Unknown error for null", () => {
-    expect(apiClient.getErrorMessage(null)).toBe("Lỗi không xác định");
+    expect(apiClient.getErrorMessage(null)).toBe("Đã xảy ra lỗi không xác định. Vui lòng thử lại.");
   });
 });
