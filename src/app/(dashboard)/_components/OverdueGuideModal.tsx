@@ -61,10 +61,20 @@ export default function OverdueGuideModal({
       maxWidth="sm"
       fullWidth
       slotProps={{
+        backdrop: {
+          sx: {
+            backdropFilter: 'blur(4px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.45)',
+            transition: 'all 280ms cubic-bezier(0.16, 1, 0.3, 1) !important',
+          },
+        },
         paper: {
           sx: {
             borderRadius: 3,
             overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            transform: 'scale(1)',
+            transition: 'transform 280ms cubic-bezier(0.16, 1, 0.3, 1) !important',
           },
         },
       }}

@@ -73,6 +73,16 @@ const config: Config = {
         lg: "12px",
         xl: "16px",
       },
+      transitionTimingFunction: {
+        "smooth-out": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "spring-snappy": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "sheet": "cubic-bezier(0.32, 0.72, 0, 1)",
+      },
+      transitionDuration: {
+        "180": "180ms",
+        "280": "280ms",
+        "350": "350ms",
+      },
       animation: {
         "pulse-blue": "pulse-blue 2s ease-in-out infinite",
         "slide-in": "slide-in 200ms ease-out",

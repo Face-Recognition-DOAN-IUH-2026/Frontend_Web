@@ -34,7 +34,7 @@ interface ProfileDialogProps {
 }
 
 export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +47,16 @@ export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
         try {
           const userData = await api.getCurrentUser();
           setAvatarUrl(userData.avatar_url ?? null);
+          if (userData.avatar_url !== user.avatar_url) {
+            updateUser({ avatar_url: userData.avatar_url ?? null });
+          }
         } catch (err) {
           console.error("Failed to fetch user data", err);
         }
       };
       fetchUser();
     }
-  }, [open, user]);
+  }, [open, user, updateUser]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -66,6 +69,7 @@ export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
     try {
       const result = await api.uploadAvatar(file);
       setAvatarUrl(result.avatarUrl);
+      updateUser({ avatar_url: result.avatarUrl });
       setSuccess(true);
     } catch (err: any) {
       setError(getErrorMessage(err) || "Tải ảnh thất bại");
@@ -80,6 +84,7 @@ export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
     try {
       await api.deleteAvatar();
       setAvatarUrl(null);
+      updateUser({ avatar_url: null });
       setSuccess(true);
     } catch (err: any) {
       setError(getErrorMessage(err) || "Xóa ảnh thất bại");
@@ -121,7 +126,8 @@ export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
         >
           <Box sx={{ position: "relative" }}>
             <Avatar
-              src={avatarUrl || undefined}
+              src={avatarUrl || user?.avatar_url || undefined}
+              alt={user?.full_name || user?.email || "Avatar"}
               sx={{
                 width: 88,
                 height: 88,
@@ -136,7 +142,7 @@ export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
                 },
               }}
             >
-              {(user.full_name || user.email || "U").charAt(0).toUpperCase()}
+              {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
             </Avatar>
             <IconButton
               component="label"

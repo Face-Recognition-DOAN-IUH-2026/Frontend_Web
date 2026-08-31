@@ -381,15 +381,37 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<UserPublic> {
-    const response = await this.client.get<UserPublic>("/users/me");
-    return response.data;
+    const response = await this.client.get<any>("/users/me");
+    const u = response.data || {};
+    return {
+      ...u,
+      id: u.id,
+      email: u.email,
+      full_name: u.full_name ?? u.fullName ?? null,
+      role: u.role,
+      avatar_url: u.avatar_url ?? u.avatarUrl ?? null,
+      phone: u.phone ?? null,
+      permanent_address: u.permanent_address ?? u.permanentAddress ?? null,
+      student_code: u.student_code ?? u.studentCode ?? null,
+      class_name: u.class_name ?? u.className ?? null,
+      has_face: u.has_face ?? u.hasFace ?? false,
+    };
   }
 
   async uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
     const formData = new FormData();
     formData.append("avatar", file);
-    const response = await this.client.post<{ avatarUrl: string }>("/users/me/avatar", formData);
-    return response.data;
+    const response = await this.client.post<{ avatarUrl?: string; avatar_url?: string }>(
+      "/users/me/avatar",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    const avatarUrl = response.data.avatarUrl || response.data.avatar_url || "";
+    return { avatarUrl };
   }
 
   async deleteAvatar(): Promise<{ message: string }> {

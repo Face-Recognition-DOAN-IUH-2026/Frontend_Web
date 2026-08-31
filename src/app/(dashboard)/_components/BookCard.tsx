@@ -9,6 +9,8 @@ import {
   Chip,
   Divider,
 } from "@mui/material";
+import { motion } from "framer-motion";
+import { SPRINGS } from "@/lib/motion";
 
 export interface BookCardData {
   title: string;
@@ -38,16 +40,26 @@ export default function BookCard({
   onCancel,
 }: BookCardProps) {
   return (
-    <Card
-      sx={{
-        maxWidth: 360,
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
-        overflow: "hidden",
-        my: 1,
-      }}
+    <motion.div
+      whileHover={{ y: -4, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      transition={SPRINGS.gentle}
+      style={{ willChange: "transform" }}
     >
+      <Card
+        sx={{
+          maxWidth: 360,
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 2,
+          overflow: "hidden",
+          my: 1,
+          transition: "box-shadow 280ms cubic-bezier(0.16, 1, 0.3, 1)",
+          "&:hover": {
+            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+          },
+        }}
+      >
       {data.cover_url && (
         <CardMedia
           component="img"
@@ -125,6 +137,7 @@ export default function BookCard({
         </Box>
       </CardContent>
     </Card>
+    </motion.div>
   );
 }
 
