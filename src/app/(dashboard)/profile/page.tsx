@@ -36,10 +36,12 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import notification from "antd/es/notification";
+import { useAuth } from "@/lib/auth-context";
 
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 export default function ProfilePage() {
+  const { updateUser } = useAuth();
   const [apiAnt, contextHolder] = notification.useNotification();
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,9 @@ export default function ProfilePage() {
       setLoading(true);
       const data = await api.getCurrentUser();
       setUser(data);
+      if (data.avatar_url) {
+        updateUser({ avatar_url: data.avatar_url, full_name: data.full_name });
+      }
       setFormData({
         full_name: data.full_name || "",
         phone: (data as any).phone || "",
@@ -100,6 +105,7 @@ export default function ProfilePage() {
       setUploadingAvatar(true);
       const result = await api.uploadAvatar(file);
       setUser((prev) => prev ? { ...prev, avatar_url: result.avatarUrl } : prev);
+      updateUser({ avatar_url: result.avatarUrl });
       showNotice("success", "Cập nhật ảnh đại diện thành công!");
     } catch (error: any) {
       showNotice("error", getErrorMessage(error) || "Upload ảnh thất bại");
@@ -205,9 +211,10 @@ export default function ProfilePage() {
                   <input ref={avatarInputRef} type="file" accept="image/*" hidden onChange={handleAvatarUpload} />
                   <Avatar
                     src={user?.avatar_url || undefined}
-                    sx={{ width: 112, height: 112, fontSize: 48, bgcolor: "primary.main", border: "4px solid", borderColor: "divider" }}
+                    alt={user?.full_name || user?.email || "Avatar"}
+                    sx={{ width: 112, height: 112, fontSize: 44, fontWeight: 800, bgcolor: "primary.main", color: "white", border: "4px solid", borderColor: "divider" }}
                   >
-                    <PersonIcon sx={{ fontSize: 48 }} />
+                    {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
                   </Avatar>
                   <Box
                     className="avatar-overlay"

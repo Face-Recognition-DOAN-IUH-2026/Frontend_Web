@@ -72,6 +72,8 @@ export interface AuthContextType {
   accessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
   setAuthFromToken: (accessToken: string, refreshToken: string | null, email: string, role?: string) => void;
+  updateUser: (fields: Partial<AuthUser>) => void;
+  refreshUser: () => Promise<void>;
   logout: () => void;
   refreshAccessToken: () => Promise<boolean>;
   isAuthenticated: boolean;
