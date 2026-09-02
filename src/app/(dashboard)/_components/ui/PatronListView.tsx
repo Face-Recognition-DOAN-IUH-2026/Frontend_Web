@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Avatar, Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import DataTable, { type DataTableColumn } from "./DataTable";
-import { initials, statusLabel, statusColor } from "@/lib/utils";
+import AvatarUser from "./AvatarUser";
+import { statusLabel, statusColor } from "@/lib/utils";
 import type { PatronPublic } from "@/lib/types";
 
 interface PatronListViewProps {
@@ -24,9 +25,7 @@ export default function PatronListView({ patrons, onEdit, onRenew, onDelete, onR
       sortable: true,
       render: (_, row) => (
         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-          <Avatar sx={{ width: 32, height: 32, bgcolor: row.status === "active" ? "rgba(16,185,129,0.15)" : "rgba(100,116,139,0.15)", color: row.status === "active" ? "success.main" : "text.secondary", fontWeight: 700, fontSize: 13 }}>
-            {initials(row.full_name)}
-          </Avatar>
+          <AvatarUser user={row} role="patron" size={32} />
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>{row.full_name}</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>{row.student_code}</Typography>

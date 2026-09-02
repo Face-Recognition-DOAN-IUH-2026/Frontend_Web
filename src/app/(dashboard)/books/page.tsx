@@ -431,11 +431,45 @@ export default function BooksPage() {
     },
   ];
 
+  const outOfStockCount = books.filter((b) => b.available_copies === 0).length;
+
   const statItems = [
-    { label: "TỔNG ĐẦU SÁCH", value: stats.totalBooks, gradient: STAT_GRADIENT.books, icon: BookIcon, pct: total > 0 ? 100 : 0 },
-    { label: "TỔNG BẢN SAO", value: stats.totalCopies, gradient: STAT_GRADIENT.copies, icon: InventoryIcon, pct: stats.totalCopies > 0 ? Math.round((stats.totalCopies / (stats.totalCopies || 1)) * 100) : 0 },
-    { label: "SẴN SÀNG", value: stats.availableCopies, gradient: STAT_GRADIENT.available, icon: CheckIcon, pct: stats.totalCopies > 0 ? Math.round((stats.availableCopies / stats.totalCopies) * 100) : 0 },
-    { label: "ĐANG MƯỢN", value: stats.borrowedCopies, gradient: STAT_GRADIENT.borrowed, icon: AssignmentIcon, pct: stats.totalCopies > 0 ? Math.round((stats.borrowedCopies / stats.totalCopies) * 100) : 0 },
+    {
+      label: "SẴN SÀNG PHỤC VỤ",
+      value: stats.availableCopies,
+      gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+      icon: CheckIcon,
+      pct: stats.totalCopies > 0 ? Math.round((stats.availableCopies / stats.totalCopies) * 100) : 0,
+      delta: stats.totalCopies > 0 ? `${Math.round((stats.availableCopies / stats.totalCopies) * 100)}% tổng số ${stats.totalCopies.toLocaleString("vi-VN")} bản sao` : undefined,
+      deltaColor: "success" as const,
+    },
+    {
+      label: "ĐANG ĐƯỢC MƯỢN",
+      value: stats.borrowedCopies,
+      gradient: "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
+      icon: AssignmentIcon,
+      pct: stats.totalCopies > 0 ? Math.round((stats.borrowedCopies / stats.totalCopies) * 100) : 0,
+      delta: stats.totalCopies > 0 ? `Lưu thông: ${Math.round((stats.borrowedCopies / stats.totalCopies) * 100)}% kho sách` : undefined,
+      deltaColor: "default" as const,
+    },
+    {
+      label: "HẾT BẢN SAO",
+      value: outOfStockCount,
+      gradient: outOfStockCount > 0 ? "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)",
+      icon: AlertIcon,
+      pct: books.length > 0 ? Math.round((outOfStockCount / books.length) * 100) : 0,
+      delta: outOfStockCount > 0 ? `⚠ ${outOfStockCount} đầu sách cần bổ sung` : "✓ Tất cả đầu sách đều còn bản sao",
+      deltaColor: outOfStockCount > 0 ? ("error" as const) : ("success" as const),
+    },
+    {
+      label: "TỔNG ĐẦU SÁCH",
+      value: stats.totalBooks,
+      gradient: "linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)",
+      icon: BookIcon,
+      pct: 100,
+      delta: `${stats.totalCopies.toLocaleString("vi-VN")} tổng bản sao`,
+      deltaColor: "default" as const,
+    },
   ];
 
   return (
@@ -479,6 +513,8 @@ export default function BooksPage() {
             icon={item.icon}
             gradient={item.gradient}
             pct={item.pct}
+            delta={item.delta}
+            deltaColor={item.deltaColor}
             index={idx}
           />
         ))}

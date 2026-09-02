@@ -27,6 +27,9 @@ import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
+import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import notification from "antd/es/notification";
@@ -35,6 +38,7 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import type { ActivePatron, CameraEvent } from "@/lib/types";
 
 const ACTIVE_CAMERA_IDS = new Set(["entry_gate", "exit_gate", "kiosk"]);
@@ -80,12 +84,6 @@ function initials(name?: string) {
 function normalizeQuery(value: string) {
   return value.trim().toLowerCase();
 }
-
-const STAT_CARDS = [
-  { key: "entry_gate", label: "Cổng vào", icon: DoorFrontOutlinedIcon, gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)" },
-  { key: "exit_gate", label: "Cổng ra", icon: ExitToAppOutlinedIcon, gradient: "linear-gradient(135deg, #D97706 0%, #B45309 100%)" },
-  { key: "kiosk", label: "Kiosk", icon: TerminalOutlinedIcon, gradient: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)" },
-] as const;
 
 export default function ActivePage() {
   const [apiAnt, contextHolder] = notification.useNotification();
@@ -185,14 +183,6 @@ export default function ActivePage() {
     );
   }, [patrons, search]);
 
-  const cameraCounts = useMemo(() =>
-    patrons.reduce<Record<string, number>>((acc, p) => {
-      acc[p.camera_id] = (acc[p.camera_id] || 0) + 1;
-      return acc;
-    }, {}),
-    [patrons]
-  );
-
   const stalePatrons = useMemo(() => {
     const now = Date.now();
     return patrons.filter((p) => {
@@ -200,6 +190,29 @@ export default function ActivePage() {
       return hours > 8;
     });
   }, [patrons]);
+
+  // Chỉ số phục vụ nguyên tắc 5 giây
+  const LIBRARY_CAPACITY = 200; // Sức chứa tối đa phòng đọc
+  const activeCount = patrons.length;
+  const occupancyPct = Math.min(100, Math.round((activeCount / LIBRARY_CAPACITY) * 100));
+
+  const avgDurationMinutes = useMemo(() => {
+    if (patrons.length === 0) return 0;
+    const now = Date.now();
+    const totalMinutes = patrons.reduce((acc, p) => {
+      const diffMs = now - new Date(p.entered_at).getTime();
+      return acc + Math.max(0, Math.floor(diffMs / 60000));
+    }, 0);
+    return Math.round(totalMinutes / patrons.length);
+  }, [patrons]);
+
+  const avgDurationText = useMemo(() => {
+    if (avgDurationMinutes < 1) return "< 1 phút";
+    if (avgDurationMinutes < 60) return `${avgDurationMinutes} phút`;
+    const h = Math.floor(avgDurationMinutes / 60);
+    const m = avgDurationMinutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h} giờ`;
+  }, [avgDurationMinutes]);
 
   const handleForceExit = async () => {
     if (!exitPatron) return;
@@ -219,8 +232,9 @@ export default function ActivePage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title="Mượn đang hoạt động"
-        icon={AssignmentOutlinedIcon}
+        title="Độc giả đang có mặt"
+        subtitle="Giám sát phòng đọc thời gian thực qua hệ thống camera AI & cổng kiểm soát"
+        icon={PeopleIcon}
         gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
         statBadges={`${patrons.length} độc giả đang ở trong thư viện — cập nhật ${lastUpdate.toLocaleTimeString("vi-VN")}`}
         onRefresh={load}
@@ -236,18 +250,48 @@ export default function ActivePage() {
         }
       />
 
+      {/* Dãy KPI chuẩn 5 giây */}
       <Grid container spacing={2}>
-        {STAT_CARDS.map((cam, idx) => (
-          <Grid key={cam.key} size={{ xs: 12, sm: 4 }}>
-            <MuiStatCard
-              label={cam.label}
-              value={cameraCounts[cam.key] || 0}
-              icon={cam.icon}
-              gradient={cam.gradient}
-              index={idx}
-            />
-          </Grid>
-        ))}
+        {/* Card 1: Góc trên bên trái - Chỉ số cốt lõi nhất */}
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <MuiStatCard
+            label="Đang trong phòng đọc"
+            value={activeCount}
+            icon={UserCheckIcon}
+            gradient="linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%)"
+            pct={occupancyPct}
+            delta={`${occupancyPct}% sức chứa (${activeCount}/${LIBRARY_CAPACITY} chỗ)`}
+            deltaColor={occupancyPct >= 90 ? "error" : occupancyPct >= 75 ? "warning" : "default"}
+            index={0}
+          />
+        </Grid>
+
+        {/* Card 2: Cảnh báo lưu lại quá 8 giờ (Tô màu có mục đích) */}
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <MuiStatCard
+            label="Lưu lại quá 8 giờ"
+            value={stalePatrons.length}
+            icon={WarningAmberOutlinedIcon}
+            gradient={stalePatrons.length > 0 ? "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)"}
+            pct={activeCount > 0 ? Math.round((stalePatrons.length / activeCount) * 100) : 0}
+            delta={stalePatrons.length > 0 ? "⚠ Nghi vấn quên check-out, cần xử lý" : "✓ 0 độc giả quá thời gian quy định"}
+            deltaColor={stalePatrons.length > 0 ? "error" : "success"}
+            index={1}
+          />
+        </Grid>
+
+        {/* Card 3: Thời gian lưu lại trung bình */}
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <MuiStatCard
+            label="Thời gian lưu lại TB"
+            value={avgDurationText}
+            icon={AccessTimeOutlinedIcon}
+            gradient="linear-gradient(135deg, #0284C7 0%, #0369A1 100%)"
+            delta={activeCount > 0 ? `Tính trên ${activeCount} độc giả hiện diện` : "Chưa có lượt vào"}
+            deltaColor="default"
+            index={2}
+          />
+        </Grid>
       </Grid>
 
       {stalePatrons.length > 0 ? (
@@ -337,18 +381,7 @@ export default function ActivePage() {
 
                       <Box sx={{ pl: 2.5, pr: 2, py: 1.5 }}>
                         <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                          <Avatar
-                            sx={{
-                              width: 36,
-                              height: 36,
-                              fontSize: 13,
-                              fontWeight: 700,
-                              background: avatarGradient,
-                              color: "#fff",
-                            }}
-                          >
-                            {initials(patron.full_name)}
-                          </Avatar>
+                          <AvatarUser user={patron} role="patron" size={36} />
                           <Box sx={{ minWidth: 0, flex: 1 }}>
                             <Stack
                               direction="row"

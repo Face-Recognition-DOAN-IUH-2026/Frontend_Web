@@ -43,6 +43,7 @@ import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import notification from "antd/es/notification";
@@ -144,22 +145,59 @@ export default function AdminPage() {
   const staffCount  = users.filter((u) => u.role === "staff").length;
   const patronCount = users.filter((u) => u.role === "patron").length;
   const faceCount   = users.filter((u) => u.has_face).length;
+  const noFaceCount = Math.max(0, total - faceCount);
+  const faceRate    = total > 0 ? Math.round((faceCount / total) * 100) : 0;
 
-  const STATS: { key: string; label: string; value: number; icon: any; gradient: string; pct: number }[] = [
-    { key: "total",  label: "Tổng người dùng",  value: total,       icon: GroupsOutlinedIcon,                    gradient: STAT_GRADIENT.total,  pct: 100 },
-    { key: "admin",  label: "Quản trị viên",    value: adminCount,  icon: AdminPanelSettingsOutlinedIcon,         gradient: STAT_GRADIENT.admin,  pct: total ? (adminCount / total) * 100 : 0 },
-    { key: "staff",  label: "Nhân viên",         value: staffCount,  icon: PersonOutlineOutlinedIcon,              gradient: STAT_GRADIENT.staff,  pct: total ? (staffCount / total) * 100 : 0 },
-    { key: "patron", label: "Độc giả",           value: patronCount, icon: AccountBoxOutlinedIcon,                 gradient: STAT_GRADIENT.patron, pct: total ? (patronCount / total) * 100 : 0 },
-    { key: "face",   label: "Đã có khuôn mặt",  value: faceCount,   icon: FaceRetouchingNaturalOutlinedIcon,     gradient: STAT_GRADIENT.face,   pct: total ? (faceCount / total) * 100 : 0 },
+  const STATS: { key: string; label: string; value: number | string; icon: any; gradient: string; pct?: number; delta?: string; deltaColor?: "success" | "warning" | "error" | "default" }[] = [
+    {
+      key: "face",
+      label: "Đã có khuôn mặt (AI)",
+      value: faceCount,
+      icon: FaceRetouchingNaturalOutlinedIcon,
+      gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+      pct: faceRate,
+      delta: total > 0 ? `${faceRate}% đã kích hoạt Face-ID` : undefined,
+      deltaColor: "success",
+    },
+    {
+      key: "noface",
+      label: "Chưa có khuôn mặt",
+      value: noFaceCount,
+      icon: AccountBoxOutlinedIcon,
+      gradient: noFaceCount > 0 ? "linear-gradient(135deg, #D97706 0%, #B45309 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)",
+      pct: total > 0 ? Math.round((noFaceCount / total) * 100) : 0,
+      delta: noFaceCount > 0 ? `⚠ ${noFaceCount} người chưa thể nhận diện AI` : "✓ 100% đã đăng ký khuôn mặt",
+      deltaColor: noFaceCount > 0 ? "warning" : "success",
+    },
+    {
+      key: "total",
+      label: "Tổng người dùng",
+      value: total,
+      icon: GroupsOutlinedIcon,
+      gradient: "linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)",
+      pct: 100,
+      delta: `${patronCount} độc giả sinh viên / giảng viên`,
+      deltaColor: "default",
+    },
+    {
+      key: "staff",
+      label: "Đội ngũ quản trị & nhân viên",
+      value: adminCount + staffCount,
+      icon: SupervisorAccountOutlinedIcon,
+      gradient: "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
+      pct: total > 0 ? Math.round(((adminCount + staffCount) / total) * 100) : 0,
+      delta: `${adminCount} Admin · ${staffCount} Nhân viên trực`,
+      deltaColor: "default",
+    },
   ];
 
-  const statBadges = `${total} người dùng · ${adminCount} admin · ${staffCount} nhân viên · ${patronCount} độc giả · ${faceCount} đã có khuôn mặt`;
+  const statBadges = `${total} người dùng · ${faceCount} đã có khuôn mặt (${faceRate}%) · ${adminCount} admin · ${staffCount} nhân viên`;
 
   return (
     <Stack spacing={3}>
       <PageHeader
         title="Quản trị người dùng"
-        subtitle="Tạo tài khoản admin/staff và theo dõi trạng thái sinh trắc học."
+        subtitle="Tạo tài khoản admin/staff và theo dõi tỷ lệ bao phủ sinh trắc học khuôn mặt AI."
         icon={AdminPanelSettingsOutlinedIcon}
         gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
         statBadges={statBadges}
@@ -178,13 +216,15 @@ export default function AdminPage() {
 
       <Grid container spacing={2}>
         {STATS.map((s, idx) => (
-          <Grid key={s.key} size={{ xs: 12, sm: 6, md: 4, lg: 2.4 } as any}>
+          <Grid key={s.key} size={{ xs: 12, sm: 6, lg: 3 }}>
             <MuiStatCard
               label={s.label}
               value={s.value}
               icon={s.icon}
               gradient={s.gradient}
               pct={s.pct}
+              delta={s.delta}
+              deltaColor={s.deltaColor}
               index={idx}
             />
           </Grid>
@@ -275,24 +315,7 @@ export default function AdminPage() {
                   >
                     <TableCell>
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                        <Avatar
-                          src={item.avatar_url || undefined}
-                          sx={{
-                            width: 38, height: 38,
-                            background: item.avatar_url ? "transparent" : (
-                              item.role === "admin"
-                                ? STAT_GRADIENT.admin
-                                : item.role === "staff"
-                                ? STAT_GRADIENT.staff
-                                : STAT_GRADIENT.patron
-                            ),
-                            fontWeight: 800,
-                            fontSize: 14,
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                          }}
-                        >
-                          {!item.avatar_url ? initials(item.full_name || item.email) : null}
-                        </Avatar>
+                        <AvatarUser user={item} size={38} />
                         <Box sx={{ minWidth: 0 }}>
                           <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }} noWrap>
                             {item.email}

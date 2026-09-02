@@ -37,6 +37,7 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import notification from "antd/es/notification";
 import { useAuth } from "@/lib/auth-context";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
@@ -209,13 +210,12 @@ export default function ProfilePage() {
                   sx={{ position: "relative", cursor: "pointer", "&:hover .avatar-overlay": { opacity: 1 } }}
                 >
                   <input ref={avatarInputRef} type="file" accept="image/*" hidden onChange={handleAvatarUpload} />
-                  <Avatar
-                    src={user?.avatar_url || undefined}
-                    alt={user?.full_name || user?.email || "Avatar"}
-                    sx={{ width: 112, height: 112, fontSize: 44, fontWeight: 800, bgcolor: "primary.main", color: "white", border: "4px solid", borderColor: "divider" }}
-                  >
-                    {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
-                  </Avatar>
+                  <AvatarUser
+                    user={user}
+                    size={112}
+                    border="4px solid rgba(255,255,255,0.85)"
+                    sx={{ fontSize: "2.4rem" }}
+                  />
                   <Box
                     className="avatar-overlay"
                     sx={{

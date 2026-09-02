@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Avatar,
   Box,
@@ -22,7 +22,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { useAuth } from "@/lib/auth-context";
-import { useRouter } from "next/navigation";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import BarChartIcon from "@mui/icons-material/BarChartOutlined";
@@ -264,20 +264,7 @@ export default function Sidebar() {
           }}
           onClick={() => router.push("/profile")}
         >
-          <Avatar
-            src={user?.avatar_url || undefined}
-            sx={{
-              width: 34,
-              height: 34,
-              flexShrink: 0,
-              bgcolor: "primary.main",
-              color: "white",
-              fontSize: "0.85rem",
-              fontWeight: 700,
-            }}
-          >
-            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
-          </Avatar>
+          <AvatarUser user={user} size={34} />
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography
               variant="body2"

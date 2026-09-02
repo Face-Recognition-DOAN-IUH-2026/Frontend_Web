@@ -9,6 +9,7 @@ import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
 import BadgeIcon from "@mui/icons-material/BadgeOutlined";
+import AvatarUser from "./AvatarUser";
 import { initials, statusLabel, statusColor } from "@/lib/utils";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import type { PatronPublic } from "@/lib/types";
@@ -43,9 +44,7 @@ export default function PatronGridView({ patrons, onEdit, onRenew, onDelete, onR
             <Box sx={{ height: 4, background: patron.status === "active" ? STAT_GRADIENT.active : patron.status === "expired" ? STAT_GRADIENT.expired : "linear-gradient(135deg, #64748b 0%, #475569 100%)" }} />
             <Box sx={{ p: 2.5 }}>
               <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", mb: 2 }}>
-                <Avatar sx={{ width: 44, height: 44, bgcolor: patron.status === "active" ? "rgba(16,185,129,0.15)" : patron.status === "expired" ? "rgba(245,158,11,0.15)" : "rgba(100,116,139,0.15)", color: patron.status === "active" ? "success.main" : patron.status === "expired" ? "warning.main" : "text.secondary", fontWeight: 700, fontSize: 16 }}>
-                  {initials(patron.full_name)}
-                </Avatar>
+                <AvatarUser user={patron} role="patron" size={44} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{patron.full_name}</Typography>
                   <Typography variant="caption" sx={{ fontFamily: "monospace", color: "text.secondary" }}>{patron.student_code}</Typography>

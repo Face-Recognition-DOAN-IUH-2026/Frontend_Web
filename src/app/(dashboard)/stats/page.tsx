@@ -327,54 +327,54 @@ export default function StatsPage() {
             }
           />
 
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)", xl: "repeat(6, 1fr)" }, gap: 2 }}>
+          {/* Dãy KPI chuẩn 5 giây */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
+            {/* Card 1 (Top-Left): Chỉ số cốt lõi nhất - Đang có mặt & Sức chứa */}
             <MuiStatCard
               label="Đang trong thư viện"
               value={activePatrons.length}
               icon={UserIcon}
-              gradient={STAT_GRADIENT.active}
-              pct={stats.total_patrons ? (activePatrons.length / stats.total_patrons) * 100 : 0}
+              gradient="linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%)"
+              pct={Math.min(100, Math.round((activePatrons.length / 200) * 100))}
+              delta={`${Math.min(100, Math.round((activePatrons.length / 200) * 100))}% sức chứa (${activePatrons.length}/200 chỗ)`}
+              deltaColor={activePatrons.length / 200 >= 0.9 ? "error" : activePatrons.length / 200 >= 0.75 ? "warning" : "default"}
               index={0}
             />
+
+            {/* Card 2: Lưu lượng vào hôm nay & Mốc so sánh với lượt ra + TB tuần */}
             <MuiStatCard
-              label="Vào hôm nay"
+              label="Lượt vào hôm nay"
               value={stats.today_entries}
               icon={LoginIcon}
-              gradient={STAT_GRADIENT.entry}
-              pct={stats.today_entries ? Math.min((stats.today_entries / (stats.total_patrons || 1)) * 100, 100) : 0}
+              gradient="linear-gradient(135deg, #0284C7 0%, #0369A1 100%)"
+              pct={(stats.today_entries + stats.today_exits) > 0 ? Math.round((stats.today_entries / (stats.today_entries + stats.today_exits)) * 100) : undefined}
+              delta={`Đã ra: ${stats.today_exits} · TB tuần: ${weeklyAvg}/ngày`}
+              deltaColor="default"
               index={1}
             />
+
+            {/* Card 3: Sách đang mượn & Cảnh báo quá hạn (Tô màu có mục đích) */}
             <MuiStatCard
-              label="Ra hôm nay"
-              value={stats.today_exits}
-              icon={LogoutIcon}
-              gradient={STAT_GRADIENT.exit}
-              pct={stats.today_exits ? Math.min((stats.today_exits / (stats.total_patrons || 1)) * 100, 100) : 0}
+              label="Sách đang mượn"
+              value={borrowStats?.active ?? "—"}
+              icon={BookIcon}
+              gradient={borrowStats && borrowStats.overdue > 0 ? STAT_GRADIENT.overdue : "linear-gradient(135deg, #475569 0%, #334155 100%)"}
+              pct={borrowStats?.total ? Math.min(100, Math.round((borrowStats.active / borrowStats.total) * 100)) : undefined}
+              delta={borrowStats ? (borrowStats.overdue > 0 ? `⚠ ${borrowStats.overdue} cuốn quá hạn cần thu hồi` : "✓ 0 sách quá hạn") : undefined}
+              deltaColor={borrowStats && borrowStats.overdue > 0 ? "error" : "success"}
               index={2}
             />
-            <MuiStatCard
-              label="Hoạt động hôm nay"
-              value={todayLogs.length}
-              icon={ChartIcon}
-              gradient={STAT_GRADIENT.activity}
-              pct={100}
-              index={3}
-            />
+
+            {/* Card 4: Tổng lượt mượn tích lũy */}
             <MuiStatCard
               label="Tổng lượt mượn"
               value={borrowStats?.total ?? "—"}
               icon={BookIcon}
-              gradient={STAT_GRADIENT.borrow}
-              pct={borrowStats?.total ? Math.min((borrowStats.active / borrowStats.total) * 100, 100) : 0}
-              index={4}
-            />
-            <MuiStatCard
-              label="Đang mượn"
-              value={borrowStats?.active ?? "—"}
-              icon={BookIcon}
-              gradient={STAT_GRADIENT.borrow_ok}
-              pct={borrowStats?.active ? Math.min((borrowStats.active / (borrowStats.total || 1)) * 100, 100) : 0}
-              index={5}
+              gradient="linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)"
+              pct={100}
+              delta={borrowStats ? `Đang lưu thông: ${borrowStats.active} cuốn` : undefined}
+              deltaColor="default"
+              index={3}
             />
           </Box>
 
