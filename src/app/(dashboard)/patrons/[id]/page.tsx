@@ -50,6 +50,7 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { initials, formatDate, formatDateTime, statusLabel, statusColor } from "@/lib/utils";
@@ -315,22 +316,13 @@ export default function PatronDetailPage() {
                   }}
                 />
                 <Box sx={{ px: 2.5, pb: 2.5, mt: -5, textAlign: "center" }}>
-                  <Avatar
-                    sx={{
-                      width: 80,
-                      height: 80,
-                      mx: "auto",
-                      bgcolor: patron.status === "active" ? "rgba(16,185,129,0.15)" : "rgba(100,116,139,0.15)",
-                      color: patron.status === "active" ? "success.main" : "text.secondary",
-                      fontWeight: 700,
-                      fontSize: 28,
-                      border: "4px solid",
-                      borderColor: "background.paper",
-                      boxShadow: 2,
-                    }}
-                  >
-                    {initials(patron.full_name)}
-                  </Avatar>
+                  <AvatarUser
+                    user={patron}
+                    role="patron"
+                    size={80}
+                    border="4px solid rgba(255,255,255,0.9)"
+                    sx={{ mx: "auto", boxShadow: 2, fontSize: "1.8rem" }}
+                  />
 
                   <Typography variant="h6" sx={{ fontWeight: 800, mt: 1.5 }}>{patron.full_name}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>{patron.student_code}</Typography>

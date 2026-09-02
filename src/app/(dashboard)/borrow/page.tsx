@@ -48,6 +48,7 @@ import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { getAlertSeverity, getAlertTitle } from "@/lib/alert-utils";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import type { BookInfo } from "@/lib/types";
 
 interface BorrowCartItem {
@@ -571,16 +572,7 @@ export default function BorrowPage() {
                   >
                     <Stack spacing={2}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                        <Avatar
-                          sx={{
-                            width: 48,
-                            height: 48,
-                            background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-                            boxShadow: "0 4px 12px rgba(99,102,241,0.3)",
-                          }}
-                        >
-                          {patronName?.[0]?.toUpperCase() || "?"}
-                        </Avatar>
+                        <AvatarUser name={patronName || patronId} role="patron" size={48} />
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography variant="subtitle1" sx={{ fontWeight: 800 }} noWrap>
                             {patronName || patronId}

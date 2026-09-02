@@ -27,6 +27,7 @@ import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import { useAuth } from "@/lib/auth-context";
 import api from "@/lib/api-client";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 
 interface ProfileDialogProps {
   open: boolean;
@@ -125,25 +126,22 @@ export default function ProfileDialog({ open, onClose }: ProfileDialogProps) {
           }}
         >
           <Box sx={{ position: "relative" }}>
-            <Avatar
-              src={avatarUrl || user?.avatar_url || undefined}
-              alt={user?.full_name || user?.email || "Avatar"}
+            <AvatarUser
+              avatarUrl={avatarUrl || user?.avatar_url}
+              name={user?.full_name}
+              email={user?.email}
+              role={user?.role}
+              size={88}
+              border="3px solid rgba(255,255,255,0.85)"
               sx={{
-                width: 88,
-                height: 88,
-                fontSize: "2.5rem",
-                fontWeight: 900,
-                bgcolor: "primary.main",
-                color: "primary.contrastText",
+                fontSize: "2.2rem",
                 transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 "&:hover": {
                   transform: "scale(1.03)",
-                  boxShadow: `0 0 0 3px ${"primary.main"}40`,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
                 },
               }}
-            >
-              {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
-            </Avatar>
+            />
             <IconButton
               component="label"
               size="small"

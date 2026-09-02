@@ -49,6 +49,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return match ? decodeURIComponent(match[1]) : null;
   }
 
+  const updateUser = useCallback((fields: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...fields };
+      try {
+        localStorage.setItem("user", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const currentUser = await api.getCurrentUser();
+      if (currentUser) {
+        updateUser({
+          full_name: currentUser.full_name,
+          avatar_url: currentUser.avatar_url ?? null,
+          role: currentUser.role,
+        });
+      }
+    } catch {
+      // Ignore network errors on background profile refresh
+    }
+  }, [updateUser]);
+
   const loadUserFromStorage = useCallback(() => {
     if (typeof window === "undefined") return;
 
@@ -82,6 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUser(recovered);
             }
           }
+          // Background sync to ensure avatar_url and latest profile details are up to date!
+          refreshUser();
         }
       } catch {
         document.cookie = "access_token=; path=/; max-age=0";
@@ -97,11 +125,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     setIsLoading(false);
-  }, []);
+  }, [refreshUser]);
 
   useEffect(() => {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
+
+  useEffect(() => {
+    if (accessToken) {
+      refreshUser();
+    }
+  }, [accessToken, refreshUser]);
 
   const login = async (email: string, password: string) => {
     const data: LoginRequest = { email, password };
@@ -129,6 +163,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     assertWebRole(userData.role);
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
+
+    // Sync avatar_url and details immediately from backend
+    try {
+      const currentUser = await api.getCurrentUser();
+      if (currentUser) {
+        const enriched: AuthUser = {
+          ...userData,
+          full_name: currentUser.full_name || userData.full_name,
+          avatar_url: currentUser.avatar_url ?? null,
+          role: currentUser.role || userData.role,
+        };
+        localStorage.setItem("user", JSON.stringify(enriched));
+        setUser(enriched);
+      }
+    } catch {
+      // ignore
+    }
   };
 
   const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
@@ -149,33 +200,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(userData));
     setAccessToken(accessToken);
     setUser(userData);
+
+    refreshUser();
   };
-
-  const updateUser = useCallback((fields: Partial<AuthUser>) => {
-    setUser((prev) => {
-      if (!prev) return null;
-      const updated = { ...prev, ...fields };
-      try {
-        localStorage.setItem("user", JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-  }, []);
-
-  const refreshUser = useCallback(async () => {
-    try {
-      const currentUser = await api.getCurrentUser();
-      if (currentUser) {
-        updateUser({
-          full_name: currentUser.full_name,
-          avatar_url: currentUser.avatar_url,
-          role: currentUser.role,
-        });
-      }
-    } catch {
-      // Ignore network errors on background profile refresh
-    }
-  }, [updateUser]);
 
   const logout = async () => {
     try {

@@ -43,6 +43,7 @@ import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { getAlertSeverity, getAlertTitle } from "@/lib/alert-utils";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
@@ -460,9 +461,7 @@ export default function ReturnPage() {
                     }}
                   >
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                      <Avatar sx={{ width: 36, height: 36, bgcolor: hasOverdue ? "error.main" : "success.main", fontSize: 13, fontWeight: 700 }}>
-                        {borrowerName(borrower)[0]?.toUpperCase() || "?"}
-                      </Avatar>
+                      <AvatarUser user={borrower.patron} name={borrowerName(borrower)} role="patron" size={36} />
                       <Box sx={{ minWidth: 0, flex: 1 }}>
                         <Typography sx={{ fontWeight: 900, fontSize: 14 }} noWrap>{borrowerName(borrower)}</Typography>
                         <Typography variant="caption" sx={{ fontFamily: "monospace", display: "block" }}>

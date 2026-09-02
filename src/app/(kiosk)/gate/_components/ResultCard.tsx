@@ -91,15 +91,17 @@ export default function ResultCard({ status, patronInfo, message }: ResultCardPr
 
         {patronInfo && (
           <Box sx={{ mb: 2 }}>
-            <Typography variant="h4" color="common.white" sx={{ fontWeight: 700 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "text.primary" }}>
               {patronInfo.fullName}
             </Typography>
-            <Typography variant="h6" color="primary.light" sx={{ fontFamily: "monospace" }}>
+            <Typography variant="subtitle1" color="primary.main" sx={{ fontFamily: "monospace", fontWeight: 700 }}>
               {patronInfo.mssv}
             </Typography>
-            <Typography variant="body1" color="grey.400">
-              {patronInfo.faculty}
-            </Typography>
+            {patronInfo.faculty && (
+              <Typography variant="body2" color="text.secondary">
+                {patronInfo.faculty}
+              </Typography>
+            )}
           </Box>
         )}
 

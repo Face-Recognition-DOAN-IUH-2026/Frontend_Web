@@ -25,6 +25,7 @@ import { useColorMode } from "@/lib/mui-theme";
 import api from "@/lib/api-client";
 import Sidebar from "@/app/(dashboard)/_components/Sidebar";
 import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationDropdown";
+import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();
@@ -111,12 +112,7 @@ function Topbar({ user }: { user: any }) {
             </IconButton>
           </Tooltip>
           <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", pl: 1.5, borderLeft: `1px solid ${theme.palette.divider}` }}>
-            <Avatar
-              src={user?.avatar_url || undefined}
-              sx={{ width: 34, height: 34, flexShrink: 0, bgcolor: "primary.main", color: "primary.contrastText" }}
-            >
-              {(user?.full_name || "A").charAt(0).toUpperCase()}
-            </Avatar>
+            <AvatarUser user={user} size={34} />
             <Box sx={{ display: { xs: "none", sm: "block" }, minWidth: 0, maxWidth: 160 }}>
               <Typography variant="body2" sx={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user?.full_name || "Admin"}

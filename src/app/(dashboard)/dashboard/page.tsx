@@ -24,6 +24,8 @@ import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import HistoryIcon from "@mui/icons-material/HistoryOutlined";
+import MenuBookIcon from "@mui/icons-material/MenuBookOutlined";
+import VideocamIcon from "@mui/icons-material/VideocamOutlined";
 import { useAuth } from "@/lib/auth-context";
 import { slideInRight, successPop } from "@/lib/animations";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
@@ -66,6 +68,35 @@ export default function DashboardPage() {
   }, [isLoading, isAuthenticated, router]);
 
   const stats = data.stats;
+  const borrowStats = data.borrowStats;
+  const cameras = data.cameraStatuses;
+
+  // 1. Góc trên bên trái: Hiện diện thực tế (Active Patrons / Sức chứa phòng đọc)
+  const LIBRARY_CAPACITY = 200; // Sức chứa danh định phòng đọc
+  const activeCount = stats?.active_patrons ?? 0;
+  const occupancyPct = stats?.active_patrons != null
+    ? Math.min(100, Math.round((activeCount / LIBRARY_CAPACITY) * 100))
+    : undefined;
+
+  // 2. Lưu lượng ra/vào hôm nay & mốc so sánh
+  const todayEntries = stats?.today_entries ?? 0;
+  const todayExits = stats?.today_exits ?? 0;
+  const totalFlow = todayEntries + todayExits;
+  const entryPct = totalFlow > 0 ? Math.round((todayEntries / totalFlow) * 100) : undefined;
+
+  // 3. Tình trạng mượn sách & Cảnh báo quá hạn (Tô màu có mục đích)
+  const activeBorrows = borrowStats?.active ?? 0;
+  const overdueBorrows = borrowStats?.overdue ?? 0;
+  const hasOverdue = overdueBorrows > 0;
+  const borrowPct = borrowStats?.total && borrowStats.total > 0
+    ? Math.min(100, Math.round((activeBorrows / borrowStats.total) * 100))
+    : undefined;
+
+  // 4. Trạng thái hạ tầng AI (Camera & Cổng)
+  const totalCams = cameras.length;
+  const onlineCams = cameras.filter((c) => c.connected && c.running).length;
+  const allCamsOnline = totalCams > 0 && onlineCams === totalCams;
+  const hasOfflineCams = totalCams > 0 && onlineCams < totalCams;
 
   if (isLoading || !isAuthenticated) {
     return <LoadingOverlay loading message="Đang tải..." />;
@@ -81,20 +112,66 @@ export default function DashboardPage() {
         liveConnected={!!stats}
       />
 
+      {/* Dãy chỉ số KPI tuân thủ quy tắc 5 giây */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
-        <MuiStatCard label="Tổng độc giả" value={stats?.total_patrons ?? "—"} icon={UsersIcon} gradient="linear-gradient(135deg, #1E6091 0%, #154E78 100%)" pct={100} index={0} />
-        <MuiStatCard label="Đang có mặt" value={stats?.active_patrons ?? "—"} icon={UserCheckIcon} gradient="linear-gradient(135deg, #059669 0%, #047857 100%)" pct={stats?.total_patrons ? (stats.active_patrons / stats.total_patrons) * 100 : 0} index={1} />
-        <MuiStatCard label="Lượt vào hôm nay" value={stats?.today_entries ?? "—"} icon={LoginIcon} gradient="linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" pct={100} index={2} />
-        <MuiStatCard label="Lượt ra hôm nay" value={stats?.today_exits ?? "—"} icon={LogoutIcon} gradient="linear-gradient(135deg, #D97706 0%, #B45309 100%)" pct={100} index={3} />
+        {/* Card 1 (Top-Left): Chỉ số sinh mạng tức thì - Đang có mặt & Sức chứa */}
+        <MuiStatCard
+          label="Đang có mặt"
+          value={stats?.active_patrons ?? "—"}
+          icon={UserCheckIcon}
+          gradient="linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%)"
+          pct={occupancyPct}
+          delta={occupancyPct != null ? `${occupancyPct}% sức chứa (${activeCount}/${LIBRARY_CAPACITY} chỗ)` : undefined}
+          deltaColor={occupancyPct && occupancyPct >= 90 ? "error" : occupancyPct && occupancyPct >= 75 ? "warning" : "default"}
+          index={0}
+        />
+
+        {/* Card 2: Lưu lượng check-in hôm nay kèm mốc đối chiếu lượt ra */}
+        <MuiStatCard
+          label="Lượt vào hôm nay"
+          value={stats?.today_entries ?? "—"}
+          icon={LoginIcon}
+          gradient="linear-gradient(135deg, #0284C7 0%, #0369A1 100%)"
+          pct={entryPct}
+          delta={stats ? `Đã check-out: ${todayExits} lượt` : undefined}
+          deltaColor="default"
+          index={1}
+        />
+
+        {/* Card 3: Sách đang mượn - Chỉ dùng đỏ khi có sách quá hạn */}
+        <MuiStatCard
+          label="Sách đang mượn"
+          value={borrowStats ? activeBorrows : "—"}
+          icon={MenuBookIcon}
+          gradient={hasOverdue ? "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)"}
+          pct={borrowPct}
+          delta={borrowStats ? (hasOverdue ? `⚠ ${overdueBorrows} cuốn quá hạn cần thu hồi` : "✓ 0 quá hạn (Đúng hạn)") : undefined}
+          deltaColor={hasOverdue ? "error" : "success"}
+          index={2}
+        />
+
+        {/* Card 4: Hạ tầng AI - Xanh lá khi 100% online, Đỏ khi có thiết bị ngắt kết nối */}
+        <MuiStatCard
+          label="Camera & Cổng AI"
+          value={totalCams > 0 ? `${onlineCams}/${totalCams} Online` : "—"}
+          icon={VideocamIcon}
+          gradient={hasOfflineCams ? "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)" : allCamsOnline ? "linear-gradient(135deg, #059669 0%, #047857 100%)" : "linear-gradient(135deg, #64748B 0%, #475569 100%)"}
+          pct={totalCams > 0 ? Math.round((onlineCams / totalCams) * 100) : undefined}
+          delta={totalCams > 0 ? (allCamsOnline ? "● 100% thiết bị hoạt động bình thường" : `⚠ ${totalCams - onlineCams} thiết bị mất kết nối`) : "Chưa có thiết bị"}
+          deltaColor={allCamsOnline ? "success" : hasOfflineCams ? "error" : "default"}
+          index={3}
+        />
       </Box>
 
+      {/* Hàng 2: Trọng tâm giám sát mật độ cao điểm & Tác nghiệp mượn trả */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
         <HourlyActivityChart logs={data.hourlyLogs} loading={data.loading} />
-        <CameraStatusGrid cameras={data.cameraStatuses} loading={data.loading} />
+        <BorrowSummaryCard borrowStats={data.borrowStats} borrows={data.activeBorrows} loading={data.loading} />
       </Box>
 
+      {/* Hàng 3: Giám sát chi tiết Camera & Nhật ký ra vào thời gian thực */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
-        <BorrowSummaryCard borrowStats={data.borrowStats} borrows={data.activeBorrows} loading={data.loading} />
+        <CameraStatusGrid cameras={data.cameraStatuses} loading={data.loading} />
 
         <DashboardCard
           title="Hoạt động gần đây"

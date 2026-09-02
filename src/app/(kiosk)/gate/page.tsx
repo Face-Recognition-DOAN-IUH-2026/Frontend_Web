@@ -31,9 +31,11 @@ import PersonSearchOutlinedIcon from "@mui/icons-material/PersonSearchOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import GateIcon from "@mui/icons-material/VideocamOutlined";
+import Divider from "@mui/material/Divider";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import CameraFeed from "@/app/(kiosk)/gate/_components/CameraFeed";
+import ResultCard from "@/app/(kiosk)/gate/_components/ResultCard";
 import { useColorMode } from "@/lib/mui-theme";
 import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
 import type { AccessLogPublic, CameraEvent, KioskResult, PatronLookupResult } from "@/lib/types";
@@ -149,6 +151,19 @@ export default function GatePage() {
   const [entryOverlay, setEntryOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
   const [exitOverlay, setExitOverlay] = useState<{ bbox?: [number, number, number, number]; landmarks?: [number, number][]; status?: string } | null>(null);
   const [todayCounts, setTodayCounts] = useState<TodayCounts>({ entries: 0, exits: 0, no_match: 0, spoof: 0 });
+  const [activePatrons, setActivePatrons] = useState<number>(0);
+  const [lastScanEvent, setLastScanEvent] = useState<{
+    status: "granted" | "denied" | "spoof" | "no_match";
+    type: "entry" | "exit";
+    name?: string;
+    studentCode?: string;
+    confidence?: number | null;
+    timestamp: number;
+  } | null>(null);
+
+  const LIBRARY_CAPACITY = 200;
+  const occupancyPct = Math.min(100, Math.round((activePatrons / LIBRARY_CAPACITY) * 100));
+  const isRecentScanActive = !!(lastScanEvent && Date.now() - lastScanEvent.timestamp < 6000);
 
   useEffect(() => {
     const cached = window.localStorage.getItem("gate_today_counts");
@@ -351,6 +366,7 @@ export default function GatePage() {
       if (!stats) return;
       const fresh: TodayCounts = { entries: stats.today_entries ?? 0, exits: stats.today_exits ?? 0, no_match: 0, spoof: 0 };
       setTodayCounts(fresh);
+      setActivePatrons(stats.active_patrons ?? Math.max(0, (stats.today_entries ?? 0) - (stats.today_exits ?? 0)));
       localStorage.setItem("gate_today_counts", JSON.stringify(fresh));
     }).catch(() => {});
   }, []);
@@ -397,20 +413,41 @@ export default function GatePage() {
         playGateSound("granted");
         addRecentLog(buildLogFromEvent(event));
         showToast(
-          type === "entry" ? "success" : "warning",
+          type === "entry" ? "success" : "info",
           `${event.full_name || "Độc giả"} - ${type === "entry" ? "Vào" : "Ra"} thư viện`,
         );
         setTodayCounts((prev) => ({
           ...prev,
           [type === "entry" ? "entries" : "exits"]: prev[type === "entry" ? "entries" : "exits"] + 1,
         }));
+        setActivePatrons((prev) => (type === "entry" ? prev + 1 : Math.max(0, prev - 1)));
+        setLastScanEvent({
+          status: "granted",
+          type,
+          name: event.full_name || undefined,
+          studentCode: event.student_code || undefined,
+          confidence: event.score ?? null,
+          timestamp: Date.now(),
+        });
       } else if (event.status === "no_match") {
         setTodayCounts((prev) => ({ ...prev, no_match: prev.no_match + 1 }));
         showToast("info", "Khuôn mặt mới - không nhận diện được.");
+        setLastScanEvent({
+          status: "no_match",
+          type: event.access_type === "exit" ? "exit" : "entry",
+          confidence: event.score ?? null,
+          timestamp: Date.now(),
+        });
       } else if (event.status === "spoof") {
         playGateSound("denied");
         setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
         showToast("error", "Phát hiện giả mạo!");
+        setLastScanEvent({
+          status: "spoof",
+          type: event.access_type === "exit" ? "exit" : "entry",
+          confidence: event.score ?? null,
+          timestamp: Date.now(),
+        });
       }
     });
     return cleanup;
@@ -427,7 +464,7 @@ export default function GatePage() {
     type: "entry" | "exit",
   ) => {
     const Icon = type === "entry" ? LoginOutlinedIcon : LogoutOutlinedIcon;
-    const color = type === "entry" ? "success" : "warning";
+    const color = type === "entry" ? "success" : "info";
 
     return (
       <Paper variant="outlined" sx={{ overflow: "hidden", height: "100%" }}>
@@ -491,10 +528,10 @@ export default function GatePage() {
           </Button>
           <Box
             sx={{
-              p: 3,
+              p: { xs: 2, sm: 2.5 },
               borderRadius: 3,
-              background: "linear-gradient(135deg, #0F3C5C 0%, #1E6091 50%, #2980B9 100%)",
-              border: "1px solid rgba(255,255,255,0.12)",
+              background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+              color: "white",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -502,11 +539,13 @@ export default function GatePage() {
               gap: 2,
               position: "relative",
               overflow: "hidden",
+              boxShadow: "0 10px 25px -5px rgba(30, 27, 75, 0.4)",
             }}
           >
             <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.06)", pointerEvents: "none" }} />
             <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
 
+            {/* Trái: Logo + Tên Cổng + Badge AI Live */}
             <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
               <Box
                 component="img"
@@ -522,22 +561,48 @@ export default function GatePage() {
                 }}
               />
               <Box>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: "#FFFFFF" }}>CỔNG KIỂM SOÁT THƯ VIỆN IUH</Typography>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: "#FFFFFF" }}>CỔNG KIỂM SOÁT THƯ VIỆN IUH</Typography>
+                  <Chip
+                    size="small"
+                    label="AI LIVE"
+                    sx={{
+                      bgcolor: "rgba(16, 185, 129, 0.2)",
+                      color: "#6ee7b7",
+                      border: "1px solid rgba(16, 185, 129, 0.4)",
+                      fontWeight: 800,
+                      fontSize: "0.7rem",
+                    }}
+                  />
+                </Stack>
                 <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)", mt: 0.3 }}>
-                  Hệ thống camera nhận diện AI và xác thực độc giả ra/vào tự động
+                  Nhận diện khuôn mặt AI tự động · Sức chứa phòng đọc: {LIBRARY_CAPACITY} chỗ
                 </Typography>
               </Box>
             </Stack>
 
-            <Stack direction="row" spacing={1.5} sx={{ zIndex: 1, alignItems: "center" }}>
-              <Paper sx={{ px: 2, py: 1, borderRadius: 2, bgcolor: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)", textAlign: "center" }}>
+            {/* Phải: Dãy số liệu thời gian thực (Đang có mặt + Đã vào + Đã ra) */}
+            <Stack direction="row" spacing={1.5} sx={{ zIndex: 1, alignItems: "center", flexWrap: "wrap" }}>
+              {/* Thẻ quan trọng nhất: Đang có mặt */}
+              <Paper sx={{ px: 2, py: 1, borderRadius: 2, bgcolor: "rgba(99,102,241,0.25)", border: "1px solid rgba(165,180,252,0.4)", textAlign: "center" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#c7d2fe", lineHeight: 1 }}>{activePatrons}</Typography>
+                <Typography variant="caption" sx={{ color: "rgba(199,210,254,0.9)", fontWeight: 700, display: "block", mt: 0.25 }}>
+                  Đang có mặt ({occupancyPct}%)
+                </Typography>
+              </Paper>
+
+              {/* Lượt vào */}
+              <Paper sx={{ px: 2, py: 1, borderRadius: 2, bgcolor: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", textAlign: "center" }}>
                 <Typography variant="h4" sx={{ fontWeight: 800, color: "#6ee7b7", lineHeight: 1 }}>{todayCounts.entries}</Typography>
-                <Typography variant="caption" sx={{ color: "rgba(110,231,183,0.7)", fontWeight: 600 }}>Vào</Typography>
+                <Typography variant="caption" sx={{ color: "rgba(110,231,183,0.85)", fontWeight: 700, display: "block", mt: 0.25 }}>Đã vào</Typography>
               </Paper>
-              <Paper sx={{ px: 2, py: 1, borderRadius: 2, bgcolor: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)", textAlign: "center" }}>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: "#fcd34d", lineHeight: 1 }}>{todayCounts.exits}</Typography>
-                <Typography variant="caption" sx={{ color: "rgba(252,211,77,0.7)", fontWeight: 600 }}>Ra</Typography>
+
+              {/* Lượt ra (dùng tone xanh dương) */}
+              <Paper sx={{ px: 2, py: 1, borderRadius: 2, bgcolor: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.3)", textAlign: "center" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#93c5fd", lineHeight: 1 }}>{todayCounts.exits}</Typography>
+                <Typography variant="caption" sx={{ color: "rgba(147,197,253,0.85)", fontWeight: 700, display: "block", mt: 0.25 }}>Đã ra</Typography>
               </Paper>
+
               <IconButton onClick={toggleMode} sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
                 {mode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
               </IconButton>
@@ -559,64 +624,102 @@ export default function GatePage() {
 
           <Grid size={{ xs: 12, lg: 4 }} sx={{ animation: `${fadeInUp} 0.45s ease-out`, animationDelay: "0.2s", animationFillMode: "both" }}>
             <Paper variant="outlined" sx={{ p: 2.5, height: "100%" }}>
-              {step === "idle" && (
-                <Stack spacing={2.5} sx={{ textAlign: "center" }}>
-                  <Avatar sx={{ mx: "auto", width: 64, height: 64, bgcolor: "primary.main", color: "primary.contrastText" }}>
-                    <PersonSearchOutlinedIcon fontSize="large" />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 850 }}>Chào mừng</Typography>
-                    <Typography color="text.secondary">Nhập MSSV để xác thực khuôn mặt.</Typography>
-                  </Box>
-                  <TextField
-                    value={mssvInput}
-                    onChange={(event) => setMssvInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") handleLookup(mssvInput);
-                    }}
-                    disabled={loading}
-                    placeholder="Nhập MSSV..."
-                    fullWidth
-                    autoFocus
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 2,
-                        bgcolor: "background.paper",
-                        textAlign: "center",
-                        "&:hover": {
-                          "& fieldset": { borderColor: "primary.main" },
-                        },
-                      },
-                    }}
-                    slotProps={{
-                      htmlInput: {
-                        style: {
-                          textAlign: "center",
-                          fontFamily: "monospace",
-                          fontSize: 20,
-                          letterSpacing: 1,
-                        },
-                      },
-                    }}
+              {/* Thẻ hiển thị kết quả quét khuôn mặt AI tự động theo thời gian thực */}
+              {isRecentScanActive && step === "idle" && lastScanEvent && (
+                <Box sx={{ mb: 2.5, animation: `${fadeInUp} 0.35s ease-out` }}>
+                  <ResultCard
+                    status={lastScanEvent.status === "granted" ? "success" : lastScanEvent.status === "no_match" ? "unregistered" : "error"}
+                    message={
+                      lastScanEvent.status === "granted"
+                        ? (lastScanEvent.type === "entry" ? "XIN MỜI VÀO THƯ VIỆN" : "XIN MỜI RA — HẸN GẶP LẠI")
+                        : lastScanEvent.status === "spoof"
+                        ? "CẢNH BÁO GIẢ MẠO HÌNH ẢNH!"
+                        : "KHUÔN MẶT CHƯA ĐƯỢC ĐĂNG KÝ"
+                    }
+                    patronInfo={
+                      lastScanEvent.name
+                        ? {
+                            fullName: lastScanEvent.name,
+                            mssv: lastScanEvent.studentCode || "",
+                            faculty: lastScanEvent.confidence ? `Độ tin cậy AI: ${Math.round(lastScanEvent.confidence * 100)}%` : "",
+                          }
+                        : undefined
+                    }
                   />
-                  <Button
-                    variant="contained"
-                    size="large"
-                    onClick={() => handleLookup(mssvInput)}
-                    disabled={loading || !mssvInput.trim()}
-                    fullWidth
-                    sx={{
-                      background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-                      borderRadius: 2,
-                      fontWeight: 700,
-                      textTransform: "none",
-                      "&:hover": {
-                        background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)",
-                      },
-                    }}
-                  >
-                    Tra cứu
-                  </Button>
+                  <Divider sx={{ my: 2 }} />
+                </Box>
+              )}
+
+              {step === "idle" && (
+                <Stack spacing={2} sx={{ textAlign: "center" }}>
+                  {!isRecentScanActive && (
+                    <Box sx={{ mb: 1 }}>
+                      <Avatar sx={{ mx: "auto", width: 56, height: 56, bgcolor: "primary.main", color: "primary.contrastText", mb: 1.5 }}>
+                        <PersonSearchOutlinedIcon fontSize="large" />
+                      </Avatar>
+                      <Typography variant="h6" sx={{ fontWeight: 850 }}>Nhận diện tự động AI</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Vui lòng đứng trước camera để hệ thống mở cổng.
+                      </Typography>
+                    </Box>
+                  )}
+
+                  <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "action.hover", border: "1px dashed", borderColor: "divider" }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, display: "block", mb: 1 }}>
+                      Không nhận diện được? Nhập MSSV hoặc Quét thẻ:
+                    </Typography>
+                    <TextField
+                      value={mssvInput}
+                      onChange={(event) => setMssvInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") handleLookup(mssvInput);
+                      }}
+                      disabled={loading}
+                      placeholder="Nhập MSSV..."
+                      fullWidth
+                      size="small"
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 2,
+                          bgcolor: "background.paper",
+                          textAlign: "center",
+                          "&:hover": {
+                            "& fieldset": { borderColor: "primary.main" },
+                          },
+                        },
+                      }}
+                      slotProps={{
+                        htmlInput: {
+                          style: {
+                            textAlign: "center",
+                            fontFamily: "monospace",
+                            fontSize: 18,
+                            fontWeight: 700,
+                            letterSpacing: 1,
+                          },
+                        },
+                      }}
+                    />
+                    <Button
+                      variant="contained"
+                      onClick={() => handleLookup(mssvInput)}
+                      disabled={loading || !mssvInput.trim()}
+                      fullWidth
+                      sx={{
+                        mt: 1.25,
+                        background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                        borderRadius: 2,
+                        fontWeight: 700,
+                        textTransform: "none",
+                        "&:hover": {
+                          background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)",
+                        },
+                      }}
+                    >
+                      Xác thực thủ công
+                    </Button>
+                  </Box>
+
                   {loading && (
                     <Stack spacing={1.25} sx={{ alignItems: "center" }}>
                       <Spin size="small" />

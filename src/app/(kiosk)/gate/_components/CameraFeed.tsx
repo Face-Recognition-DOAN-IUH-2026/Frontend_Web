@@ -95,22 +95,78 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
     }
   }, [overlay]);
 
+  const isGranted = overlay?.status === "granted";
+  const isDenied = overlay?.status === "spoof" || overlay?.status === "wrong_direction" || overlay?.status === "expired" || overlay?.status === "denied";
+
   return (
-    <Paper variant="outlined" sx={{ overflow: "hidden", height: "100%" }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        overflow: "hidden",
+        height: "100%",
+        transition: "all 0.3s ease",
+        borderColor: isGranted ? "#10b981" : isDenied ? "#ef4444" : "divider",
+        borderWidth: isGranted || isDenied ? 2 : 1,
+        boxShadow: isGranted
+          ? "0 0 24px rgba(16, 185, 129, 0.4)"
+          : isDenied
+          ? "0 0 24px rgba(239, 68, 68, 0.4)"
+          : "none",
+      }}
+    >
       <Stack
         direction="row"
         spacing={1.25}
-        sx={{ alignItems: "center", justifyContent: "space-between", px: 2, py: 1.25, borderBottom: 1, borderColor: "divider" }}
+        sx={{
+          alignItems: "center",
+          justifyContent: "space-between",
+          px: 2,
+          py: 1.25,
+          borderBottom: 1,
+          borderColor: isGranted ? "#10b981" : isDenied ? "#ef4444" : "divider",
+          bgcolor: isGranted
+            ? "rgba(16, 185, 129, 0.08)"
+            : isDenied
+            ? "rgba(239, 68, 68, 0.08)"
+            : "background.paper",
+          transition: "all 0.3s ease",
+        }}
       >
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <VideocamOutlinedIcon color="disabled" fontSize="small" />
-          <Typography sx={{ fontWeight: 800 }}>{label}</Typography>
+          <VideocamOutlinedIcon
+            sx={{
+              color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "text.secondary",
+              fontSize: 20,
+            }}
+          />
+          <Typography sx={{ fontWeight: 800, color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "text.primary" }}>
+            {label}
+          </Typography>
         </Stack>
-        <Chip
-          size="small"
-          color={ok === null ? "warning" : ok ? "success" : "error"}
-          label={ok === null ? "Đang nối" : ok ? "Online" : "Mất tín hiệu"}
-        />
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          {isGranted && (
+            <Chip
+              size="small"
+              color="success"
+              label="HỢP LỆ — MỜI QUA"
+              sx={{ fontWeight: 800, fontSize: "0.72rem" }}
+            />
+          )}
+          {isDenied && (
+            <Chip
+              size="small"
+              color="error"
+              label="TỪ CHỐI"
+              sx={{ fontWeight: 800, fontSize: "0.72rem" }}
+            />
+          )}
+          <Chip
+            size="small"
+            color={ok === null ? "warning" : ok ? "success" : "error"}
+            label={ok === null ? "Đang nối" : ok ? "Online" : "Mất tín hiệu"}
+            variant="outlined"
+          />
+        </Stack>
       </Stack>
 
       <Box sx={{ position: "relative", aspectRatio: "16 / 9", bgcolor: "common.black" }}>
