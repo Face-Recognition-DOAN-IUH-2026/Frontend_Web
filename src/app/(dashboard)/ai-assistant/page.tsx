@@ -43,6 +43,7 @@ import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api, { getApiAccessToken } from "@/lib/api-client";
 import BookCard, { parseBookCard } from "@/app/(dashboard)/_components/BookCard";
+import LibraryHoursCard, { type LibraryScheduleData } from "@/app/(dashboard)/_components/AIWidget/cards/LibraryHoursCard";
 import { fadeInUp } from "@/lib/animations";
 
 interface Message {
@@ -110,13 +111,92 @@ async function confirmAction(sessionId: string, action: "approve" | "reject") {
   return res.json();
 }
 
+function extractSchedule(text: string): {
+  before: string;
+  scheduleData: LibraryScheduleData | null;
+  after: string;
+} {
+  const blockRegex = /```(?:json)?\s*(\{[\s\S]*?"schedule"\s*:\s*\[[\s\S]*?\][\s\S]*?\})\s*```/;
+  const blockMatch = text.match(blockRegex);
+  if (blockMatch) {
+    try {
+      const parsed = JSON.parse(blockMatch[1]);
+      if (Array.isArray(parsed.schedule)) {
+        const idx = text.indexOf(blockMatch[0]);
+        return {
+          before: text.substring(0, idx).trim(),
+          scheduleData: parsed,
+          after: text.substring(idx + blockMatch[0].length).trim(),
+        };
+      }
+    } catch {}
+  }
+
+  const rawRegex = /\{[\s\S]*?"schedule"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/;
+  const rawMatch = text.match(rawRegex);
+  if (rawMatch) {
+    try {
+      const parsed = JSON.parse(rawMatch[0]);
+      if (Array.isArray(parsed.schedule)) {
+        const idx = text.indexOf(rawMatch[0]);
+        return {
+          before: text.substring(0, idx).trim(),
+          scheduleData: parsed,
+          after: text.substring(idx + rawMatch[0].length).trim(),
+        };
+      }
+    } catch {}
+  }
+
+  return { before: text, scheduleData: null, after: "" };
+}
+
+function parseAiSegments(content: string): Array<
+  | { type: "text"; content: string }
+  | { type: "book_card"; bookData: any }
+  | { type: "library_hours"; scheduleData: LibraryScheduleData }
+> {
+  if (!content) return [];
+
+  const sched = extractSchedule(content);
+  if (sched.scheduleData) {
+    const beforeSegments = sched.before ? parseAiSegments(sched.before) : [];
+    const afterSegments = sched.after ? parseAiSegments(sched.after) : [];
+    return [
+      ...beforeSegments,
+      { type: "library_hours", scheduleData: sched.scheduleData },
+      ...afterSegments,
+    ];
+  }
+
+  const parsedBook = parseBookCard(content);
+  if (parsedBook.bookData) {
+    const beforeSegments = parsedBook.before ? parseAiSegments(parsedBook.before) : [];
+    const afterSegments = parsedBook.after ? parseAiSegments(parsedBook.after) : [];
+    return [
+      ...beforeSegments,
+      { type: "book_card", bookData: parsedBook.bookData },
+      ...afterSegments,
+    ];
+  }
+
+  const trimmed = content.trim();
+  return trimmed ? [{ type: "text", content: trimmed }] : [];
+}
+
 function MessageContent({ content }: { content: string }) {
-  const { before, bookData, after } = parseBookCard(content);
+  const segments = parseAiSegments(content);
   return (
     <>
-      {before ? <Markdown>{before}</Markdown> : null}
-      {bookData ? <BookCard data={bookData} /> : null}
-      {after ? <Markdown>{after}</Markdown> : null}
+      {segments.map((seg, idx) => {
+        if (seg.type === "book_card") {
+          return <BookCard key={idx} data={seg.bookData} />;
+        }
+        if (seg.type === "library_hours") {
+          return <LibraryHoursCard key={idx} data={seg.scheduleData} />;
+        }
+        return <Markdown key={idx}>{seg.content}</Markdown>;
+      })}
     </>
   );
 }
@@ -513,38 +593,63 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
     );
   }
 
-  if (tr.name === "search_books" && Array.isArray(data)) {
-    return (
-      <Box>
-        <Chip label={`📖 Tìm thấy ${data.length} cuốn sách`} size="small" color="primary" sx={{ fontWeight: 800, fontSize: 11, mb: 1, height: 24 }} />
-        <Stack spacing={1}>
-          {data.map((book: any, i: number) => (
-            <Paper key={i} elevation={0} sx={{ borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
-              <Box sx={{ display: "flex" }}>
-                <Box sx={{ width: 4, bgcolor: book.is_available ? "#10b981" : "#f59e0b", flexShrink: 0 }} />
-                <Box sx={{ flex: 1, p: 1.5 }}>
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                    <Avatar sx={{ width: 40, height: 40, background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", fontSize: 18, flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>📖</Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, lineHeight: 1.3, fontSize: 13 }}>{book.title}</Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.4 }}>{book.author}</Typography>
-                      <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: "wrap", gap: 0.5 }}>
-                        <Chip label={book.categories || "Sách"} size="small" variant="outlined" sx={{ fontSize: 10, height: 20, fontWeight: 600, borderRadius: 1.5 }} />
-                        <Chip label={book.isbn} size="small" variant="outlined" sx={{ fontSize: 10, height: 20, fontFamily: "monospace", borderRadius: 1.5 }} />
-                        <Chip label={book.is_available ? "Có sẵn" : "Đang mượn"} size="small" color={book.is_available ? "success" : "warning"} sx={{ fontSize: 10, height: 20, fontWeight: 700, borderRadius: 1.5 }} />
-                      </Stack>
-                      {book.shelf_location ? (
-                        <Chip label={`📍 ${book.shelf_location}`} size="small" color="primary" variant="outlined" sx={{ mt: 0.5, fontSize: 10, height: 20, fontWeight: 700, fontFamily: "monospace", borderRadius: 1.5 }} />
-                      ) : null}
-                    </Box>
-                  </Stack>
+  if (tr.name === "get_library_hours") {
+    const sched = data?.schedule
+      ? data
+      : data?.data?.schedule
+      ? data.data
+      : null;
+    if (sched) {
+      return <LibraryHoursCard data={sched} />;
+    }
+  }
+
+  if ((tr.name === "search_books" || tr.name === "lookup_book") && data) {
+    const books = Array.isArray(data)
+      ? data
+      : data.book
+      ? [data.book]
+      : data.title
+      ? [data]
+      : [];
+    if (books.length > 0) {
+      return (
+        <Box>
+          <Chip
+            label={tr.name === "lookup_book" ? "📖 Chi tiết sách" : `📖 Tìm thấy ${books.length} cuốn sách`}
+            size="small"
+            color="primary"
+            sx={{ fontWeight: 800, fontSize: 11, mb: 1, height: 24 }}
+          />
+          <Stack spacing={1}>
+            {books.map((book: any, i: number) => (
+              <Paper key={i} elevation={0} sx={{ borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+                <Box sx={{ display: "flex" }}>
+                  <Box sx={{ width: 4, bgcolor: book.is_available ? "#10b981" : "#f59e0b", flexShrink: 0 }} />
+                  <Box sx={{ flex: 1, p: 1.5 }}>
+                    <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                      <Avatar sx={{ width: 40, height: 40, background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", fontSize: 18, flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>📖</Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 800, lineHeight: 1.3, fontSize: 13 }}>{book.title}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.4 }}>{book.author}</Typography>
+                        <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: "wrap", gap: 0.5 }}>
+                          <Chip label={book.categories || "Sách"} size="small" variant="outlined" sx={{ fontSize: 10, height: 20, fontWeight: 600, borderRadius: 1.5 }} />
+                          {book.isbn && <Chip label={book.isbn} size="small" variant="outlined" sx={{ fontSize: 10, height: 20, fontFamily: "monospace", borderRadius: 1.5 }} />}
+                          <Chip label={book.is_available !== false ? "Có sẵn" : "Đang mượn"} size="small" color={book.is_available !== false ? "success" : "warning"} sx={{ fontSize: 10, height: 20, fontWeight: 700, borderRadius: 1.5 }} />
+                        </Stack>
+                        {book.shelf_location ? (
+                          <Chip label={`📍 ${book.shelf_location}`} size="small" color="primary" variant="outlined" sx={{ mt: 0.5, fontSize: 10, height: 20, fontWeight: 700, fontFamily: "monospace", borderRadius: 1.5 }} />
+                        ) : null}
+                      </Box>
+                    </Stack>
+                  </Box>
                 </Box>
-              </Box>
-            </Paper>
-          ))}
-        </Stack>
-      </Box>
-    );
+              </Paper>
+            ))}
+          </Stack>
+        </Box>
+      );
+    }
   }
 
   if (tr.name === "get_overdue_borrows" && Array.isArray(data)) {
@@ -592,15 +697,21 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
     );
   }
 
-  if (tr.name === "get_patron_borrows" && Array.isArray(data)) {
+  if (
+    (tr.name === "get_patron_borrows" ||
+      tr.name === "get_my_borrows" ||
+      tr.name === "get_my_history" ||
+      tr.name === "get_patron_history_by_id") &&
+    Array.isArray(data)
+  ) {
     if (data.length === 0) {
       return (
         <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid", borderColor: "#10b981", bgcolor: alpha("#10b981", 0.04) }}>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
             <Avatar sx={{ width: 36, height: 36, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", fontSize: 18 }}>✓</Avatar>
             <Box>
-              <Typography variant="body2" sx={{ fontWeight: 800, color: "#10b981" }}>Không sách đang mượn</Typography>
-              <Typography variant="caption" color="text.secondary">Độc giả chưa mượn cuốn nào</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: "#10b981" }}>Không có sách mượn / lịch sử</Typography>
+              <Typography variant="caption" color="text.secondary">Độc giả chưa có bản ghi mượn trả</Typography>
             </Box>
           </Stack>
         </Paper>
@@ -608,7 +719,7 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
     }
     return (
       <Box>
-        <Chip label={`📚 ${data.length} sách đang mượn`} size="small" color="info" sx={{ fontWeight: 800, fontSize: 11, mb: 1, height: 24 }} />
+        <Chip label={`📚 Danh sách sách (${data.length} cuốn)`} size="small" color="info" sx={{ fontWeight: 800, fontSize: 11, mb: 1, height: 24 }} />
         <Stack spacing={1}>
           {data.map((item: any, i: number) => (
             <Paper key={i} elevation={0} sx={{ borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
@@ -618,8 +729,8 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
                   <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
                     <Avatar sx={{ width: 36, height: 36, background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", fontSize: 16, flexShrink: 0 }}>📚</Avatar>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, fontSize: 13 }}>{item.book?.title || "N/A"}</Typography>
-                      <Typography variant="caption" color="text.secondary">{item.book?.author}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 800, fontSize: 13 }}>{item.book?.title || item.title || "N/A"}</Typography>
+                      <Typography variant="caption" color="text.secondary">{item.book?.author || item.author || ""}</Typography>
                       <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: "wrap", gap: 0.5 }}>
                         <Chip label={item.status === "borrowed" ? "Đang mượn" : "Đã trả"} size="small" color={item.status === "borrowed" ? "warning" : "success"} sx={{ fontSize: 10, height: 20, fontWeight: 700, borderRadius: 1.5 }} />
                         {item.due_at ? (
@@ -634,6 +745,41 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
           ))}
         </Stack>
       </Box>
+    );
+  }
+
+  if (
+    (tr.name === "get_my_patron_info" || tr.name === "get_patron_info_by_id") &&
+    data &&
+    (data.full_name || data.email || data.name)
+  ) {
+    return (
+      <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
+        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+          <Avatar sx={{ width: 42, height: 42, background: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)", fontWeight: 700, fontSize: 16 }}>
+            {(data.full_name || data.name || data.email || "ĐG").slice(0, 2).toUpperCase()}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              {data.full_name || data.name || "Thông tin độc giả"}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+              {data.email} {data.patron_code ? `• Mã SV: ${data.patron_code}` : ""}
+            </Typography>
+            <Stack direction="row" spacing={0.75} sx={{ mt: 0.5, flexWrap: "wrap", gap: 0.5 }}>
+              <Chip
+                label={data.status === "active" ? "Đang hoạt động" : data.status || "Hoạt động"}
+                size="small"
+                color={data.status === "active" ? "success" : "default"}
+                sx={{ height: 20, fontSize: 10, fontWeight: 700, borderRadius: 1.5 }}
+              />
+              {data.membership_type && (
+                <Chip label={`Hạng: ${data.membership_type}`} size="small" variant="outlined" sx={{ height: 20, fontSize: 10, borderRadius: 1.5 }} />
+              )}
+            </Stack>
+          </Box>
+        </Stack>
+      </Paper>
     );
   }
 

@@ -9,25 +9,16 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import api, { setApiAccessToken, getApiAccessToken } from "./api-client";
-import ReauthOverlay from "@/app/_components/ReauthOverlay";
+import api, {
+  setStoredAccessToken,
+  clearStoredAuth,
+  getStoredRefreshToken,
+  getCookieValue,
+  decodeJwtPayload,
+  isTokenExpiringSoon,
+  getApiAccessToken,
+} from "./api-client";
 import type { AuthContextType, AuthUser, LoginRequest } from "./types";
-
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -42,12 +33,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  function getCookieValue(name: string): string | null {
-    if (typeof document === "undefined") return null;
-    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-    return match ? decodeURIComponent(match[1]) : null;
-  }
 
   const updateUser = useCallback((fields: Partial<AuthUser>) => {
     setUser((prev) => {
@@ -75,10 +60,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [updateUser]);
 
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch { /* ignore */ }
+    clearStoredAuth();
+    setUser(null);
+    setAccessToken(null);
+    router.push("/login");
+  }, [router]);
+
   const loadUserFromStorage = useCallback(() => {
     if (typeof window === "undefined") return;
 
-    const storedToken = getCookieValue("access_token") || localStorage.getItem("access_token") || getApiAccessToken();
+    const storedToken =
+      getCookieValue("access_token") ||
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token") ||
+      getApiAccessToken();
+    const storedRefreshToken =
+      getStoredRefreshToken() ||
+      getCookieValue("refresh_token") ||
+      localStorage.getItem("refresh_token");
     const storedUser = localStorage.getItem("user");
 
     if (storedToken) {
@@ -86,35 +89,92 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const payload = decodeJwtPayload(storedToken);
         const exp = payload?.exp as number | undefined;
         const isExpired = exp ? exp * 1000 < Date.now() : false;
+
         if (isExpired) {
-          document.cookie = "access_token=; path=/; max-age=0";
-          document.cookie = "refresh_token=; path=/; max-age=0";
-          localStorage.removeItem("user");
+          if (storedRefreshToken) {
+            // Silently refresh token using refresh_token
+            api
+              .refreshAuthToken(storedRefreshToken)
+              .then((res) => {
+                if (res.access_token) {
+                  setAccessToken(res.access_token);
+                  setStoredAccessToken(res.access_token, res.refresh_token || storedRefreshToken);
+                  if (storedUser) {
+                    try {
+                      setUser(JSON.parse(storedUser));
+                    } catch {}
+                  } else {
+                    const newPayload = decodeJwtPayload(res.access_token);
+                    if (newPayload) {
+                      const recovered: AuthUser = {
+                        id: (newPayload?.sub as string) || "",
+                        email: (newPayload?.email as string) || "",
+                        role: ((newPayload?.roles as string[])?.[0]) || "user",
+                        full_name: (newPayload?.full_name as string) || null,
+                      };
+                      localStorage.setItem("user", JSON.stringify(recovered));
+                      setUser(recovered);
+                    }
+                  }
+                  refreshUser();
+                }
+              })
+              .catch(() => {
+                logout();
+              })
+              .finally(() => {
+                setIsLoading(false);
+              });
+            return;
+          } else {
+            logout();
+            setIsLoading(false);
+            return;
+          }
         } else {
           setAccessToken(storedToken);
-          setApiAccessToken(storedToken);
+          setStoredAccessToken(storedToken, storedRefreshToken);
           if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            try {
+              setUser(JSON.parse(storedUser));
+            } catch {}
           } else {
-            const payload = decodeJwtPayload(storedToken);
-            if (payload) {
-              const recovered: AuthUser = {
-                id: (payload?.sub as string) || "",
-                email: (payload?.email as string) || "",
-                role: ((payload?.roles as string[])?.[0]) || "user",
-                full_name: (payload?.full_name as string) || null,
-              };
-              localStorage.setItem("user", JSON.stringify(recovered));
-              setUser(recovered);
-            }
+            const recovered: AuthUser = {
+              id: (payload?.sub as string) || "",
+              email: (payload?.email as string) || "",
+              role: ((payload?.roles as string[])?.[0]) || "user",
+              full_name: (payload?.full_name as string) || null,
+            };
+            localStorage.setItem("user", JSON.stringify(recovered));
+            setUser(recovered);
           }
-          // Background sync to ensure avatar_url and latest profile details are up to date!
           refreshUser();
         }
       } catch {
-        document.cookie = "access_token=; path=/; max-age=0";
-        localStorage.removeItem("user");
+        logout();
       }
+    } else if (storedRefreshToken) {
+      api
+        .refreshAuthToken(storedRefreshToken)
+        .then((res) => {
+          if (res.access_token) {
+            setAccessToken(res.access_token);
+            setStoredAccessToken(res.access_token, res.refresh_token || storedRefreshToken);
+            if (storedUser) {
+              try {
+                setUser(JSON.parse(storedUser));
+              } catch {}
+            }
+            refreshUser();
+          }
+        })
+        .catch(() => {
+          logout();
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+      return;
     } else {
       if (storedUser) {
         try {
@@ -125,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     setIsLoading(false);
-  }, [refreshUser]);
+  }, [logout, refreshUser]);
 
   useEffect(() => {
     loadUserFromStorage();
@@ -137,6 +197,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [accessToken, refreshUser]);
 
+  // Silent auto-refresh heartbeat: check every 60 seconds, refresh if expiring in < 3 minutes
+  useEffect(() => {
+    if (!accessToken) return;
+    const interval = setInterval(async () => {
+      const currentToken = getApiAccessToken() || accessToken;
+      if (currentToken && isTokenExpiringSoon(currentToken, 3 * 60_000)) {
+        try {
+          const res = await api.refreshAuthToken();
+          if (res.access_token) {
+            setAccessToken(res.access_token);
+          }
+        } catch {
+          // ignore background heartbeat error, request interceptor handles retry
+        }
+      }
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [accessToken]);
+
   const login = async (email: string, password: string) => {
     const data: LoginRequest = { email, password };
     const response = await api.login(data);
@@ -144,13 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Backend did not return access_token");
     }
 
-    setApiAccessToken(response.access_token);
-    document.cookie = `access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
-    localStorage.setItem("access_token", response.access_token);
-    if (response.refresh_token) {
-      document.cookie = `refresh_token=${response.refresh_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
-      localStorage.setItem("refresh_token", response.refresh_token);
-    }
+    setStoredAccessToken(response.access_token, response.refresh_token);
     setAccessToken(response.access_token);
 
     const payload = decodeJwtPayload(response.access_token);
@@ -182,58 +255,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const setAuthFromToken = (accessToken: string, refreshToken: string | null, email: string, role?: string) => {
-    setApiAccessToken(accessToken);
-    document.cookie = `access_token=${accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
-    localStorage.setItem("access_token", accessToken);
-    if (refreshToken) {
-      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
-      localStorage.setItem("refresh_token", refreshToken);
-    }
+  const setAuthFromToken = (newAccessToken: string, refreshToken: string | null, email: string, role?: string) => {
+    setStoredAccessToken(newAccessToken, refreshToken);
+    setAccessToken(newAccessToken);
 
-    const payload = decodeJwtPayload(accessToken);
+    const payload = decodeJwtPayload(newAccessToken);
     const userId = (payload?.sub as string) || "";
     const userRole = role || ((payload?.roles as string[])?.[0]) || "user";
     assertWebRole(userRole);
 
     const userData: AuthUser = { id: userId, email, role: userRole, full_name: (payload?.full_name as string) || null };
     localStorage.setItem("user", JSON.stringify(userData));
-    setAccessToken(accessToken);
     setUser(userData);
 
     refreshUser();
   };
 
-  const logout = async () => {
-    try {
-      await api.logout();
-    } catch { /* ignore */ }
-    setApiAccessToken(null);
-    document.cookie = "access_token=; path=/; max-age=0";
-    document.cookie = "refresh_token=; path=/; max-age=0";
-    localStorage.removeItem("user");
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    setUser(null);
-    setAccessToken(null);
-    router.push("/login");
-  };
-
   const refreshAccessToken = async (): Promise<boolean> => {
     try {
-      const refreshToken = getCookieValue("refresh_token");
-      if (!refreshToken) return false;
-
-      const { access_token, refresh_token: newRefreshToken } = await api.refreshAuthToken(refreshToken);
-      if (access_token) {
-        setApiAccessToken(access_token);
-        document.cookie = `access_token=${access_token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
-        setAccessToken(access_token);
+      const res = await api.refreshAuthToken();
+      if (res.access_token) {
+        setAccessToken(res.access_token);
+        return true;
       }
-      if (newRefreshToken) {
-        document.cookie = `refresh_token=${newRefreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax; Secure`;
-      }
-      return true;
+      return false;
     } catch {
       return false;
     }
@@ -255,7 +300,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-      <ReauthOverlay />
     </AuthContext.Provider>
   );
 }

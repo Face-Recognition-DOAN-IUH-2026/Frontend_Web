@@ -119,10 +119,19 @@ function setStoredAccessToken(token: string | null, refreshToken?: string | null
   if (token) {
     setAccessTokenCookie(token);
     if (typeof window !== "undefined") {
-      try { localStorage.setItem("token", token); } catch {}
+      try {
+        localStorage.setItem("token", token);
+        localStorage.setItem("access_token", token);
+      } catch {}
     }
   } else {
     clearAccessTokenCookie();
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("token");
+        localStorage.removeItem("access_token");
+      } catch {}
+    }
   }
 
   if (refreshToken !== undefined) {
@@ -162,6 +171,7 @@ function clearStoredAuth() {
     try {
       localStorage.removeItem("user");
       localStorage.removeItem("token");
+      localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
     } catch {}
   }
@@ -214,12 +224,19 @@ function getErrorMessage(err: unknown): string {
   return translateError(String(err));
 }
 
-function setApiAccessToken(token: string | null) {
+function setApiAccessToken(token: string | null, refreshToken?: string | null) {
   _accessToken = token;
+  if (refreshToken !== undefined) {
+    _refreshToken = refreshToken;
+  }
 }
 
 function getApiAccessToken(): string | null {
   return _accessToken;
+}
+
+function getApiRefreshToken(): string | null {
+  return getStoredRefreshToken();
 }
 
 class ApiClient {
@@ -235,8 +252,28 @@ class ApiClient {
     });
 
     this.client.interceptors.request.use(
-      (config) => {
-        const token = _accessToken || getCookieValue("access_token");
+      async (config) => {
+        const url = config.url || "";
+        const isAuthEndpoint =
+          url.includes("/api/auth/login") ||
+          url.includes("/api/auth/register") ||
+          url.includes("/api/auth/refresh");
+
+        let token =
+          _accessToken ||
+          getCookieValue("access_token") ||
+          (typeof window !== "undefined"
+            ? localStorage.getItem("access_token") || localStorage.getItem("token")
+            : null);
+
+        // Proactive silent refresh: if token expires in less than 60s, refresh before sending
+        if (token && !isAuthEndpoint && isTokenExpiringSoon(token, 60_000)) {
+          const newToken = await this.refreshToken();
+          if (newToken) {
+            token = newToken;
+          }
+        }
+
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -249,10 +286,23 @@ class ApiClient {
       (response) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as any;
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        const url = originalRequest?.url || "";
+        const isAuthEndpoint =
+          url.includes("/api/auth/login") ||
+          url.includes("/api/auth/register") ||
+          url.includes("/api/auth/refresh");
+
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
           originalRequest._retry = true;
           try {
-            const newToken = await this.handleUnauthorized();
+            // Wait for existing refresh if in progress
+            let newToken: string | null = null;
+            if (this.refreshPromise) {
+              newToken = await this.refreshPromise;
+            } else {
+              newToken = await this.handleUnauthorized();
+            }
+
             if (newToken) {
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               return this.client(originalRequest);
@@ -273,7 +323,10 @@ class ApiClient {
     this.cancelPendingRequests();
     clearStoredAuth();
     if (typeof window !== "undefined") {
-      bus.emit("auth:required");
+      const pathname = window.location.pathname;
+      if (pathname !== "/login" && pathname !== "/register") {
+        window.location.href = `/login?redirect=${encodeURIComponent(pathname)}&reason=session-expired`;
+      }
     }
     return null;
   }
@@ -293,12 +346,17 @@ class ApiClient {
     this.refreshPromise = (async () => {
       try {
         const storedRefreshToken = getStoredRefreshToken();
-        const resp = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-          refresh_token: storedRefreshToken,
-        }, {
-          withCredentials: true,
-          timeout: 10000,
-        });
+        if (!storedRefreshToken) return null;
+        const resp = await axios.post(
+          `${API_BASE_URL}/api/auth/refresh`,
+          {
+            refresh_token: storedRefreshToken,
+          },
+          {
+            withCredentials: true,
+            timeout: 10000,
+          }
+        );
         const data = resp.data;
         const token = data?.access_token || data?.accessToken;
         const newRefreshToken = data?.refresh_token || data?.refreshToken;
@@ -352,10 +410,18 @@ class ApiClient {
     return response.data;
   }
 
-  async refreshAuthToken(refreshToken: string): Promise<TokenResponse> {
-    const response = await this.client.post<TokenResponse>("/api/auth/refresh", { refresh_token: refreshToken });
+  async refreshAuthToken(refreshToken?: string): Promise<TokenResponse> {
+    const tokenToUse = refreshToken || getStoredRefreshToken();
+    if (!tokenToUse) {
+      throw new Error("No refresh token available");
+    }
+    const response = await axios.post<TokenResponse>(
+      `${API_BASE_URL}/api/auth/refresh`,
+      { refresh_token: tokenToUse },
+      { withCredentials: true, timeout: 10000 }
+    );
     if (response.data.access_token) {
-      setStoredAccessToken(response.data.access_token, response.data.refresh_token);
+      setStoredAccessToken(response.data.access_token, response.data.refresh_token || tokenToUse);
     }
     return response.data;
   }
@@ -1496,9 +1562,13 @@ export {
   getCookieValue,
   setAccessTokenCookie,
   clearAccessTokenCookie,
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+  getStoredRefreshToken,
   getErrorMessage,
   setApiAccessToken,
   getApiAccessToken,
+  getApiRefreshToken,
   retryPendingRequests,
   cancelPendingRequests,
 };

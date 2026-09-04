@@ -5,7 +5,9 @@ import { jwtVerify } from "jose";
 const publicPaths = ["/login", "/register", "/", "/library/vr-tour"];
 
 const rawSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "";
+const rawRefreshSecret = process.env.JWT_REFRESH_SECRET || rawSecret;
 const JWT_SECRET = new TextEncoder().encode(rawSecret);
+const JWT_REFRESH_SECRET = new TextEncoder().encode(rawRefreshSecret);
 
 export async function middleware(request: NextRequest) {
   if (!rawSecret) {
@@ -21,43 +23,78 @@ export async function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get("access_token")?.value;
-  if (!token) {
+  const refreshToken = request.cookies.get("refresh_token")?.value;
+
+  if (!token && !refreshToken) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", path);
     return NextResponse.redirect(loginUrl);
   }
 
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET, {
-      algorithms: ["HS256"],
-      issuer: process.env.JWT_ISSUER || undefined,
-      audience: process.env.JWT_AUDIENCE || undefined,
-    });
+  // 1. First check access_token
+  if (token) {
+    try {
+      const { payload } = await jwtVerify(token, JWT_SECRET, {
+        algorithms: ["HS256"],
+        issuer: process.env.JWT_ISSUER || undefined,
+        audience: process.env.JWT_AUDIENCE || undefined,
+      });
 
-    const role =
-      (payload.roles as string[])?.[0] ||
-      (payload.role as string) ||
-      null;
-    if (role !== "admin" && role !== "staff") {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("reason", "staff-only");
-      const response = NextResponse.redirect(loginUrl);
-      response.cookies.delete("access_token");
-      return response;
-    }
+      const role =
+        (payload.roles as string[])?.[0] ||
+        (payload.role as string) ||
+        null;
+      if (role !== "admin" && role !== "staff") {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("reason", "staff-only");
+        const response = NextResponse.redirect(loginUrl);
+        response.cookies.delete("access_token");
+        response.cookies.delete("refresh_token");
+        return response;
+      }
 
-    return NextResponse.next();
-  } catch (err: any) {
-    const loginUrl = new URL("/login", request.url);
-    if (err.code === "ERR_JWT_EXPIRED") {
-      loginUrl.searchParams.set("reason", "token-expired");
-    } else {
-      loginUrl.searchParams.set("reason", "invalid-token");
+      return NextResponse.next();
+    } catch {
+      // Access token expired or invalid: fall through to check refresh_token
     }
-    const response = NextResponse.redirect(loginUrl);
-    response.cookies.delete("access_token");
-    return response;
   }
+
+  // 2. If access_token is expired or missing, check refresh_token
+  if (refreshToken) {
+    try {
+      const { payload } = await jwtVerify(refreshToken, JWT_REFRESH_SECRET, {
+        algorithms: ["HS256"],
+        issuer: process.env.JWT_ISSUER || undefined,
+        audience: process.env.JWT_AUDIENCE || undefined,
+      });
+
+      const role =
+        (payload.roles as string[])?.[0] ||
+        (payload.role as string) ||
+        null;
+      if (role !== "admin" && role !== "staff") {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("reason", "staff-only");
+        const response = NextResponse.redirect(loginUrl);
+        response.cookies.delete("access_token");
+        response.cookies.delete("refresh_token");
+        return response;
+      }
+
+      // Valid refresh_token! Allow page to load so client-side AuthProvider can silently refresh access_token
+      return NextResponse.next();
+    } catch {
+      // Both access_token and refresh_token are invalid
+    }
+  }
+
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("redirect", path);
+  loginUrl.searchParams.set("reason", "session-expired");
+  const response = NextResponse.redirect(loginUrl);
+  response.cookies.delete("access_token");
+  response.cookies.delete("refresh_token");
+  return response;
 }
 
 export const config = {
