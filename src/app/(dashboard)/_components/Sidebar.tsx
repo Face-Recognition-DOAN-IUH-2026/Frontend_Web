@@ -43,6 +43,7 @@ import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
+import FireIcon from "@mui/icons-material/LocalFireDepartmentOutlined";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 const drawerWidth = 264;
@@ -75,6 +76,7 @@ const aiItems = [
 
 const staffAiItems = [
   { href: "/ai-assistant", label: "Trợ lý AI", icon: AssistantIcon },
+  { href: "/fire-detection", label: "Cảnh báo cháy (AI)", icon: FireIcon },
 ];
 
 const adminItems = [
@@ -238,7 +240,7 @@ export default function Sidebar() {
         {isAdminOrStaff && (
           <NavSection title="AI" items={staffAiItems} onClose={handleClose} />
         )}
-        {isAdmin && (
+        {isAdminOrStaff && (
           <NavSection title="Chẩn đoán AI" items={aiItems} onClose={handleClose} />
         )}
         {isAdmin && (

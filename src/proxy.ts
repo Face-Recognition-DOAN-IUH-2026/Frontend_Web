@@ -9,7 +9,7 @@ const rawRefreshSecret = process.env.JWT_REFRESH_SECRET || rawSecret;
 const JWT_SECRET = new TextEncoder().encode(rawSecret);
 const JWT_REFRESH_SECRET = new TextEncoder().encode(rawRefreshSecret);
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (!rawSecret) {
     return new NextResponse(JSON.stringify({ error: "Server misconfigured: JWT secret not set" }), {
       status: 500,
@@ -109,3 +109,7 @@ export const config = {
     "/((?!api|_next/static|_next/image|favicon\\.ico|favicon\\.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|webm)|VRLIB/).*)",
   ],
 };
+
+export const middleware = proxy;
+
+

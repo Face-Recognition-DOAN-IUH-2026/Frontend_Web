@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
         {/* Be Vietnam Pro — font tiếng Việt chuyên nghiệp, thay thế Fira Sans/system-ui */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
