@@ -29,13 +29,10 @@ import Sidebar from "@/app/(dashboard)/_components/Sidebar";
 import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationDropdown";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import GlobalFireAlert from "@/app/(dashboard)/_components/ui/GlobalFireAlert";
-import VideocamIcon from "@mui/icons-material/VideocamOutlined";
-import { FireSurveillanceProvider, useFireSurveillance } from "@/lib/fire-surveillance-context";
+import { FireSurveillanceProvider } from "@/lib/fire-surveillance-context";
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();
-  const router = useRouter();
-  const { isCameraActive } = useFireSurveillance();
   const { mode, effectiveMode, preference, reducedMotion, toggleMode } = useColorMode();
   const [bellAnchorEl, setBellAnchorEl] = useState<HTMLElement | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -103,28 +100,6 @@ function Topbar({ user }: { user: any }) {
         }}
       >
         <Toolbar sx={{ justifyContent: "flex-end", gap: 1.5, minHeight: 64 }}>
-          {isCameraActive && (
-            <Tooltip title="Camera PCCC đang quét ngầm liên tục (Độ tin cậy yêu cầu ≥ 60%). Nhấn để xem màn hình giám sát.">
-              <Chip
-                size="small"
-                icon={<VideocamIcon fontSize="small" sx={{ color: "#ef4444 !important" }} />}
-                label="CCTV PCCC Đang Quét (≥60%)"
-                onClick={() => router.push("/fire-detection")}
-                sx={{
-                  bgcolor: alpha("#ef4444", 0.1),
-                  color: "#dc2626",
-                  fontWeight: 600,
-                  fontSize: "0.75rem",
-                  border: "1px solid",
-                  borderColor: alpha("#ef4444", 0.3),
-                  cursor: "pointer",
-                  "&:hover": {
-                    bgcolor: alpha("#ef4444", 0.2),
-                  },
-                }}
-              />
-            </Tooltip>
-          )}
           <Box sx={{ position: "relative" }}>
             <Tooltip title="Thông báo">
               <IconButton color="inherit" onClick={handleBellClick}>
