@@ -7,6 +7,7 @@ export interface FireAlertEventPayload {
   active: boolean;
   cameraName: string;
   location: string;
+  hazardType?: "fire" | "smoke" | "both";
   fireCount: number;
   smokeCount: number;
   timestamp: string;

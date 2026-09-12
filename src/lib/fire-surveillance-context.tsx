@@ -260,11 +260,15 @@ export function FireSurveillanceProvider({ children }: { children: React.ReactNo
           return updated;
         });
 
-        // Phát sự kiện toàn cục đa tab
+        const detectedHazardType: "fire" | "smoke" | "both" =
+          data.has_fire && data.has_smoke ? "both" : data.has_fire ? "fire" : "smoke";
+
+        // Phát sự kiện toàn cục đa tab (phân biệt rõ sự cố khói và sự cố cháy)
         fireAlertBus.publish({
           active: true,
           cameraName: currentCam,
           location: camLocation,
+          hazardType: detectedHazardType,
           fireCount: data.fire_count || (data.has_fire ? 1 : 0),
           smokeCount: data.smoke_count || (data.has_smoke ? 1 : 0),
           timestamp: timeStr,

@@ -12,6 +12,7 @@ import {
   BarChartOutlined,
   PersonOffOutlined,
   MenuBookOutlined,
+  LocalFireDepartmentOutlined,
 } from "@mui/icons-material";
 import api from "@/lib/api-client";
 import type { Notification } from "@/lib/types";
@@ -27,6 +28,10 @@ const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string
   shift_reminder: { icon: <CalendarMonthOutlined fontSize="small" />, color: "info.main", label: "Nhắc lịch" },
   membership_expiry: { icon: <BadgeOutlined fontSize="small" />, color: "info.main", label: "Hạn thẻ" },
   anomaly_alert: { icon: <ShieldOutlined fontSize="small" />, color: "error.main", label: "Bất thường" },
+  fire_hazard: { icon: <LocalFireDepartmentOutlined fontSize="small" />, color: "error.main", label: "Cảnh báo cháy" },
+  hazard_alert: { icon: <LocalFireDepartmentOutlined fontSize="small" />, color: "error.main", label: "Nguy cơ cháy" },
+  smoke_alert: { icon: <ShieldOutlined fontSize="small" />, color: "warning.main", label: "Cảnh báo khói" },
+  smoke_hazard: { icon: <ShieldOutlined fontSize="small" />, color: "warning.main", label: "Phát hiện khói" },
   daily_report: { icon: <BarChartOutlined fontSize="small" />, color: "primary.main", label: "Thống kê" },
   staff_absence: { icon: <PersonOffOutlined fontSize="small" />, color: "warning.main", label: "Vắng mặt" },
   bid_warning: { icon: <ErrorOutlined fontSize="small" />, color: "warning.main", label: "Đấu giá" },

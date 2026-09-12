@@ -22,6 +22,7 @@ import EmergencyOutlinedIcon from "@mui/icons-material/EmergencyOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import PhoneInTalkOutlinedIcon from "@mui/icons-material/PhoneInTalkOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import VolumeOffOutlinedIcon from "@mui/icons-material/VolumeOffOutlined";
 import VolumeUpOutlinedIcon from "@mui/icons-material/VolumeUpOutlined";
 import { fireAlertBus, FireAlertEventPayload } from "@/lib/fire-alert-bus";
@@ -80,6 +81,13 @@ export default function GlobalFireAlert() {
     router.push("/fire-detection");
   };
 
+  const isSmokeOnly =
+    activeAlert?.hazardType === "smoke" ||
+    Boolean(activeAlert && activeAlert.smokeCount > 0 && activeAlert.fireCount === 0);
+
+  const alertBgColor = isSmokeOnly ? "#d97706" : "#dc2626";
+  const alertShadowColor = isSmokeOnly ? "rgba(217, 119, 6, 0.55)" : "rgba(220, 38, 38, 0.55)";
+
   return (
     <>
       <Slide direction="down" in={Boolean(activeAlert && !isDismissed)} mountOnEnter unmountOnExit>
@@ -92,7 +100,7 @@ export default function GlobalFireAlert() {
             zIndex: 9999,
             width: "calc(100% - 32px)",
             maxWidth: 1080,
-            boxShadow: "0 12px 36px rgba(239, 68, 68, 0.55), 0 0 0 2px rgba(255, 255, 255, 0.25)",
+            boxShadow: `0 12px 36px ${alertShadowColor}, 0 0 0 2px rgba(255, 255, 255, 0.25)`,
             borderRadius: 3,
             animation: "globalPulse 1.2s infinite ease-in-out",
             "@keyframes globalPulse": {
@@ -103,9 +111,15 @@ export default function GlobalFireAlert() {
           }}
         >
           <Alert
-            severity="error"
+            severity={isSmokeOnly ? "warning" : "error"}
             variant="filled"
-            icon={<LocalFireDepartmentOutlinedIcon sx={{ fontSize: 36, animation: "bounce 0.8s infinite alternate" }} />}
+            icon={
+              isSmokeOnly ? (
+                <WarningAmberOutlinedIcon sx={{ fontSize: 36, animation: "bounce 0.8s infinite alternate" }} />
+              ) : (
+                <LocalFireDepartmentOutlinedIcon sx={{ fontSize: 36, animation: "bounce 0.8s infinite alternate" }} />
+              )
+            }
             action={
               <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                 <Tooltip title={isMuted ? "Bật âm thanh còi báo" : "Tắt âm thanh còi báo"}>
@@ -136,17 +150,17 @@ export default function GlobalFireAlert() {
                 </Button>
 
                 <Button
-                  color="warning"
+                  color={isSmokeOnly ? "inherit" : "warning"}
                   size="small"
                   variant="contained"
                   startIcon={<VideocamOutlinedIcon />}
                   onClick={handleGoToCamera}
                   sx={{
                     fontWeight: 800,
-                    bgcolor: "#fbbf24",
-                    color: "#78350f",
+                    bgcolor: isSmokeOnly ? "#ffffff" : "#fbbf24",
+                    color: isSmokeOnly ? "#b45309" : "#78350f",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                    "&:hover": { bgcolor: "#f59e0b" },
+                    "&:hover": { bgcolor: isSmokeOnly ? "#fef3c7" : "#f59e0b" },
                   }}
                 >
                   Xem Camera Ngay
@@ -158,7 +172,7 @@ export default function GlobalFireAlert() {
               </Stack>
             }
             sx={{
-              bgcolor: "#dc2626",
+              bgcolor: alertBgColor,
               color: "#ffffff",
               py: 1.5,
               px: 2.5,
@@ -170,11 +184,22 @@ export default function GlobalFireAlert() {
           >
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 800, letterSpacing: 0.5 }}>
-                🚨 BÁO ĐỘNG KHẨN CẤP: PHÁT HIỆN NGUY CƠ CHÁY NỔ!
+                {isSmokeOnly
+                  ? "⚠️ CẢNH BÁO PCCC: PHÁT HIỆN DẤU HIỆU KHÓI BẤT THƯỜNG!"
+                  : "🚨 BÁO ĐỘNG KHẨN CẤP: PHÁT HIỆN NGUY CƠ CHÁY NỔ!"}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.95, fontWeight: 500 }}>
-                Hệ thống AI vừa phát hiện <b>{activeAlert.fireCount} điểm cháy / khói</b> tại khu vực:{" "}
-                <b>{activeAlert.location}</b> ({activeAlert.cameraName}) lúc {activeAlert.timestamp}. Đề nghị nhân viên kiểm tra và chuẩn bị phương án sơ tán!
+                {isSmokeOnly ? (
+                  <>
+                    Hệ thống AI vừa phát hiện <b>{activeAlert.smokeCount} vùng khói nghi vấn</b> tại khu vực:{" "}
+                    <b>{activeAlert.location}</b> ({activeAlert.cameraName}) lúc {activeAlert.timestamp}. Đề nghị nhân viên kiểm tra hiện trường ngay để ngăn ngừa cháy lan!
+                  </>
+                ) : (
+                  <>
+                    Hệ thống AI vừa phát hiện <b>{activeAlert.fireCount} điểm cháy</b> tại khu vực:{" "}
+                    <b>{activeAlert.location}</b> ({activeAlert.cameraName}) lúc {activeAlert.timestamp}. Đề nghị nhân viên kiểm tra và chuẩn bị phương án sơ tán!
+                  </>
+                )}
               </Typography>
             </Box>
           </Alert>
