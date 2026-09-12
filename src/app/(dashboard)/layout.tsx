@@ -7,6 +7,7 @@ import {
   Avatar,
   Badge,
   Box,
+  Chip,
   CircularProgress,
   IconButton,
   Stack,
@@ -14,6 +15,7 @@ import {
   Tooltip,
   Typography,
   useTheme,
+  alpha,
 } from "@mui/material";
 import BellIcon from "@mui/icons-material/NotificationsOutlined";
 import Brightness6Icon from "@mui/icons-material/Brightness6Outlined";
@@ -26,6 +28,8 @@ import api from "@/lib/api-client";
 import Sidebar from "@/app/(dashboard)/_components/Sidebar";
 import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationDropdown";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
+import GlobalFireAlert from "@/app/(dashboard)/_components/ui/GlobalFireAlert";
+import { FireSurveillanceProvider } from "@/lib/fire-surveillance-context";
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();
@@ -152,14 +156,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isAuthenticated) return null;
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
-      <Sidebar />
-      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <Topbar user={user} />
-        <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 2, md: 3 } }}>
-          {children}
+    <FireSurveillanceProvider>
+      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+        <GlobalFireAlert />
+        <Sidebar />
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <Topbar user={user} />
+          <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 2, md: 3 } }}>
+            {children}
+          </Box>
         </Box>
       </Box>
-    </Box>
+    </FireSurveillanceProvider>
   );
 }

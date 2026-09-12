@@ -52,6 +52,15 @@ import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
 import StopOutlinedIcon from "@mui/icons-material/StopOutlined";
 import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
+import VolumeUpOutlinedIcon from "@mui/icons-material/VolumeUpOutlined";
+import VolumeOffOutlinedIcon from "@mui/icons-material/VolumeOffOutlined";
+import {
+  useFireSurveillance,
+  DetectedBox,
+  DetectionResponse,
+  IncidentLog,
+  DEFAULT_CONFIDENCE_THRESHOLD,
+} from "@/lib/fire-surveillance-context";
 
 // Shared Dashboard Components
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
@@ -61,73 +70,88 @@ import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { useAuth } from "@/lib/auth-context";
 
-interface DetectedBox {
-  label: string;
-  confidence?: number;
-  box: [number, number, number, number];
-  norm_box: [number, number, number, number];
-  width: number;
-  height: number;
-  area: number;
-}
-
-interface DetectionResponse {
-  success: boolean;
-  filename?: string;
-  image_size?: { width: number; height: number };
-  has_fire: boolean;
-  has_smoke: boolean;
-  fire_count: number;
-  smoke_count: number;
-  boxes: DetectedBox[];
-  latency_ms: number;
-  raw_response: string;
-  annotated_image_base64?: string;
-}
-
-interface IncidentLog {
-  id: string;
-  timestamp: string;
-  cameraName: string;
-  type: "fire" | "smoke" | "safe";
-  severity: "high" | "medium" | "low";
-  confidence: number;
-  status: "Đã kích hoạt cảnh báo" | "Đang giám sát" | "Bình thường";
-  thumbnail?: string;
-}
-
 export default function FireDetectionPage() {
   const theme = useTheme();
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
-  // API Gateway URL (chuẩn kết nối cổng 80 của toàn bộ hệ thống)
-  const serviceUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
+  // Dùng chung trạng thái Camera và Giám Sát Ngầm xuyên suốt toàn hệ thống
+  const {
+    isCameraActive,
+    isAutoScanning,
+    selectedCamera,
+    confidenceThreshold,
+    stream,
+    lastResult: result,
+    lastScanTime,
+    isProcessing,
+    error: ctxError,
+    serviceHealthy,
+    checkHealth,
+    incidents,
+    isAudioMuted,
+    startCamera,
+    stopCamera,
+    setSelectedCamera,
+    setIsAutoScanning,
+    setConfidenceThreshold,
+    toggleAudioMute: handleToggleAudio,
+    acknowledgeAlert: handleAcknowledgeAlert,
+    clearIncidents: handleClearIncidentsContext,
+    evaluateBlob,
+    captureFrameBlob,
+  } = useFireSurveillance();
 
-  // State quản lý kết nối
-  const [serviceHealthy, setServiceHealthy] = useState<boolean | null>(null);
-  const [serviceInfo, setServiceInfo] = useState<any>(null);
-
-  // Kênh Camera
-  const [selectedCamera, setSelectedCamera] = useState("CAM-PCCC-01");
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isAutoScanning, setIsAutoScanning] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>("");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const error = localError || ctxError;
+  const setError = setLocalError;
 
-  // Refs điều khiển Camera & Scan
+  // Video preview element trên trang này
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const isProcessingRef = useRef(false);
-  const autoScanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Kết quả phân tích hiện tại
-  const [result, setResult] = useState<DetectionResponse | null>(null);
-  const [lastScanTime, setLastScanTime] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Gắn stream đang chạy (hoặc mới mở) vào thẻ video preview của màn hình
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [stream, isCameraActive]);
 
-  // Sổ nhật ký sự cố (Surveillance Incident Log)
-  const [incidents, setIncidents] = useState<IncidentLog[]>([]);
+  // Xuất file CSV nhật ký sự cố
+  const handleExportCSV = () => {
+    if (incidents.length === 0) {
+      alert("Chưa có sự cố nào để xuất báo cáo.");
+      return;
+    }
+    const headers = ["Mã Sự Cố", "Thời Gian", "Vị Trí Camera", "Loại Nguy Cơ", "Mức Độ", "Độ Tin Cậy", "Trạng Thái"];
+    const rows = incidents.map((i) => [
+      i.id,
+      `"${i.timestamp}"`,
+      `"${i.cameraName}"`,
+      i.type === "fire" ? "Cháy / Lửa" : "Khói",
+      i.severity === "high" ? "Cao" : "Trung bình",
+      `${i.confidence}%`,
+      `"${i.status}"`,
+    ]);
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Nhat_ky_PCCC_IUH_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Làm mới hoặc xóa sổ nhật ký sự cố
+  const handleClearIncidents = async () => {
+    if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử trong sổ nhật ký sự cố PCCC?")) return;
+    await handleClearIncidentsContext();
+  };
 
   // Dialog kiểm định ảnh thủ công
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -162,158 +186,6 @@ export default function FireDetectionPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // Kiểm tra trạng thái AI qua API Gateway
-  const checkHealth = useCallback(async () => {
-    try {
-      let res = await fetch(`${serviceUrl}/api/fire/health`, { method: "GET" }).catch(() => null);
-      if (!res || !res.ok) {
-        res = await fetch(`${serviceUrl}/health`, { method: "GET" }).catch(() => null);
-      }
-      if (res && res.ok) {
-        const data = await res.json();
-        setServiceHealthy(true);
-        setServiceInfo(data);
-      } else {
-        setServiceHealthy(false);
-      }
-    } catch {
-      setServiceHealthy(false);
-    }
-  }, [serviceUrl]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      checkHealth();
-    }
-  }, [isAuthenticated, checkHealth]);
-
-  // Mở Camera
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 25 } },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      streamRef.current = stream;
-      setIsCameraActive(true);
-      setError(null);
-    } catch (err: any) {
-      setError("Không thể kết nối Camera an ninh: " + (err.message || "Vui lòng cấp quyền truy cập webcam"));
-    }
-  };
-
-  // Tắt Camera
-  const stopCamera = () => {
-    if (autoScanIntervalRef.current) {
-      clearInterval(autoScanIntervalRef.current);
-      autoScanIntervalRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    setIsCameraActive(false);
-  };
-
-  // Trích xuất frame từ Video stream
-  const captureFrameBlob = (): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      if (!videoRef.current) return reject("Camera chưa kích hoạt");
-      const canvas = document.createElement("canvas");
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return reject("Không tạo được context vẽ");
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else reject("Không capture được frame");
-        },
-        "image/jpeg",
-        0.88
-      );
-    });
-  };
-
-  // Hàm gửi frame tới Gateway để AI phân tích
-  const evaluateBlob = useCallback(
-    async (blob: Blob, isManual: boolean = false) => {
-      const formData = new FormData();
-      formData.append("file", blob, "cctv_frame.jpg");
-      formData.append("return_annotated", "true");
-
-      const res = await fetch(`${serviceUrl}/api/v1/detect/image`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        throw new Error(`Lỗi phân tích từ máy chủ (${res.status})`);
-      }
-
-      const data: DetectionResponse = await res.json();
-      setResult(data);
-      setLastScanTime(new Date().toLocaleTimeString("vi-VN"));
-
-      // Ghi nhận sự cố vào nhật ký nếu phát hiện lửa/khói
-      if (data.has_fire || data.has_smoke) {
-        const newIncident: IncidentLog = {
-          id: `INC-${Date.now().toString().slice(-6)}`,
-          timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-          cameraName: selectedCamera === "CAM-PCCC-01" ? "Kho sách Tầng 1" : "Sảnh chính",
-          type: data.has_fire ? "fire" : "smoke",
-          severity: data.has_fire ? "high" : "medium",
-          confidence: Math.round(
-            data.boxes.length > 0 ? (data.boxes[0].confidence ? data.boxes[0].confidence * 100 : 92) : 90
-          ),
-          status: "Đã kích hoạt cảnh báo",
-          thumbnail: data.annotated_image_base64,
-        };
-        setIncidents((prev) => [newIncident, ...prev.slice(0, 9)]);
-      }
-
-      return data;
-    },
-    [serviceUrl, selectedCamera]
-  );
-
-  // Vòng lặp tự động quét liên tục khi Camera mở (~2.5 FPS / mỗi 400ms)
-  useEffect(() => {
-    if (!isCameraActive || !isAutoScanning) {
-      if (autoScanIntervalRef.current) {
-        clearInterval(autoScanIntervalRef.current);
-        autoScanIntervalRef.current = null;
-      }
-      return;
-    }
-
-    const scanRoutine = async () => {
-      if (isProcessingRef.current || !videoRef.current || videoRef.current.videoWidth === 0) return;
-      isProcessingRef.current = true;
-      try {
-        const blob = await captureFrameBlob();
-        await evaluateBlob(blob, false);
-      } catch {
-        // Bỏ qua lỗi gián đoạn frame đơn lẻ
-      } finally {
-        isProcessingRef.current = false;
-      }
-    };
-
-    autoScanIntervalRef.current = setInterval(scanRoutine, 400);
-
-    return () => {
-      if (autoScanIntervalRef.current) {
-        clearInterval(autoScanIntervalRef.current);
-        autoScanIntervalRef.current = null;
-      }
-    };
-  }, [isCameraActive, isAutoScanning, evaluateBlob]);
-
   // Chụp kiểm tra thủ công 1 frame
   const handleManualCapture = async () => {
     if (!isCameraActive) return;
@@ -343,13 +215,23 @@ export default function FireDetectionPage() {
     }
   };
 
-  // Mức độ nguy cơ hiện tại
+  // Mức độ nguy cơ hiện tại (CHỈ BÁO ĐỘNG KHI ĐỘ TIN CẬY TRÊN 60% THEO YÊU CẦU)
   const currentRiskLevel = useMemo(() => {
     if (!result) return "safe";
+    const maxConf =
+      result.boxes && result.boxes.length > 0
+        ? Math.max(...result.boxes.map((b) => (typeof b.confidence === "number" ? b.confidence : 0.9)))
+        : 0;
+
+    // Nếu độ tin cậy < 60% thì coi như cảnh báo giả, duy trì trạng thái an toàn
+    if (maxConf < confidenceThreshold) {
+      return "safe";
+    }
+
     if (result.has_fire) return "danger";
     if (result.has_smoke) return "warning";
     return "safe";
-  }, [result]);
+  }, [result, confidenceThreshold]);
 
   return (
     <Stack spacing={3}>
@@ -361,6 +243,16 @@ export default function FireDetectionPage() {
           icon={LocalFireDepartmentOutlinedIcon}
           actions={
             <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+              <Tooltip title="Chỉ phát âm thanh cảnh báo và kích hoạt còi khi độ tin cậy nhận diện trên 60%">
+                <Chip
+                  icon={<SecurityOutlinedIcon fontSize="small" />}
+                  label={`Ngưỡng Báo Động: ≥ ${(confidenceThreshold * 100).toFixed(0)}%`}
+                  color="primary"
+                  variant="outlined"
+                  size="medium"
+                  sx={{ fontWeight: 700 }}
+                />
+              </Tooltip>
               <Chip
                 icon={serviceHealthy ? <CheckCircleOutlineOutlinedIcon /> : <WarningAmberOutlinedIcon />}
                 label={
@@ -375,6 +267,19 @@ export default function FireDetectionPage() {
                 size="medium"
                 sx={{ fontWeight: 700 }}
               />
+              <Tooltip title={isAudioMuted ? "Bật còi hú báo động PCCC" : "Tắt tiếng còi hú PCCC"}>
+                <IconButton
+                  onClick={handleToggleAudio}
+                  size="small"
+                  sx={{
+                    border: 1,
+                    borderColor: isAudioMuted ? "divider" : "error.main",
+                    color: isAudioMuted ? "text.secondary" : "error.main",
+                  }}
+                >
+                  {isAudioMuted ? <VolumeOffOutlinedIcon fontSize="small" /> : <VolumeUpOutlinedIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
               <Tooltip title="Kiểm tra lại kết nối">
                 <IconButton onClick={checkHealth} size="small" sx={{ border: 1, borderColor: "divider" }}>
                   <RefreshOutlinedIcon fontSize="small" />
@@ -394,7 +299,20 @@ export default function FireDetectionPage() {
         />
       </Box>
 
-      {/* Banner báo động khẩn cấp khi phát hiện lửa/khói */}
+      {/* Thông báo lọc bỏ cảnh báo giả khi độ tin cậy < 60% */}
+      {result && (result.has_fire || result.has_smoke) && currentRiskLevel === "safe" && (
+        <Box sx={staggerSx(1)}>
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            Hệ thống AI nhận diện dấu hiệu nghi vấn nhưng độ tin cậy đạt{" "}
+            {Math.round(
+              (result.boxes?.[0]?.confidence ?? 0.5) * 100
+            )}
+            %, thấp hơn ngưỡng kích hoạt quy định (≥ 60%). Hệ thống đã tự động lọc bỏ cảnh báo giả để tránh làm gián đoạn hoạt động thư viện.
+          </Alert>
+        </Box>
+      )}
+
+      {/* Banner báo động khẩn cấp khi phát hiện lửa/khói (Độ tin cậy ≥ 60%) */}
       {currentRiskLevel !== "safe" && (
         <Box sx={staggerSx(1)}>
           <Alert
@@ -402,15 +320,47 @@ export default function FireDetectionPage() {
             variant="filled"
             icon={<LocalFireDepartmentOutlinedIcon fontSize="large" />}
             action={
-              <Button
-                color="inherit"
-                size="small"
-                variant="outlined"
-                onClick={() => setEmergencyDialogOpen(true)}
-                sx={{ fontWeight: 800, borderColor: "white", color: "white" }}
-              >
-                Xem Hướng Dẫn Xử Lý
-              </Button>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Button
+                  color="inherit"
+                  size="small"
+                  variant="outlined"
+                  startIcon={isAudioMuted ? <VolumeOffOutlinedIcon /> : <VolumeUpOutlinedIcon />}
+                  onClick={handleToggleAudio}
+                  sx={{ fontWeight: 800, borderColor: "white", color: "white" }}
+                >
+                  {isAudioMuted ? "Bật Còi Hú" : "Tắt Còi Hú"}
+                </Button>
+                <Button
+                  color="inherit"
+                  size="small"
+                  variant="outlined"
+                  onClick={handleAcknowledgeAlert}
+                  sx={{
+                    fontWeight: 800,
+                    borderColor: "white",
+                    color: "white",
+                    bgcolor: "rgba(0,0,0,0.18)",
+                    display: { xs: "none", sm: "inline-flex" },
+                  }}
+                >
+                  Đã Kiểm Tra An Toàn
+                </Button>
+                <Button
+                  color="inherit"
+                  size="small"
+                  variant="contained"
+                  onClick={() => setEmergencyDialogOpen(true)}
+                  sx={{
+                    fontWeight: 800,
+                    bgcolor: "white",
+                    color: currentRiskLevel === "danger" ? "#b91c1c" : "#b45309",
+                    "&:hover": { bgcolor: "#f8fafc" },
+                  }}
+                >
+                  Quy Trình Khẩn Cấp
+                </Button>
+              </Stack>
             }
             sx={{
               py: 1.5,
@@ -1072,15 +1022,28 @@ export default function FireDetectionPage() {
           title="Sổ Nhật Ký Giám Sát & Sự Cố PCCC"
           subtitle="Ghi nhận lịch sử các cảnh báo và trạng thái xử lý của ban quản lý thư viện"
           actions={
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<DownloadOutlinedIcon />}
-              onClick={() => alert("Đã xuất báo cáo sự cố PCCC định dạng PDF")}
-              sx={{ fontWeight: 700 }}
-            >
-              Xuất Nhật Ký
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<DownloadOutlinedIcon />}
+                onClick={handleExportCSV}
+                sx={{ fontWeight: 700 }}
+              >
+                Xuất Nhật Ký (CSV)
+              </Button>
+              {incidents.length > 0 && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={handleClearIncidents}
+                  sx={{ fontWeight: 700 }}
+                >
+                  Làm Mới Sổ
+                </Button>
+              )}
+            </Stack>
           }
         >
           {incidents.length === 0 ? (
