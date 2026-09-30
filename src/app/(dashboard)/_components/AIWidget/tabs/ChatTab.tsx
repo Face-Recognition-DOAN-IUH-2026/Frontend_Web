@@ -326,7 +326,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           bgcolor: isUser ? "secondary.main" : "primary.main",
           boxShadow: isDark
             ? "0 2px 8px rgba(0,0,0,0.4)"
-            : "0 2px 8px rgba(30, 96, 145, 0.2)",
+            : "0 2px 8px rgba(139, 0, 0, 0.2)",
           flexShrink: 0,
           mt: 0.5,
         }}
@@ -381,7 +381,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                 boxShadow: isUser
                   ? isDark
                     ? "0 2px 8px rgba(0,0,0,0.3)"
-                    : "0 2px 10px rgba(30, 96, 145, 0.25)"
+                    : "0 2px 10px rgba(139, 0, 0, 0.2)"
                   : isDark
                   ? "0 2px 10px rgba(0,0,0,0.25)"
                   : "0 2px 8px rgba(0, 0, 0, 0.04)",
@@ -405,7 +405,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                     "& li": { mb: 0.35, lineHeight: 1.55 },
                     "& strong": {
                       fontWeight: 700,
-                      color: isDark ? "#93C5FD" : "#1E40AF",
+                      color: isDark ? "secondary.light" : "primary.main",
                     },
                     "& em": { fontStyle: "italic" },
                     "& h1, & h2, & h3, & h4": {
@@ -457,7 +457,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                       color: "text.secondary",
                     },
                     "& a": {
-                      color: isDark ? "#60A5FA" : "#2563EB",
+                      color: isDark ? "secondary.light" : "primary.main",
                       textDecoration: "none",
                       "&:hover": { textDecoration: "underline" },
                     },

@@ -16,6 +16,7 @@ import {
   Drawer,
   IconButton,
   MenuItem,
+  Snackbar,
   Stack,
   TextField,
   Typography,
@@ -31,7 +32,6 @@ import { initials } from "@/lib/utils";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import notification from "antd/es/notification";
 import ConfirmDialog from "@/app/(dashboard)/_components/ui/ConfirmDialog";
 import PatronStatCards from "@/app/(dashboard)/_components/ui/PatronStatCards";
 import PatronToolbar from "@/app/(dashboard)/_components/ui/PatronToolbar";
@@ -43,14 +43,13 @@ export type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face"
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 const STAT_GRADIENT = {
-  total: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  total: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
   active: "linear-gradient(135deg, #059669 0%, #047857 100%)",
   expired: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
-  face: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+  face: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
 };
 
 export default function PatronsPage() {
-  const [apiAnt, contextHolder] = notification.useNotification();
   const router = useRouter();
   const [patrons, setPatrons] = useState<PatronPublic[]>([]);
   const [query, setQuery] = useState("");
@@ -82,10 +81,7 @@ export default function PatronsPage() {
 
   const [notice, setNotice] = useState<Notice>(null);
   const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => {
-    if (severity === "success") apiAnt.success({ title: message, placement: "topRight" });
-    else if (severity === "error") apiAnt.error({ title: message, placement: "topRight" });
-    else if (severity === "warning") apiAnt.warning({ title: message, placement: "topRight" });
-    else apiAnt.info({ title: message, placement: "topRight" });
+    setNotice({ severity, message });
   };
 
   const load = useCallback(async () => {
@@ -197,12 +193,11 @@ export default function PatronsPage() {
       <PageHeader
         title="Quản lý Độc giả"
         icon={PeopleIcon}
-        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
         statBadges={statBadges}
         onRefresh={load}
         actions={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreate(true)}
-            sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", boxShadow: "0 4px 14px rgba(99,102,241,0.4)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}>
+            sx={{ background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", boxShadow: "0 4px 14px rgba(139,0,0,0.3)", "&:hover": { background: "linear-gradient(135deg, #700000 0%, #500000 100%)" } }}>
             Thêm độc giả
           </Button>
         }
@@ -384,7 +379,23 @@ export default function PatronsPage() {
         </DialogActions>
       </Dialog>
 
-      {contextHolder}
+      <Snackbar
+        open={Boolean(notice)}
+        autoHideDuration={4000}
+        onClose={() => setNotice(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        {notice ? (
+          <Alert
+            onClose={() => setNotice(null)}
+            severity={notice.severity}
+            variant="filled"
+            sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
+          >
+            {notice.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Stack>
   );
 }

@@ -17,6 +17,7 @@ import {
   LinearProgress,
   MenuItem,
   Paper,
+  Snackbar,
   Stack,
   Tab,
   Table,
@@ -51,7 +52,6 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
-import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { initials, formatDate, formatDateTime, statusLabel, statusColor } from "@/lib/utils";
 import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
@@ -88,7 +88,6 @@ function MetaRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 }
 
 export default function PatronDetailPage() {
-  const [apiAnt, contextHolder] = notification.useNotification();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
@@ -112,6 +111,11 @@ export default function PatronDetailPage() {
   const [enrollError, setEnrollError] = useState("");
   const [enrollSuccess, setEnrollSuccess] = useState("");
   const [enrollLoading, setEnrollLoading] = useState(false);
+  const [notice, setNotice] = useState<{ severity: "success" | "error" | "warning" | "info"; message: string } | null>(null);
+
+  const showNotice = (severity: "success" | "error" | "warning" | "info", message: string) => {
+    setNotice({ severity, message });
+  };
 
   const loadPatron = useCallback(async () => {
     try {
@@ -169,7 +173,7 @@ export default function PatronDetailPage() {
     if (!patron) return;
     await api.updatePatron(patron.id, editForm);
     setShowEdit(false);
-    apiAnt.success({ title: "Đã cập nhật thông tin độc giả.", placement: "topRight" });
+    showNotice("success", "Đã cập nhật thông tin độc giả.");
     await loadPatron();
   };
 
@@ -179,7 +183,7 @@ export default function PatronDetailPage() {
     if (next < new Date()) next.setTime(Date.now());
     next.setFullYear(next.getFullYear() + 1);
     await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
-    apiAnt.success({ title: "Đã gia hạn thẻ thêm 1 năm.", placement: "topRight" });
+    showNotice("success", "Đã gia hạn thẻ thêm 1 năm.");
     await loadPatron();
   };
 
@@ -190,10 +194,10 @@ export default function PatronDetailPage() {
       router.push("/patrons");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        apiAnt.error({ title: "Độc giả không tồn tại hoặc đã bị xóa.", placement: "topRight" });
+        showNotice("error", "Độc giả không tồn tại hoặc đã bị xóa.");
         router.push("/patrons");
       } else {
-        apiAnt.error({ title: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
+        showNotice("error", `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
       }
     }
   };
@@ -204,10 +208,10 @@ export default function PatronDetailPage() {
       await api.restorePatron(patron.id);
       setShowRestore(false);
       setRestoreConfirmText("");
-      apiAnt.success({ title: "Đã khôi phục độc giả.", placement: "topRight" });
+      showNotice("success", "Đã khôi phục độc giả.");
       await loadPatron();
     } catch (err: any) {
-      apiAnt.error({ title: `Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
+      showNotice("error", `Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
     }
   };
 
@@ -610,7 +614,23 @@ export default function PatronDetailPage() {
             </DialogActions>
           </Dialog>
 
-          {contextHolder}
+          <Snackbar
+            open={Boolean(notice)}
+            autoHideDuration={4000}
+            onClose={() => setNotice(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          >
+            {notice ? (
+              <Alert
+                onClose={() => setNotice(null)}
+                severity={notice.severity}
+                variant="filled"
+                sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
+              >
+                {notice.message}
+              </Alert>
+            ) : undefined}
+          </Snackbar>
         </Stack>
       )}
     </LoadingOverlay>

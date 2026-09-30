@@ -62,32 +62,32 @@ const CATEGORY_META: Record<string, { label: string; icon: React.ReactElement; c
   borrow: {
     label: "Mượn trả",
     icon: <MenuBookOutlinedIcon />,
-    color: "#8b5cf6",
-    gradient: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+    color: "#8B0000",
+    gradient: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
   },
   fine: {
     label: "Phí phạt",
     icon: <MonetizationOnOutlinedIcon />,
-    color: "#ef4444",
-    gradient: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+    color: "#DC2626",
+    gradient: "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)",
   },
   smtp: {
     label: "Email SMTP",
     icon: <EmailOutlinedIcon />,
-    color: "#3b82f6",
-    gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+    color: "#0A2540",
+    gradient: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
   },
   automation: {
     label: "Tác vụ tự động",
     icon: <ScheduleOutlinedIcon />,
-    color: "#10b981",
-    gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+    color: "#059669",
+    gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)",
   },
   access: {
     label: "Ra vào",
     icon: <MeetingRoomOutlinedIcon />,
-    color: "#f59e0b",
-    gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+    color: "#D97706",
+    gradient: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
   },
 } as const;
 
@@ -420,20 +420,20 @@ export default function SettingsPage() {
       {/* ─── Gradient Header ─── */}
       <Box sx={{
         p: 3, borderRadius: 3,
-        background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
-        border: "1px solid", borderColor: "rgba(99,102,241,0.3)",
+        background: "linear-gradient(135deg, #0A2540 0%, #154E78 50%, #0A2540 100%)",
+        border: "1px solid", borderColor: "rgba(212,175,55,0.3)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: 2, position: "relative", overflow: "hidden",
       }}>
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(212,175,55,0.06)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(212,175,55,0.04)", pointerEvents: "none" }} />
         <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-            <SettingsOutlinedIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          <Avatar sx={{ bgcolor: "rgba(212,175,55,0.15)", width: 52, height: 52, border: "1px solid rgba(212,175,55,0.35)" }}>
+            <SettingsOutlinedIcon sx={{ color: "#D4AF37", fontSize: 28 }} />
           </Avatar>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Cài đặt hệ thống</Typography>
-            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#ffffff" }}>Cài đặt hệ thống</Typography>
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", mt: 0.3 }}>
               {totalConfigs > 0
                 ? `${totalConfigs} cấu hình · ${CATEGORIES.length} nhóm${changedCount > 0 ? ` · ${changedCount} thay đổi chưa lưu` : ""}`
                 : "Quản lý cấu hình vận hành thư viện"}
@@ -441,7 +441,7 @@ export default function SettingsPage() {
           </Box>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ zIndex: 1 }}>
-          <IconButton onClick={load} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+          <IconButton onClick={load} size="small" sx={{ color: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.25)", "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}>
             <RefreshOutlinedIcon fontSize="small" />
           </IconButton>
         </Stack>
@@ -653,7 +653,7 @@ export default function SettingsPage() {
             variant="contained"
             disabled={!testEmail || testEmailSending}
             onClick={handleTestEmail}
-            sx={{ borderRadius: 2, fontWeight: 700, bgcolor: CATEGORY_META.smtp.color, "&:hover": { bgcolor: "#1d4ed8" } }}
+            sx={{ borderRadius: 2, fontWeight: 700, bgcolor: CATEGORY_META.smtp.color, "&:hover": { bgcolor: "#071A2E" } }}
           >
             {testEmailSending ? "Đang gửi..." : "Gửi"}
           </Button>

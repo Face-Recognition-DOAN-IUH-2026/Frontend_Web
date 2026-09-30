@@ -65,7 +65,7 @@ export default function AdminActionMenu({
           <ListItemText>Gợi ý lịch tự động</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => { setScheduleAnchor(null); onAction("templates"); }}>
-          <ListItemIcon><ScheduleIcon sx={{ fontSize: 18, color: "#a5b4fc" }} /></ListItemIcon>
+          <ListItemIcon><ScheduleIcon sx={{ fontSize: 18, color: "primary.main" }} /></ListItemIcon>
           <ListItemText>Mẫu lịch</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => { setScheduleAnchor(null); onAction("delete-week"); }}>
@@ -97,12 +97,12 @@ export default function AdminActionMenu({
           {pendingBidCount > 0 && <Typography variant="caption" sx={{ ml: 1, color: "text.secondary" }}>({pendingBidCount})</Typography>}
         </MenuItem>
         <MenuItem onClick={() => { setApproveAnchor(null); onAction("swaps-view"); }}>
-          <ListItemIcon><GroupIcon sx={{ fontSize: 18, color: "#3b82f6" }} /></ListItemIcon>
+          <ListItemIcon><GroupIcon sx={{ fontSize: 18, color: "primary.main" }} /></ListItemIcon>
           <ListItemText>Đổi ca</ListItemText>
           {pendingSwapCount > 0 && <Typography variant="caption" sx={{ ml: 1, color: "text.secondary" }}>({pendingSwapCount})</Typography>}
         </MenuItem>
         <MenuItem onClick={() => { setApproveAnchor(null); onAction("manual-checkin"); }}>
-          <ListItemIcon><EditNoteIcon sx={{ fontSize: 18, color: "#8b5cf6" }} /></ListItemIcon>
+          <ListItemIcon><EditNoteIcon sx={{ fontSize: 18, color: "secondary.main" }} /></ListItemIcon>
           <ListItemText>Check-in thủ công</ListItemText>
           {pendingManualCount > 0 && <Typography variant="caption" sx={{ ml: 1, color: "text.secondary" }}>({pendingManualCount})</Typography>}
         </MenuItem>
@@ -112,18 +112,18 @@ export default function AdminActionMenu({
         <IconButton
           size="small"
           onClick={(e) => setConfigAnchor(e.currentTarget)}
-          sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}
+          sx={{ color: "text.primary", border: "1px solid", borderColor: "divider", "&:hover": { bgcolor: "action.hover" } }}
         >
           <SettingsIcon fontSize="small" />
         </IconButton>
       </Tooltip>
       <Menu anchorEl={configAnchor} open={Boolean(configAnchor)} onClose={() => setConfigAnchor(null)} sx={menuStyle}>
         <MenuItem onClick={() => { setConfigAnchor(null); onAction("management"); }}>
-          <ListItemIcon><SettingsIcon sx={{ fontSize: 18, color: "#a5b4fc" }} /></ListItemIcon>
+          <ListItemIcon><SettingsIcon sx={{ fontSize: 18, color: "text.secondary" }} /></ListItemIcon>
           <ListItemText>Quản lý ca/khu vực</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => { setConfigAnchor(null); onAction("templates-config"); }}>
-          <ListItemIcon><AssignmentTurnedInIcon sx={{ fontSize: 18, color: "#a5b4fc" }} /></ListItemIcon>
+          <ListItemIcon><AssignmentTurnedInIcon sx={{ fontSize: 18, color: "text.secondary" }} /></ListItemIcon>
           <ListItemText>Mẫu lịch</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => { setConfigAnchor(null); onAction("geofence"); }}>

@@ -44,19 +44,19 @@ function getApiError(err: any): string {
 }
 
 const ACTION_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode; category: string }> = {
-  "assignment.created":                      { label: "Phân ca mới",        color: "#10b981", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
-  "assignment.confirmed":                    { label: "Xác nhận ca",         color: "#3b82f6", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
-  "assignment.admin_confirmed":              { label: "Admin xác nhận",      color: "#8b5cf6", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
-  "assignment.cancelled":                    { label: "Hủy ca",              color: "#ef4444", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
-  "assignment.cancelled_by_config_delete":   { label: "Hủy (xóa ca/zone)",  color: "#f97316", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
-  "attendance.checked_in":                   { label: "Check-in",            color: "#10b981", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
-  "attendance.checked_out":                  { label: "Check-out",           color: "#3b82f6", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
-  "attendance.auto_checkout":                { label: "Auto check-out",      color: "#f59e0b", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
-  "attendance.admin_fixed":                  { label: "Admin sửa điểm danh", color: "#8b5cf6", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
-  "attendance.removed_orphaned":             { label: "Xóa attendance mồ côi", color: "#ef4444", icon: <FingerprintIcon sx={{ fontSize: 14 }} />, category: "attendance" },
-  "zone.deactivated":                        { label: "Vô hiệu hóa zone",    color: "#ef4444", icon: <TuneIcon sx={{ fontSize: 14 }} />,         category: "config" },
-  "shift.deactivated":                       { label: "Vô hiệu hóa ca",      color: "#ef4444", icon: <ScheduleIcon sx={{ fontSize: 14 }} />,     category: "config" },
-  "template.deactivated":                    { label: "Vô hiệu hóa mẫu",     color: "#ef4444", icon: <EventIcon sx={{ fontSize: 14 }} />,        category: "config" },
+  "assignment.created":                      { label: "Phân ca mới",        color: "#059669", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
+  "assignment.confirmed":                    { label: "Xác nhận ca",         color: "#0A2540", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
+  "assignment.admin_confirmed":              { label: "Admin xác nhận",      color: "#8B0000", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
+  "assignment.cancelled":                    { label: "Hủy ca",              color: "#DC2626", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
+  "assignment.cancelled_by_config_delete":   { label: "Hủy (xóa ca/zone)",  color: "#D97706", icon: <AssignmentIndIcon sx={{ fontSize: 14 }} />, category: "assignment" },
+  "attendance.checked_in":                   { label: "Check-in",            color: "#059669", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
+  "attendance.checked_out":                  { label: "Check-out",           color: "#0A2540", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
+  "attendance.auto_checkout":                { label: "Auto check-out",      color: "#D97706", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
+  "attendance.admin_fixed":                  { label: "Admin sửa điểm danh", color: "#D4AF37", icon: <FingerprintIcon sx={{ fontSize: 14 }} />,   category: "attendance" },
+  "attendance.removed_orphaned":             { label: "Xóa attendance mồ côi", color: "#DC2626", icon: <FingerprintIcon sx={{ fontSize: 14 }} />, category: "attendance" },
+  "zone.deactivated":                        { label: "Vô hiệu hóa zone",    color: "#DC2626", icon: <TuneIcon sx={{ fontSize: 14 }} />,         category: "config" },
+  "shift.deactivated":                       { label: "Vô hiệu hóa ca",      color: "#DC2626", icon: <ScheduleIcon sx={{ fontSize: 14 }} />,     category: "config" },
+  "template.deactivated":                    { label: "Vô hiệu hóa mẫu",     color: "#DC2626", icon: <EventIcon sx={{ fontSize: 14 }} />,        category: "config" },
 };
 
 const CATEGORY_ACTIONS: Record<string, string[]> = {
@@ -206,14 +206,14 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
     <Drawer anchor="right" open={open} onClose={onClose} sx={{ zIndex: 9999 }}>
       <Box sx={{ width: { xs: "100%", sm: 540 }, height: "100%", display: "flex", flexDirection: "column" }}>
         {/* Header */}
-        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: "divider", background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: "divider", background: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Box sx={{ width: 32, height: 32, borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "rgba(165,180,252,0.2)" }}>
-              <TimelineIcon sx={{ fontSize: 18, color: "#a5b4fc" }} />
+            <Box sx={{ width: 32, height: 32, borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "rgba(212,175,55,0.15)" }}>
+              <TimelineIcon sx={{ fontSize: 18, color: "#D4AF37" }} />
             </Box>
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "common.white" }}>Nhật ký hoạt động</Typography>
-              <Typography variant="caption" sx={{ color: "#c7d2fe" }}>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)" }}>
                 {groupedLogs.reduce((s, g) => s + g.items.length, 0)} / {total} bản ghi
               </Typography>
             </Box>
@@ -222,11 +222,11 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
             <IconButton
               size="small"
               onClick={() => setShowStats(!showStats)}
-              sx={{ color: "#a5b4fc", bgcolor: showStats ? "rgba(165,180,252,0.3)" : "transparent" }}
+              sx={{ color: "rgba(255,255,255,0.85)", bgcolor: showStats ? "rgba(255,255,255,0.15)" : "transparent" }}
             >
               <BarChartIcon sx={{ fontSize: 18 }} />
             </IconButton>
-            <IconButton size="small" onClick={onClose} sx={{ color: "#c7d2fe" }}>
+            <IconButton size="small" onClick={onClose} sx={{ color: "rgba(255,255,255,0.85)" }}>
               <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
@@ -234,7 +234,7 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
 
         {/* Stats Summary */}
         {showStats && (
-          <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: "divider", bgcolor: "rgba(99,102,241,0.05)" }}>
+          <Box sx={{ px: 3, py: 2, borderBottom: 1, borderColor: "divider", bgcolor: (t) => t.palette.mode === "dark" ? "rgba(10,37,64,0.3)" : "rgba(10,37,64,0.04)" }}>
             {statsLoading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 1 }}>
                 <CircularProgress size={16} />
@@ -242,12 +242,12 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
             ) : stats ? (
               <Stack spacing={1}>
                 <Stack direction="row" spacing={2}>
-                  <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.05)" }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: "#a5b4fc" }}>{stats.totalToday}</Typography>
+                  <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "action.hover" }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: "primary.main" }}>{stats.totalToday}</Typography>
                     <Typography variant="caption" color="text.secondary">Hôm nay</Typography>
                   </Box>
-                  <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.05)" }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: "#a5b4fc" }}>{stats.totalThisWeek}</Typography>
+                  <Box sx={{ flex: 1, textAlign: "center", p: 1, borderRadius: 1, bgcolor: "action.hover" }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: "secondary.main" }}>{stats.totalThisWeek}</Typography>
                     <Typography variant="caption" color="text.secondary">Tuần này</Typography>
                   </Box>
                 </Stack>
@@ -318,11 +318,11 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
                 sx={{
                   height: 26, fontSize: 11, borderRadius: "13px", flexShrink: 0,
                   fontWeight: filterCategory === cat.key ? 700 : 500,
-                  bgcolor: filterCategory === cat.key ? "#6366f1" : "transparent",
+                  bgcolor: filterCategory === cat.key ? "primary.main" : "transparent",
                   color: filterCategory === cat.key ? "#fff" : "text.secondary",
-                  borderColor: filterCategory === cat.key ? "#6366f1" : "divider",
+                  borderColor: filterCategory === cat.key ? "primary.main" : "divider",
                   "& .MuiChip-icon": { color: filterCategory === cat.key ? "#fff" : "text.secondary", fontSize: 14 },
-                  "&:hover": { bgcolor: filterCategory === cat.key ? "#4f46e5" : "action.hover" },
+                  "&:hover": { bgcolor: filterCategory === cat.key ? "primary.dark" : "action.hover" },
                 }}
               />
             ))}
@@ -351,9 +351,9 @@ export default function AuditLogsPanel({ open, onClose }: Props) {
 
           {groupedLogs.map((group) => (
             <Box key={group.dateKey}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 3, py: 1, position: "sticky", top: 0, zIndex: 10, bgcolor: "#1e1b2e" }}>
-                <TodayIcon sx={{ fontSize: 13, color: "#6366f1" }} />
-                <Typography variant="caption" sx={{ fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 3, py: 1, position: "sticky", top: 0, zIndex: 10, bgcolor: (t) => t.palette.mode === "dark" ? "rgba(10,37,64,0.4)" : "rgba(139,0,0,0.04)", backdropFilter: "blur(8px)" }}>
+                <TodayIcon sx={{ fontSize: 13, color: "primary.main" }} />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: "primary.main", textTransform: "uppercase", letterSpacing: 0.5 }}>
                   {group.label}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>

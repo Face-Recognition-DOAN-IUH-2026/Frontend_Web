@@ -60,15 +60,15 @@ export default function BookRecommendations({
   if (!data || !data.recommendations.length) return null;
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderColor: "info.main" }}>
+    <Paper variant="outlined" sx={{ p: 2, borderColor: "primary.light", bgcolor: (t) => t.palette.mode === "dark" ? "rgba(139,0,0,0.05)" : "rgba(139,0,0,0.02)" }}>
       <Stack spacing={2}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", justifyContent: "space-between" }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <AutoAwesomeIcon color="info" fontSize="small" />
+            <AutoAwesomeIcon sx={{ color: "primary.main" }} fontSize="small" />
             <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
               Gợi ý sách cho {data.patron_name}
             </Typography>
-            <Chip size="small" variant="outlined" label="AI đề xuất" color="info" />
+            <Chip size="small" variant="outlined" label="AI đề xuất" color="primary" />
           </Stack>
           {onClose && (
             <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
@@ -97,7 +97,7 @@ function RecommendationCard({ book, index }: { book: AIBookRecommendation; index
         animation: `${fadeInUp} 0.35s ease-out`,
         animationDelay: `${index * 0.08}s`,
         animationFillMode: "both",
-        "&:hover": { borderColor: "info.main", boxShadow: "0 2px 8px rgba(3,165,226,0.12)" },
+        "&:hover": { borderColor: "primary.main", boxShadow: "0 2px 8px rgba(139,0,0,0.12)" },
       }}
     >
       <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
@@ -134,14 +134,14 @@ function RecommendationCard({ book, index }: { book: AIBookRecommendation; index
             </Box>
           </Box>
           <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-            <LightbulbIcon sx={{ fontSize: 14, color: "info.main" }} />
-            <Typography variant="caption" color="info.main" sx={{ lineHeight: 1.3 }}>{book.reason}</Typography>
+            <LightbulbIcon sx={{ fontSize: 14, color: "warning.main" }} />
+            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>{book.reason}</Typography>
           </Stack>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <LinearProgress
               variant="determinate"
               value={book.relevance_score}
-              color={book.relevance_score >= 70 ? "success" : book.relevance_score >= 40 ? "warning" : "info"}
+              color={book.relevance_score >= 70 ? "success" : book.relevance_score >= 40 ? "warning" : "primary"}
               sx={{ flex: 1, height: 4, borderRadius: 4 }}
             />
             <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, fontWeight: 700 }}>

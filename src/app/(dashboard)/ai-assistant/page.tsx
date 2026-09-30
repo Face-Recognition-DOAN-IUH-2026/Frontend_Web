@@ -32,14 +32,12 @@ import ScheduleIcon from "@mui/icons-material/CalendarTodayOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
-import AntdButton from "antd/es/button";
 
 import Markdown from "react-markdown";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api, { getApiAccessToken } from "@/lib/api-client";
 import BookCard, { parseBookCard } from "@/app/(dashboard)/_components/BookCard";
@@ -70,12 +68,12 @@ interface PendingAction {
 const STORAGE_KEY = "ai-assistant-session";
 
 const SUGGESTIONS = [
-  { label: "Tìm sách về AI", icon: <SearchIcon sx={{ fontSize: 16 }} />, color: "#1E6091" },
-  { label: "Lịch trực hôm nay", icon: <ScheduleIcon sx={{ fontSize: 16 }} />, color: "#2563EB" },
+  { label: "Tìm sách về AI", icon: <SearchIcon sx={{ fontSize: 16 }} />, color: "#0A2540" },
+  { label: "Lịch trực hôm nay", icon: <ScheduleIcon sx={{ fontSize: 16 }} />, color: "#8B0000" },
   { label: "Sách quá hạn", icon: <WarningIcon sx={{ fontSize: 16 }} />, color: "#DC2626" },
   { label: "Giờ mở cửa", icon: <AccessTimeIcon sx={{ fontSize: 16 }} />, color: "#059669" },
   { label: "Quy định mượn trả", icon: <RuleIcon sx={{ fontSize: 16 }} />, color: "#D97706" },
-  { label: "Độc giả trong thư viện", icon: <GroupsIcon sx={{ fontSize: 16 }} />, color: "#154E78" },
+  { label: "Độc giả trong thư viện", icon: <GroupsIcon sx={{ fontSize: 16 }} />, color: "#0F3C5C" },
 ];
 
 function buildApiUrl(path: string) {
@@ -202,7 +200,6 @@ function MessageContent({ content }: { content: string }) {
 }
 
 export default function AiAssistantPage() {
-  const [apiAnt, contextHolder] = notification.useNotification();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -295,7 +292,6 @@ export default function AiAssistantPage() {
       }
     } catch {
       setError("Không thể kết nối AI. Vui lòng thử lại.");
-      apiAnt.error({ title: "Không thể kết nối AI. Vui lòng thử lại.", placement: "topRight" });
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
     } finally {
       setLoading(false);
@@ -369,8 +365,8 @@ export default function AiAssistantPage() {
   }, [messages]);
 
   const stats = [
-    { key: "msg", label: "Tin nhắn", value: messages.length, gradient: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)" },
-    { key: "tool", label: "Công cụ", value: toolCount, gradient: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" },
+    { key: "msg", label: "Tin nhắn", value: messages.length, gradient: "linear-gradient(135deg, #8B0000 0%, #700000 100%)" },
+    { key: "tool", label: "Công cụ", value: toolCount, gradient: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)" },
     { key: "session", label: "Phiên", value: sessionId ? sessionId.slice(0, 6) : "Mới", gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)" },
     { key: "status", label: "Trạng thái", value: loading ? "Xử lý..." : "Sẵn sàng", gradient: "linear-gradient(135deg, #D97706 0%, #B45309 100%)" },
   ];
@@ -386,7 +382,6 @@ export default function AiAssistantPage() {
       <PageHeader
         title="AI Trợ lý"
         icon={SmartToyIcon}
-        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
         statBadges={statBadges}
         onRefresh={clearChat}
         actions={
@@ -395,7 +390,7 @@ export default function AiAssistantPage() {
               <Chip
                 label={`Phiên: ${sessionId.slice(0, 8)}...`}
                 size="small"
-                sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", fontWeight: 600, fontSize: "0.72rem" }}
+                sx={{ color: "text.secondary", borderColor: "divider", fontWeight: 600, fontSize: "0.72rem" }}
                 variant="outlined"
               />
             ) : null}
@@ -410,8 +405,8 @@ export default function AiAssistantPage() {
             {showEmpty ? (
               <EmptyState
                 icon={
-                  <Avatar sx={{ width: 72, height: 72, bgcolor: "rgba(99,102,241,0.15)", border: "2px solid rgba(99,102,241,0.3)" }}>
-                    <SmartToyIcon sx={{ fontSize: 36, color: "#6366f1" }} />
+                  <Avatar sx={{ width: 72, height: 72, bgcolor: "rgba(139,0,0,0.12)", border: "2px solid rgba(139,0,0,0.25)" }}>
+                    <SmartToyIcon sx={{ fontSize: 36, color: "primary.main" }} />
                   </Avatar>
                 }
                 title="Trợ lý AI Thư viện IUH"
@@ -419,16 +414,27 @@ export default function AiAssistantPage() {
                 action={
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, justifyContent: "center", maxWidth: 600, mx: "auto" }}>
                     {SUGGESTIONS.map((s) => (
-                      <AntdButton
+                      <Button
                         key={s.label}
-                        icon={s.icon}
-                        shape="round"
-                        type="dashed"
+                        startIcon={s.icon}
+                        variant="outlined"
+                        size="small"
                         onClick={() => sendMessage(s.label)}
-                        style={{ borderColor: alpha(s.color, 0.4), color: s.color, fontWeight: 600, fontSize: "0.78rem" }}
+                        sx={{
+                          borderRadius: 99,
+                          borderColor: alpha(s.color, 0.4),
+                          color: s.color,
+                          fontWeight: 600,
+                          fontSize: "0.78rem",
+                          textTransform: "none",
+                          "&:hover": {
+                            borderColor: s.color,
+                            bgcolor: alpha(s.color, 0.08),
+                          },
+                        }}
                       >
                         {s.label}
-                      </AntdButton>
+                      </Button>
                     ))}
                   </Box>
                 }
@@ -451,7 +457,7 @@ export default function AiAssistantPage() {
               borderRadius: 3,
               borderColor: "divider",
               transition: "border-color 0.2s, box-shadow 0.2s",
-              "&:focus-within": { borderColor: "#6366f1", boxShadow: "0 0 0 2px rgba(99,102,241,0.1)" },
+              "&:focus-within": { borderColor: "primary.main", boxShadow: "0 0 0 2px rgba(139,0,0,0.12)" },
             }}
           >
             <Stack direction="row" spacing={1} sx={{ alignItems: "flex-end" }}>
@@ -479,17 +485,17 @@ export default function AiAssistantPage() {
                 onClick={() => sendMessage()}
                 disabled={loading || !input.trim()}
                 sx={{
-                  background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                  background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
                   color: "white",
                   width: 40,
                   height: 40,
                   borderRadius: 2,
-                  boxShadow: "0 4px 14px rgba(99,102,241,0.4)",
+                  boxShadow: "0 4px 14px rgba(139,0,0,0.3)",
                   transition: "transform 0.2s, box-shadow 0.2s",
                   "&:hover": {
-                    background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
+                    background: "linear-gradient(135deg, #700000 0%, #500000 100%)",
                     transform: "scale(1.05)",
-                    boxShadow: "0 6px 20px rgba(99,102,241,0.5)",
+                    boxShadow: "0 6px 20px rgba(139,0,0,0.4)",
                   },
                   "&:disabled": {
                     background: "action.disabledBackground",
@@ -509,10 +515,8 @@ export default function AiAssistantPage() {
       </DashboardCard>
       </Box>
 
-      {contextHolder}
-
       <Dialog open={confirmDialog.open} onClose={() => handleConfirm("reject")} maxWidth="sm" fullWidth>
-        <Box sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", p: 2.5, color: "white" }}>
+        <Box sx={{ background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)", p: 2.5, color: "white" }}>
           <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
             <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
               <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", width: 40, height: 40 }}>
@@ -558,7 +562,7 @@ export default function AiAssistantPage() {
             onClick={() => handleConfirm("approve")}
             variant="contained"
             startIcon={<CheckCircleIcon />}
-            sx={{ borderRadius: 2, fontWeight: 700, background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}
+            sx={{ borderRadius: 2, fontWeight: 700, background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)", "&:hover": { background: "linear-gradient(135deg, #700000 0%, #500000 100%)" } }}
           >
             Xác nhận
           </Button>
@@ -628,7 +632,7 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
                   <Box sx={{ width: 4, bgcolor: book.is_available ? "#10b981" : "#f59e0b", flexShrink: 0 }} />
                   <Box sx={{ flex: 1, p: 1.5 }}>
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                      <Avatar sx={{ width: 40, height: 40, background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", fontSize: 18, flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>📖</Avatar>
+                      <Avatar sx={{ width: 40, height: 40, background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)", fontSize: 18, flexShrink: 0, boxShadow: "0 2px 8px rgba(139,0,0,0.2)" }}>📖</Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" sx={{ fontWeight: 800, lineHeight: 1.3, fontSize: 13 }}>{book.title}</Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.4 }}>{book.author}</Typography>
@@ -724,10 +728,10 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
           {data.map((item: any, i: number) => (
             <Paper key={i} elevation={0} sx={{ borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
               <Box sx={{ display: "flex" }}>
-                <Box sx={{ width: 4, bgcolor: "#3b82f6", flexShrink: 0 }} />
+                <Box sx={{ width: 4, bgcolor: "primary.main", flexShrink: 0 }} />
                 <Box sx={{ flex: 1, p: 1.5 }}>
                   <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                    <Avatar sx={{ width: 36, height: 36, background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", fontSize: 16, flexShrink: 0 }}>📚</Avatar>
+                    <Avatar sx={{ width: 36, height: 36, background: "linear-gradient(135deg, #8B0000 0%, #0A2540 100%)", fontSize: 16, flexShrink: 0 }}>📚</Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 800, fontSize: 13 }}>{item.book?.title || item.title || "N/A"}</Typography>
                       <Typography variant="caption" color="text.secondary">{item.book?.author || item.author || ""}</Typography>
@@ -756,7 +760,7 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
     return (
       <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
         <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-          <Avatar sx={{ width: 42, height: 42, background: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)", fontWeight: 700, fontSize: 16 }}>
+          <Avatar sx={{ width: 42, height: 42, background: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)", fontWeight: 700, fontSize: 16 }}>
             {(data.full_name || data.name || data.email || "ĐG").slice(0, 2).toUpperCase()}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -791,7 +795,7 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
           {Object.entries(data).map(([shelf, books]: [string, any], i: number) => (
             <Paper key={i} elevation={0} sx={{ borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
               <Box sx={{ display: "flex" }}>
-                <Box sx={{ width: 4, bgcolor: "#6366f1", flexShrink: 0 }} />
+                <Box sx={{ width: 4, bgcolor: "secondary.main", flexShrink: 0 }} />
                 <Box sx={{ flex: 1, p: 1.5 }}>
                   <Typography variant="body2" sx={{ fontWeight: 800, mb: 0.75, fontSize: 13 }}>📍 {shelf}</Typography>
                   <Stack spacing={0.5}>
@@ -835,12 +839,12 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
     });
 
     const shiftMeta: Record<string, { icon: string; gradient: string }> = {
-      "Ca sáng": { icon: "🌅", gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" },
-      "Ca chiều": { icon: "🌤️", gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" },
-      "Ca tối": { icon: "🌙", gradient: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)" },
-      "Sáng": { icon: "🌅", gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" },
-      "Chiều": { icon: "🌤️", gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" },
-      "Tối": { icon: "🌙", gradient: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)" },
+      "Ca sáng": { icon: "🌅", gradient: "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)" },
+      "Ca chiều": { icon: "🌤️", gradient: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)" },
+      "Ca tối": { icon: "🌙", gradient: "linear-gradient(135deg, #8B0000 0%, #700000 100%)" },
+      "Sáng": { icon: "🌅", gradient: "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)" },
+      "Chiều": { icon: "🌤️", gradient: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)" },
+      "Tối": { icon: "🌙", gradient: "linear-gradient(135deg, #8B0000 0%, #700000 100%)" },
     };
 
     return (
@@ -916,7 +920,7 @@ function MessageBubble({ msg }: { msg: Message }) {
           sx={{
             width: 36,
             height: 36,
-            background: isUser ? "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)" : "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+            background: isUser ? "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)" : "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
             fontSize: 14,
             mt: 0.5,
             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
@@ -930,14 +934,14 @@ function MessageBubble({ msg }: { msg: Message }) {
             sx={{
               px: 2,
               py: 1.5,
-              background: isUser ? "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" : "background.paper",
+              background: isUser ? "linear-gradient(135deg, #8B0000 0%, #700000 100%)" : "background.paper",
               color: isUser ? "white" : "text.primary",
               border: isUser ? "none" : "1px solid",
               borderColor: isUser ? "transparent" : "divider",
               borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
               maxWidth: "100%",
               overflow: "hidden",
-              boxShadow: isUser ? "0 2px 12px rgba(99,102,241,0.3)" : "none",
+              boxShadow: isUser ? "0 2px 12px rgba(139,0,0,0.25)" : "none",
               "& h1, & h2, & h3, & h4": { fontWeight: 800, mt: 1.5, mb: 0.75, lineHeight: 1.3 },
               "& h1": { fontSize: "1.25rem" },
               "& h2": { fontSize: "1.15rem" },

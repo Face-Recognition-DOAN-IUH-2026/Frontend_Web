@@ -32,14 +32,14 @@ import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
   borrow: { icon: <MenuBookOutlined />, color: "success.main", label: "Mượn sách" },
-  return: { icon: <MenuBookOutlined />, color: "info.main", label: "Trả sách" },
+  return: { icon: <MenuBookOutlined />, color: "primary.main", label: "Trả sách" },
   book_available: { icon: <MenuBookOutlined />, color: "success.main", label: "Sách có sẵn" },
   overdue_reminder: { icon: <ErrorOutlined />, color: "error.main", label: "Quá hạn" },
   due_soon_reminder: { icon: <ErrorOutlined />, color: "warning.main", label: "Sắp đến hạn" },
   fine_notice: { icon: <ErrorOutlined />, color: "error.main", label: "Phí phạt" },
   schedule_change: { icon: <CalendarMonthOutlined />, color: "warning.main", label: "Lịch trực" },
-  shift_reminder: { icon: <CalendarMonthOutlined />, color: "info.main", label: "Nhắc lịch" },
-  membership_expiry: { icon: <BadgeOutlined />, color: "info.main", label: "Hạn thẻ" },
+  shift_reminder: { icon: <CalendarMonthOutlined />, color: "secondary.main", label: "Nhắc lịch" },
+  membership_expiry: { icon: <BadgeOutlined />, color: "error.main", label: "Hạn thẻ" },
   anomaly_alert: { icon: <ShieldOutlined />, color: "error.main", label: "Bất thường" },
   daily_report: { icon: <BarChartOutlined />, color: "primary.main", label: "Thống kê" },
   staff_absence: { icon: <PersonOffOutlined />, color: "warning.main", label: "Vắng mặt" },
@@ -144,13 +144,12 @@ export default function NotificationsPage() {
       <PageHeader
         title="Thông báo"
         icon={NotificationsOutlined}
-        gradient="linear-gradient(135deg, #4338ca 0%, #6366f1 50%, #818cf8 100%)"
         statBadges={unreadCount > 0 ? `${unreadCount} chưa đọc` : undefined}
         onRefresh={fetchNotifications}
         actions={
           <Typography
             variant="body2"
-            sx={{ color: "#c7d2fe", cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}
+            sx={{ color: "primary.main", cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}
             onClick={handleMarkAllRead}
           >
             Đánh dấu đã đọc tất cả

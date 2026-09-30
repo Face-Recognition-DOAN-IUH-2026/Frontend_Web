@@ -13,16 +13,17 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputAdornment,
   Paper,
   Stack,
+  Step,
+  StepLabel,
+  Stepper,
+  TextField,
   Typography,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import Input from "antd/es/input";
-import Result from "antd/es/result";
-import Steps from "antd/es/steps";
-import notification from "antd/es/notification";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
@@ -60,7 +61,6 @@ export default function BorrowScannerDialog({
   onClose: () => void;
   onSuccess: (message: string) => void;
 }) {
-  const [apiAnt, contextHolder] = notification.useNotification();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<any>(null);
@@ -303,34 +303,56 @@ export default function BorrowScannerDialog({
               <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
             )}
           </Stack>
-          <Steps
-            current={currentStep}
-            size="small"
-            items={[
-              { title: "Quét sách" },
-              { title: "Xác nhận" },
-              { title: "Hoàn tất" },
-            ]}
-            style={{ marginTop: 12 }}
-          />
+          <Stepper
+            activeStep={currentStep}
+            sx={{
+              mt: 1.5,
+              "& .MuiStepIcon-root.Mui-active": { color: "primary.main" },
+              "& .MuiStepIcon-root.Mui-completed": { color: "secondary.main" },
+            }}
+          >
+            {["Quét sách", "Xác nhận", "Hoàn tất"].map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 2, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {successResult ? (
-            <Result
-              status="success"
-              title="Tạo phiếu mượn thành công"
-              subTitle={`${successResult.bookCount} cuốn sách đã được thêm vào phiếu`}
-              extra={[
-                <Button key="close" variant="contained" onClick={() => {
+            <Stack spacing={2} sx={{ alignItems: "center", py: 4, textAlign: "center" }}>
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  bgcolor: "success.light",
+                  color: "success.dark",
+                  display: "grid",
+                  placeItems: "center",
+                }}
+              >
+                <CheckCircleIcon sx={{ fontSize: 36 }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Tạo phiếu mượn thành công
+              </Typography>
+              <Typography color="text.secondary">
+                {successResult.bookCount} cuốn sách đã được thêm vào phiếu
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => {
                   setSuccessResult(null);
                   setScanned([]);
                   onSuccess(successResult.message);
                   onClose();
-                }}>
-                  Đóng
-                </Button>,
-              ]}
-            />
+                }}
+                sx={{ mt: 1, borderRadius: 2 }}
+              >
+                Đóng
+              </Button>
+            </Stack>
           ) : (
           <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
             <Paper
@@ -409,19 +431,28 @@ export default function BorrowScannerDialog({
                 </Paper>
               ) : null}
 
-              <Input
-                size="middle"
+              <TextField
+                size="small"
                 placeholder="Nhập ISBN thủ công..."
-                prefix={<QrCodeScannerIcon style={{ fontSize: 14, color: "#999" }} />}
                 value={manualIsbn}
                 onChange={(e) => setManualIsbn(e.target.value)}
-                onPressEnter={() => {
-                  if (manualIsbn.trim()) {
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && manualIsbn.trim()) {
+                    e.preventDefault();
                     addScanned(manualIsbn.trim());
                     setManualIsbn("");
                   }
                 }}
-                allowClear
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <QrCodeScannerIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+                fullWidth
               />
 
               {scanned.length === 0 ? (
@@ -522,8 +553,6 @@ export default function BorrowScannerDialog({
           )}
         </DialogActions>
       </Dialog>
-
-      {contextHolder}
     </>
   );
 }

@@ -5,9 +5,9 @@ import { Avatar, Box, Stack, Typography, type SxProps, type Theme } from "@mui/m
 import { initials, stringToColor } from "@/lib/utils";
 
 const ROLE_GRADIENT: Record<string, string> = {
-  admin: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-  staff: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-  patron: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+  admin: "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)",
+  staff: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
+  patron: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
 };
 
 export interface AvatarUserProps {

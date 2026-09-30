@@ -19,14 +19,14 @@ import type { Notification } from "@/lib/types";
 
 const NOTIFICATION_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
   borrow: { icon: <MenuBookOutlined fontSize="small" />, color: "success.main", label: "Mượn sách" },
-  return: { icon: <MenuBookOutlined fontSize="small" />, color: "info.main", label: "Trả sách" },
+  return: { icon: <MenuBookOutlined fontSize="small" />, color: "primary.main", label: "Trả sách" },
   book_available: { icon: <MenuBookOutlined fontSize="small" />, color: "success.main", label: "Sách có sẵn" },
   overdue_reminder: { icon: <ErrorOutlined fontSize="small" />, color: "error.main", label: "Quá hạn" },
   due_soon_reminder: { icon: <ErrorOutlined fontSize="small" />, color: "warning.main", label: "Sắp đến hạn" },
   fine_notice: { icon: <ErrorOutlined fontSize="small" />, color: "error.main", label: "Phí phạt" },
   schedule_change: { icon: <CalendarMonthOutlined fontSize="small" />, color: "warning.main", label: "Lịch trực" },
-  shift_reminder: { icon: <CalendarMonthOutlined fontSize="small" />, color: "info.main", label: "Nhắc lịch" },
-  membership_expiry: { icon: <BadgeOutlined fontSize="small" />, color: "info.main", label: "Hạn thẻ" },
+  shift_reminder: { icon: <CalendarMonthOutlined fontSize="small" />, color: "secondary.main", label: "Nhắc lịch" },
+  membership_expiry: { icon: <BadgeOutlined fontSize="small" />, color: "error.main", label: "Hạn thẻ" },
   anomaly_alert: { icon: <ShieldOutlined fontSize="small" />, color: "error.main", label: "Bất thường" },
   fire_hazard: { icon: <LocalFireDepartmentOutlined fontSize="small" />, color: "error.main", label: "Cảnh báo cháy" },
   hazard_alert: { icon: <LocalFireDepartmentOutlined fontSize="small" />, color: "error.main", label: "Nguy cơ cháy" },

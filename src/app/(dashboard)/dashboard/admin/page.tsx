@@ -26,6 +26,7 @@ import {
   Typography,
   ToggleButton,
   ToggleButtonGroup,
+  Snackbar,
   alpha,
 } from "@mui/material";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
@@ -46,7 +47,6 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
-import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
@@ -61,15 +61,14 @@ function roleChipColor(role: string): "warning" | "primary" | "default" | "succe
 }
 
 const STAT_GRADIENT: Record<string, string> = {
-  total:  "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-  admin:  "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-  staff:  "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-  patron: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
-  face:   "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  total:  "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+  admin:  "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)",
+  staff:  "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
+  patron: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  face:   "linear-gradient(135deg, #059669 0%, #047857 100%)",
 };
 
 export default function AdminPage() {
-  const [apiAnt, contextHolder] = notification.useNotification();
   const { isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<UserPublic[]>([]);
@@ -125,7 +124,6 @@ export default function AdminPage() {
       setShowCreate(false);
       setCreateForm({ email: "", password: "", role: "staff" });
       setNotice("Tạo người dùng thành công. Tài khoản đã active.");
-      apiAnt.success({ title: "Tạo người dùng thành công. Tài khoản đã active.", placement: "topRight" });
       load();
     } catch (err: any) {
       setCreateError(err?.response?.data?.detail || "Tạo người dùng thất bại.");
@@ -174,7 +172,7 @@ export default function AdminPage() {
       label: "Tổng người dùng",
       value: total,
       icon: GroupsOutlinedIcon,
-      gradient: "linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)",
+      gradient: STAT_GRADIENT.total,
       pct: 100,
       delta: `${patronCount} độc giả sinh viên / giảng viên`,
       deltaColor: "default",
@@ -184,7 +182,7 @@ export default function AdminPage() {
       label: "Đội ngũ quản trị & nhân viên",
       value: adminCount + staffCount,
       icon: SupervisorAccountOutlinedIcon,
-      gradient: "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
+      gradient: STAT_GRADIENT.staff,
       pct: total > 0 ? Math.round(((adminCount + staffCount) / total) * 100) : 0,
       delta: `${adminCount} Admin · ${staffCount} Nhân viên trực`,
       deltaColor: "default",
@@ -199,7 +197,6 @@ export default function AdminPage() {
         title="Quản trị người dùng"
         subtitle="Tạo tài khoản admin/staff và theo dõi tỷ lệ bao phủ sinh trắc học khuôn mặt AI."
         icon={AdminPanelSettingsOutlinedIcon}
-        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
         statBadges={statBadges}
         onRefresh={load}
         actions={
@@ -207,7 +204,7 @@ export default function AdminPage() {
             variant="contained"
             startIcon={<AddOutlinedIcon />}
             onClick={() => setShowCreate(true)}
-            sx={{ borderRadius: 2, fontWeight: 700, bgcolor: "#6366f1", "&:hover": { bgcolor: "#4f46e5" }, boxShadow: "0 4px 14px rgba(99,102,241,0.4)" }}
+            sx={{ borderRadius: 2, fontWeight: 700, bgcolor: "primary.main", "&:hover": { bgcolor: "primary.dark" }, boxShadow: "0 4px 14px rgba(139,0,0,0.3)" }}
           >
             Thêm người dùng
           </Button>
@@ -374,7 +371,7 @@ export default function AdminPage() {
         onClose={() => setShowCreate(false)}
         sx={{ "& .MuiDrawer-paper": { width: { xs: "100%", sm: 480 }, bgcolor: "background.default" } }}
       >
-        <Box sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", p: 3, color: "white" }}>
+        <Box sx={{ background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)", p: 3, color: "white" }}>
           <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 800 }}>Thêm Thành Viên</Typography>
@@ -465,14 +462,23 @@ export default function AdminPage() {
             <Button variant="outlined" color="inherit" onClick={() => setShowCreate(false)} fullWidth sx={{ borderRadius: 2 }}>
               Hủy
             </Button>
-            <Button variant="contained" onClick={handleCreate} fullWidth sx={{ borderRadius: 2, fontWeight: 700, background: STAT_GRADIENT.total, "&:hover": { background: "linear-gradient(135deg,#4f46e5,#3730a3)" } }}>
+            <Button variant="contained" onClick={handleCreate} fullWidth sx={{ borderRadius: 2, fontWeight: 700, background: STAT_GRADIENT.total, "&:hover": { background: "linear-gradient(135deg,#700000,#500000)" } }}>
               Cấp tài khoản
             </Button>
           </Stack>
         </Box>
       </Drawer>
 
-      {contextHolder}
+      <Snackbar
+        open={!!notice}
+        autoHideDuration={4000}
+        onClose={() => setNotice("")}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert severity="success" onClose={() => setNotice("")} sx={{ borderRadius: 2 }}>
+          {notice}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

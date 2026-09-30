@@ -130,7 +130,14 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
           </div>
 
           {notify && (
-            <div style={{ fontSize: "0.7rem", color: "#6366f1", background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 6, padding: 8 }}>
+            <div style={{
+              fontSize: "0.7rem",
+              color: isDark ? "#93C5FD" : "#0A2540",
+              background: isDark ? "rgba(10,37,64,0.3)" : "rgba(10,37,64,0.06)",
+              border: `1px solid ${isDark ? "rgba(147,197,253,0.3)" : "rgba(10,37,64,0.18)"}`,
+              borderRadius: 6,
+              padding: 8
+            }}>
               Nhân viên bị ảnh hưởng sẽ nhận thông báo qua hệ thống.
             </div>
           )}

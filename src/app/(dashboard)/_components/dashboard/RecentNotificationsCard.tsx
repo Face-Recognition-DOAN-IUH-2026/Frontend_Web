@@ -18,10 +18,10 @@ interface RecentNotificationsCardProps {
 }
 
 const TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
-  borrow_overdue: { icon: <WarningIcon sx={{ fontSize: 18 }} />, color: "#ef4444" },
-  book_available: { icon: <BookIcon sx={{ fontSize: 18 }} />, color: "#3b82f6" },
-  schedule_change: { icon: <CalendarIcon sx={{ fontSize: 18 }} />, color: "#f59e0b" },
-  membership_expiry: { icon: <PersonIcon sx={{ fontSize: 18 }} />, color: "#8b5cf6" },
+  borrow_overdue: { icon: <WarningIcon sx={{ fontSize: 18 }} />, color: "#DC2626" },
+  book_available: { icon: <BookIcon sx={{ fontSize: 18 }} />, color: "#059669" },
+  schedule_change: { icon: <CalendarIcon sx={{ fontSize: 18 }} />, color: "#D97706" },
+  membership_expiry: { icon: <PersonIcon sx={{ fontSize: 18 }} />, color: "#8B0000" },
 };
 
 function relativeTime(dateStr: string) {

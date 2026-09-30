@@ -21,24 +21,24 @@ const speaking = keyframes`
 `;
 
 const glow = keyframes`
-  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.6); }
+  0%, 100% { box-shadow: 0 0 20px rgba(139, 0, 0, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(139, 0, 0, 0.6); }
 `;
 
 const getStateColor = (state: CompanionState): string => {
   switch (state) {
     case 'idle':
-      return '#6366f1';
+      return '#8B0000';
     case 'listening':
-      return '#3b82f6';
+      return '#0A2540';
     case 'speaking':
-      return '#10b981';
+      return '#059669';
     case 'thinking':
-      return '#f59e0b';
+      return '#D4AF37';
     case 'error':
-      return '#ef4444';
+      return '#DC2626';
     default:
-      return '#6366f1';
+      return '#8B0000';
   }
 };
 

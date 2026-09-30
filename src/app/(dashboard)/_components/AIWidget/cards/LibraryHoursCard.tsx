@@ -59,13 +59,13 @@ export default function LibraryHoursCard({ data }: LibraryHoursCardProps) {
         my: 1,
         borderRadius: 2.5,
         border: "1px solid",
-        borderColor: isDark ? alpha("#2980B9", 0.3) : alpha("#1E6091", 0.2),
+        borderColor: isDark ? alpha("#0A2540", 0.4) : alpha("#0A2540", 0.15),
         background: isDark
-          ? "linear-gradient(145deg, rgba(20, 35, 55, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-          : "linear-gradient(145deg, rgba(240, 247, 255, 0.9) 0%, rgba(255, 255, 255, 0.98) 100%)",
+          ? "linear-gradient(145deg, rgba(10, 37, 64, 0.4) 0%, rgba(15, 23, 42, 0.95) 100%)"
+          : "linear-gradient(145deg, rgba(248, 250, 252, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%)",
         boxShadow: isDark
           ? "0 4px 20px rgba(0, 0, 0, 0.4)"
-          : "0 4px 16px rgba(30, 96, 145, 0.08)",
+          : "0 4px 16px rgba(10, 37, 64, 0.06)",
         overflow: "hidden",
       }}
     >
@@ -75,8 +75,8 @@ export default function LibraryHoursCard({ data }: LibraryHoursCardProps) {
           px: 2,
           py: 1.25,
           background: isDark
-            ? "linear-gradient(90deg, rgba(41, 128, 185, 0.25) 0%, rgba(15, 60, 92, 0.25) 100%)"
-            : "linear-gradient(90deg, rgba(30, 96, 145, 0.12) 0%, rgba(41, 128, 185, 0.06) 100%)",
+            ? "linear-gradient(90deg, rgba(10, 37, 64, 0.5) 0%, rgba(15, 60, 92, 0.3) 100%)"
+            : "linear-gradient(90deg, rgba(10, 37, 64, 0.06) 0%, rgba(139, 0, 0, 0.03) 100%)",
           borderBottom: "1px solid",
           borderColor: "divider",
           display: "flex",
@@ -87,7 +87,7 @@ export default function LibraryHoursCard({ data }: LibraryHoursCardProps) {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <AccessTimeFilledIcon
             sx={{
-              color: isDark ? "#60A5FA" : "#1E6091",
+              color: isDark ? "#D4AF37" : "primary.main",
               fontSize: 20,
             }}
           />
@@ -171,23 +171,23 @@ export default function LibraryHoursCard({ data }: LibraryHoursCardProps) {
                         ? alpha("#F59E0B", 0.2)
                         : alpha("#F59E0B", 0.12)
                       : isDark
-                      ? alpha("#2563EB", 0.2)
-                      : alpha("#2563EB", 0.1),
+                      ? alpha("#0A2540", 0.4)
+                      : alpha("#0A2540", 0.08),
                     color: isWeekend
                       ? isDark
                         ? "#FBBF24"
                         : "#B45309"
                       : isDark
                       ? "#93C5FD"
-                      : "#1D4ED8",
+                      : "#0A2540",
                     border: "1px solid",
                     borderColor: isWeekend
                       ? isDark
                         ? alpha("#F59E0B", 0.3)
                         : alpha("#F59E0B", 0.25)
                       : isDark
-                      ? alpha("#2563EB", 0.3)
-                      : alpha("#2563EB", 0.2),
+                      ? alpha("#0A2540", 0.5)
+                      : alpha("#0A2540", 0.2),
                   }}
                 />
               </Box>

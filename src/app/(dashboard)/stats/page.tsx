@@ -62,15 +62,15 @@ type RealtimeState = "connecting" | "connected" | "disconnected";
 
 const STAT_GRADIENT: Record<string, string> = {
   active:    "linear-gradient(135deg, #059669 0%, #047857 100%)",
-  entry:     "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-  exit:      "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
-  activity:  "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
-  borrow:    "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
-  borrow_ok: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+  entry:     "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
+  exit:      "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)",
+  activity:  "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+  borrow:    "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+  borrow_ok: "linear-gradient(135deg, #059669 0%, #047857 100%)",
   overdue:   "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)",
-  camera:    "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
-  top:       "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
-  week:      "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+  camera:    "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
+  top:       "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)",
+  week:      "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
 };
 
 function toDateStr(d: Date) {
@@ -334,7 +334,7 @@ export default function StatsPage() {
               label="Đang trong thư viện"
               value={activePatrons.length}
               icon={UserIcon}
-              gradient="linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%)"
+              gradient={STAT_GRADIENT.entry}
               pct={Math.min(100, Math.round((activePatrons.length / 200) * 100))}
               delta={`${Math.min(100, Math.round((activePatrons.length / 200) * 100))}% sức chứa (${activePatrons.length}/200 chỗ)`}
               deltaColor={activePatrons.length / 200 >= 0.9 ? "error" : activePatrons.length / 200 >= 0.75 ? "warning" : "default"}
@@ -346,7 +346,7 @@ export default function StatsPage() {
               label="Lượt vào hôm nay"
               value={stats.today_entries}
               icon={LoginIcon}
-              gradient="linear-gradient(135deg, #0284C7 0%, #0369A1 100%)"
+              gradient={STAT_GRADIENT.top}
               pct={(stats.today_entries + stats.today_exits) > 0 ? Math.round((stats.today_entries / (stats.today_entries + stats.today_exits)) * 100) : undefined}
               delta={`Đã ra: ${stats.today_exits} · TB tuần: ${weeklyAvg}/ngày`}
               deltaColor="default"
@@ -370,7 +370,7 @@ export default function StatsPage() {
               label="Tổng lượt mượn"
               value={borrowStats?.total ?? "—"}
               icon={BookIcon}
-              gradient="linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)"
+              gradient="linear-gradient(135deg, #8B0000 0%, #700000 100%)"
               pct={100}
               delta={borrowStats ? `Đang lưu thông: ${borrowStats.active} cuốn` : undefined}
               deltaColor="default"
@@ -454,8 +454,8 @@ export default function StatsPage() {
                         formatter={(value: any, name: any) => [value, name === "entry" ? "Vào" : "Ra"]}
                       />
                       <Legend wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 12 }} />
-                      <Bar dataKey="entry" name="Vào" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="exit" name="Ra" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="entry" name="Vào" fill="#0A2540" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="exit" name="Ra" fill="#D4AF37" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </Box>

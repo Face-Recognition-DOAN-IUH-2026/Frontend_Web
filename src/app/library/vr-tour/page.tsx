@@ -18,7 +18,7 @@ const VRViewer = dynamic(() => import('@/app/library/vr-tour/_components/VRViewe
         justifyContent: "center",
       }}
     >
-      <CircularProgress size={48} sx={{ color: "info.light", mb: 2 }} />
+      <CircularProgress size={48} sx={{ color: "primary.light", mb: 2 }} />
       <Typography variant="h6" color="common.white" sx={{ fontWeight: 700 }}>
         Đang tải không gian tham quan 3D...
       </Typography>
@@ -49,7 +49,7 @@ export default function VRTourPage() {
           justifyContent: "center",
         }}
       >
-        <CircularProgress size={48} sx={{ color: "info.light", mb: 2 }} />
+        <CircularProgress size={48} sx={{ color: "primary.light", mb: 2 }} />
         <Typography variant="h6" color="common.white" sx={{ fontWeight: 700 }}>
           Đang tải không gian tham quan 3D...
         </Typography>

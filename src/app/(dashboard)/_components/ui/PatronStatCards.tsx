@@ -15,10 +15,10 @@ interface PatronStatCardsProps {
 }
 
 const STAT_GRADIENT = {
-  total: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  total: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
   active: "linear-gradient(135deg, #059669 0%, #047857 100%)",
   expired: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
-  face: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+  face: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
 };
 
 function Sparkline({ data, color, id }: { data: number[]; color: string; id: string }) {
@@ -68,10 +68,10 @@ export default function PatronStatCards({ patrons }: PatronStatCardsProps) {
   }, [patrons]);
 
   const items = [
-    { label: "Tổng độc giả", value: patrons.length, gradient: STAT_GRADIENT.total, icon: PeopleIcon, pct: 100, sparkColor: "#1E6091" },
+    { label: "Tổng độc giả", value: patrons.length, gradient: STAT_GRADIENT.total, icon: PeopleIcon, pct: 100, sparkColor: "#0A2540" },
     { label: "Hoạt động", value: stats.activeCount, gradient: STAT_GRADIENT.active, icon: PersonIcon, pct: patrons.length ? Math.round((stats.activeCount / patrons.length) * 100) : 0, sparkColor: "#059669" },
     { label: "Hết hạn / Khóa", value: stats.expiredCount, gradient: STAT_GRADIENT.expired, icon: UpdateIcon, pct: patrons.length ? Math.round((stats.expiredCount / patrons.length) * 100) : 0, sparkColor: "#D97706" },
-    { label: "Có khuôn mặt", value: stats.faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((stats.faceCount / patrons.length) * 100) : 0, sparkColor: "#2563EB" },
+    { label: "Có khuôn mặt", value: stats.faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((stats.faceCount / patrons.length) * 100) : 0, sparkColor: "#8B0000" },
   ];
 
   return (

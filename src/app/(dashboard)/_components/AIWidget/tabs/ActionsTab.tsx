@@ -26,7 +26,7 @@ const ACTIONS = [
     title: "Độc giả trong thư viện",
     description: "Xem ai đang ở trong thư viện",
     path: "/active",
-    color: "#3B82F6",
+    color: "#0A2540",
   },
 ];
 

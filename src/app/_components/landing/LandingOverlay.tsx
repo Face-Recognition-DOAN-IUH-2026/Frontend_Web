@@ -46,8 +46,8 @@ const features = [
     title: "Kiểm soát Cổng AI",
     desc: "Nhận diện khuôn mặt độc giả tự động tại cổng vào/ra với công nghệ chống giả mạo (Anti-spoofing).",
     badge: "AI Powered",
-    color: "#1E6091",
-    bg: "rgba(30, 96, 145, 0.08)",
+    color: "#0A2540",
+    bg: "rgba(10, 37, 64, 0.08)",
   },
   {
     icon: AutoStoriesIcon,
@@ -70,16 +70,16 @@ const features = [
     title: "Trợ lý AI & Không gian 3D",
     desc: "Trợ lý thông minh giải đáp quy chế 24/7, gợi ý sách theo ngành học và trải nghiệm tham quan ảo 360°.",
     badge: "Công nghệ mới",
-    color: "#2563EB",
-    bg: "rgba(37, 99, 235, 0.08)",
+    color: "#8B0000",
+    bg: "rgba(139, 0, 0, 0.08)",
   },
 ];
 
 const stats = [
-  { value: "15,000+", label: "Độc giả sinh viên & Giảng viên", color: "#1E6091" },
+  { value: "15,000+", label: "Độc giả sinh viên & Giảng viên", color: "#0A2540" },
   { value: "20,000+", label: "Đầu sách & Giáo trình số", color: "#D97706" },
   { value: "99.2%", label: "Độ chính xác nhận diện khuôn mặt", color: "#059669" },
-  { value: "24/7", label: "Hỗ trợ tra cứu & Đặt mượn sách", color: "#2563EB" },
+  { value: "24/7", label: "Hỗ trợ tra cứu & Đặt mượn sách", color: "#8B0000" },
 ];
 
 const steps = [

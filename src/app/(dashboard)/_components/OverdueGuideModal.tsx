@@ -26,22 +26,22 @@ interface OverdueGuideModalProps {
 
 const steps = [
   {
-    icon: <QRCodeIcon sx={{ color: '#1976d2' }} />,
+    icon: <QRCodeIcon sx={{ color: 'primary.main' }} />,
     title: '1. Quét mã QR tại quầy',
     description: 'Đến quầy thư viện (Tầng 1, Khu A) và quét mã QR thanh toán.',
   },
   {
-    icon: <PaymentIcon sx={{ color: '#f57c00' }} />,
+    icon: <PaymentIcon sx={{ color: 'warning.main' }} />,
     title: '2. Thanh toán phí quá hạn',
     description: 'Thanh toán phí quá hạn qua ví điện tử hoặc tiền mặt.',
   },
   {
-    icon: <LocationOnIcon sx={{ color: '#e53935' }} />,
+    icon: <LocationOnIcon sx={{ color: 'error.main' }} />,
     title: '3. Trả sách tại quầy',
     description: 'Giao sách cho nhân viên thư viện để họ cập nhật hệ thống.',
   },
   {
-    icon: <CheckCircleOutlineIcon sx={{ color: '#2e7d32' }} />,
+    icon: <CheckCircleOutlineIcon sx={{ color: 'success.main' }} />,
     title: '4. Mở khóa thẻ',
     description: 'Sau khi thanh toán, thẻ của bạn sẽ được mở khóa tự động.',
   },
@@ -82,7 +82,7 @@ export default function OverdueGuideModal({
       {/* Header */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)',
+          background: 'linear-gradient(135deg, #8B0000 0%, #700000 100%)',
           p: 2.5,
           display: 'flex',
           alignItems: 'center',
@@ -107,7 +107,7 @@ export default function OverdueGuideModal({
         {bookTitle && (
           <Box
             sx={{
-              bgcolor: '#f5f5f5',
+              bgcolor: 'action.hover',
               borderRadius: 2,
               p: 2,
               mb: 3,
@@ -131,8 +131,9 @@ export default function OverdueGuideModal({
         {fineAmount !== undefined && (
           <Box
             sx={{
-              background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
-              border: '1px solid #ffb74d',
+              background: (t) => t.palette.mode === 'dark' ? 'rgba(217,119,6,0.15)' : 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+              border: '1px solid',
+              borderColor: 'warning.main',
               borderRadius: 2,
               p: 2.5,
               textAlign: 'center',
@@ -142,7 +143,7 @@ export default function OverdueGuideModal({
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
               Phí quá hạn cần thanh toán
             </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: '#e65100' }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: 'warning.main' }}>
               {fineAmount.toLocaleString('vi-VN')}đ
             </Typography>
           </Box>
@@ -157,7 +158,7 @@ export default function OverdueGuideModal({
                   width: 40,
                   height: 40,
                   borderRadius: '50%',
-                  bgcolor: '#f5f5f5',
+                  bgcolor: 'action.hover',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -183,12 +184,14 @@ export default function OverdueGuideModal({
         {/* Footer info */}
         <Box
           sx={{
-            bgcolor: '#e3f2fd',
+            bgcolor: 'action.hover',
+            border: '1px solid',
+            borderColor: 'divider',
             borderRadius: 2,
             p: 2,
           }}
         >
-          <Typography variant="body2" sx={{ color: '#0d47a1', fontWeight: 500 }}>
+          <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
             <strong>Lưu ý:</strong> Sau khi thanh toán, vui lòng báo nhân viên thư viện để được mở khóa thẻ. Nếu bạn cần hỗ trợ, vui lòng liên hệ thư viện qua email hoặc số điện thoại trên thẻ thành viên.
           </Typography>
         </Box>

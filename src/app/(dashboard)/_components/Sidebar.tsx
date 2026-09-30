@@ -22,6 +22,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { useAuth } from "@/lib/auth-context";
+import { usePermission } from "@/lib/permission-context";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -42,6 +43,7 @@ import ShieldIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
+import DynamicFormOutlinedIcon from "@mui/icons-material/DynamicFormOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
@@ -77,10 +79,18 @@ const staffAiItems = [
   { href: "/ai-assistant", label: "Trợ lý AI", icon: AssistantIcon },
 ];
 
-const adminItems = [
-  { href: "/dashboard/admin", label: "Quản trị", icon: ShieldIcon },
-  { href: "/settings", label: "Cài đặt", icon: SettingsIcon },
-  { href: "/stats", label: "Thống kê", icon: BarChartIcon },
+interface SidebarNavItem {
+  href: string;
+  label: string;
+  icon: any;
+  permission?: string;
+}
+
+const adminItems: SidebarNavItem[] = [
+  { href: "/dashboard/admin", label: "Quản trị người dùng", icon: ShieldIcon, permission: "admin:users" },
+  { href: "/dynamic-admin", label: "Phân quyền động (RBAC)", icon: DynamicFormOutlinedIcon, permission: "admin:settings" },
+  { href: "/settings", label: "Cài đặt hệ thống", icon: SettingsIcon, permission: "admin:settings" },
+  { href: "/stats", label: "Thống kê", icon: BarChartIcon, permission: "admin:stats" },
 ];
 
 function NavSection({
@@ -104,7 +114,8 @@ function NavSection({
           fontSize: "0.68rem",
           fontWeight: 700,
           letterSpacing: "0.09em",
-          color: "text.disabled",
+          color: "#D4AF37", // IUH Gold
+          fontFamily: "'Space Grotesk', sans-serif",
           display: "block",
           mb: 0.5,
         }}
@@ -128,34 +139,34 @@ function NavSection({
               onClick={onClose}
               sx={{
                 mb: 0.25,
-                borderRadius: 2,
+                borderRadius: "2px",
                 py: 0.8,
                 px: 1.25,
-                color: selected ? "primary.main" : "text.secondary",
+                color: selected ? "#FFFFFF" : "#CBD5E1",
                 transition: "all 0.15s ease",
                 "&.Mui-selected": {
-                  bgcolor: "action.selected",
-                  color: "primary.main",
-                  "& .MuiListItemIcon-root": { color: "primary.main" },
-                  "&:hover": { bgcolor: "action.selected" },
+                  bgcolor: "rgba(212, 175, 55, 0.16)",
+                  color: "#FFFFFF",
+                  "& .MuiListItemIcon-root": { color: "#D4AF37" },
+                  "&:hover": { bgcolor: "rgba(212, 175, 55, 0.22)" },
                   // Left accent bar
                   "&::before": {
                     content: '""',
                     position: "absolute",
                     left: 0,
-                    top: "20%",
-                    bottom: "20%",
+                    top: "15%",
+                    bottom: "15%",
                     width: 3,
                     borderRadius: "0 2px 2px 0",
-                    bgcolor: "primary.main",
+                    bgcolor: "#D4AF37", // IUH Gold
                   },
                 },
-                "&:hover": { bgcolor: "action.hover", color: "text.primary" },
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)", color: "#FFFFFF", "& .MuiListItemIcon-root": { color: "#FFFFFF" } },
                 position: "relative",
               }}
             >
               <ListItemIcon
-                sx={{ minWidth: 34, color: selected ? "primary.main" : "text.disabled" }}
+                sx={{ minWidth: 34, color: selected ? "#D4AF37" : "#94A3B8" }}
               >
                 <Icon sx={{ fontSize: 18 }} />
               </ListItemIcon>
@@ -170,7 +181,7 @@ function NavSection({
                 }
               />
               {selected && (
-                <ChevronRightIcon sx={{ fontSize: 14, color: "primary.main", opacity: 0.5 }} />
+                <ChevronRightIcon sx={{ fontSize: 14, color: "#D4AF37", opacity: 0.8 }} />
               )}
             </ListItemButton>
           );
@@ -188,12 +199,21 @@ export default function Sidebar() {
   const isAdminOrStaff = role === "admin" || role === "staff";
   const isAdmin = role === "admin";
 
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleClose = () => setMobileOpen(false);
 
   const isDark = theme.palette.mode === "dark";
+
+  const { canAccessPage } = usePermission();
+
+  const visibleLibraryItems = libraryItems.filter((item) => canAccessPage(item.href));
+  const visibleCirculationItems = circulationItems.filter((item) => canAccessPage(item.href));
+  const visibleStaffItems = staffItems.filter((item) => canAccessPage(item.href));
+  const visibleStaffAiItems = staffAiItems.filter((item) => canAccessPage(item.href));
+  const visibleAiItems = aiItems.filter((item) => canAccessPage(item.href));
+  const visibleAdminItems = adminItems.filter((item) => canAccessPage(item.href));
 
   const drawerContent = (
     <Stack sx={{ height: "100%" }}>
@@ -228,21 +248,23 @@ export default function Sidebar() {
         spacing={2}
         sx={{ flex: 1, px: 1, py: 1.5, overflowY: "auto" }}
       >
-        <NavSection title="Thư viện" items={libraryItems} onClose={handleClose} />
-        {isAdminOrStaff && (
-          <NavSection title="Mượn / Trả" items={circulationItems} onClose={handleClose} />
+        {visibleLibraryItems.length > 0 && (
+          <NavSection title="Thư viện" items={visibleLibraryItems} onClose={handleClose} />
         )}
-        {isAdminOrStaff && (
-          <NavSection title="Nhân sự" items={staffItems} onClose={handleClose} />
+        {visibleCirculationItems.length > 0 && (
+          <NavSection title="Mượn / Trả" items={visibleCirculationItems} onClose={handleClose} />
         )}
-        {isAdminOrStaff && (
-          <NavSection title="AI" items={staffAiItems} onClose={handleClose} />
+        {visibleStaffItems.length > 0 && (
+          <NavSection title="Nhân sự" items={visibleStaffItems} onClose={handleClose} />
         )}
-        {isAdminOrStaff && (
-          <NavSection title="Chẩn đoán AI" items={aiItems} onClose={handleClose} />
+        {visibleStaffAiItems.length > 0 && (
+          <NavSection title="AI" items={visibleStaffAiItems} onClose={handleClose} />
         )}
-        {isAdmin && (
-          <NavSection title="Quản trị" items={adminItems} onClose={handleClose} />
+        {visibleAiItems.length > 0 && (
+          <NavSection title="Chẩn đoán AI" items={visibleAiItems} onClose={handleClose} />
+        )}
+        {visibleAdminItems.length > 0 && (
+          <NavSection title="Quản trị" items={visibleAdminItems} onClose={handleClose} />
         )}
       </Stack>
 
@@ -271,22 +293,25 @@ export default function Sidebar() {
               sx={{
                 fontWeight: 700,
                 fontSize: "0.82rem",
+                color: "#FFFFFF",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
             >
-              {user?.full_name || user?.email?.split("@")[0] || "Người dùng"}
+              {user?.full_name || user?.email?.split("@")[0] || "Thủ thư"}
             </Typography>
             <Chip
-              label={role === "admin" ? "Admin" : "Nhân viên"}
+              label={role === "admin" ? "QUẢN TRỊ VIÊN" : "THỦ THƯ TRỰC"}
               size="small"
               sx={{
-                height: 16,
+                height: 18,
                 fontSize: "0.62rem",
                 fontWeight: 700,
-                bgcolor: role === "admin" ? "secondary.main" : "action.selected",
-                color: role === "admin" ? "white" : "primary.main",
+                bgcolor: role === "admin" ? "#8B0000" : "rgba(212, 175, 55, 0.2)",
+                color: role === "admin" ? "#FFFFFF" : "#D4AF37",
+                border: "1px solid rgba(212, 175, 55, 0.4)",
+                borderRadius: "2px",
                 "& .MuiChip-label": { px: 0.75 },
               }}
             />
@@ -329,7 +354,15 @@ export default function Sidebar() {
           open={mobileOpen}
           onClose={handleClose}
           ModalProps={{ keepMounted: true }}
-          sx={{ "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth } }}
+          sx={{
+            "& .MuiDrawer-paper": {
+              boxSizing: "border-box",
+              width: drawerWidth,
+              bgcolor: "#0A2540",
+              color: "#FFFFFF",
+              borderRight: "1px solid rgba(255, 255, 255, 0.12)",
+            },
+          }}
         >
           {drawerContent}
         </Drawer>
@@ -346,8 +379,9 @@ export default function Sidebar() {
         "& .MuiDrawer-paper": {
           width: drawerWidth,
           boxSizing: "border-box",
-          bgcolor: "background.paper",
-          borderRight: `1px solid ${theme.palette.divider}`,
+          bgcolor: "#0A2540",
+          color: "#FFFFFF",
+          borderRight: "1px solid rgba(255, 255, 255, 0.12)",
         },
       }}
     >

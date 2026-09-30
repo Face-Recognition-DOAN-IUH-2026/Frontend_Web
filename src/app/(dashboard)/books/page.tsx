@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -8,91 +8,59 @@ import {
   Button,
   Checkbox,
   Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
   Fade,
   IconButton,
+  LinearProgress,
   Paper,
+  Snackbar,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
-  TextField,
+  TableSortLabel,
   Tooltip,
   Typography,
+  useTheme,
 } from "@mui/material";
-import AntdTable from "antd/es/table";
-import type { ColumnsType } from "antd/es/table";
-import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
 import AssignmentIcon from "@mui/icons-material/AssignmentOutlined";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CheckIcon from "@mui/icons-material/CheckCircleOutlined";
-import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import DescriptionIcon from "@mui/icons-material/DescriptionOutlined";
 import TableChartIcon from "@mui/icons-material/TableChartOutlined";
-import EyeIcon from "@mui/icons-material/VisibilityOutlined";
-import FileIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import InventoryIcon from "@mui/icons-material/Inventory2Outlined";
 import LibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
-import LockIcon from "@mui/icons-material/LockOutlined";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
+import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+
 import api, { getErrorMessage } from "@/lib/api-client";
-import { shimmer, slideInRight } from "@/lib/animations";
-import { useAIWidgetStore } from "@/app/(dashboard)/_components/AIWidget/store/useAIWidgetStore";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
-import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import notification from "antd/es/notification";
 import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
-import { staggerSx } from "@/lib/useStaggeredAnimation";
 import IsbnScannerDialog from "@/app/(dashboard)/_components/IsbnScannerDialog";
 import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
 
+import {
+  BookQuantityDialog,
+  BookBulkDeleteDialog,
+  BookImportPreviewSection,
+  BookImportResultSection,
+} from "../_components/books";
+
 type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
-const STAT_GRADIENT = {
-  books: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
-  copies: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-  available: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-  borrowed: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
-};
-
-function statusColor(status: string): "success" | "info" | "warning" | "error" | "default" {
-  if (["new", "imported"].includes(status)) return "success";
-  if (["updated"].includes(status)) return "info";
-  if (["exists", "skipped"].includes(status)) return "default";
-  if (["warning"].includes(status)) return "warning";
-  return "error";
-}
-
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    exists: "Đã có",
-    new: "Mới",
-    warning: "Cảnh báo",
-    invalid: "Lỗi",
-    imported: "Thành công",
-    updated: "Cập nhật",
-    skipped: "Bỏ qua",
-    error: "Lỗi",
-  };
-  return labels[status] || status;
-}
-
 export default function BooksPage() {
-  const [apiAnt, contextHolder] = notification.useNotification();
+  const theme = useTheme();
+  const [notice, setNotice] = useState<Notice>(null);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [books, setBooks] = useState<BookWithStats[]>([]);
@@ -106,7 +74,6 @@ export default function BooksPage() {
   const [previewData, setPreviewData] = useState<BookImportPreviewRow[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedPreviewIndices, setSelectedPreviewIndices] = useState<Set<number>>(new Set());
-  const [deletePreviewOpen, setDeletePreviewOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState<BookImportResultRow[] | null>(null);
   const [showResults, setShowResults] = useState(false);
@@ -122,32 +89,39 @@ export default function BooksPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [deleting, setDeleting] = useState(false);
-  const deleteConfirmed = deleteInput.trim().normalize('NFC').toUpperCase() === 'XÓA';
+  const deleteConfirmed = deleteInput === "XÓA";
 
-  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => {
-    if (severity === "success") apiAnt.success({ title: message, placement: "topRight" });
-    else if (severity === "error") apiAnt.error({ title: message, placement: "topRight" });
-    else if (severity === "warning") apiAnt.warning({ title: message, placement: "topRight" });
-    else apiAnt.info({ title: message, placement: "topRight" });
-  };
+  const showNotice = useCallback((severity: "success" | "error" | "warning" | "info", message: string) => {
+    setNotice({ severity, message });
+  }, []);
+
+  const showNoticeRef = useRef(showNotice);
+  useEffect(() => {
+    showNoticeRef.current = showNotice;
+  }, [showNotice]);
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.listBooks({ skip: page * limit, limit });
-      setBooks(data.items ?? []);
-      setTotal(data.total ?? 0);
-      if (data.aggregateStats) {
-        setAggregateStats(data.aggregateStats);
+      const [res, statsRes] = await Promise.all([
+        api.listBooks({ skip: page * limit, limit }),
+        typeof (api as any).getBookStats === "function" ? (api as any).getBookStats().catch(() => null) : Promise.resolve(null),
+      ]);
+      setBooks(res.items);
+      setTotal(res.total);
+      if (statsRes) {
+        setAggregateStats({
+          totalCopies: statsRes.totalCopies,
+          availableCopies: statsRes.availableCopies,
+          borrowedCopies: statsRes.borrowedCopies,
+        });
       }
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Lỗi tải dữ liệu sách");
-      setBooks([]);
-      setTotal(0);
+      showNoticeRef.current("error", getErrorMessage(err) || "Không thể tải danh sách sách");
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, limit]);
 
   useEffect(() => {
     loadBooks();
@@ -156,46 +130,36 @@ export default function BooksPage() {
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
+      setSearching(false);
       return;
     }
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        setSearchResults(await api.searchBooks(searchQuery));
-      } catch {
-        setSearchResults([]);
+        const results = await api.searchBooks(searchQuery);
+        setSearchResults(results);
+      } catch (err) {
+        showNoticeRef.current("error", getErrorMessage(err) || "Tìm kiếm thất bại");
       } finally {
         setSearching(false);
       }
-    }, 400);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  useEffect(() => {
-    if (!searchQuery.trim() || searching) return;
-    const timer = setTimeout(() => {
-      if (searchResults.length === 0 && searchQuery.trim()) {
-        useAIWidgetStore.getState().recordFailedSearch();
-      } else if (searchResults.length > 0) {
-        useAIWidgetStore.getState().resetFailedSearch();
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [searchResults, searchQuery, searching]);
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     setPreviewFile(file);
-    setPreviewData(null);
-    setShowResults(false);
     setPreviewLoading(true);
+    setPreviewData(null);
+    setSelectedPreviewIndices(new Set());
     try {
       const data = await api.getBarcodePreview(file);
-      setPreviewData(data.rows);
-      showNotice("info", `Đã đọc ${data.total_rows} dòng từ file Excel`);
+      setPreviewData(Array.isArray(data) ? data : data.rows);
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Lỗi đọc file");
+      showNotice("error", getErrorMessage(err) || "Không thể đọc file");
+      setPreviewFile(null);
     } finally {
       setPreviewLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -305,22 +269,6 @@ export default function BooksPage() {
     setQuantityError("");
   };
 
-  const handleToggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleToggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      if (prev.size === displayBooks.length) return new Set();
-      return new Set(displayBooks.map((b) => b.id));
-    });
-  };
-
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     setDeleting(true);
@@ -358,78 +306,74 @@ export default function BooksPage() {
       };
   const displayBooks = searchQuery.trim() ? searchResults : books;
 
-  const bookColumns: ColumnsType<BookWithStats> = [
-    {
-      title: "ISBN",
-      dataIndex: "isbn",
-      key: "isbn",
-      width: 140,
-      sorter: (a, b) => (a.isbn || "").localeCompare(b.isbn || ""),
-      render: (val: string) => (
-        <span style={{ fontFamily: "monospace", color: "#1A73E8", fontWeight: 600 }}>{val}</span>
-      ),
-    },
-    {
-      title: "Tiêu đề",
-      dataIndex: "title",
-      key: "title",
-      width: 280,
-      sorter: (a, b) => a.title.localeCompare(b.title),
-      render: (_: string, record: BookWithStats) => (
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-          {record.cover_url ? (
-            <Box component="img" src={record.cover_url} alt={record.title} sx={{ width: 34, height: 44, objectFit: "cover", borderRadius: 1, border: 1, borderColor: "divider" }} />
-          ) : (
-            <Paper variant="outlined" sx={{ width: 34, height: 44, display: "grid", placeItems: "center", bgcolor: "background.default", borderRadius: 1 }}>
-              <BookIcon fontSize="small" />
-            </Paper>
-          )}
-          <Typography variant="body2" sx={{ fontWeight: 800 }}>{record.title}</Typography>
-        </Stack>
-      ),
-    },
-    {
-      title: "Tác giả",
-      dataIndex: "author",
-      key: "author",
-      width: 160,
-      sorter: (a, b) => (a.author || "").localeCompare(b.author || ""),
-      render: (val: string) => val || "-",
-    },
-    {
-      title: "NXB",
-      dataIndex: "publisher",
-      key: "publisher",
-      width: 140,
-      render: (val: string) => val || "-",
-    },
-    {
-      title: "Tổng",
-      dataIndex: "total_copies",
-      key: "total_copies",
-      width: 80,
-      align: "center" as const,
-      sorter: (a, b) => a.total_copies - b.total_copies,
-    },
-    {
-      title: "Sẵn sàng",
-      dataIndex: "available_copies",
-      key: "available_copies",
-      width: 100,
-      align: "center" as const,
-      sorter: (a, b) => a.available_copies - b.available_copies,
-      render: (val: number) => (
-        <Chip size="small" color={val > 0 ? "success" : "error"} label={val} />
-      ),
-    },
-    {
-      title: "Mượn",
-      key: "borrowed",
-      width: 80,
-      align: "center" as const,
-      render: (_: unknown, record: BookWithStats) => record.total_copies - record.available_copies,
-    },
-  ];
+  const [orderBy, setOrderBy] = useState<string>("title");
+  const [order, setOrder] = useState<"asc" | "desc">("asc");
+
+  const handleRequestSort = (property: string) => {
+    const isAsc = orderBy === property && order === "asc";
+    setOrder(isAsc ? "desc" : "asc");
+    setOrderBy(property);
+  };
+
+  const sortedBooks = useMemo(() => {
+    const list = [...displayBooks];
+    list.sort((a, b) => {
+      let valA: any = "";
+      let valB: any = "";
+      if (orderBy === "isbn") {
+        valA = a.isbn || "";
+        valB = b.isbn || "";
+      } else if (orderBy === "title") {
+        valA = a.title || "";
+        valB = b.title || "";
+      } else if (orderBy === "author") {
+        valA = a.author || "";
+        valB = b.author || "";
+      } else if (orderBy === "total_copies") {
+        valA = a.total_copies ?? 0;
+        valB = b.total_copies ?? 0;
+      } else if (orderBy === "available_copies") {
+        valA = a.available_copies ?? 0;
+        valB = b.available_copies ?? 0;
+      } else if (orderBy === "borrowed") {
+        valA = a.total_copies - a.available_copies;
+        valB = b.total_copies - b.available_copies;
+      }
+      if (typeof valA === "number" && typeof valB === "number") {
+        return order === "asc" ? valA - valB : valB - valA;
+      }
+      return order === "asc"
+        ? String(valA).localeCompare(String(valB))
+        : String(valB).localeCompare(String(valA));
+    });
+    return list;
+  }, [displayBooks, orderBy, order]);
+
+  const isAllSelected = displayBooks.length > 0 && displayBooks.every((b) => selectedIds.has(b.id));
+  const isSomeSelected = displayBooks.some((b) => selectedIds.has(b.id)) && !isAllSelected;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const newSelected = new Set(selectedIds);
+      displayBooks.forEach((b) => newSelected.add(b.id));
+      setSelectedIds(newSelected);
+    } else {
+      const newSelected = new Set(selectedIds);
+      displayBooks.forEach((b) => newSelected.delete(b.id));
+      setSelectedIds(newSelected);
+    }
+  };
+
+  const handleSelectOne = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
 
   const outOfStockCount = books.filter((b) => b.available_copies === 0).length;
 
@@ -446,38 +390,36 @@ export default function BooksPage() {
     {
       label: "ĐANG ĐƯỢC MƯỢN",
       value: stats.borrowedCopies,
-      gradient: "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
+      gradient: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
       icon: AssignmentIcon,
       pct: stats.totalCopies > 0 ? Math.round((stats.borrowedCopies / stats.totalCopies) * 100) : 0,
-      delta: stats.totalCopies > 0 ? `Lưu thông: ${Math.round((stats.borrowedCopies / stats.totalCopies) * 100)}% kho sách` : undefined,
-      deltaColor: "default" as const,
+      delta: stats.totalCopies > 0 ? `${Math.round((stats.borrowedCopies / stats.totalCopies) * 100)}% tổng kho` : undefined,
+      deltaColor: "warning" as const,
     },
     {
-      label: "HẾT BẢN SAO",
+      label: "HẾT BẢN SAO SẴN CÓ",
       value: outOfStockCount,
-      gradient: outOfStockCount > 0 ? "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)",
-      icon: AlertIcon,
-      pct: books.length > 0 ? Math.round((outOfStockCount / books.length) * 100) : 0,
-      delta: outOfStockCount > 0 ? `⚠ ${outOfStockCount} đầu sách cần bổ sung` : "✓ Tất cả đầu sách đều còn bản sao",
+      gradient: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+      icon: InventoryIcon,
+      delta: outOfStockCount > 0 ? `${outOfStockCount} đầu sách cần bổ sung` : "Tất cả sách đều sẵn có",
       deltaColor: outOfStockCount > 0 ? ("error" as const) : ("success" as const),
     },
     {
       label: "TỔNG ĐẦU SÁCH",
       value: stats.totalBooks,
-      gradient: "linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)",
-      icon: BookIcon,
-      pct: 100,
-      delta: `${stats.totalCopies.toLocaleString("vi-VN")} tổng bản sao`,
+      gradient: "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)",
+      icon: LibraryIcon,
+      delta: `${stats.totalCopies.toLocaleString("vi-VN")} tổng số bản sao`,
       deltaColor: "default" as const,
     },
   ];
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2.5}>
       <PageHeader
-        title="Quản lý sách"
-        icon={LibraryIcon}
-        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
+        title="Quản lý Kho Sách"
+        subtitle="Quản lý thông tin sách, bản sao và nhập kho tự động bằng Excel"
+        icon={BookIcon}
         statBadges={`${total} đầu sách trong hệ thống`}
         onRefresh={() => { setPage(0); setSearchQuery(""); loadBooks(); }}
         actions={
@@ -486,7 +428,7 @@ export default function BooksPage() {
               <IconButton
                 onClick={() => api.downloadBookTemplate()}
                 size="small"
-                sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}
+                sx={{ border: "1px solid", borderColor: "divider" }}
               >
                 <DescriptionIcon fontSize="small" />
               </IconButton>
@@ -495,7 +437,7 @@ export default function BooksPage() {
               <IconButton
                 onClick={() => api.exportBooks()}
                 size="small"
-                sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}
+                sx={{ border: "1px solid", borderColor: "divider" }}
               >
                 <TableChartIcon fontSize="small" />
               </IconButton>
@@ -526,7 +468,7 @@ export default function BooksPage() {
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Tìm kiếm sách theo ISBN, tên, tác giả..."
-            sx={{ flexGrow: 1, minWidth: 240, "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
+            sx={{ flexGrow: 1, minWidth: 240, "& .MuiOutlinedInput-root": { borderRadius: "4px", bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
           />
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
@@ -534,15 +476,15 @@ export default function BooksPage() {
               variant="contained"
               startIcon={<UploadIcon />}
               onClick={() => fileInputRef.current?.click()}
-              sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", "&:hover": { background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)" } }}
+              sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
             >
               Nhập Excel
             </Button>
             <Button
-              variant="contained"
+              variant="outlined"
               startIcon={<QrCodeScannerIcon />}
               onClick={() => setIsbnScannerOpen(true)}
-              sx={{ background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", "&:hover": { background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)" } }}
+              sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
             >
               Quét ISBN
             </Button>
@@ -567,302 +509,316 @@ export default function BooksPage() {
         </DashboardCard>
       ) : null}
 
-      {previewFile ? (
-        <DashboardCard
-          title={`Xem trước: ${previewFile.name}`}
-          subtitle="Kiểm tra dữ liệu trước khi nhập kho"
-          actions={<Button variant="text" color="inherit" onClick={() => { setPreviewFile(null); setPreviewData(null); setSelectedPreviewIndices(new Set()); }}>Hủy</Button>}
-        >
-          {previewLoading ? (
-            <LoadingOverlay loading message="Đang đọc file..." />
-          ) : previewData?.length ? (
-            <Stack spacing={2}>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
-                <Chip color="success" label={`${previewData.filter((row) => row.status !== "invalid").length} hàng hợp lệ`} />
-                <Chip color="error" label={`${previewData.filter((row) => row.status === "invalid").length} hàng lỗi`} />
-                {selectedPreviewIndices.size > 0 ? (
-                  <Chip
-                    color="warning"
-                    label={`${selectedPreviewIndices.size} đã chọn`}
-                    onDelete={() => setSelectedPreviewIndices(new Set())}
-                    deleteIcon={<CloseIcon />}
-                    sx={{ ml: 1 }}
-                  />
-                ) : null}
-                {selectedPreviewIndices.size > 0 ? (
-                  <Button
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                    startIcon={<DeleteIcon />}
-                    onClick={() => setDeletePreviewOpen(true)}
-                    sx={{ ml: 1 }}
-                  >
-                    Xóa {selectedPreviewIndices.size} dòng
-                  </Button>
-                ) : null}
-              </Stack>
-      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, borderRadius: 2, overflowX: "auto" }}>
-      <Table size="small" stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell padding="checkbox" sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>
-                        <Checkbox
-                          size="small"
-                          indeterminate={selectedPreviewIndices.size > 0 && selectedPreviewIndices.size < (previewData?.filter(r => r.status !== "invalid").length ?? 0)}
-                          checked={!!previewData?.length && selectedPreviewIndices.size === previewData.filter(r => r.status !== "invalid").length}
-                          onChange={(_, checked) => {
-                            if (checked) {
-                              setSelectedPreviewIndices(new Set(previewData!.map((_, i) => i).filter(i => previewData![i].status !== "invalid")));
-                            } else {
-                              setSelectedPreviewIndices(new Set());
-                            }
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>ISBN</TableCell>
-                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Tên sách</TableCell>
-                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Tác giả</TableCell>
-                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>NXB</TableCell>
-                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Số lượng</TableCell>
-                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Mã vạch mẫu</TableCell>
-                      <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Trạng thái</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Xóa</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {previewData!.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={10} align="center" sx={{ py: 3, color: "text.secondary" }}>
-                          Không có dòng nào
-                        </TableCell>
-                      </TableRow>
-                    ) : previewData!.slice(0, 50).map((row, index) => {
-                      const isSelected = selectedPreviewIndices.has(index);
-                      const isInvalid = row.status === "invalid";
-                      return (
-                        <TableRow
-                          key={`${row.isbn}-${index}`}
-                          selected={isInvalid || isSelected}
-                          sx={{
-                            "&:hover .preview-delete-btn": { opacity: 1 },
-                            "& > td": { py: 0.5 },
-                            cursor: isInvalid ? "default" : "pointer",
-                            ...staggerSx(index, 0.03),
-                          }}
-                        >
-                          <TableCell padding="checkbox">
-                            <Checkbox
-                              size="small"
-                              checked={isSelected}
-                              disabled={isInvalid}
-                              onChange={(_, checked) => {
-                                const newSet = new Set(selectedPreviewIndices);
-                                if (checked) newSet.add(index);
-                                else newSet.delete(index);
-                                setSelectedPreviewIndices(newSet);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: "monospace", py: 0.5 }}>{row.isbn || "-"}</TableCell>
-                          <TableCell sx={{ py: 0.5 }}>{row.title || "-"}</TableCell>
-                          <TableCell sx={{ py: 0.5 }}>{row.author || "-"}</TableCell>
-                          <TableCell sx={{ py: 0.5 }}>{row.publisher || "-"}</TableCell>
-                          <TableCell sx={{ py: 0.5 }}>{row.quantity}</TableCell>
-                          <TableCell sx={{ fontFamily: "monospace", py: 0.5 }}>{row.barcodes[0] || "-"}</TableCell>
-                          <TableCell sx={{ py: 0.5 }}><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
-                          <TableCell align="center" sx={{ py: 0.5 }}>
-                            <IconButton
-                              className="preview-delete-btn"
-                              size="small"
-                              sx={{ opacity: 0, transition: "opacity 0.15s" }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPreviewData(previewData!.filter((_, i) => i !== index));
-                                setSelectedPreviewIndices(prev => {
-                                  const next = new Set<number>();
-                                  prev.forEach(v => { if (v < index) next.add(v); else if (v > index) next.add(v - 1); });
-                                  return next;
-                                });
-                                showNotice("info", "Đã xóa dòng");
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" color="error" />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
-                <Button variant="outlined" onClick={() => { setPreviewFile(null); setPreviewData(null); setSelectedPreviewIndices(new Set()); }}>Hủy</Button>
-                <Button variant="contained" startIcon={<CheckIcon />} onClick={handleImport} disabled={importing}>
-                  {importing ? "Đang nhập..." : "Xác nhận nhập kho"}
-                </Button>
-              </Stack>
-            </Stack>
-          ) : null}
-        </DashboardCard>
-      ) : null}
+      {/* Book Import Preview Component */}
+      <BookImportPreviewSection
+        previewFile={previewFile}
+        previewData={previewData}
+        setPreviewData={setPreviewData}
+        selectedPreviewIndices={selectedPreviewIndices}
+        setSelectedPreviewIndices={setSelectedPreviewIndices}
+        onCancel={() => {
+          setPreviewFile(null);
+          setPreviewData(null);
+          setSelectedPreviewIndices(new Set());
+        }}
+        onImport={handleImport}
+        importing={importing}
+        showNotice={showNotice}
+      />
 
-      {showResults && importResults ? (
-        <DashboardCard title="Kết quả nhập kho">
-      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflowX: "auto" }}>
-      <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>ISBN</TableCell>
-                  <TableCell>Tên sách</TableCell>
-                  <TableCell>Số lượng</TableCell>
-                  <TableCell>Barcode mẫu</TableCell>
-                  <TableCell>Trạng thái</TableCell>
-                  <TableCell>Thông báo</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {importResults.map((row, index) => (
-                  <TableRow key={`${row.isbn}-${index}`} selected={row.status === "error" || row.status === "warning"}>
-                    <TableCell sx={{ fontFamily: "monospace" }}>{row.isbn || "-"}</TableCell>
-                    <TableCell>{row.title || "-"}</TableCell>
-                    <TableCell>{row.quantity}</TableCell>
-                    <TableCell sx={{ fontFamily: "monospace" }}>{row.barcodes[0] || "-"}</TableCell>
-                    <TableCell><Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} /></TableCell>
-                    <TableCell>{row.message || "-"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          {importResults.some((row) => row.status === "imported" || row.status === "warning") ? (
-            <Button sx={{ mt: 2 }} variant="outlined" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()}>
-              In mã vạch vừa tạo
-            </Button>
-          ) : null}
-        </DashboardCard>
-      ) : null}
+      {/* Book Import Result Component */}
+      <BookImportResultSection
+        showResults={showResults}
+        importResults={importResults}
+        onPrintBarcodes={() => handlePrintBarcodes()}
+      />
 
       {recentlyPrinted.length > 0 ? (
         <DashboardCard title={`Mã vạch sẵn sàng in (${recentlyPrinted.length})`}>
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-            {recentlyPrinted.map((barcode) => <Chip key={barcode} label={barcode} sx={{ fontFamily: "monospace" }} />)}
+            {recentlyPrinted.map((barcode) => (
+              <Chip key={barcode} label={barcode} sx={{ fontFamily: "'JetBrains Mono', monospace" }} />
+            ))}
           </Stack>
         </DashboardCard>
       ) : null}
 
       <DashboardCard noPadding>
-        <AntdTable<BookWithStats>
-          rowKey={(record) => record.id}
-          columns={bookColumns}
-          dataSource={displayBooks}
-          loading={loading}
-          size="small"
-          rowSelection={{
-            selectedRowKeys: Array.from(selectedIds),
-            onChange: (keys) => setSelectedIds(new Set(keys as string[])),
-          }}
-          onRow={(record) => ({
-            onClick: () => {
-              if (process.env.NODE_ENV === "test") {
-                openQuantityDialog(record);
-              } else {
-                router.push(`/books/${record.id}`);
-              }
-            },
-            style: { cursor: "pointer" },
-          })}
-          pagination={
-            !searchQuery && total > limit
-              ? {
-                  current: page + 1,
-                  pageSize: limit,
-                  total,
-                  showSizeChanger: false,
-                  onChange: (p) => setPage(p - 1),
-                  showTotal: (t) => `${t} đầu sách`,
-                }
-              : false
-          }
-          scroll={{ x: 800 }}
-          locale={{
-            emptyText: (
-              <EmptyState
-                icon={<BookIcon fontSize="large" />}
-                title={searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}
-              />
-            ),
-          }}
-        />
+        {loading && <LinearProgress color="primary" sx={{ height: 3 }} />}
+        <TableContainer sx={{ overflowX: "auto", maxHeight: 720 }}>
+          <Table size="small" stickyHeader sx={{ minWidth: 800 }}>
+            <TableHead>
+              <TableRow sx={{ bgcolor: "background.neutral" }}>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    indeterminate={isSomeSelected}
+                    checked={isAllSelected}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700, minWidth: 130 }}>
+                  <TableSortLabel
+                    active={orderBy === "isbn"}
+                    direction={orderBy === "isbn" ? order : "asc"}
+                    onClick={() => handleRequestSort("isbn")}
+                  >
+                    ISBN
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700, minWidth: 260 }}>
+                  <TableSortLabel
+                    active={orderBy === "title"}
+                    direction={orderBy === "title" ? order : "asc"}
+                    onClick={() => handleRequestSort("title")}
+                  >
+                    Tiêu đề sách
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>
+                  <TableSortLabel
+                    active={orderBy === "author"}
+                    direction={orderBy === "author" ? order : "asc"}
+                    onClick={() => handleRequestSort("author")}
+                  >
+                    Tác giả
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700, minWidth: 130 }}>
+                  Nhà xuất bản
+                </TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700, minWidth: 80 }}>
+                  <TableSortLabel
+                    active={orderBy === "total_copies"}
+                    direction={orderBy === "total_copies" ? order : "asc"}
+                    onClick={() => handleRequestSort("total_copies")}
+                  >
+                    Tổng
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700, minWidth: 100 }}>
+                  <TableSortLabel
+                    active={orderBy === "available_copies"}
+                    direction={orderBy === "available_copies" ? order : "asc"}
+                    onClick={() => handleRequestSort("available_copies")}
+                  >
+                    Sẵn sàng
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700, minWidth: 80 }}>
+                  <TableSortLabel
+                    active={orderBy === "borrowed"}
+                    direction={orderBy === "borrowed" ? order : "asc"}
+                    onClick={() => handleRequestSort("borrowed")}
+                  >
+                    Mượn
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, minWidth: 90 }}>
+                  Thao tác
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {sortedBooks.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} sx={{ py: 6, textAlign: "center" }}>
+                    <EmptyState
+                      icon={<BookIcon fontSize="large" />}
+                      title={searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedBooks.map((record: BookWithStats) => {
+                  const isSelected = selectedIds.has(record.id);
+                  const borrowed = record.total_copies - record.available_copies;
+                  return (
+                    <TableRow
+                      key={record.id}
+                      hover
+                      selected={isSelected}
+                      onClick={() => {
+                        if (process.env.NODE_ENV === "test") {
+                          openQuantityDialog(record);
+                        } else {
+                          router.push(`/books/${record.id}`);
+                        }
+                      }}
+                      sx={{
+                        cursor: "pointer",
+                        "&:hover": { bgcolor: "action.hover" },
+                        transition: "background-color 0.15s ease",
+                      }}
+                    >
+                      <TableCell padding="checkbox" onClick={(e) => handleSelectOne(record.id, e)}>
+                        <Checkbox checked={isSelected} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontFamily: "'JetBrains Mono', monospace",
+                            color: "primary.main",
+                            fontWeight: 700,
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          {record.isbn || "-"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                          {record.cover_url ? (
+                            <Box
+                              component="img"
+                              src={record.cover_url}
+                              alt={record.title}
+                              sx={{
+                                width: 34,
+                                height: 46,
+                                objectFit: "cover",
+                                borderRadius: "4px",
+                                border: "1px solid",
+                                borderColor: "divider",
+                                flexShrink: 0,
+                              }}
+                            />
+                          ) : (
+                            <Paper
+                              variant="outlined"
+                              sx={{
+                                width: 34,
+                                height: 46,
+                                display: "grid",
+                                placeItems: "center",
+                                bgcolor: "background.default",
+                                borderRadius: "4px",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <BookIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                            </Paper>
+                          )}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 700,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                              }}
+                            >
+                              {record.title}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {record.author || "-"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {record.publisher || "-"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {record.total_copies}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          size="small"
+                          color={record.available_copies > 0 ? "success" : "error"}
+                          variant={record.available_copies > 0 ? "filled" : "outlined"}
+                          label={record.available_copies}
+                          sx={{ fontWeight: 700, minWidth: 36 }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="body2" color={borrowed > 0 ? "warning.main" : "text.secondary"} sx={{ fontWeight: 600 }}>
+                          {borrowed}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                        <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
+                          <Tooltip title="Chỉnh số lượng">
+                            <IconButton
+                              size="small"
+                              onClick={() => openQuantityDialog(record)}
+                              sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
+                            >
+                              <EditNoteOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Chi tiết sách">
+                            <IconButton
+                              size="small"
+                              onClick={() => router.push(`/books/${record.id}`)}
+                              sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
+                            >
+                              <VisibilityOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {!searchQuery && total > limit ? (
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={(_, newPage) => setPage(newPage)}
+            rowsPerPage={limit}
+            rowsPerPageOptions={[limit]}
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} trên ${count !== -1 ? count : `hơn ${to}`} đầu sách`}
+            sx={{ borderTop: 1, borderColor: "divider" }}
+          />
+        ) : null}
       </DashboardCard>
 
-      <Dialog open={!!selectedBook} onClose={() => setSelectedBook(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Sửa số lượng sách</DialogTitle>
-        <DialogContent>
-          {selectedBook ? (
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                {selectedBook.cover_url ? (
-                  <Box component="img" src={selectedBook.cover_url} alt={selectedBook.title} sx={{ width: 48, height: 64, objectFit: "cover", borderRadius: 1 }} />
-                ) : (
-                  <Paper variant="outlined" sx={{ width: 48, height: 64, display: "grid", placeItems: "center", borderRadius: 1 }}>
-                    <BookIcon />
-                  </Paper>
-                )}
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 900 }} noWrap>{selectedBook.title}</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>ISBN: {selectedBook.isbn}</Typography>
-                </Box>
-              </Stack>
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 1 }}>
-                <Alert severity="info">Tổng: {selectedBook.total_copies}</Alert>
-                <Alert severity="success">Sẵn sàng: {selectedBook.available_copies}</Alert>
-                <Alert severity="warning">Đang mượn: {selectedBook.total_copies - selectedBook.available_copies}</Alert>
-              </Box>
-              {selectedBook.publisher ? (
-                <Typography variant="body2"><strong>NXB:</strong> {selectedBook.publisher}</Typography>
-              ) : null}
-              {selectedBook.published_date ? (
-                <Typography variant="body2"><strong>Năm XB:</strong> {selectedBook.published_date}</Typography>
-              ) : null}
-              {selectedBook.categories ? (
-                <Typography variant="body2"><strong>Thể loại:</strong> {selectedBook.categories}</Typography>
-              ) : null}
-              {selectedBook.page_count ? (
-                <Typography variant="body2"><strong>Số trang:</strong> {selectedBook.page_count}</Typography>
-              ) : null}
-              {selectedBook.average_rating ? (
-                <Typography variant="body2"><strong>Đánh giá:</strong> {selectedBook.average_rating}/5</Typography>
-              ) : null}
-              {selectedBook.language ? (
-                <Typography variant="body2"><strong>Ngôn ngữ:</strong> {selectedBook.language}</Typography>
-              ) : null}
-              {selectedBook.description ? (
-                <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                  {selectedBook.description}
-                </Typography>
-              ) : null}
-              <TextField
-                label="Số lượng mới"
-                type="number"
-                value={editQuantity}
-                onChange={(event) => { setEditQuantity(Number(event.target.value) || 0); setQuantityError(""); }}
-                error={!!quantityError}
-                helperText={quantityError || "Số lượng không được nhỏ hơn số bản đang mượn"}
-                fullWidth
-                slotProps={{ htmlInput: { min: 1 } }}
-              />
-            </Stack>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSelectedBook(null)}>Hủy</Button>
-          <Button variant="contained" onClick={handleQuantitySave} disabled={savingQuantity}>{savingQuantity ? "Đang lưu..." : "Lưu thay đổi"}</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Book Quantity Dialog Component */}
+      <BookQuantityDialog
+        selectedBook={selectedBook}
+        onClose={() => setSelectedBook(null)}
+        editQuantity={editQuantity}
+        setEditQuantity={setEditQuantity}
+        quantityError={quantityError}
+        setQuantityError={setQuantityError}
+        onSave={handleQuantitySave}
+        savingQuantity={savingQuantity}
+      />
 
-      {contextHolder}
+      <Snackbar
+        open={Boolean(notice)}
+        autoHideDuration={4000}
+        onClose={() => setNotice(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        {notice ? (
+          <Alert
+            onClose={() => setNotice(null)}
+            severity={notice.severity}
+            variant="filled"
+            sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
+          >
+            {notice.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
 
       <IsbnScannerDialog
         open={isbnScannerOpen}
@@ -870,27 +826,28 @@ export default function BooksPage() {
         onImportComplete={handleIsbnImportComplete}
       />
 
+      {/* Floating Selection Bar */}
       <Fade in={selectedIds.size > 0}>
-  <Paper
-    elevation={8}
-    sx={{
-      position: "fixed",
-      bottom: { xs: 12, sm: 24 },
-      left: "50%",
-      transform: "translateX(-50%)",
-      zIndex: 1300,
-      maxWidth: "calc(100vw - 32px)",
-      width: "auto",
-      display: "flex",
-      alignItems: "center",
-      gap: 1.5,
-      px: { xs: 1.5, sm: 3 },
-      py: 1.5,
-            borderRadius: 3,
-            background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+        <Paper
+          elevation={4}
+          sx={{
+            position: "fixed",
+            bottom: { xs: 12, sm: 24 },
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1300,
+            maxWidth: "calc(100vw - 32px)",
+            width: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            px: { xs: 1.5, sm: 3 },
+            py: 1.5,
+            borderRadius: "4px",
+            bgcolor: "background.paper",
             border: "1px solid",
             borderColor: "warning.main",
-            boxShadow: "0 8px 32px rgba(255, 183, 77, 0.2)",
+            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.15)",
           }}
         >
           <Chip
@@ -904,6 +861,7 @@ export default function BooksPage() {
             variant="text"
             color="inherit"
             onClick={() => setSelectedIds(new Set())}
+            sx={{ textTransform: "none" }}
           >
             Bỏ chọn
           </Button>
@@ -916,116 +874,28 @@ export default function BooksPage() {
               setDeleteInput("");
               setDeleteConfirmOpen(true);
             }}
+            sx={{ textTransform: "none", fontWeight: 700 }}
           >
             Xóa
           </Button>
         </Paper>
       </Fade>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <AlertIcon sx={{ color: "warning.main" }} />
-          Xóa {selectedIds.size} cuốn sách?
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Sách sẽ bị xóa vĩnh viễn cùng tất cả bản sao:
-            </Typography>
-            <Box sx={{ maxHeight: 200, overflow: "auto", p: 1, bgcolor: "grey.900", borderRadius: 1 }}>
-              {displayBooks.filter((b) => selectedIds.has(b.id)).map((book) => (
-                <Stack key={book.id} direction="row" spacing={1} sx={{ py: 0.5, alignItems: "center" }}>
-                  {book.total_copies - book.available_copies > 0 ? <LockIcon fontSize="small" sx={{ color: "error.main" }} /> : null}
-                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary", minWidth: 120 }}>
-                    {book.isbn}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
-                    {book.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {book.total_copies} bản
-                  </Typography>
-                </Stack>
-              ))}
-            </Box>
-            {displayBooks.filter((b) => selectedIds.has(b.id) && b.total_copies - b.available_copies > 0).length > 0 ? (
-              <Alert severity="error">
-                Một số sách đang được mượn và sẽ không thể xóa. Hệ thống sẽ bỏ qua chúng.
-              </Alert>
-            ) : null}
-            <TextField
-              label='Nhập "XÓA" để xác nhận'
-              value={deleteInput}
-              onChange={(e) => setDeleteInput(e.target.value)}
-              fullWidth
-              size="small"
-              autoFocus
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setDeleteConfirmOpen(false); setDeleteInput(""); }}>Hủy</Button>
-          <Button
-            variant="contained"
-            color="error"
-            disabled={!deleteConfirmed || deleting}
-            onClick={handleBulkDelete}
-            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
-          >
-            {deleting ? "Đang xóa..." : "Xóa vĩnh viễn"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={deletePreviewOpen} onClose={() => setDeletePreviewOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <AlertIcon sx={{ color: "warning.main" }} />
-          Xóa {selectedPreviewIndices.size} dòng khỏi danh sách?
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Các dòng sau sẽ bị xóa khỏi danh sách trước khi nhập:
-            </Typography>
-            <Box sx={{ maxHeight: 200, overflow: "auto", p: 1, bgcolor: "grey.900", borderRadius: 1 }}>
-              {previewData?.filter((_, i) => selectedPreviewIndices.has(i)).slice(0, 10).map((row, idx) => (
-                <Stack key={idx} direction="row" spacing={1} sx={{ py: 0.5, alignItems: "center" }}>
-                  <Typography variant="body2" sx={{ fontFamily: "monospace", color: "text.secondary", minWidth: 130 }}>
-                    {row.isbn}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }} noWrap>
-                    {row.title || "Không có tên"}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    SL: {row.quantity}
-                  </Typography>
-                </Stack>
-              ))}
-              {selectedPreviewIndices.size > 10 ? (
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, textAlign: "center" }}>
-                  ... và {selectedPreviewIndices.size - 10} dòng khác
-                </Typography>
-              ) : null}
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeletePreviewOpen(false)}>Hủy</Button>
-          <Button
-            variant="contained"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => {
-              setPreviewData(previewData!.filter((_, i) => !selectedPreviewIndices.has(i)));
-              setSelectedPreviewIndices(new Set());
-              setDeletePreviewOpen(false);
-              showNotice("info", `Đã xóa ${selectedPreviewIndices.size} dòng`);
-            }}
-          >
-            Xóa {selectedPreviewIndices.size} dòng
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Book Bulk Delete Dialog Component */}
+      <BookBulkDeleteDialog
+        open={deleteConfirmOpen}
+        onClose={() => {
+          setDeleteConfirmOpen(false);
+          setDeleteInput("");
+        }}
+        selectedIds={selectedIds}
+        displayBooks={displayBooks}
+        deleteInput={deleteInput}
+        setDeleteInput={setDeleteInput}
+        deleteConfirmed={deleteConfirmed}
+        deleting={deleting}
+        onDelete={handleBulkDelete}
+      />
     </Stack>
   );
 }
