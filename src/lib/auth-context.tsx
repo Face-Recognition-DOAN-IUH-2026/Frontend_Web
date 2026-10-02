@@ -64,6 +64,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.logout();
     } catch { /* ignore */ }
+
+    // Dọn dẹp an toàn bộ nhớ đệm AI Chat khi bàn giao ca trực
+    if (typeof window !== "undefined") {
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith("ai-assistant-session") || k === "ai-widget-storage")) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+      } catch {}
+    }
+
     clearStoredAuth();
     setUser(null);
     setAccessToken(null);

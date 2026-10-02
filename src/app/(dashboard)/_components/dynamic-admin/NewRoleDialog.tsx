@@ -42,33 +42,34 @@ export function NewRoleDialog({
       slotProps={{ paper: { sx: { borderRadius: "4px" } } }}
     >
       <DialogTitle sx={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
-        Tạo vai trò mới
+        Thêm Nhóm Chức vụ Mới
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
-            label="Mã vai trò (Key ID)"
-            placeholder="e.g. intern, student_assistant"
+            label="Mã chức vụ (Key)"
+            placeholder="vd: tro_ly, thu_thu_kho, kiem_ke"
             value={newRoleName}
             onChange={(e) => setNewRoleName(e.target.value)}
             fullWidth
             size="small"
-            helperText="Viết liền không dấu, dùng để định danh trong backend"
+            helperText="Viết thường không dấu, dùng để nhận diện nội bộ hệ thống"
             slotProps={{ input: { sx: { fontFamily: "'JetBrains Mono', monospace" } } }}
           />
           <TextField
-            label="Tên hiển thị (Label)"
-            placeholder="e.g. Thực tập sinh thư viện"
+            label="Tên gọi chức vụ / vị trí"
+            placeholder="vd: Thủ thư quản lý kho, Trợ lý thư viện, Cán bộ kiểm kê"
             value={newRoleLabel}
             onChange={(e) => setNewRoleLabel(e.target.value)}
             fullWidth
             size="small"
+            helperText="Tên gọi hiển thị thân thiện trên thẻ nhân viên và phân quyền"
           />
         </Stack>
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose} sx={{ textTransform: "none" }}>
-          Hủy
+          Hủy bỏ
         </Button>
         <Button
           variant="contained"
@@ -81,7 +82,7 @@ export function NewRoleDialog({
             "&:hover": { bgcolor: theme.palette.primary.dark },
           }}
         >
-          Tạo vai trò
+          Tạo chức vụ
         </Button>
       </DialogActions>
     </Dialog>

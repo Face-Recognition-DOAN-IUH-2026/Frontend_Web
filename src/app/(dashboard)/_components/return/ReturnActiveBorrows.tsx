@@ -7,11 +7,13 @@ import {
   Chip,
   Paper,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import UsersIcon from "@mui/icons-material/GroupsOutlined";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
@@ -56,6 +58,9 @@ export default function ReturnActiveBorrows({
   returningId,
   onConfirmReturn,
 }: ReturnActiveBorrowsProps) {
+  const { can } = usePermission();
+  const canUpdateBorrow = can("borrows", "update");
+
   if (!selectedBorrower) {
     return (
       <DashboardCard>
@@ -125,17 +130,24 @@ export default function ReturnActiveBorrows({
                     Mượn: {formatDate(record.borrow_at)} | Hạn: {formatDate(record.due_at)}
                   </Typography>
                 </Stack>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="success"
-                  startIcon={<CheckCircleIcon />}
-                  disabled={!!returningId}
-                  onClick={() => onConfirmReturn(record)}
-                  sx={{ flexShrink: 0, alignSelf: "center", textTransform: "none", fontWeight: 700 }}
-                >
-                  Trả
-                </Button>
+                <Tooltip title={!canUpdateBorrow ? getPermissionDeniedReason("borrows", "update") : ""}>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="success"
+                      startIcon={<CheckCircleIcon />}
+                      disabled={!!returningId || !canUpdateBorrow}
+                      onClick={() => {
+                        if (!canUpdateBorrow) return;
+                        onConfirmReturn(record);
+                      }}
+                      sx={{ flexShrink: 0, alignSelf: "center", textTransform: "none", fontWeight: 700 }}
+                    >
+                      Trả
+                    </Button>
+                  </span>
+                </Tooltip>
               </Stack>
             </Paper>
           ))}

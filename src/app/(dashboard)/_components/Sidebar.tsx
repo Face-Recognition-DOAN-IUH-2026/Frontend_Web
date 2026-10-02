@@ -213,7 +213,12 @@ export default function Sidebar() {
   const visibleStaffItems = staffItems.filter((item) => canAccessPage(item.href));
   const visibleStaffAiItems = staffAiItems.filter((item) => canAccessPage(item.href));
   const visibleAiItems = aiItems.filter((item) => canAccessPage(item.href));
-  const visibleAdminItems = adminItems.filter((item) => canAccessPage(item.href));
+  const visibleAdminItems = adminItems.filter((item) => {
+    if (item.href.startsWith("/dashboard/admin")) {
+      return isAdmin;
+    }
+    return canAccessPage(item.href);
+  });
 
   const drawerContent = (
     <Stack sx={{ height: "100%" }}>

@@ -614,7 +614,7 @@ export default function DynamicAdminPage() {
                 lineHeight: 1.2,
               }}
             >
-              Phân quyền & Vai trò
+              Phân Quyền & Quản Lý Nhân Sự Thư Viện
             </Typography>
             <Typography
               variant="body2"
@@ -624,7 +624,7 @@ export default function DynamicAdminPage() {
                 mt: 0.25,
               }}
             >
-              Kiểm soát quyền truy cập màn hình và ma trận thao tác dữ liệu thư viện
+              Thiết lập quyền mở màn hình chức năng và các thao tác nghiệp vụ cho từng vị trí và nhân viên
             </Typography>
           </Box>
         </Stack>
@@ -663,7 +663,7 @@ export default function DynamicAdminPage() {
                 px: 2.5,
               }}
             >
-              {saving ? "Đang lưu..." : `Lưu vai trò [${activeRoleConfig.label}]`}
+              {saving ? "Đang lưu..." : `Lưu quyền chức vụ [${activeRoleConfig.label}]`}
             </Button>
           ) : activeTab === 1 ? (
             <Button
@@ -679,7 +679,7 @@ export default function DynamicAdminPage() {
                 px: 2.5,
               }}
             >
-              {saving ? "Đang lưu..." : "Lưu ghi đè tài khoản"}
+              {saving ? "Đang lưu..." : "Lưu quyền riêng nhân viên"}
             </Button>
           ) : null}
         </Stack>
@@ -697,9 +697,9 @@ export default function DynamicAdminPage() {
         }}
       >
         {[
-          { label: "Ma trận theo Vai trò", icon: <RuleOutlinedIcon fontSize="small" /> },
-          { label: "Ghi đè theo Tài khoản", icon: <KeyOutlinedIcon fontSize="small" /> },
-          { label: "Thanh tra Quyền thực tế", icon: <CodeOutlinedIcon fontSize="small" /> },
+          { label: "Phân quyền theo Chức vụ", icon: <RuleOutlinedIcon fontSize="small" /> },
+          { label: "Đặc quyền riêng Nhân viên", icon: <KeyOutlinedIcon fontSize="small" /> },
+          { label: "Kiểm tra Quyền hạn Thực tế", icon: <CodeOutlinedIcon fontSize="small" /> },
         ].map((tab, idx) => {
           const isSelected = activeTab === idx;
           return (

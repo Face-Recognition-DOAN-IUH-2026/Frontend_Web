@@ -113,17 +113,17 @@ export function UserOverridesTab({
           </Box>
           <Box sx={{ flex: 1, maxWidth: 360 }}>
             <FormControl fullWidth size="small">
-              <InputLabel id="staff-select-label">Chọn tài khoản nhân viên</InputLabel>
+              <InputLabel id="staff-select-label">Chọn nhân viên thư viện</InputLabel>
               <Select
                 labelId="staff-select-label"
                 value={selectedUserId}
-                label="Chọn tài khoản nhân viên"
+                label="Chọn nhân viên thư viện"
                 onChange={(e) => setSelectedUserId(e.target.value)}
                 sx={{ borderRadius: 1.5 }}
               >
                 {staffList.map((st) => (
                   <MenuItem key={st.id} value={st.id}>
-                    {st.fullName || st.email} ({st.role})
+                    {st.fullName || st.email} ({st.role === "admin" ? "Quản trị viên" : "Thủ thư"})
                   </MenuItem>
                 ))}
               </Select>
@@ -133,11 +133,10 @@ export function UserOverridesTab({
           {selectedStaffMember && (
             <Chip
               size="small"
-              label={`Vai trò gốc: ${baseRole.toUpperCase()}`}
+              label={`Chức vụ: ${selectedStaffMember.role === "admin" ? "Quản trị viên" : "Thủ thư"}`}
               sx={{
                 fontWeight: 700,
                 borderRadius: 1,
-                fontFamily: "JetBrains Mono, monospace",
                 bgcolor: "action.hover",
               }}
             />
@@ -148,10 +147,10 @@ export function UserOverridesTab({
         <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
           <Box sx={{ textAlign: "right" }}>
             <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.85rem" }}>
-              Kích hoạt ghi đè cá nhân
+              Cấp quyền riêng cho nhân viên này
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {userOverride.enabled ? "Đang áp dụng quyền riêng biệt" : "Đang kế thừa từ vai trò"}
+              {userOverride.enabled ? "Đang áp dụng đặc quyền riêng" : "Đang áp dụng theo chức vụ"}
             </Typography>
           </Box>
           <Switch
@@ -169,7 +168,7 @@ export function UserOverridesTab({
               disabled={saving}
               sx={{ textTransform: "none", fontWeight: 600, borderRadius: 1.5 }}
             >
-              Hủy ghi đè
+              Hủy đặc quyền
             </Button>
           )}
         </Stack>
@@ -187,10 +186,10 @@ export function UserOverridesTab({
           }}
         >
           <Typography variant="body1" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Tài khoản này đang sử dụng quyền mặc định của vai trò [{baseRole.toUpperCase()}]
+            Nhân viên này đang dùng bộ quyền chuẩn của nhóm [{baseConfig?.label || baseRole}]
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 600, mx: "auto", mb: 2 }}>
-            Để cấp thêm quyền hoặc thu hồi riêng cho tài khoản này mà không làm ảnh hưởng đến người dùng khác, hãy bật công tắc &quot;Kích hoạt ghi đè cá nhân&quot; ở trên.
+            Nếu bạn muốn cấp thêm quyền đặc biệt (ví dụ: giao thêm việc kiểm kê, sửa sách) hoặc tạm khóa một số tính năng riêng cho nhân viên này, hãy nhấn nút bên dưới.
           </Typography>
           <Button
             variant="contained"
@@ -198,7 +197,7 @@ export function UserOverridesTab({
             onClick={() => handleToggleUserOverrideEnabled(true)}
             sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
           >
-            Bật ghi đè cá nhân
+            Bật thiết lập quyền riêng cho nhân viên
           </Button>
         </Paper>
       ) : (
@@ -223,10 +222,10 @@ export function UserOverridesTab({
               }}
             >
               <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                Ghi đè ma trận thao tác CRUD
+                1. Tùy chỉnh thao tác dữ liệu riêng biệt
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Chọn trạng thái: Kế thừa (Mặc định) • Cấp thêm (+) • Thu hồi (-)
+                Chọn: Theo chức vụ (Mặc định) • Cấp thêm quyền (+) • Chặn thao tác (-)
               </Typography>
             </Box>
 
@@ -234,17 +233,17 @@ export function UserOverridesTab({
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: isDark ? alpha("#FFFFFF", 0.02) : "#F1F5F9" }}>
-                    <TableCell sx={{ fontWeight: 700, width: "28%" }}>Phân hệ</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, width: "18%" }}>Đọc (Read)</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, width: "18%" }}>Tạo mới (Create)</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, width: "18%" }}>Cập nhật (Update)</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, width: "18%" }}>Xóa (Delete)</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "32%" }}>Phân hệ nghiệp vụ</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, width: "17%" }}>Xem</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, width: "17%" }}>Thêm mới</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, width: "17%" }}>Chỉnh sửa</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, width: "17%" }}>Xóa</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {ALL_RESOURCES.map((res) => (
                     <TableRow key={res} hover>
-                      <TableCell sx={{ py: 1 }}>
+                      <TableCell sx={{ py: 1.25 }}>
                         <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.85rem" }}>
                           {RESOURCE_LABELS[res] || res}
                         </Typography>
@@ -280,9 +279,9 @@ export function UserOverridesTab({
                             >
                               <ToggleButton
                                 value="inherit"
-                                title={`Kế thừa vai trò (${baseVal ? "Có" : "Không"})`}
+                                title={`Kế thừa từ vai trò (${baseVal ? "Có quyền" : "Không có"})`}
                               >
-                                Mặc định
+                                {baseVal ? "Có (Gốc)" : "Không"}
                               </ToggleButton>
                               <ToggleButton
                                 value="grant"
@@ -337,10 +336,10 @@ export function UserOverridesTab({
               }}
             >
               <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                Ghi đè quyền truy cập màn hình & URL
+                2. Tùy chỉnh quyền mở màn hình chức năng
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Tùy chỉnh quyền truy cập URL riêng biệt cho tài khoản
+                Mở thêm hoặc tạm ẩn các mục trên menu làm việc riêng của nhân viên này
               </Typography>
             </Box>
 
@@ -348,9 +347,9 @@ export function UserOverridesTab({
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow sx={{ bgcolor: isDark ? alpha("#FFFFFF", 0.02) : "#F1F5F9" }}>
-                    <TableCell sx={{ fontWeight: 700, width: "38%" }}>Tên màn hình</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "32%" }}>Đường dẫn</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, width: "30%" }}>Thiết lập ghi đè</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "42%" }}>Màn hình chức năng</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "28%" }}>Mặc định theo chức vụ</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, width: "30%" }}>Thiết lập riêng cho nhân viên</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -367,20 +366,26 @@ export function UserOverridesTab({
 
                     return (
                       <TableRow key={route.path} hover>
-                        <TableCell sx={{ py: 0.8 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.84rem" }}>
+                        <TableCell sx={{ py: 1.1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.85rem", color: "text.primary" }}>
                             {route.label}
                           </Typography>
                         </TableCell>
-                        <TableCell sx={{ py: 0.8 }}>
-                          <Typography
-                            variant="caption"
-                            sx={{ fontFamily: "JetBrains Mono, monospace", color: "text.secondary", fontSize: "0.75rem" }}
-                          >
-                            {route.path}
-                          </Typography>
+                        <TableCell sx={{ py: 1.1 }}>
+                          <Chip
+                            size="small"
+                            label={isBaseAllowed ? "Được mở" : "Không được mở"}
+                            sx={{
+                              height: 20,
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              borderRadius: 1,
+                              bgcolor: isBaseAllowed ? alpha("#059669", 0.1) : alpha("#64748B", 0.1),
+                              color: isBaseAllowed ? "#059669" : "#64748B",
+                            }}
+                          />
                         </TableCell>
-                        <TableCell align="center" sx={{ py: 0.8 }}>
+                        <TableCell align="center" sx={{ py: 1.1 }}>
                           <ToggleButtonGroup
                             size="small"
                             exclusive
@@ -398,7 +403,7 @@ export function UserOverridesTab({
                             }}
                           >
                             <ToggleButton value="inherit">
-                              Mặc định ({isBaseAllowed ? "Được" : "Chặn"})
+                              Theo chức vụ
                             </ToggleButton>
                             <ToggleButton
                               value="grant"
@@ -409,7 +414,7 @@ export function UserOverridesTab({
                                 },
                               }}
                             >
-                              Cấp (+)
+                              Cho phép (+)
                             </ToggleButton>
                             <ToggleButton
                               value="revoke"
@@ -420,7 +425,7 @@ export function UserOverridesTab({
                                 },
                               }}
                             >
-                              Chặn (-)
+                              Tạm khóa (-)
                             </ToggleButton>
                           </ToggleButtonGroup>
                         </TableCell>

@@ -10,9 +10,11 @@ import {
   DialogTitle,
   MenuItem,
   Select,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import type { BorrowRecord, StaffPatronActiveBorrowsResponse } from "@/lib/types";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 
 interface ReturnConfirmDialogProps {
   record: BorrowRecord | null;
@@ -33,6 +35,8 @@ export default function ReturnConfirmDialog({
   onConfirm,
   loading,
 }: ReturnConfirmDialogProps) {
+  const { can } = usePermission();
+  const canUpdateBorrow = can("borrows", "update");
   const patronName = detail?.patron.full_name || detail?.patron.student_code || "độc giả";
 
   return (
@@ -79,15 +83,22 @@ export default function ReturnConfirmDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>Hủy</Button>
-        <Button
-          variant="contained"
-          color="success"
-          onClick={onConfirm}
-          disabled={loading}
-          sx={{ textTransform: "none", fontWeight: 700 }}
-        >
-          {loading ? "Đang trả..." : "Xác nhận trả"}
-        </Button>
+        <Tooltip title={!canUpdateBorrow ? getPermissionDeniedReason("borrows", "update") : ""}>
+          <span>
+            <Button
+              variant="contained"
+              color="success"
+              onClick={() => {
+                if (!canUpdateBorrow) return;
+                onConfirm();
+              }}
+              disabled={loading || !canUpdateBorrow}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {loading ? "Đang trả..." : "Xác nhận trả"}
+            </Button>
+          </span>
+        </Tooltip>
       </DialogActions>
     </Dialog>
   );

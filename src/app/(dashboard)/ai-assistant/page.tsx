@@ -32,6 +32,7 @@ import ScheduleIcon from "@mui/icons-material/CalendarTodayOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import AddCommentOutlinedIcon from "@mui/icons-material/AddCommentOutlined";
 
 import Markdown from "react-markdown";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
@@ -40,6 +41,7 @@ import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api, { getApiAccessToken } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import BookCard, { parseBookCard } from "@/app/(dashboard)/_components/BookCard";
 import LibraryHoursCard, { type LibraryScheduleData } from "@/app/(dashboard)/_components/AIWidget/cards/LibraryHoursCard";
 import { fadeInUp } from "@/lib/animations";
@@ -200,6 +202,7 @@ function MessageContent({ content }: { content: string }) {
 }
 
 export default function AiAssistantPage() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -212,9 +215,14 @@ export default function AiAssistantPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Dynamic storage key isolated per user
+  const currentStorageKey = useMemo(() => {
+    return user?.id ? `ai-assistant-session_${user.id}` : "ai-assistant-session_guest";
+  }, [user?.id]);
+
   useEffect(() => {
     setMounted(true);
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(currentStorageKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -223,26 +231,35 @@ export default function AiAssistantPage() {
           setMessages(
             parsed.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })),
           );
+        } else {
+          initDefaultGreeting();
         }
-      } catch {}
+      } catch {
+        initDefaultGreeting();
+      }
     } else {
-      setMessages([
-        {
-          id: "1",
-          role: "assistant",
-          content:
-            "Xin chào! Tôi là Trợ lý AI của Thư viện IUH. Tôi có thể hỗ trợ bạn:\n\n• Tìm kiếm sách và vị trí kệ\n• Trả lời câu hỏi về thư viện (giờ mở cửa, quy định mượn trả, chính sách phạt...)\n• Tra cứu thông tin độc giả và lịch sử mượn\n• Xem lịch trực nhân viên hôm nay\n• Đề xuất sách theo nhu cầu\n\nBạn cần tôi giúp gì?",
-          timestamp: new Date(),
-        },
-      ]);
+      initDefaultGreeting();
     }
-  }, []);
+  }, [currentStorageKey]);
+
+  const initDefaultGreeting = () => {
+    setSessionId("");
+    setMessages([
+      {
+        id: "1",
+        role: "assistant",
+        content:
+          "Xin chào! Tôi là Trợ lý AI của Thư viện IUH. Tôi có thể hỗ trợ bạn:\n\n• Tìm kiếm sách và vị trí kệ\n• Trả lời câu hỏi về thư viện (giờ mở cửa, quy định mượn trả, chính sách phạt...)\n• Tra cứu thông tin độc giả và lịch sử mượn\n• Xem lịch trực nhân viên hôm nay\n• Đề xuất sách theo nhu cầu\n\nBạn cần tôi giúp gì?",
+        timestamp: new Date(),
+      },
+    ]);
+  };
 
   useEffect(() => {
-    if (mounted) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ sessionId, messages }));
+    if (mounted && currentStorageKey) {
+      localStorage.setItem(currentStorageKey, JSON.stringify({ sessionId, messages }));
     }
-  }, [sessionId, messages, mounted]);
+  }, [sessionId, messages, mounted, currentStorageKey]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -343,12 +360,14 @@ export default function AiAssistantPage() {
       {
         id: Date.now().toString(),
         role: "assistant",
-        content: "Đã xóa cuộc trò chuyện. Tôi có thể giúp gì cho bạn?",
+        content: "Đã bắt đầu cuộc trò chuyện mới. Tôi có thể giúp gì cho bạn hôm nay?",
         timestamp: new Date(),
       },
     ]);
     setSessionId("");
-    localStorage.removeItem(STORAGE_KEY);
+    if (currentStorageKey) {
+      localStorage.removeItem(currentStorageKey);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -385,7 +404,27 @@ export default function AiAssistantPage() {
         statBadges={statBadges}
         onRefresh={clearChat}
         actions={
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddCommentOutlinedIcon />}
+              onClick={clearChat}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                borderRadius: 1.5,
+                borderColor: "primary.main",
+                color: "primary.main",
+                bgcolor: alpha("#8B0000", 0.04),
+                "&:hover": {
+                  bgcolor: alpha("#8B0000", 0.1),
+                  borderColor: "primary.main",
+                },
+              }}
+            >
+              Đoạn chat mới
+            </Button>
             {sessionId ? (
               <Chip
                 label={`Phiên: ${sessionId.slice(0, 8)}...`}

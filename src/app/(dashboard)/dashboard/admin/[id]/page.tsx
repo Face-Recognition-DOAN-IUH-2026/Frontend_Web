@@ -53,6 +53,7 @@ import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { initials, formatDate, formatDateTime, roleLabel, statusLabel, statusColor } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 import type { UserPublic } from "@/lib/types";
 
 const ROLE_OPTIONS = [
@@ -91,10 +92,21 @@ export default function UserDetailPage() {
   });
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user: currentUser, isLoading: isAuthLoading, isAuthenticated } = useAuth();
 
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthLoading) {
+      if (!isAuthenticated) {
+        router.push("/login");
+      } else if (currentUser?.role !== "admin") {
+        router.push("/dashboard");
+      }
+    }
+  }, [isAuthLoading, isAuthenticated, currentUser, router]);
 
   const [editForm, setEditForm] = useState({
     full_name: "",

@@ -10,12 +10,14 @@ import {
   Grid,
   Paper,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import LocalLibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
 
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import type { BorrowCartItem } from "./types";
 
@@ -40,6 +42,9 @@ export function BorrowStepConfirm({
   handleConfirmBorrowSlip,
   setCurrentStep,
 }: BorrowStepConfirmProps) {
+  const { can } = usePermission();
+  const canCreateBorrow = can("borrows", "create");
+
   return (
     <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
       {/* Left Column: Summary of Patron & Books */}
@@ -130,29 +135,36 @@ export function BorrowStepConfirm({
               </Typography>
             </Alert>
 
-            <Button
-              variant="contained"
-              size="large"
-              fullWidth
-              disabled={creatingSlip || cartItems.length === 0}
-              onClick={handleConfirmBorrowSlip}
-              sx={{
-                py: 1.6,
-                borderRadius: "4px",
-                fontWeight: 800,
-                fontSize: "1.05rem",
-                textTransform: "none",
-              }}
-            >
-              {creatingSlip ? (
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                  <CircularProgress size={22} color="inherit" />
-                  <span>Đang tạo phiếu mượn...</span>
-                </Stack>
-              ) : (
-                `Xác nhận tạo phiếu (${cartItems.length} cuốn)`
-              )}
-            </Button>
+            <Tooltip title={!canCreateBorrow ? getPermissionDeniedReason("borrows", "create") : ""}>
+              <span style={{ width: "100%" }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  disabled={creatingSlip || cartItems.length === 0 || !canCreateBorrow}
+                  onClick={() => {
+                    if (!canCreateBorrow) return;
+                    handleConfirmBorrowSlip();
+                  }}
+                  sx={{
+                    py: 1.6,
+                    borderRadius: "4px",
+                    fontWeight: 800,
+                    fontSize: "1.05rem",
+                    textTransform: "none",
+                  }}
+                >
+                  {creatingSlip ? (
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <CircularProgress size={22} color="inherit" />
+                      <span>Đang tạo phiếu mượn...</span>
+                    </Stack>
+                  ) : (
+                    `Xác nhận tạo phiếu (${cartItems.length} cuốn)`
+                  )}
+                </Button>
+              </span>
+            </Tooltip>
 
             <Button
               variant="outlined"

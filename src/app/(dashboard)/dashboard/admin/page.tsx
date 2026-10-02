@@ -69,7 +69,7 @@ const STAT_GRADIENT: Record<string, string> = {
 };
 
 export default function AdminPage() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<UserPublic[]>([]);
   const [total, setTotal] = useState(0);
@@ -83,8 +83,14 @@ export default function AdminPage() {
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "staff" | "patron">("all");
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) router.push("/login");
-  }, [isLoading, isAuthenticated, router]);
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push("/login");
+      } else if (user?.role !== "admin") {
+        router.push("/dashboard");
+      }
+    }
+  }, [isLoading, isAuthenticated, user, router]);
 
   const load = async () => {
     try {

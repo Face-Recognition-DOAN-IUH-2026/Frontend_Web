@@ -41,6 +41,7 @@ import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import api, { getErrorMessage } from "@/lib/api-client";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
@@ -60,6 +61,12 @@ type Notice = { severity: "success" | "error" | "warning" | "info"; message: str
 
 export default function BooksPage() {
   const theme = useTheme();
+  const { can } = usePermission();
+  const canCreateBook = can("books", "create");
+  const canUpdateBook = can("books", "update");
+  const canDeleteBook = can("books", "delete");
+  const canReadBook = can("books", "read");
+
   const [notice, setNotice] = useState<Notice>(null);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -433,14 +440,17 @@ export default function BooksPage() {
                 <DescriptionIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Xuất Excel">
-              <IconButton
-                onClick={() => api.exportBooks()}
-                size="small"
-                sx={{ border: "1px solid", borderColor: "divider" }}
-              >
-                <TableChartIcon fontSize="small" />
-              </IconButton>
+            <Tooltip title={!canReadBook ? getPermissionDeniedReason("books", "read") : "Xuất Excel"}>
+              <span>
+                <IconButton
+                  disabled={!canReadBook}
+                  onClick={() => api.exportBooks()}
+                  size="small"
+                  sx={{ border: "1px solid", borderColor: "divider" }}
+                >
+                  <TableChartIcon fontSize="small" />
+                </IconButton>
+              </span>
             </Tooltip>
           </>
         }
@@ -472,22 +482,38 @@ export default function BooksPage() {
           />
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
-            <Button
-              variant="contained"
-              startIcon={<UploadIcon />}
-              onClick={() => fileInputRef.current?.click()}
-              sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
-            >
-              Nhập Excel
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<QrCodeScannerIcon />}
-              onClick={() => setIsbnScannerOpen(true)}
-              sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
-            >
-              Quét ISBN
-            </Button>
+            <Tooltip title={!canCreateBook ? getPermissionDeniedReason("books", "create") : ""}>
+              <span>
+                <Button
+                  variant="contained"
+                  disabled={!canCreateBook}
+                  startIcon={<UploadIcon />}
+                  onClick={() => {
+                    if (!canCreateBook) return;
+                    fileInputRef.current?.click();
+                  }}
+                  sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
+                >
+                  Nhập Excel
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title={!canCreateBook ? getPermissionDeniedReason("books", "create") : ""}>
+              <span>
+                <Button
+                  variant="outlined"
+                  disabled={!canCreateBook}
+                  startIcon={<QrCodeScannerIcon />}
+                  onClick={() => {
+                    if (!canCreateBook) return;
+                    setIsbnScannerOpen(true);
+                  }}
+                  sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
+                >
+                  Quét ISBN
+                </Button>
+              </span>
+            </Tooltip>
           </Stack>
         </Stack>
       </DashboardCard>
@@ -748,14 +774,20 @@ export default function BooksPage() {
                       </TableCell>
                       <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                         <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
-                          <Tooltip title="Chỉnh số lượng">
-                            <IconButton
-                              size="small"
-                              onClick={() => openQuantityDialog(record)}
-                              sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
-                            >
-                              <EditNoteOutlinedIcon fontSize="small" />
-                            </IconButton>
+                          <Tooltip title={!canUpdateBook ? getPermissionDeniedReason("books", "update") : "Chỉnh số lượng"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={!canUpdateBook}
+                                onClick={() => {
+                                  if (!canUpdateBook) return;
+                                  openQuantityDialog(record);
+                                }}
+                                sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
+                              >
+                                <EditNoteOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </span>
                           </Tooltip>
                           <Tooltip title="Chi tiết sách">
                             <IconButton
@@ -865,19 +897,25 @@ export default function BooksPage() {
           >
             Bỏ chọn
           </Button>
-          <Button
-            size="small"
-            variant="contained"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => {
-              setDeleteInput("");
-              setDeleteConfirmOpen(true);
-            }}
-            sx={{ textTransform: "none", fontWeight: 700 }}
-          >
-            Xóa
-          </Button>
+          <Tooltip title={!canDeleteBook ? getPermissionDeniedReason("books", "delete") : ""}>
+            <span>
+              <Button
+                size="small"
+                variant="contained"
+                color="error"
+                disabled={!canDeleteBook}
+                startIcon={<DeleteIcon />}
+                onClick={() => {
+                  if (!canDeleteBook) return;
+                  setDeleteInput("");
+                  setDeleteConfirmOpen(true);
+                }}
+                sx={{ textTransform: "none", fontWeight: 700 }}
+              >
+                Xóa
+              </Button>
+            </span>
+          </Tooltip>
         </Paper>
       </Fade>
 

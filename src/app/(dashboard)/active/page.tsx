@@ -32,6 +32,7 @@ import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
@@ -86,6 +87,9 @@ function normalizeQuery(value: string) {
 }
 
 export default function ActivePage() {
+  const { can } = usePermission();
+  const canUpdate = can("borrows", "update");
+
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
     open: false,
     message: "",
@@ -463,15 +467,21 @@ export default function ActivePage() {
                               </Stack>
                             </Stack>
                           </Box>
-                          <Tooltip title="Đánh dấu đã ra">
-                            <IconButton
-                              size="small"
-                              color="warning"
-                              onClick={() => setExitPatron(patron)}
-                              sx={{ flexShrink: 0, mt: 0.5 }}
-                            >
-                              <LogoutIcon fontSize="small" />
-                            </IconButton>
+                          <Tooltip title={!canUpdate ? getPermissionDeniedReason("borrows", "update") : "Đánh dấu đã ra"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="warning"
+                                disabled={!canUpdate}
+                                onClick={() => {
+                                  if (!canUpdate) return;
+                                  setExitPatron(patron);
+                                }}
+                                sx={{ flexShrink: 0, mt: 0.5 }}
+                              >
+                                <LogoutIcon fontSize="small" />
+                              </IconButton>
+                            </span>
                           </Tooltip>
                         </Stack>
                       </Box>

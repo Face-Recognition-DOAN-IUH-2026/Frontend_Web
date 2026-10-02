@@ -118,12 +118,11 @@ export function RolePermissionsTab({
               fontWeight: 700,
               fontFamily: "Space Grotesk, sans-serif",
               letterSpacing: "0.02em",
-              textTransform: "uppercase",
-              fontSize: "0.8rem",
+              fontSize: "0.82rem",
               color: "text.primary",
             }}
           >
-            Danh sách vai trò
+            Chức vụ & Vị trí
           </Typography>
           <IconButton
             size="small"
@@ -132,7 +131,7 @@ export function RolePermissionsTab({
               color: "primary.main",
               "&:hover": { bgcolor: alpha(primaryColor, 0.08) },
             }}
-            title="Thêm vai trò mới"
+            title="Thêm nhóm chức vụ mới"
           >
             <AddCircleOutlineOutlinedIcon fontSize="small" />
           </IconButton>
@@ -145,7 +144,7 @@ export function RolePermissionsTab({
             const isRoleAdmin = rKey === "admin";
             const allowedCount = isRoleAdmin
               ? "Toàn quyền"
-              : `${(rConfig?.allowedPages || []).length} trang`;
+              : `${(rConfig?.allowedPages || []).length} màn hình`;
 
             return (
               <Box
@@ -177,8 +176,8 @@ export function RolePermissionsTab({
                 <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", minWidth: 0 }}>
                   <Box
                     sx={{
-                      width: 30,
-                      height: 30,
+                      width: 32,
+                      height: 32,
                       borderRadius: 1,
                       bgcolor: isRoleAdmin
                         ? alpha(primaryColor, 0.12)
@@ -208,7 +207,7 @@ export function RolePermissionsTab({
                       {rConfig?.label || rKey}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.72rem" }}>
-                      code: {rKey}
+                      {isRoleAdmin ? "Quản trị cao nhất" : "Nhân sự thư viện"}
                     </Typography>
                   </Box>
                 </Stack>
@@ -221,7 +220,6 @@ export function RolePermissionsTab({
                     fontSize: "0.68rem",
                     fontWeight: 700,
                     borderRadius: 1,
-                    fontFamily: "JetBrains Mono, monospace",
                     bgcolor: isRoleAdmin
                       ? alpha(primaryColor, 0.12)
                       : isSelected
@@ -252,7 +250,7 @@ export function RolePermissionsTab({
               "&:hover": { borderColor: "primary.main", bgcolor: "action.hover" },
             }}
           >
-            Thêm vai trò mới
+            Thêm chức vụ mới
           </Button>
         </Box>
       </Paper>
@@ -281,33 +279,33 @@ export function RolePermissionsTab({
               </Typography>
               <Chip
                 size="small"
-                label={isAdmin ? "HỆ THỐNG MẶC ĐỊNH" : "VAI TRÒ TÙY BIẾN"}
+                label={isAdmin ? "CHỨC VỤ HỆ THỐNG" : "NHÓM THỦ THƯ"}
                 color={isAdmin ? "primary" : "default"}
                 sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, borderRadius: 1 }}
               />
             </Stack>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.82rem", mt: 0.25 }}>
-              {activeRoleConfig.description || "Quyền hạn phân bổ mặc định cho vai trò người dùng này."}
+              {activeRoleConfig.description || "Quyền hạn chuẩn áp dụng cho nhóm nhân sự này khi làm việc tại thư viện."}
             </Typography>
           </Box>
 
           {isAdmin ? (
             <Chip
               icon={<CheckCircleOutlineOutlinedIcon />}
-              label="Toàn quyền bảo mật (Locked)"
+              label="Toàn quyền quản trị viên"
               color="success"
               variant="outlined"
               size="small"
               sx={{ fontWeight: 700, height: 26 }}
             />
           ) : (
-            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "JetBrains Mono, monospace" }}>
-              {(activeRoleConfig.allowedPages || []).length} màn hình • 7 phân hệ CRUD
+            <Typography variant="caption" color="text.secondary">
+              {(activeRoleConfig.allowedPages || []).length} màn hình thao tác • 7 phân hệ dữ liệu
             </Typography>
           )}
         </Paper>
 
-        {/* 1. CRUD Matrix (Data-First) */}
+        {/* 1. Quyền thao tác nghiệp vụ thư viện */}
         <Paper
           variant="outlined"
           sx={{
@@ -331,10 +329,10 @@ export function RolePermissionsTab({
           >
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.88rem" }}>
-                1. Ma trận thao tác dữ liệu (CRUD Matrix)
+                1. Quyền thao tác nghiệp vụ thư viện
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Quyền thực hiện các tác vụ dữ liệu trên từng phân hệ thư viện
+                Quy định quyền Xem, Thêm mới, Chỉnh sửa hoặc Xóa trên từng phân hệ sách và độc giả
               </Typography>
             </Box>
           </Box>
@@ -343,12 +341,12 @@ export function RolePermissionsTab({
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ bgcolor: isDark ? alpha("#FFFFFF", 0.02) : "#F1F5F9" }}>
-                  <TableCell sx={{ fontWeight: 700, width: "30%", py: 1.25 }}>Phân hệ tài nguyên</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "14%", py: 1.25 }}>Đọc (Read)</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "14%", py: 1.25 }}>Tạo mới (Create)</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "14%", py: 1.25 }}>Cập nhật (Update)</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "14%", py: 1.25 }}>Xóa (Delete)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700, width: "14%", py: 1.25 }}>Gán nhanh</TableCell>
+                  <TableCell sx={{ fontWeight: 700, width: "32%", py: 1.25 }}>Phân hệ nghiệp vụ</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, width: "13%", py: 1.25 }}>Xem</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, width: "13%", py: 1.25 }}>Thêm mới</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, width: "13%", py: 1.25 }}>Chỉnh sửa</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, width: "13%", py: 1.25 }}>Xóa dữ liệu</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, width: "16%", py: 1.25 }}>Cài đặt nhanh</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -368,15 +366,21 @@ export function RolePermissionsTab({
                         "&:last-child td, &:last-child th": { border: 0 },
                       }}
                     >
-                      <TableCell sx={{ py: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.85rem" }}>
+                      <TableCell sx={{ py: 1.25 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.85rem", color: "text.primary" }}>
                           {RESOURCE_LABELS[res] || res}
                         </Typography>
                         <Typography
                           variant="caption"
-                          sx={{ fontFamily: "JetBrains Mono, monospace", color: "text.secondary", fontSize: "0.7rem" }}
+                          sx={{ color: "text.secondary", fontSize: "0.72rem" }}
                         >
-                          {res}
+                          {res === "books" && "Sách, ấn phẩm, mã vạch và phân loại tài liệu"}
+                          {res === "patrons" && "Hồ sơ sinh viên, giảng viên và thẻ bạn đọc"}
+                          {res === "borrows" && "Phiếu mượn, gia hạn và lịch sử trả tài liệu"}
+                          {res === "schedules" && "Ca trực quầy và lịch làm việc thủ thư"}
+                          {res === "ai_tools" && "Trợ lý tra cứu và nhận diện khuôn mặt"}
+                          {res === "settings" && "Cấu hình số ngày mượn, hạn ngạch tài khoản"}
+                          {res === "stats" && "Báo cáo mượn trả và biểu đồ lưu lượng"}
                         </Typography>
                       </TableCell>
 
@@ -436,7 +440,7 @@ export function RolePermissionsTab({
                               onClick={() => handleSetResourcePresetForRole(res, "full")}
                               sx={{ fontSize: "0.72rem", py: 0.2, px: 0.75, minWidth: 0, textTransform: "none", fontWeight: 600 }}
                             >
-                              Tất cả
+                              Đầy đủ
                             </Button>
                             <Button
                               size="small"
@@ -483,10 +487,10 @@ export function RolePermissionsTab({
           >
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.88rem" }}>
-                2. Quyền truy cập màn hình & URL (Page Access)
+                2. Quyền mở màn hình & Chức năng
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Xác định các màn hình hiển thị trên thanh Menu và cho phép người dùng truy cập
+                Xác định các màn hình xuất hiện trên thanh điều hướng menu của nhân viên
               </Typography>
             </Box>
 
@@ -494,7 +498,7 @@ export function RolePermissionsTab({
             <Stack direction="row" spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
               <TextField
                 size="small"
-                placeholder="Tìm trang hoặc URL..."
+                placeholder="Tìm màn hình chức năng..."
                 value={routeSearch}
                 onChange={(e) => setRouteSearch(e.target.value)}
                 slotProps={{
@@ -507,7 +511,6 @@ export function RolePermissionsTab({
                     sx: {
                       height: 32,
                       fontSize: "0.8rem",
-                      fontFamily: "JetBrains Mono, monospace",
                       bgcolor: "background.paper",
                       borderRadius: 1.5,
                     },
@@ -526,9 +529,9 @@ export function RolePermissionsTab({
                   borderRadius: 1.5,
                 }}
               >
-                <MenuItem value="all">Tất cả trang</MenuItem>
-                <MenuItem value="allowed">Được phép</MenuItem>
-                <MenuItem value="blocked">Bị chặn</MenuItem>
+                <MenuItem value="all">Tất cả màn hình</MenuItem>
+                <MenuItem value="allowed">Được phép mở</MenuItem>
+                <MenuItem value="blocked">Đang khóa</MenuItem>
               </Select>
 
               {!isAdmin && (
@@ -539,7 +542,7 @@ export function RolePermissionsTab({
                     onClick={() => handleToggleAllRoutesForRole(true)}
                     sx={{ fontSize: "0.72rem", textTransform: "none", borderRadius: 1.5, px: 1.25, height: 32, flexShrink: 0 }}
                   >
-                    Cấp tất cả
+                    Mở tất cả
                   </Button>
                   <Button
                     size="small"
@@ -548,7 +551,7 @@ export function RolePermissionsTab({
                     onClick={() => handleToggleAllRoutesForRole(false)}
                     sx={{ fontSize: "0.72rem", textTransform: "none", borderRadius: 1.5, px: 1.25, height: 32, flexShrink: 0 }}
                   >
-                    Chỉ Dashboard
+                    Chỉ Tổng quan
                   </Button>
                 </>
               )}
@@ -559,9 +562,9 @@ export function RolePermissionsTab({
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow sx={{ bgcolor: isDark ? alpha("#FFFFFF", 0.02) : "#F1F5F9" }}>
-                  <TableCell sx={{ fontWeight: 700, width: "42%", py: 1.25 }}>Tên màn hình chức năng</TableCell>
-                  <TableCell sx={{ fontWeight: 700, width: "38%", py: 1.25 }}>Đường dẫn (URL Route)</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "20%", py: 1.25 }}>Cho phép truy cập</TableCell>
+                  <TableCell sx={{ fontWeight: 700, width: "48%", py: 1.25 }}>Màn hình chức năng</TableCell>
+                  <TableCell sx={{ fontWeight: 700, width: "32%", py: 1.25 }}>Khu vực làm việc</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, width: "20%", py: 1.25 }}>Quyền mở trang</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -578,38 +581,44 @@ export function RolePermissionsTab({
                         "&:last-child td, &:last-child th": { border: 0 },
                       }}
                     >
-                      <TableCell sx={{ py: 0.9 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.84rem" }}>
+                      <TableCell sx={{ py: 1.1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.85rem", color: "text.primary" }}>
                           {route.label}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ py: 0.9 }}>
+                      <TableCell sx={{ py: 1.1 }}>
                         <Typography
                           variant="caption"
                           sx={{
-                            fontFamily: "JetBrains Mono, monospace",
                             color: "text.secondary",
-                            bgcolor: "action.hover",
-                            px: 1,
-                            py: 0.25,
-                            borderRadius: 0.5,
                             fontSize: "0.75rem",
                           }}
                         >
-                          {route.path}
+                          {route.path === "/dashboard" && "Bảng điều khiển trung tâm"}
+                          {route.path === "/books" && "Kho tư liệu & Ấn phẩm"}
+                          {route.path === "/patrons" && "Quản lý thẻ & Thông tin độc giả"}
+                          {route.path === "/borrow" && "Quầy phục vụ mượn sách"}
+                          {route.path === "/return" && "Quầy tiếp nhận trả sách"}
+                          {route.path === "/gate" && "Cổng kiểm soát an ninh"}
+                          {route.path === "/history" && "Sổ theo dõi mượn trả"}
+                          {route.path === "/staff-schedules" && "Bảng phân lịch làm việc"}
+                          {route.path === "/ai-assistant" && "Trợ lý ảo & Hỗ trợ nghiệp vụ"}
+                          {route.path === "/enroll" && "Cấp phát dữ liệu sinh trắc học"}
+                          {route.path === "/dynamic-admin" && "Phân quyền quản trị hệ thống"}
+                          {route.path === "/settings" && "Cấu hình chung thư viện"}
+                          {route.path === "/stats" && "Báo cáo số liệu thư viện"}
                         </Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ py: 0.9 }}>
+                      <TableCell align="center" sx={{ py: 1.1 }}>
                         <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "center" }}>
                           <Chip
                             size="small"
-                            label={isAllowed ? "ĐƯỢC PHÉP" : "CHẶN"}
+                            label={isAllowed ? "Đang mở" : "Đã khóa"}
                             sx={{
-                              height: 18,
-                              fontSize: "0.62rem",
+                              height: 20,
+                              fontSize: "0.68rem",
                               fontWeight: 700,
-                              fontFamily: "JetBrains Mono, monospace",
-                              borderRadius: 0.5,
+                              borderRadius: 1,
                               bgcolor: isAllowed ? alpha("#059669", 0.12) : alpha("#64748B", 0.1),
                               color: isAllowed ? "#059669" : "#64748B",
                             }}

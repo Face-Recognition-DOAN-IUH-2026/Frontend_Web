@@ -57,7 +57,7 @@ export function CompactMetricBar({
             fontSize: "0.72rem",
           }}
         >
-          Vai trò hệ thống
+          Nhóm chức vụ thư viện
         </Typography>
         <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mt: 0.5 }}>
           <Typography
@@ -75,7 +75,7 @@ export function CompactMetricBar({
             variant="caption"
             sx={{ color: theme.palette.primary.main, fontWeight: 700 }}
           >
-            roles
+            nhóm
           </Typography>
         </Box>
       </Box>
@@ -100,7 +100,7 @@ export function CompactMetricBar({
             fontSize: "0.72rem",
           }}
         >
-          Trang được cấp [{selectedRole}]
+          Màn hình mở cho [{selectedRole}]
         </Typography>
         <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mt: 0.5 }}>
           <Typography
@@ -119,7 +119,7 @@ export function CompactMetricBar({
             )}
           </Typography>
           <Typography variant="caption" sx={{ color: "#059669", fontWeight: 700 }}>
-            routes
+            màn hình
           </Typography>
         </Box>
       </Box>
@@ -144,7 +144,7 @@ export function CompactMetricBar({
             fontSize: "0.72rem",
           }}
         >
-          Hành động CRUD kích hoạt
+          Quyền thao tác nghiệp vụ
         </Typography>
         <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mt: 0.5 }}>
           <Typography
@@ -163,7 +163,7 @@ export function CompactMetricBar({
             )}
           </Typography>
           <Typography variant="caption" sx={{ color: "#D97706", fontWeight: 700 }}>
-            actions
+            thao tác
           </Typography>
         </Box>
       </Box>
@@ -181,7 +181,7 @@ export function CompactMetricBar({
             fontSize: "0.72rem",
           }}
         >
-          Nhân sự / Tài khoản
+          Nhân sự thư viện
         </Typography>
         <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mt: 0.5 }}>
           <Typography
@@ -196,7 +196,7 @@ export function CompactMetricBar({
             {loading ? <Skeleton width={40} /> : metrics.totalStaff}
           </Typography>
           <Typography variant="caption" sx={{ color: isDark ? "#94A3B8" : "#64748B" }}>
-            tài khoản
+            nhân viên
           </Typography>
         </Box>
       </Box>

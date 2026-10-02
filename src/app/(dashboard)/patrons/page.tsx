@@ -19,6 +19,7 @@ import {
   Snackbar,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -28,6 +29,7 @@ import EditIcon from "@mui/icons-material/EditOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import { initials } from "@/lib/utils";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
@@ -51,6 +53,11 @@ const STAT_GRADIENT = {
 
 export default function PatronsPage() {
   const router = useRouter();
+  const { can } = usePermission();
+  const canCreatePatron = can("patrons", "create");
+  const canUpdatePatron = can("patrons", "update");
+  const canDeletePatron = can("patrons", "delete");
+
   const [patrons, setPatrons] = useState<PatronPublic[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -196,10 +203,35 @@ export default function PatronsPage() {
         statBadges={statBadges}
         onRefresh={load}
         actions={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowCreate(true)}
-            sx={{ background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none", boxShadow: "0 4px 14px rgba(139,0,0,0.3)", "&:hover": { background: "linear-gradient(135deg, #700000 0%, #500000 100%)" } }}>
-            Thêm độc giả
-          </Button>
+          <Tooltip title={!canCreatePatron ? getPermissionDeniedReason("patrons", "create") : ""}>
+            <span>
+              <Button
+                variant="contained"
+                disabled={!canCreatePatron}
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  if (!canCreatePatron) return;
+                  setShowCreate(true);
+                }}
+                sx={{
+                  background: !canCreatePatron
+                    ? undefined
+                    : "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+                  borderRadius: 2,
+                  fontWeight: 700,
+                  textTransform: "none",
+                  boxShadow: !canCreatePatron ? "none" : "0 4px 14px rgba(139,0,0,0.3)",
+                  "&:hover": {
+                    background: !canCreatePatron
+                      ? undefined
+                      : "linear-gradient(135deg, #700000 0%, #500000 100%)",
+                  },
+                }}
+              >
+                Thêm độc giả
+              </Button>
+            </span>
+          </Tooltip>
         }
       />
 
@@ -277,9 +309,13 @@ export default function PatronsPage() {
 
           <Stack direction="row" spacing={1.5} sx={{ px: 2.5, py: 2, borderTop: 1, borderColor: "divider" }}>
             <Button fullWidth variant="outlined" onClick={() => setEditTarget(null)} disabled={editSaving}>Hủy</Button>
-            <Button fullWidth variant="contained" onClick={handleEdit} disabled={editSaving}>
-              {editSaving ? <CircularProgress size={20} /> : "Lưu thay đổi"}
-            </Button>
+            <Tooltip title={!canUpdatePatron ? getPermissionDeniedReason("patrons", "update") : ""}>
+              <span style={{ width: "100%" }}>
+                <Button fullWidth variant="contained" onClick={handleEdit} disabled={editSaving || !canUpdatePatron}>
+                  {editSaving ? <CircularProgress size={20} /> : "Lưu thay đổi"}
+                </Button>
+              </span>
+            </Tooltip>
           </Stack>
         </Box>
       </Drawer>
@@ -319,7 +355,11 @@ export default function PatronsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setRenewTarget(null); setRenewMonths(12); }} color="inherit">Hủy</Button>
-          <Button variant="contained" onClick={handleRenew}>Gia hạn</Button>
+          <Tooltip title={!canUpdatePatron ? getPermissionDeniedReason("patrons", "update") : ""}>
+            <span>
+              <Button variant="contained" onClick={handleRenew} disabled={!canUpdatePatron}>Gia hạn</Button>
+            </span>
+          </Tooltip>
         </DialogActions>
       </Dialog>
 
@@ -345,9 +385,13 @@ export default function PatronsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setDeleteTarget(null); setDeleteConfirmText(""); }} color="inherit">Hủy</Button>
-          <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>
-            Xóa vĩnh viễn
-          </Button>
+          <Tooltip title={!canDeletePatron ? getPermissionDeniedReason("patrons", "delete") : ""}>
+            <span>
+              <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA" || !canDeletePatron}>
+                Xóa vĩnh viễn
+              </Button>
+            </span>
+          </Tooltip>
         </DialogActions>
       </Dialog>
 
@@ -373,9 +417,13 @@ export default function PatronsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setRestoreTarget(null); setRestoreConfirmText(""); }} color="inherit">Hủy</Button>
-          <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC"}>
-            Khôi phục
-          </Button>
+          <Tooltip title={!canUpdatePatron ? getPermissionDeniedReason("patrons", "update") : ""}>
+            <span>
+              <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC" || !canUpdatePatron}>
+                Khôi phục
+              </Button>
+            </span>
+          </Tooltip>
         </DialogActions>
       </Dialog>
 

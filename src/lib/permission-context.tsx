@@ -128,9 +128,19 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
       // Base path match (e.g. /books matches /books/123)
       const targetPath = path.split('?')[0].split('#')[0];
+
+      // Strict security rule: /dashboard/admin is exclusively reserved for 'admin'
+      if (targetPath === '/dashboard/admin' || targetPath.startsWith('/dashboard/admin/')) {
+        return false;
+      }
+
       if (!permissions || !permissions.allowedPages) {
         // Fallback for staff
-        if (user.role === 'staff' && targetPath !== '/dynamic-admin' && targetPath !== '/settings') {
+        if (
+          user.role === 'staff' &&
+          targetPath !== '/dynamic-admin' &&
+          targetPath !== '/settings'
+        ) {
           return true;
         }
         return false;
@@ -203,3 +213,23 @@ export function Can({ I, a, page, pass, fallback = null, children }: CanProps) {
 
   return <>{children}</>;
 }
+
+export function getPermissionDeniedReason(resource: SystemResource, action: CrudAction): string {
+  const resourceNames: Record<SystemResource, string> = {
+    books: 'kho sách',
+    patrons: 'độc giả',
+    borrows: 'mượn / trả sách',
+    schedules: 'lịch trực',
+    ai_tools: 'công cụ AI',
+    settings: 'cài đặt hệ thống',
+    stats: 'báo cáo thống kê',
+  };
+  const actionNames: Record<CrudAction, string> = {
+    create: 'thêm mới',
+    read: 'xem dữ liệu',
+    update: 'chỉnh sửa',
+    delete: 'xóa dữ liệu',
+  };
+  return `Bạn không có quyền ${actionNames[action] || action} trên ${resourceNames[resource] || resource}. Liên hệ Quản trị viên để được cấp quyền.`;
+}
+
