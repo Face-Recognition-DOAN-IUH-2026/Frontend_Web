@@ -208,7 +208,7 @@ export default function AssignStaffDialog({
         </Form.Item>
       </Form>
 
-      {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginBottom: 12 }} />}
+      {error && <Alert title={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginBottom: 12 }} />}
 
       {warnings.length > 0 && (
         <div style={{ marginBottom: 12 }}>

@@ -66,6 +66,7 @@ export default function BooksPage() {
   const canUpdateBook = can("books", "update");
   const canDeleteBook = can("books", "delete");
   const canReadBook = can("books", "read");
+  const canPrintBook = can("books", "print");
 
   const [notice, setNotice] = useState<Notice>(null);
   const router = useRouter();
@@ -527,9 +528,23 @@ export default function BooksPage() {
               </Typography>
             </Stack>
             {searchResults.length > 0 ? (
-              <Button color="primary" size="small" startIcon={<PrintIcon />} onClick={() => handlePrintBarcodes()} sx={{ textTransform: "none", fontWeight: 600 }}>
-                In mã vạch
-              </Button>
+              <Tooltip title={!canPrintBook ? getPermissionDeniedReason("books", "print") : ""}>
+                <span>
+                  <Button
+                    color="primary"
+                    size="small"
+                    disabled={!canPrintBook}
+                    startIcon={<PrintIcon />}
+                    onClick={() => {
+                      if (!canPrintBook) return;
+                      handlePrintBarcodes();
+                    }}
+                    sx={{ textTransform: "none", fontWeight: 600 }}
+                  >
+                    In mã vạch
+                  </Button>
+                </span>
+              </Tooltip>
             ) : null}
           </Stack>
         </DashboardCard>
@@ -557,6 +572,7 @@ export default function BooksPage() {
         showResults={showResults}
         importResults={importResults}
         onPrintBarcodes={() => handlePrintBarcodes()}
+        canPrint={canPrintBook}
       />
 
       {recentlyPrinted.length > 0 ? (

@@ -46,37 +46,38 @@ import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import DynamicFormOutlinedIcon from "@mui/icons-material/DynamicFormOutlined";
 import VisibilityIcon from "@mui/icons-material/VisibilityOutlined";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ActiveUserIcon from "@mui/icons-material/PersonPinCircleOutlined";
 
 const drawerWidth = 264;
 
 const libraryItems = [
-  { href: "/dashboard", label: "Tổng quan", icon: DashboardIcon },
-  { href: "/patrons", label: "Độc giả", icon: UsersIcon },
-  { href: "/active", label: "Đang hiện diện", icon: BookIcon },
-  { href: "/gate", label: "Cổng ra vào", icon: DoorIcon },
-  { href: "/history", label: "Lịch sử ra vào", icon: HistoryIcon },
-  { href: "/library/vr-tour", label: "Tham quan 3D", icon: MapIcon },
+  { href: "/dashboard", label: "Tổng quan thư viện", icon: DashboardIcon },
+  { href: "/patrons", label: "Quản lý bạn đọc", icon: UsersIcon },
+  { href: "/active", label: "Bạn đọc đang có mặt", icon: ActiveUserIcon },
+  { href: "/gate", label: "Cổng kiểm soát Kiosk", icon: DoorIcon },
+  { href: "/history", label: "Nhật ký vào ra & Mượn trả", icon: HistoryIcon },
+  { href: "/library/vr-tour", label: "Tham quan 3D Thư viện", icon: MapIcon },
 ];
 
 const circulationItems = [
-  { href: "/borrow", label: "Mượn sách", icon: BookPlusIcon },
-  { href: "/return", label: "Trả sách", icon: BookReturnIcon },
-  { href: "/books", label: "Kho sách", icon: LibraryIcon },
+  { href: "/borrow", label: "Quầy mượn sách", icon: BookPlusIcon },
+  { href: "/return", label: "Quầy trả sách", icon: BookReturnIcon },
+  { href: "/books", label: "Kho sách & Tài liệu", icon: LibraryIcon },
 ];
 
 const staffItems = [
-  { href: "/staff-schedules", label: "Lịch trực", icon: CalendarIcon },
+  { href: "/staff-schedules", label: "Lịch trực thủ thư", icon: CalendarIcon },
 ];
 
 const aiItems = [
   { href: "/enroll", label: "Đăng ký khuôn mặt", icon: FaceIcon },
-  { href: "/verify", label: "Xác thực khuôn mặt", icon: UserCheckIcon },
-  { href: "/identify", label: "Nhận diện", icon: SearchIcon },
-  { href: "/liveness", label: "Kiểm tra sống", icon: VisibilityIcon },
+  { href: "/verify", label: "Xác thực khuôn mặt (1:1)", icon: UserCheckIcon },
+  { href: "/identify", label: "Nhận diện bạn đọc (1:N)", icon: SearchIcon },
+  { href: "/liveness", label: "Kiểm tra thực thể sống", icon: VisibilityIcon },
 ];
 
 const staffAiItems = [
-  { href: "/ai-assistant", label: "Trợ lý AI", icon: AssistantIcon },
+  { href: "/ai-assistant", label: "Trợ lý AI Thủ thư", icon: AssistantIcon },
 ];
 
 interface SidebarNavItem {
@@ -88,9 +89,9 @@ interface SidebarNavItem {
 
 const adminItems: SidebarNavItem[] = [
   { href: "/dashboard/admin", label: "Quản trị người dùng", icon: ShieldIcon, permission: "admin:users" },
-  { href: "/dynamic-admin", label: "Phân quyền động (RBAC)", icon: DynamicFormOutlinedIcon, permission: "admin:settings" },
+  { href: "/dynamic-admin", label: "Phân quyền & Vai trò", icon: DynamicFormOutlinedIcon, permission: "admin:settings" },
   { href: "/settings", label: "Cài đặt hệ thống", icon: SettingsIcon, permission: "admin:settings" },
-  { href: "/stats", label: "Thống kê", icon: BarChartIcon, permission: "admin:stats" },
+  { href: "/stats", label: "Báo cáo & Thống kê", icon: BarChartIcon, permission: "admin:stats" },
 ];
 
 function NavSection({
@@ -254,22 +255,22 @@ export default function Sidebar() {
         sx={{ flex: 1, px: 1, py: 1.5, overflowY: "auto" }}
       >
         {visibleLibraryItems.length > 0 && (
-          <NavSection title="Thư viện" items={visibleLibraryItems} onClose={handleClose} />
+          <NavSection title="Thư viện & Bạn đọc" items={visibleLibraryItems} onClose={handleClose} />
         )}
         {visibleCirculationItems.length > 0 && (
-          <NavSection title="Mượn / Trả" items={visibleCirculationItems} onClose={handleClose} />
+          <NavSection title="Lưu hành & Mượn trả" items={visibleCirculationItems} onClose={handleClose} />
         )}
         {visibleStaffItems.length > 0 && (
-          <NavSection title="Nhân sự" items={visibleStaffItems} onClose={handleClose} />
+          <NavSection title="Lịch trực & Nhân sự" items={visibleStaffItems} onClose={handleClose} />
         )}
         {visibleStaffAiItems.length > 0 && (
-          <NavSection title="AI" items={visibleStaffAiItems} onClose={handleClose} />
+          <NavSection title="Trợ lý ảo AI" items={visibleStaffAiItems} onClose={handleClose} />
         )}
         {visibleAiItems.length > 0 && (
-          <NavSection title="Chẩn đoán AI" items={visibleAiItems} onClose={handleClose} />
+          <NavSection title="Sinh trắc học & Camera AI" items={visibleAiItems} onClose={handleClose} />
         )}
         {visibleAdminItems.length > 0 && (
-          <NavSection title="Quản trị" items={visibleAdminItems} onClose={handleClose} />
+          <NavSection title="Quản trị hệ thống" items={visibleAdminItems} onClose={handleClose} />
         )}
       </Stack>
 

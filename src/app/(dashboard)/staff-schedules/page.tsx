@@ -70,7 +70,7 @@ export default function StaffSchedulesPage() {
     staff, zones, shifts, assignments, loading, error, setError,
     weekStart, days, from, to,
     goPrevWeek, goNextWeek, goToday, loadData,
-  } = useScheduleData();
+  } = useScheduleData(canManage);
 
   const {
     filter, zoneFilter, shiftFilter,

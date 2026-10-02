@@ -142,7 +142,7 @@ export default function ManualCheckInAdmin({ open, onClose, onUpdated }: Props) 
           </Box>
 
           <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-            {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} />}
+            {error && <Alert title={error} type="error" showIcon closable onClose={() => setError(null)} />}
 
             {loading && (
               <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>

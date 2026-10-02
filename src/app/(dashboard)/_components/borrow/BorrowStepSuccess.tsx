@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Box, Button, Stack, Typography, alpha, useTheme } from "@mui/material";
+import { Box, Button, Stack, Tooltip, Typography, alpha, useTheme } from "@mui/material";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
@@ -10,6 +10,7 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import BookRecommendations from "@/app/(dashboard)/_components/BookRecommendations";
 import { fadeInUp } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 
 export interface BorrowStepSuccessProps {
   slipSuccess: { message: string; count: number };
@@ -27,6 +28,8 @@ export function BorrowStepSuccess({
   handleClearSession,
 }: BorrowStepSuccessProps) {
   const theme = useTheme();
+  const { can } = usePermission();
+  const canPrintBorrow = can("borrows", "print");
 
   return (
     <Stack spacing={3} sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -74,21 +77,30 @@ export function BorrowStepSuccess({
             >
               Tạo lượt mượn mới
             </Button>
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={<PrintIcon />}
-              onClick={() => window.print()}
-              sx={{
-                borderRadius: 2.5,
-                fontWeight: 700,
-                textTransform: "none",
-                px: 3,
-                borderColor: "divider",
-              }}
-            >
-              In biên nhận
-            </Button>
+
+            <Tooltip title={!canPrintBorrow ? getPermissionDeniedReason("borrows", "print") : ""}>
+              <span>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  disabled={!canPrintBorrow}
+                  startIcon={<PrintIcon />}
+                  onClick={() => {
+                    if (!canPrintBorrow) return;
+                    window.print();
+                  }}
+                  sx={{
+                    borderRadius: 2.5,
+                    fontWeight: 700,
+                    textTransform: "none",
+                    px: 3,
+                    borderColor: "divider",
+                  }}
+                >
+                  In biên nhận
+                </Button>
+              </span>
+            </Tooltip>
           </Stack>
         </Stack>
       </DashboardCard>

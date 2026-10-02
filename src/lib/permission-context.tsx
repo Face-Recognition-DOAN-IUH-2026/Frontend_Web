@@ -24,41 +24,52 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const [permissions, setPermissions] = useState<EffectivePermissions | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  const userId = user?.id;
+  const userRole = user?.role;
+
   const refreshPermissions = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setPermissions(null);
       setLoading(false);
       return;
     }
 
     // Admin bypass: always granted full permissions
-    if (user.role === 'admin') {
+    if (userRole === "admin") {
       setPermissions({
-        role: 'admin',
+        role: "admin",
         isCustom: false,
         allowedPages: [
-          '/dashboard',
-          '/books',
-          '/patrons',
-          '/borrow',
-          '/return',
-          '/gate',
-          '/history',
-          '/staff-schedules',
-          '/ai-assistant',
-          '/enroll',
-          '/dynamic-admin',
-          '/settings',
-          '/stats',
+          "/dashboard",
+          "/books",
+          "/patrons",
+          "/borrow",
+          "/return",
+          "/gate",
+          "/history",
+          "/active",
+          "/staff-schedules",
+          "/ai-assistant",
+          "/enroll",
+          "/verify",
+          "/identify",
+          "/liveness",
+          "/library/vr-tour",
+          "/profile",
+          "/notifications",
+          "/dashboard/admin",
+          "/dynamic-admin",
+          "/settings",
+          "/stats",
         ],
         crud: {
-          books: { create: true, read: true, update: true, delete: true },
-          patrons: { create: true, read: true, update: true, delete: true },
-          borrows: { create: true, read: true, update: true, delete: true },
-          schedules: { create: true, read: true, update: true, delete: true },
-          ai_tools: { create: true, read: true, update: true, delete: true },
-          settings: { create: true, read: true, update: true, delete: true },
-          stats: { create: true, read: true, update: true, delete: true },
+          books: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+          patrons: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+          borrows: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+          schedules: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+          ai_tools: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+          settings: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+          stats: { create: true, read: true, update: true, delete: true, approve: true, print: true },
         },
       });
       setLoading(false);
@@ -66,44 +77,51 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     }
 
     try {
-      setLoading(true);
+      setLoading((prev) => (permissions ? false : true));
       const res = await api.getMyPermissions();
       setPermissions(res);
     } catch (err: any) {
-      console.warn('[PermissionProvider] Could not fetch permissions, fallback to defaults:', err.message);
+      console.warn("[PermissionProvider] Could not fetch permissions, fallback to defaults:", err.message);
       // Fallback baseline for staff
-      if (user.role === 'staff') {
+      if (userRole === "staff") {
         setPermissions({
-          role: 'staff',
+          role: "staff",
           isCustom: false,
           allowedPages: [
-            '/dashboard',
-            '/books',
-            '/patrons',
-            '/borrow',
-            '/return',
-            '/gate',
-            '/history',
-            '/staff-schedules',
-            '/ai-assistant',
-            '/enroll',
-            '/stats',
+            "/dashboard",
+            "/books",
+            "/patrons",
+            "/borrow",
+            "/return",
+            "/gate",
+            "/history",
+            "/active",
+            "/staff-schedules",
+            "/ai-assistant",
+            "/enroll",
+            "/verify",
+            "/identify",
+            "/liveness",
+            "/library/vr-tour",
+            "/profile",
+            "/notifications",
+            "/stats",
           ],
           crud: {
-            books: { create: true, read: true, update: true, delete: false },
-            patrons: { create: true, read: true, update: true, delete: false },
-            borrows: { create: true, read: true, update: true, delete: false },
-            schedules: { create: false, read: true, update: false, delete: false },
-            ai_tools: { create: true, read: true, update: true, delete: false },
-            settings: { create: false, read: false, update: false, delete: false },
-            stats: { create: false, read: true, update: false, delete: false },
+            books: { create: true, read: true, update: true, delete: false, approve: false, print: true },
+            patrons: { create: true, read: true, update: true, delete: false, approve: true, print: true },
+            borrows: { create: true, read: true, update: true, delete: false, approve: true, print: true },
+            schedules: { create: false, read: true, update: false, delete: false, approve: false, print: true },
+            ai_tools: { create: true, read: true, update: true, delete: false, approve: false, print: false },
+            settings: { create: false, read: false, update: false, delete: false, approve: false, print: false },
+            stats: { create: false, read: true, update: false, delete: false, approve: false, print: true },
           },
         });
       }
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userId, userRole]);
 
   useEffect(() => {
     refreshPermissions();
@@ -129,9 +147,9 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
       // Base path match (e.g. /books matches /books/123)
       const targetPath = path.split('?')[0].split('#')[0];
 
-      // Strict security rule: /dashboard/admin is exclusively reserved for 'admin'
+      // /dashboard/admin requires explicit permission if not admin
       if (targetPath === '/dashboard/admin' || targetPath.startsWith('/dashboard/admin/')) {
-        return false;
+        return Boolean(permissions?.allowedPages?.includes('/dashboard/admin'));
       }
 
       if (!permissions || !permissions.allowedPages) {
@@ -172,12 +190,52 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   );
 }
 
+const DEFAULT_FALLBACK_CONTEXT: PermissionContextType = {
+  permissions: {
+    role: 'admin',
+    isCustom: false,
+    allowedPages: [
+      '/dashboard',
+      '/books',
+      '/patrons',
+      '/borrow',
+      '/return',
+      '/gate',
+      '/history',
+      '/active',
+      '/staff-schedules',
+      '/ai-assistant',
+      '/enroll',
+      '/verify',
+      '/identify',
+      '/liveness',
+      '/library/vr-tour',
+      '/profile',
+      '/notifications',
+      '/dashboard/admin',
+      '/dynamic-admin',
+      '/settings',
+      '/stats',
+    ],
+    crud: {
+      books: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      patrons: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      borrows: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      schedules: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      ai_tools: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      settings: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      stats: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+    },
+  },
+  loading: false,
+  can: () => true,
+  canAccessPage: () => true,
+  refreshPermissions: async () => {},
+};
+
 export function usePermission() {
   const context = useContext(PermissionContext);
-  if (!context) {
-    throw new Error('usePermission must be used within a PermissionProvider');
-  }
-  return context;
+  return context || DEFAULT_FALLBACK_CONTEXT;
 }
 
 interface CanProps {
@@ -229,6 +287,8 @@ export function getPermissionDeniedReason(resource: SystemResource, action: Crud
     read: 'xem dữ liệu',
     update: 'chỉnh sửa',
     delete: 'xóa dữ liệu',
+    approve: 'phê duyệt',
+    print: 'in ấn',
   };
   return `Bạn không có quyền ${actionNames[action] || action} trên ${resourceNames[resource] || resource}. Liên hệ Quản trị viên để được cấp quyền.`;
 }

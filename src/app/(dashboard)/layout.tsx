@@ -178,13 +178,13 @@ import { Button } from "@mui/material";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 function DashboardGuard({ children }: { children: React.ReactNode }) {
-  const { canAccessPage, loading } = usePermission();
+  const { canAccessPage, loading, permissions } = usePermission();
   const pathname = usePathname();
   const router = useRouter();
 
   const isAllowed = canAccessPage(pathname);
 
-  if (loading) {
+  if (loading && !permissions) {
     return (
       <Box sx={{ flex: 1, display: "grid", placeItems: "center", minHeight: 300 }}>
         <CircularProgress size={32} />

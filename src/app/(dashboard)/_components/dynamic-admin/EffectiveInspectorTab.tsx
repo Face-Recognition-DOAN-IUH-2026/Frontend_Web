@@ -30,9 +30,14 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
 import {
   ALL_RESOURCES,
+  ALL_ACTIONS,
   ALL_ROUTES,
   RESOURCE_LABELS,
+  ACTION_LABELS,
+  CATEGORY_LABELS,
   type EffectivePermissions,
+  type RouteCategory,
+  type SystemRoute,
 } from "@/lib/types";
 
 export interface EffectiveInspectorTabProps {
@@ -66,6 +71,20 @@ export function EffectiveInspectorTab({
     const found = ALL_ROUTES.find((r) => r.path === path);
     return found ? found.label : path;
   };
+
+  // Group allowed routes by category
+  const allowedRoutesByCategory = React.useMemo(() => {
+    const map: Partial<Record<RouteCategory, string[]>> = {};
+    const allowedSet = new Set(effectivePermissionsPreview.allowedPages);
+    ALL_ROUTES.forEach((r) => {
+      if (allowedSet.has(r.path)) {
+        const cat = r.category || "library";
+        if (!map[cat]) map[cat] = [];
+        map[cat]!.push(r.path);
+      }
+    });
+    return map;
+  }, [effectivePermissionsPreview.allowedPages]);
 
   return (
     <Stack spacing={2.5}>
@@ -125,7 +144,7 @@ export function EffectiveInspectorTab({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+          gridTemplateColumns: { xs: "1fr", lg: "1fr 1.15fr" },
           gap: 2.5,
         }}
       >
@@ -150,28 +169,48 @@ export function EffectiveInspectorTab({
             </Typography>
           </Box>
 
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, maxHeight: 380, overflowY: "auto", p: 0.5 }}>
-            {effectivePermissionsPreview.allowedPages.map((path) => (
-              <Chip
-                key={path}
-                label={getRouteLabel(path)}
-                size="medium"
-                icon={<CheckCircleOutlineOutlinedIcon sx={{ fontSize: "16px !important" }} />}
-                sx={{
-                  fontWeight: 600,
-                  fontSize: "0.82rem",
-                  borderRadius: 1.5,
-                  bgcolor: alpha("#059669", 0.08),
-                  color: "#059669",
-                  border: "1px solid",
-                  borderColor: alpha("#059669", 0.2),
-                }}
-              />
-            ))}
-          </Box>
+          <Stack spacing={2} sx={{ maxHeight: 420, overflowY: "auto", pr: 0.5 }}>
+            {(Object.keys(allowedRoutesByCategory) as RouteCategory[]).map((cat) => {
+              const paths = allowedRoutesByCategory[cat] || [];
+              if (paths.length === 0) return null;
+
+              return (
+                <Box key={cat}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: "primary.main", textTransform: "uppercase", letterSpacing: 0.5, display: "block", mb: 0.75 }}>
+                    {CATEGORY_LABELS[cat]} ({paths.length})
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+                    {paths.map((path) => (
+                      <Chip
+                        key={path}
+                        label={getRouteLabel(path)}
+                        size="small"
+                        icon={<CheckCircleOutlineOutlinedIcon sx={{ fontSize: "14px !important" }} />}
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: "0.78rem",
+                          borderRadius: 1,
+                          bgcolor: alpha("#059669", 0.08),
+                          color: "#059669",
+                          border: "1px solid",
+                          borderColor: alpha("#059669", 0.2),
+                        }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              );
+            })}
+
+            {effectivePermissionsPreview.allowedPages.length === 0 && (
+              <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic", py: 2, textAlign: "center" }}>
+                Nhân viên hiện không được mở màn hình nào.
+              </Typography>
+            )}
+          </Stack>
         </Paper>
 
-        {/* Right: Bảng thao tác nghiệp vụ */}
+        {/* Right: Bảng thao tác nghiệp vụ (6 Actions) */}
         <Paper
           variant="outlined"
           sx={{
@@ -191,22 +230,23 @@ export function EffectiveInspectorTab({
             }}
           >
             <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: "0.92rem" }}>
-              Quyền thao tác nghiệp vụ thư viện
+              Quyền thao tác nghiệp vụ thư viện (Chi tiết 6 hành động)
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Chi tiết các tác vụ được phép thực hiện trên từng phân hệ sách & bạn đọc
             </Typography>
           </Box>
 
-          <TableContainer sx={{ maxHeight: 380 }}>
+          <TableContainer sx={{ maxHeight: 420 }}>
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow sx={{ bgcolor: isDark ? alpha("#FFFFFF", 0.02) : "#F1F5F9" }}>
-                  <TableCell sx={{ fontWeight: 700, width: "36%" }}>Phân hệ</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "16%" }}>Xem</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "16%" }}>Thêm</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "16%" }}>Sửa</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "16%" }}>Xóa</TableCell>
+                  <TableCell sx={{ fontWeight: 700, width: "25%" }}>Phân hệ</TableCell>
+                  {ALL_ACTIONS.map((act) => (
+                    <TableCell key={act} align="center" sx={{ fontWeight: 700, width: "12.5%" }}>
+                      {ACTION_LABELS[act] || act}
+                    </TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -216,6 +256,8 @@ export function EffectiveInspectorTab({
                     create: false,
                     update: false,
                     delete: false,
+                    approve: false,
+                    print: false,
                   };
 
                   return (
@@ -225,7 +267,7 @@ export function EffectiveInspectorTab({
                           {RESOURCE_LABELS[res] || res}
                         </Typography>
                       </TableCell>
-                      {(["read", "create", "update", "delete"] as const).map((act) => {
+                      {ALL_ACTIONS.map((act) => {
                         const isGranted = Boolean(perms[act]);
                         return (
                           <TableCell key={act} align="center" sx={{ py: 1 }}>

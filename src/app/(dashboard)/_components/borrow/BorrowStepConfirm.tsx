@@ -43,7 +43,7 @@ export function BorrowStepConfirm({
   setCurrentStep,
 }: BorrowStepConfirmProps) {
   const { can } = usePermission();
-  const canCreateBorrow = can("borrows", "create");
+  const canCreateBorrow = can("borrows", "create") || can("borrows", "approve");
 
   return (
     <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>

@@ -11,6 +11,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
 } from "@mui/material";
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
@@ -20,6 +21,7 @@ export interface BookImportResultSectionProps {
   showResults: boolean;
   importResults: BookImportResultRow[] | null;
   onPrintBarcodes: () => void;
+  canPrint?: boolean;
 }
 
 function statusColor(status: string): "success" | "info" | "warning" | "error" | "default" {
@@ -48,6 +50,7 @@ export function BookImportResultSection({
   showResults,
   importResults,
   onPrintBarcodes,
+  canPrint = true,
 }: BookImportResultSectionProps) {
   if (!showResults || !importResults) return null;
 
@@ -82,10 +85,24 @@ export function BookImportResultSection({
         </Table>
       </TableContainer>
       {importResults.some((row) => row.status === "imported" || row.status === "warning") ? (
-        <Button sx={{ mt: 2, textTransform: "none" }} variant="outlined" startIcon={<PrintIcon />} onClick={onPrintBarcodes}>
-          In mã vạch vừa tạo
-        </Button>
+        <Tooltip title={!canPrint ? "Bạn không có quyền in ấn mã vạch sách" : ""}>
+          <span>
+            <Button
+              sx={{ mt: 2, textTransform: "none" }}
+              variant="outlined"
+              disabled={!canPrint}
+              startIcon={<PrintIcon />}
+              onClick={() => {
+                if (!canPrint) return;
+                onPrintBarcodes();
+              }}
+            >
+              In mã vạch vừa tạo
+            </Button>
+          </span>
+        </Tooltip>
       ) : null}
     </DashboardCard>
   );
 }
+

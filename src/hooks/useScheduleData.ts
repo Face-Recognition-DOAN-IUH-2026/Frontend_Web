@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import useSWR from "swr";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { usePermission } from "@/lib/permission-context";
 import type { ScheduleStaff, LibraryZone, StaffShift, StaffScheduleAssignment } from "@/lib/types";
 
 export function startOfWeek(date = new Date()) {
@@ -90,9 +91,11 @@ const fetchScheduleData = async (from: string, to: string, isAdmin: boolean): Pr
   }
 };
 
-export function useScheduleData(): ScheduleData {
+export function useScheduleData(canViewAllOverride?: boolean): ScheduleData {
   const { user } = useAuth();
+  const { can } = usePermission();
   const isAdmin = user?.role === "admin";
+  const canManageAll = isAdmin || (canViewAllOverride !== undefined ? canViewAllOverride : (can("schedules", "create") || can("schedules", "update")));
   const isStaff = !!user;
   const [weekStart, setWeekStart] = useState(startOfWeek);
   const [staff, setStaff] = useState<ScheduleStaff[]>([]);
@@ -106,12 +109,12 @@ export function useScheduleData(): ScheduleData {
   const from = toDateInput(days[0]);
   const to = toDateInput(days[6]);
 
-  const cacheKey = `schedule:${from}:${to}:${isAdmin ? "admin" : "staff"}`;
+  const cacheKey = `schedule:${from}:${to}:${canManageAll ? "all" : "my"}`;
   const mountedRef = useRef(true);
 
   const { data: cachedData, mutate } = useSWR<ScheduleDataResult>(
     isStaff ? cacheKey : null,
-    () => fetchScheduleData(from, to, isAdmin),
+    () => fetchScheduleData(from, to, canManageAll),
     {
       dedupingInterval: 10000,
       revalidateOnFocus: true,

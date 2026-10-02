@@ -37,6 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUser = useCallback((fields: Partial<AuthUser>) => {
     setUser((prev) => {
       if (!prev) return null;
+      const hasChanged = Object.entries(fields).some(
+        ([key, val]) => (prev as any)[key] !== val
+      );
+      if (!hasChanged) return prev;
       const updated = { ...prev, ...fields };
       try {
         localStorage.setItem("user", JSON.stringify(updated));

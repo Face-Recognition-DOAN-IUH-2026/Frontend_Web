@@ -153,4 +153,69 @@ describe("Dynamic RBAC Permissions Engine", () => {
     expect(effective.allowedPages).not.toContain("/books");
     expect(effective.crud.books.delete).toBe(false);
   });
+
+  it("supports extended enterprise actions: approve and print", () => {
+    expect(ALL_ACTIONS).toContain("approve");
+    expect(ALL_ACTIONS).toContain("print");
+
+    const staffWithExtended: RolePermissionConfig = {
+      role: "staff",
+      label: "Thủ thư",
+      allowedPages: ["/borrow", "/books"],
+      crud: {
+        books: { create: true, read: true, update: true, delete: false, approve: false, print: true },
+        patrons: { create: true, read: true, update: true, delete: false, approve: true, print: true },
+        borrows: { create: true, read: true, update: true, delete: false, approve: true, print: true },
+        schedules: { create: false, read: true, update: false, delete: false, approve: false, print: true },
+        ai_tools: { create: true, read: true, update: true, delete: false, approve: false, print: false },
+        settings: { create: false, read: false, update: false, delete: false, approve: false, print: false },
+        stats: { create: false, read: true, update: false, delete: false, approve: false, print: true },
+      },
+    };
+
+    const effective = resolveEffective("staff", staffWithExtended, null);
+    expect(effective.crud.borrows.approve).toBe(true);
+    expect(effective.crud.books.approve).toBe(false);
+    expect(effective.crud.books.print).toBe(true);
+  });
+
+  it("applies user override for approve and print actions", () => {
+    const staffWithExtended: RolePermissionConfig = {
+      role: "staff",
+      label: "Thủ thư",
+      allowedPages: ["/borrow", "/books"],
+      crud: {
+        books: { create: true, read: true, update: true, delete: false, approve: false, print: false },
+        patrons: { create: true, read: true, update: true, delete: false, approve: false, print: false },
+        borrows: { create: true, read: true, update: true, delete: false, approve: false, print: false },
+        schedules: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+        ai_tools: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+        settings: { create: false, read: false, update: false, delete: false, approve: false, print: false },
+        stats: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+      },
+    };
+
+    const override: UserPermissionOverride = {
+      enabled: true,
+      grantedPages: [],
+      revokedPages: [],
+      grantedCrud: {
+        books: { approve: true, print: true },
+      },
+      revokedCrud: {},
+    };
+
+    const effective = resolveEffective("staff", staffWithExtended, override);
+    expect(effective.crud.books.approve).toBe(true);
+    expect(effective.crud.books.print).toBe(true);
+  });
+
+  it("validates that all 21 routes have assigned valid categories", () => {
+    expect(ALL_ROUTES.length).toBe(21);
+    const validCategories = ["library", "circulation", "personnel", "ai_vision", "admin"];
+    ALL_ROUTES.forEach((route) => {
+      expect((route as any).category).toBeDefined();
+      expect(validCategories).toContain((route as any).category);
+    });
+  });
 });

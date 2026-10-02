@@ -51,13 +51,13 @@ const DEFAULT_FALLBACK_ROLES: Record<string, RolePermissionConfig> = {
     description: "Toàn quyền truy cập mọi trang và thực hiện mọi thao tác",
     allowedPages: ALL_ROUTES.map((r) => r.path),
     crud: {
-      books: { create: true, read: true, update: true, delete: true },
-      patrons: { create: true, read: true, update: true, delete: true },
-      borrows: { create: true, read: true, update: true, delete: true },
-      schedules: { create: true, read: true, update: true, delete: true },
-      ai_tools: { create: true, read: true, update: true, delete: true },
-      settings: { create: true, read: true, update: true, delete: true },
-      stats: { create: true, read: true, update: true, delete: true },
+      books: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      patrons: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      borrows: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      schedules: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      ai_tools: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      settings: { create: true, read: true, update: true, delete: true, approve: true, print: true },
+      stats: { create: true, read: true, update: true, delete: true, approve: true, print: true },
     },
   },
   staff: {
@@ -72,19 +72,26 @@ const DEFAULT_FALLBACK_ROLES: Record<string, RolePermissionConfig> = {
       "/return",
       "/gate",
       "/history",
+      "/active",
       "/staff-schedules",
       "/ai-assistant",
       "/enroll",
       "/verify",
+      "/identify",
+      "/liveness",
+      "/library/vr-tour",
+      "/profile",
+      "/notifications",
+      "/stats",
     ],
     crud: {
-      books: { create: true, read: true, update: true, delete: false },
-      patrons: { create: true, read: true, update: true, delete: false },
-      borrows: { create: true, read: true, update: true, delete: false },
-      schedules: { create: false, read: true, update: false, delete: false },
-      ai_tools: { create: true, read: true, update: false, delete: false },
-      settings: { create: false, read: false, update: false, delete: false },
-      stats: { create: false, read: true, update: false, delete: false },
+      books: { create: true, read: true, update: true, delete: false, approve: false, print: true },
+      patrons: { create: true, read: true, update: true, delete: false, approve: true, print: true },
+      borrows: { create: true, read: true, update: true, delete: false, approve: true, print: true },
+      schedules: { create: false, read: true, update: false, delete: false, approve: false, print: true },
+      ai_tools: { create: true, read: true, update: true, delete: false, approve: false, print: false },
+      settings: { create: false, read: false, update: false, delete: false, approve: false, print: false },
+      stats: { create: false, read: true, update: false, delete: false, approve: false, print: true },
     },
   },
   viewer: {
@@ -93,13 +100,13 @@ const DEFAULT_FALLBACK_ROLES: Record<string, RolePermissionConfig> = {
     description: "Chỉ xem dữ liệu thống kê và lịch sử ra vào",
     allowedPages: ["/dashboard", "/history", "/stats"],
     crud: {
-      books: { create: false, read: true, update: false, delete: false },
-      patrons: { create: false, read: true, update: false, delete: false },
-      borrows: { create: false, read: true, update: false, delete: false },
-      schedules: { create: false, read: true, update: false, delete: false },
-      ai_tools: { create: false, read: false, update: false, delete: false },
-      settings: { create: false, read: false, update: false, delete: false },
-      stats: { create: false, read: true, update: false, delete: false },
+      books: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+      patrons: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+      borrows: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+      schedules: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+      ai_tools: { create: false, read: false, update: false, delete: false, approve: false, print: false },
+      settings: { create: false, read: false, update: false, delete: false, approve: false, print: false },
+      stats: { create: false, read: true, update: false, delete: false, approve: false, print: false },
     },
   },
 };
@@ -268,6 +275,28 @@ export default function DynamicAdminPage() {
     });
   };
 
+  const handleToggleCategoryRoutesForRole = (category: string, enableAll: boolean) => {
+    if (selectedRole === "admin") return;
+
+    const categoryPaths = ALL_ROUTES.filter((r) => r.category === category).map((r) => r.path);
+    setRoles((prev) => {
+      const current = prev[selectedRole] || activeRoleConfig;
+      const currentPages = new Set(current.allowedPages || []);
+      categoryPaths.forEach((p) => {
+        if (p === "/dashboard") return;
+        if (enableAll) currentPages.add(p);
+        else currentPages.delete(p);
+      });
+      return {
+        ...prev,
+        [selectedRole]: {
+          ...current,
+          allowedPages: Array.from(currentPages),
+        },
+      };
+    });
+  };
+
   const handleToggleCrudForRole = (resource: SystemResource, action: CrudAction) => {
     if (selectedRole === "admin") return;
 
@@ -297,8 +326,8 @@ export default function DynamicAdminPage() {
       const current = prev[selectedRole] || activeRoleConfig;
       const newPerms =
         preset === "full"
-          ? { create: true, read: true, update: true, delete: true }
-          : { create: false, read: true, update: false, delete: false };
+          ? { create: true, read: true, update: true, delete: true, approve: true, print: true }
+          : { create: false, read: true, update: false, delete: false, approve: false, print: false };
       return {
         ...prev,
         [selectedRole]: {
@@ -309,6 +338,91 @@ export default function DynamicAdminPage() {
           },
         },
       };
+    });
+  };
+
+  const handleApplyRoleTemplate = (template: "circulation" | "cataloging" | "assistant") => {
+    if (selectedRole === "admin") return;
+
+    setRoles((prev) => {
+      const current = prev[selectedRole] || activeRoleConfig;
+      let allowedPages: string[] = [];
+      const crud: Record<SystemResource, any> = {
+        books: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+        patrons: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+        borrows: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+        schedules: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+        ai_tools: { create: false, read: true, update: false, delete: false, approve: false, print: false },
+        settings: { create: false, read: false, update: false, delete: false, approve: false, print: false },
+        stats: { create: false, read: false, update: false, delete: false, approve: false, print: false },
+      };
+
+      if (template === "circulation") {
+        allowedPages = [
+          "/dashboard",
+          "/patrons",
+          "/active",
+          "/gate",
+          "/history",
+          "/borrow",
+          "/return",
+          "/books",
+          "/staff-schedules",
+          "/profile",
+          "/notifications",
+        ];
+        crud.borrows = { create: true, read: true, update: true, delete: false, approve: true, print: true };
+        crud.patrons = { create: true, read: true, update: true, delete: false, approve: true, print: true };
+        crud.books = { create: false, read: true, update: false, delete: false, approve: false, print: true };
+        crud.schedules = { create: false, read: true, update: false, delete: false, approve: false, print: false };
+      } else if (template === "cataloging") {
+        allowedPages = [
+          "/dashboard",
+          "/books",
+          "/patrons",
+          "/stats",
+          "/profile",
+          "/notifications",
+        ];
+        crud.books = { create: true, read: true, update: true, delete: true, approve: true, print: true };
+        crud.patrons = { create: false, read: true, update: false, delete: false, approve: false, print: false };
+        crud.borrows = { create: false, read: true, update: false, delete: false, approve: false, print: false };
+        crud.stats = { create: false, read: true, update: false, delete: false, approve: false, print: true };
+      } else if (template === "assistant") {
+        allowedPages = [
+          "/dashboard",
+          "/borrow",
+          "/return",
+          "/gate",
+          "/history",
+          "/active",
+          "/profile",
+        ];
+        crud.borrows = { create: true, read: true, update: false, delete: false, approve: false, print: false };
+        crud.books = { create: false, read: true, update: false, delete: false, approve: false, print: false };
+        crud.patrons = { create: false, read: true, update: false, delete: false, approve: false, print: false };
+      }
+
+      return {
+        ...prev,
+        [selectedRole]: {
+          ...current,
+          allowedPages,
+          crud,
+        },
+      };
+    });
+
+    const labelMap = {
+      circulation: "Thủ thư Quầy Lưu hành",
+      cataloging: "Thủ thư Kho & Biên mục",
+      assistant: "Cộng tác viên Sinh viên",
+    };
+
+    setToast({
+      open: true,
+      message: `Đã áp dụng mẫu [${labelMap[template]}]! Nhấn nút 'Lưu quyền chức vụ' để lưu vĩnh viễn.`,
+      severity: "info",
     });
   };
 
@@ -752,9 +866,11 @@ export default function DynamicAdminPage() {
               setRouteFilter={setRouteFilter}
               handleToggleRouteForRole={handleToggleRouteForRole}
               handleToggleAllRoutesForRole={handleToggleAllRoutesForRole}
+              handleToggleCategoryRoutesForRole={handleToggleCategoryRoutesForRole}
               handleToggleCrudForRole={handleToggleCrudForRole}
               handleSetResourcePresetForRole={handleSetResourcePresetForRole}
               handleSaveRoleConfig={handleSaveRoleConfig}
+              handleApplyRoleTemplate={handleApplyRoleTemplate}
               saving={saving}
               setOpenNewRoleModal={setOpenNewRoleModal}
             />

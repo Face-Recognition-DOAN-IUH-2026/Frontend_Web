@@ -50,6 +50,7 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { usePermission } from "@/lib/permission-context";
 import { fadeInUp, shimmer } from "@/lib/animations";
 import { initials, roleLabel, statusLabel, statusColor } from "@/lib/utils";
 import type { UserPublic } from "@/lib/types";
@@ -70,6 +71,7 @@ const STAT_GRADIENT: Record<string, string> = {
 
 export default function AdminPage() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { canAccessPage, loading: permLoading } = usePermission();
   const router = useRouter();
   const [users, setUsers] = useState<UserPublic[]>([]);
   const [total, setTotal] = useState(0);
@@ -83,14 +85,14 @@ export default function AdminPage() {
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "staff" | "patron">("all");
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && !permLoading) {
       if (!isAuthenticated) {
         router.push("/login");
-      } else if (user?.role !== "admin") {
+      } else if (user?.role !== "admin" && !canAccessPage("/dashboard/admin")) {
         router.push("/dashboard");
       }
     }
-  }, [isLoading, isAuthenticated, user, router]);
+  }, [isLoading, permLoading, isAuthenticated, user, canAccessPage, router]);
 
   const load = async () => {
     try {

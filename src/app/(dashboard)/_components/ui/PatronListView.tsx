@@ -21,6 +21,7 @@ export default function PatronListView({ patrons, onEdit, onRenew, onDelete, onR
   const { can } = usePermission();
   const canUpdate = can("patrons", "update");
   const canDelete = can("patrons", "delete");
+  const canApproveOrUpdate = can("patrons", "approve") || can("patrons", "update");
 
   const columns: DataTableColumn<PatronPublic>[] = [
     {
@@ -117,15 +118,15 @@ export default function PatronListView({ patrons, onEdit, onRenew, onDelete, onR
                   </Button>
                 </span>
               </Tooltip>
-              <Tooltip title={!canUpdate ? getPermissionDeniedReason("patrons", "update") : ""}>
+              <Tooltip title={!canApproveOrUpdate ? getPermissionDeniedReason("patrons", "approve") : ""}>
                 <span>
                   <Button
                     size="small"
                     variant="outlined"
                     color="success"
-                    disabled={!canUpdate}
+                    disabled={!canApproveOrUpdate}
                     onClick={() => {
-                      if (!canUpdate) return;
+                      if (!canApproveOrUpdate) return;
                       onRenew(row);
                     }}
                     sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}
