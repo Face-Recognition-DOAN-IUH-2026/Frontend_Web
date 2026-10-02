@@ -70,7 +70,7 @@ export interface CameraStatus {
 
 export interface CameraEvent {
   camera_id: string;
-  status: "granted" | "no_match" | "expired" | "spoof" | "error";
+  status: "granted" | "no_match" | "expired" | "spoof" | "error" | "wrong_direction" | "denied";
   patron_id?: string;
   full_name?: string;
   student_code?: string;

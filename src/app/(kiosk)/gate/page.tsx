@@ -158,8 +158,12 @@ export default function GatePage() {
     name?: string;
     studentCode?: string;
     confidence?: number | null;
+    message?: string;
     timestamp: number;
   } | null>(null);
+
+  const [useExitWebcam, setUseExitWebcam] = useState(true);
+  const [useEntryWebcam, setUseEntryWebcam] = useState(true);
 
   const LIBRARY_CAPACITY = 200;
   const occupancyPct = Math.min(100, Math.round((activePatrons / LIBRARY_CAPACITY) * 100));
@@ -431,6 +435,33 @@ export default function GatePage() {
           confidence: event.score ?? null,
           timestamp: Date.now(),
         });
+      } else if (event.status === "wrong_direction") {
+        playGateSound("denied");
+        const dirMsg = event.access_type === "exit"
+          ? "Chưa quét vào cổng nên không thể ra!"
+          : "Bạn đang ở trong thư viện!";
+        showToast("warning", `${event.full_name || "Độc giả"}: ${dirMsg}`);
+        setLastScanEvent({
+          status: "denied",
+          type: event.access_type === "exit" ? "exit" : "entry",
+          name: event.full_name || undefined,
+          studentCode: event.student_code || undefined,
+          confidence: event.score ?? null,
+          message: dirMsg,
+          timestamp: Date.now(),
+        });
+      } else if (event.status === "expired") {
+        playGateSound("denied");
+        showToast("error", `${event.full_name || "Độc giả"}: Thẻ hội viên đã hết hạn hoặc bị khóa!`);
+        setLastScanEvent({
+          status: "denied",
+          type: event.access_type === "exit" ? "exit" : "entry",
+          name: event.full_name || undefined,
+          studentCode: event.student_code || undefined,
+          confidence: event.score ?? null,
+          message: "THẺ HỘI VIÊN ĐÃ HẾT HẠN HOẶC BỊ KHÓA!",
+          timestamp: Date.now(),
+        });
       } else if (event.status === "no_match") {
         setTodayCounts((prev) => ({ ...prev, no_match: prev.no_match + 1 }));
         showToast("info", "Khuôn mặt mới - không nhận diện được.");
@@ -616,10 +647,24 @@ export default function GatePage() {
           <Grid size={{ xs: 12, lg: 8 }}>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationFillMode: "both" }}>
-                <CameraFeed src={ENTRY_CAM} cameraId={ENTRY_CAM_ID} label="Cổng vào" overlay={entryOverlay} />
+                <CameraFeed
+                  src={ENTRY_CAM}
+                  cameraId={ENTRY_CAM_ID}
+                  label="Cổng vào"
+                  useWebcam={useEntryWebcam}
+                  onToggleWebcam={() => setUseEntryWebcam((p) => !p)}
+                  overlay={entryOverlay}
+                />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
-                <CameraFeed src={EXIT_CAM} cameraId={EXIT_CAM_ID} label="Cổng ra" overlay={exitOverlay} />
+                <CameraFeed
+                  src={EXIT_CAM}
+                  cameraId={EXIT_CAM_ID}
+                  label="Cổng ra"
+                  useWebcam={useExitWebcam}
+                  onToggleWebcam={() => setUseExitWebcam((p) => !p)}
+                  overlay={exitOverlay}
+                />
               </Grid>
             </Grid>
           </Grid>
@@ -632,11 +677,13 @@ export default function GatePage() {
                   <ResultCard
                     status={lastScanEvent.status === "granted" ? "success" : lastScanEvent.status === "no_match" ? "unregistered" : "error"}
                     message={
-                      lastScanEvent.status === "granted"
-                        ? (lastScanEvent.type === "entry" ? "XIN MỜI VÀO THƯ VIỆN" : "XIN MỜI RA — HẸN GẶP LẠI")
-                        : lastScanEvent.status === "spoof"
-                        ? "CẢNH BÁO GIẢ MẠO HÌNH ẢNH!"
-                        : "KHUÔN MẶT CHƯA ĐƯỢC ĐĂNG KÝ"
+                      lastScanEvent.message || (
+                        lastScanEvent.status === "granted"
+                          ? (lastScanEvent.type === "entry" ? "XIN MỜI VÀO THƯ VIỆN" : "XIN MỜI RA — HẸN GẶP LẠI")
+                          : lastScanEvent.status === "spoof"
+                          ? "CẢNH BÁO GIẢ MẠO HÌNH ẢNH!"
+                          : "KHUÔN MẶT CHƯA ĐƯỢC ĐĂNG KÝ"
+                      )
                     }
                     patronInfo={
                       lastScanEvent.name
