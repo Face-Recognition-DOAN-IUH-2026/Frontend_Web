@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, Stack, Tooltip, Typography } from "@mui/material";
 import DataTable, { type DataTableColumn } from "./DataTable";
 import AvatarUser from "./AvatarUser";
 import { statusLabel, statusColor } from "@/lib/utils";
 import type { PatronPublic } from "@/lib/types";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 
 interface PatronListViewProps {
   patrons: PatronPublic[];
@@ -17,6 +18,10 @@ interface PatronListViewProps {
 
 export default function PatronListView({ patrons, onEdit, onRenew, onDelete, onRestore }: PatronListViewProps) {
   const router = useRouter();
+  const { can } = usePermission();
+  const canUpdate = can("patrons", "update");
+  const canDelete = can("patrons", "delete");
+  const canApproveOrUpdate = can("patrons", "approve") || can("patrons", "update");
 
   const columns: DataTableColumn<PatronPublic>[] = [
     {
@@ -60,14 +65,93 @@ export default function PatronListView({ patrons, onEdit, onRenew, onDelete, onR
         <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
           {row.status === "deleted" ? (
             <>
-              <Button size="small" variant="outlined" color="success" onClick={() => onRestore(row)} sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}>Khôi phục</Button>
-              <Button size="small" variant="outlined" color="error" onClick={() => onDelete(row)} sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}>Xóa</Button>
+              <Tooltip title={!canUpdate ? getPermissionDeniedReason("patrons", "update") : ""}>
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="success"
+                    disabled={!canUpdate}
+                    onClick={() => {
+                      if (!canUpdate) return;
+                      onRestore(row);
+                    }}
+                    sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}
+                  >
+                    Khôi phục
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title={!canDelete ? getPermissionDeniedReason("patrons", "delete") : ""}>
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    disabled={!canDelete}
+                    onClick={() => {
+                      if (!canDelete) return;
+                      onDelete(row);
+                    }}
+                    sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}
+                  >
+                    Xóa
+                  </Button>
+                </span>
+              </Tooltip>
             </>
           ) : (
             <>
-              <Button size="small" variant="outlined" onClick={() => onEdit(row)} sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}>Sửa</Button>
-              <Button size="small" variant="outlined" color="success" onClick={() => onRenew(row)} sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}>Gia hạn</Button>
-              <Button size="small" variant="outlined" color="error" onClick={() => onDelete(row)} sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}>Xóa</Button>
+              <Tooltip title={!canUpdate ? getPermissionDeniedReason("patrons", "update") : ""}>
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={!canUpdate}
+                    onClick={() => {
+                      if (!canUpdate) return;
+                      onEdit(row);
+                    }}
+                    sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}
+                  >
+                    Sửa
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title={!canApproveOrUpdate ? getPermissionDeniedReason("patrons", "approve") : ""}>
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="success"
+                    disabled={!canApproveOrUpdate}
+                    onClick={() => {
+                      if (!canApproveOrUpdate) return;
+                      onRenew(row);
+                    }}
+                    sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}
+                  >
+                    Gia hạn
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title={!canDelete ? getPermissionDeniedReason("patrons", "delete") : ""}>
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    disabled={!canDelete}
+                    onClick={() => {
+                      if (!canDelete) return;
+                      onDelete(row);
+                    }}
+                    sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.72rem" }}
+                  >
+                    Xóa
+                  </Button>
+                </span>
+              </Tooltip>
             </>
           )}
         </Stack>

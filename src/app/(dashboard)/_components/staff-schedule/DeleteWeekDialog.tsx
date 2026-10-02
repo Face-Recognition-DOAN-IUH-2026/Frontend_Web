@@ -94,7 +94,7 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
     >
       {result ? (
         <div>
-          <Alert message={result.message} type="success" showIcon style={{ marginBottom: 8 }} />
+          <Alert title={result.message} type="success" showIcon style={{ marginBottom: 8 }} />
           {result.skipped > 0 && (
             <div style={{ fontSize: "0.75rem", color: "#d97706" }}>
               Đã bỏ qua {result.skipped} ca trong quá khứ (không thể hủy).
@@ -102,7 +102,7 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
           )}
         </div>
       ) : isPast ? (
-        <Alert message="Toàn bộ lịch trong tuần này đã qua. Không có ca nào để hủy." type="warning" showIcon />
+        <Alert title="Toàn bộ lịch trong tuần này đã qua. Không có ca nào để hủy." type="warning" showIcon />
       ) : (
         <div>
           <div style={{ padding: 12, borderRadius: 8, border: `1px solid ${isDark ? "#2E3345" : "#D0D7E2"}`, marginBottom: 12, background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)" }}>
@@ -121,7 +121,7 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
           </div>
 
           {displayCount !== undefined && displayCount !== null && (
-            <Alert message={`${displayCount} ca trực sẽ bị ảnh hưởng trong khoảng thời gian này.`} type="info" showIcon style={{ marginBottom: 12 }} />
+            <Alert title={`${displayCount} ca trực sẽ bị ảnh hưởng trong khoảng thời gian này.`} type="info" showIcon style={{ marginBottom: 12 }} />
           )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -130,12 +130,19 @@ export default function DeleteWeekDialog({ open, onClose, weekFrom, weekTo, affe
           </div>
 
           {notify && (
-            <div style={{ fontSize: "0.7rem", color: "#6366f1", background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 6, padding: 8 }}>
+            <div style={{
+              fontSize: "0.7rem",
+              color: isDark ? "#93C5FD" : "#0A2540",
+              background: isDark ? "rgba(10,37,64,0.3)" : "rgba(10,37,64,0.06)",
+              border: `1px solid ${isDark ? "rgba(147,197,253,0.3)" : "rgba(10,37,64,0.18)"}`,
+              borderRadius: 6,
+              padding: 8
+            }}>
               Nhân viên bị ảnh hưởng sẽ nhận thông báo qua hệ thống.
             </div>
           )}
 
-          {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginTop: 12 }} />}
+          {error && <Alert title={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginTop: 12 }} />}
         </div>
       )}
     </Modal>

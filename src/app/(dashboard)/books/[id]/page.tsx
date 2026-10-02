@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
+  Alert,
   Avatar,
   Box,
   Button,
@@ -16,6 +17,7 @@ import {
   Grid,
   IconButton,
   Paper,
+  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -42,7 +44,6 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 const Book3DViewer = dynamic(
@@ -55,7 +56,7 @@ const VRViewer = dynamic(
   { ssr: false, loading: () => <Box sx={{ height: 400, display: "flex", alignItems: "center", justifyContent: "center" }}><CircularProgress /></Box> }
 );
 
-function StatCard({ label, value, color, icon }: { label: string; value: number; color: "info" | "success" | "warning"; icon: React.ReactNode }) {
+function StatCard({ label, value, color, icon }: { label: string; value: number; color: "primary" | "info" | "success" | "warning"; icon: React.ReactNode }) {
   return (
     <Paper
       variant="outlined"
@@ -65,7 +66,14 @@ function StatCard({ label, value, color, icon }: { label: string; value: number;
         textAlign: "center",
         borderColor: `${color}.main`,
         borderRadius: 2,
-        background: color === "info" ? "rgba(2,136,209,0.08)" : color === "success" ? "rgba(46,125,50,0.08)" : "rgba(245,124,0,0.08)",
+        background:
+          color === "primary"
+            ? "rgba(139,0,0,0.06)"
+            : color === "success"
+            ? "rgba(5,150,105,0.08)"
+            : color === "warning"
+            ? "rgba(217,119,6,0.08)"
+            : "rgba(10,37,64,0.06)",
       }}
     >
       <Box sx={{ color: `${color}.main`, mb: 0.5 }}>{icon}</Box>
@@ -99,7 +107,10 @@ function MetaItem({ icon, label, value }: { icon: React.ReactNode; label: string
 }
 
 export default function BookDetailPage() {
-  const [apiAnt, contextHolder] = notification.useNotification();
+  const [notice, setNotice] = useState<{ severity: "success" | "error" | "warning" | "info"; message: string } | null>(null);
+  const showNotice = (severity: "success" | "error" | "warning" | "info", message: string) => {
+    setNotice({ severity, message });
+  };
   const theme = useTheme();
   const params = useParams();
   const router = useRouter();
@@ -215,9 +226,9 @@ export default function BookDetailPage() {
 
       setBook(updated);
       setEditOpen(false);
-      apiAnt.success({ title: "Cập nhật sách thành công", placement: "topRight" });
+      showNotice("success", "Cập nhật sách thành công");
     } catch (err: any) {
-      apiAnt.error({ title: getErrorMessage(err) || "Cập nhật sách thất bại", placement: "topRight" });
+      showNotice("error", getErrorMessage(err) || "Cập nhật sách thất bại");
     } finally {
       setEditSaving(false);
     }
@@ -230,10 +241,10 @@ export default function BookDetailPage() {
       router.push("/books");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        apiAnt.error({ title: "Sách không tồn tại hoặc đã bị xóa.", placement: "topRight" });
+        showNotice("error", "Sách không tồn tại hoặc đã bị xóa.");
         router.push("/books");
       } else {
-        apiAnt.error({ title: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
+        showNotice("error", `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
       }
     }
   };
@@ -338,8 +349,9 @@ export default function BookDetailPage() {
                       width: "auto",
                       borderRadius: 2,
                       boxShadow: 3,
-                      bgcolor: "rgba(25, 118, 210, 0.9)",
+                      bgcolor: "rgba(139, 0, 0, 0.9)",
                       backdropFilter: "blur(4px)",
+                      "&:hover": { bgcolor: "primary.dark" },
                     }}
                   >
                     Góc nhìn 3D
@@ -369,7 +381,7 @@ export default function BookDetailPage() {
 
                 <Box sx={{ p: 2.5 }}>
                   <Stack direction="row" spacing={1} sx={{ mb: 2.5 }}>
-                    <StatCard label="Tổng" value={book.total_copies} color="info" icon={<GridViewIcon fontSize="small" />} />
+                    <StatCard label="Tổng" value={book.total_copies} color="primary" icon={<GridViewIcon fontSize="small" />} />
                     <StatCard label="Sẵn sàng" value={book.available_copies} color="success" icon={<VerifiedIcon fontSize="small" />} />
                     <StatCard label="Đang mượn" value={borrowed} color="warning" icon={<MenuBookIcon fontSize="small" />} />
                   </Stack>
@@ -726,7 +738,23 @@ export default function BookDetailPage() {
             </Box>
           </Dialog>
 
-          {contextHolder}
+          <Snackbar
+            open={Boolean(notice)}
+            autoHideDuration={4000}
+            onClose={() => setNotice(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          >
+            {notice ? (
+              <Alert
+                onClose={() => setNotice(null)}
+                severity={notice.severity}
+                variant="filled"
+                sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
+              >
+                {notice.message}
+              </Alert>
+            ) : undefined}
+          </Snackbar>
         </Stack>
       )}
     </LoadingOverlay>

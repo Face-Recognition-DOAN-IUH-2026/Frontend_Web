@@ -8,12 +8,12 @@ import { Box, Typography } from "@mui/material";
 
 // Mock data for the 3D visualization
 const MOCK_DATA = [
-  { label: "CNTT", value: 45, color: "#1976d2" },
-  { label: "Kinh tế", value: 30, color: "#2e7d32" },
-  { label: "Cơ khí", value: 25, color: "#ed6c02" },
-  { label: "Ngoại ngữ", value: 15, color: "#9c27b0" },
-  { label: "Điện tử", value: 35, color: "#d32f2f" },
-  { label: "Luật", value: 20, color: "#0288d1" },
+  { label: "CNTT", value: 45, color: "#0A2540" },
+  { label: "Kinh tế", value: 30, color: "#059669" },
+  { label: "Cơ khí", value: 25, color: "#D97706" },
+  { label: "Ngoại ngữ", value: 15, color: "#D4AF37" },
+  { label: "Điện tử", value: 35, color: "#8B0000" },
+  { label: "Luật", value: 20, color: "#64748B" },
 ];
 
 function Bar3D({ position, height, color, label }: { position: [number, number, number]; height: number; color: string; label: string }) {

@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
   Chip,
+  CircularProgress,
+  keyframes,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
-import Spin from "antd/es/spin";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import CenterFocusWeakIcon from "@mui/icons-material/CenterFocusWeak";
 
 interface CameraFeedProps {
   src: string;
@@ -24,11 +26,32 @@ interface CameraFeedProps {
 }
 
 const OVERLAY_COLORS: Record<string, string> = {
-  granted: "#22c55e",
-  wrong_direction: "#eab308",
+  granted: "#10b981",
+  wrong_direction: "#f59e0b",
   expired: "#f97316",
   spoof: "#ef4444",
 };
+
+const laserScan = keyframes`
+  0% {
+    top: 5%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+  100% {
+    top: 5%;
+    opacity: 0.8;
+  }
+`;
+
+const pulseDot = keyframes`
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+`;
 
 const ONLINE_INTERVAL = 1000;
 const OFFLINE_INTERVAL = 5000;
@@ -80,7 +103,7 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
 
     if (overlay.bbox) {
       const [x1, y1, x2, y2] = overlay.bbox;
-      ctx.strokeStyle = OVERLAY_COLORS[overlay.status || "granted"] || "#22c55e";
+      ctx.strokeStyle = OVERLAY_COLORS[overlay.status || "granted"] || "#10b981";
       ctx.lineWidth = 3;
       ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
     }
@@ -104,16 +127,18 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
       sx={{
         overflow: "hidden",
         height: "100%",
+        borderRadius: 3,
         transition: "all 0.3s ease",
         borderColor: isGranted ? "#10b981" : isDenied ? "#ef4444" : "divider",
         borderWidth: isGranted || isDenied ? 2 : 1,
         boxShadow: isGranted
-          ? "0 0 24px rgba(16, 185, 129, 0.4)"
+          ? "0 0 28px rgba(16, 185, 129, 0.4)"
           : isDenied
-          ? "0 0 24px rgba(239, 68, 68, 0.4)"
-          : "none",
+          ? "0 0 28px rgba(239, 68, 68, 0.4)"
+          : "0 4px 20px rgba(0, 0, 0, 0.08)",
       }}
     >
+      {/* Header bar */}
       <Stack
         direction="row"
         spacing={1.25}
@@ -125,9 +150,9 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
           borderBottom: 1,
           borderColor: isGranted ? "#10b981" : isDenied ? "#ef4444" : "divider",
           bgcolor: isGranted
-            ? "rgba(16, 185, 129, 0.08)"
+            ? "rgba(16, 185, 129, 0.1)"
             : isDenied
-            ? "rgba(239, 68, 68, 0.08)"
+            ? "rgba(239, 68, 68, 0.1)"
             : "background.paper",
           transition: "all 0.3s ease",
         }}
@@ -135,14 +160,15 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           <VideocamOutlinedIcon
             sx={{
-              color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "text.secondary",
-              fontSize: 20,
+              color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "primary.main",
+              fontSize: 22,
             }}
           />
           <Typography sx={{ fontWeight: 800, color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "text.primary" }}>
             {label}
           </Typography>
         </Stack>
+
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           {isGranted && (
             <Chip
@@ -163,13 +189,29 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
           <Chip
             size="small"
             color={ok === null ? "warning" : ok ? "success" : "error"}
-            label={ok === null ? "Đang nối" : ok ? "Online" : "Mất tín hiệu"}
+            label={ok === null ? "Đang nối" : ok ? "Live Stream" : "Mất tín hiệu"}
             variant="outlined"
+            icon={
+              ok ? (
+                <Box
+                  sx={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    bgcolor: "success.main",
+                    animation: `${pulseDot} 1.5s infinite`,
+                    ml: 0.5,
+                  }}
+                />
+              ) : undefined
+            }
+            sx={{ fontWeight: 700 }}
           />
         </Stack>
       </Stack>
 
-      <Box sx={{ position: "relative", aspectRatio: "16 / 9", bgcolor: "common.black" }}>
+      {/* Video Viewport with Cyber Biometric HUD */}
+      <Box sx={{ position: "relative", aspectRatio: "16 / 9", bgcolor: "#070B14", overflow: "hidden" }}>
         <Box
           component="img"
           ref={imgRef}
@@ -180,16 +222,130 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
           sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
         />
         <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
+
+        {/* Cyber HUD Corner Brackets when active */}
+        {ok && (
+          <>
+            {/* Top-Left Bracket */}
+            <Box
+              sx={{
+                position: "absolute",
+                top: 14,
+                left: 14,
+                width: 24,
+                height: 24,
+                borderTop: "3px solid #10b981",
+                borderLeft: "3px solid #10b981",
+                pointerEvents: "none",
+                filter: "drop-shadow(0 0 6px #10b981)",
+              }}
+            />
+            {/* Top-Right Bracket */}
+            <Box
+              sx={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                width: 24,
+                height: 24,
+                borderTop: "3px solid #10b981",
+                borderRight: "3px solid #10b981",
+                pointerEvents: "none",
+                filter: "drop-shadow(0 0 6px #10b981)",
+              }}
+            />
+            {/* Bottom-Left Bracket */}
+            <Box
+              sx={{
+                position: "absolute",
+                bottom: 14,
+                left: 14,
+                width: 24,
+                height: 24,
+                borderBottom: "3px solid #10b981",
+                borderLeft: "3px solid #10b981",
+                pointerEvents: "none",
+                filter: "drop-shadow(0 0 6px #10b981)",
+              }}
+            />
+            {/* Bottom-Right Bracket */}
+            <Box
+              sx={{
+                position: "absolute",
+                bottom: 14,
+                right: 14,
+                width: 24,
+                height: 24,
+                borderBottom: "3px solid #10b981",
+                borderRight: "3px solid #10b981",
+                pointerEvents: "none",
+                filter: "drop-shadow(0 0 6px #10b981)",
+              }}
+            />
+
+            {/* Laser scanning sweep line */}
+            <Box
+              sx={{
+                position: "absolute",
+                left: "8%",
+                right: "8%",
+                height: "2px",
+                background: "linear-gradient(90deg, transparent, #10b981, transparent)",
+                boxShadow: "0 0 12px 2px rgba(16, 185, 129, 0.7)",
+                animation: `${laserScan} 3s ease-in-out infinite`,
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* Sub-HUD Badge */}
+            <Box
+              sx={{
+                position: "absolute",
+                bottom: 10,
+                left: "50%",
+                transform: "translateX(-50%)",
+                bgcolor: "rgba(10, 37, 64, 0.75)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                px: 1.5,
+                py: 0.35,
+                borderRadius: 1.5,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
+                pointerEvents: "none",
+              }}
+            >
+              <CenterFocusWeakIcon sx={{ fontSize: 13, color: "#10b981" }} />
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "white",
+                  fontSize: "0.68rem",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  letterSpacing: 0.5,
+                  fontWeight: 600,
+                }}
+              >
+                AI BIOMETRIC GATEWAY
+              </Typography>
+            </Box>
+          </>
+        )}
+
+        {/* Loading overlay */}
         {ok === null && (
-          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-            <Spin size="small" />
-            <Typography variant="body2">Đang kết nối...</Typography>
+          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(7, 11, 20, 0.75)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.5}>
+            <CircularProgress size={32} sx={{ color: "primary.light" }} />
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Đang kết nối luồng camera...</Typography>
           </Stack>
         )}
+
+        {/* Offline overlay */}
         {ok === false && (
-          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.70)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-            <VideocamOutlinedIcon sx={{ fontSize: 48, opacity: 0.4 }} />
-            <Typography variant="body2" color="rgba(255,255,255,0.6)">Camera ngoại tuyến</Typography>
+          <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(7, 11, 20, 0.85)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.5}>
+            <VideocamOutlinedIcon sx={{ fontSize: 52, color: "error.light", opacity: 0.7 }} />
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>Camera ngoại tuyến — Kiểm tra kết nối</Typography>
           </Stack>
         )}
       </Box>

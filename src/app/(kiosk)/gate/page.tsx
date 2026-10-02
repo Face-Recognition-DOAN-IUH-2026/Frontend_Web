@@ -8,17 +8,17 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Grid,
   IconButton,
   LinearProgress,
   Paper,
+  Snackbar,
   Stack,
   TextField,
   Typography,
   useTheme,
 } from "@mui/material";
-import Spin from "antd/es/spin";
-import antdMsg from "antd/es/message";
 
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
@@ -175,8 +175,10 @@ export default function GatePage() {
     }
   }, []);
 
+  const [toast, setToast] = useState<{ severity: "success" | "warning" | "error" | "info"; msg: string } | null>(null);
+
   const showToast = useCallback((severity: "success" | "warning" | "error" | "info", msg: string) => {
-    antdMsg[severity](msg, 6);
+    setToast({ severity, msg });
   }, []);
 
   const addRecentLog = useCallback((log: AccessLogPublic) => {
@@ -707,12 +709,13 @@ export default function GatePage() {
                       fullWidth
                       sx={{
                         mt: 1.25,
-                        background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                        background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
                         borderRadius: 2,
                         fontWeight: 700,
                         textTransform: "none",
+                        boxShadow: "0 4px 14px rgba(139,0,0,0.3)",
                         "&:hover": {
-                          background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)",
+                          background: "linear-gradient(135deg, #700000 0%, #500000 100%)",
                         },
                       }}
                     >
@@ -722,7 +725,7 @@ export default function GatePage() {
 
                   {loading && (
                     <Stack spacing={1.25} sx={{ alignItems: "center" }}>
-                      <Spin size="small" />
+                      <CircularProgress size={24} sx={{ color: "primary.main" }} />
                       <Typography variant="body2" color="text.secondary">{statusText || "Đang xử lý..."}</Typography>
                     </Stack>
                   )}
@@ -735,15 +738,27 @@ export default function GatePage() {
                     <Typography variant="h5" sx={{ fontWeight: 850 }}>Xác thực khuôn mặt</Typography>
                     <Typography color="text.secondary">{lookup?.patron?.full_name || mssv}</Typography>
                   </Box>
-                  <Paper variant="outlined" sx={{ position: "relative", overflow: "hidden", aspectRatio: "4 / 3", bgcolor: "common.black" }}>
+                  <Paper variant="outlined" sx={{ position: "relative", overflow: "hidden", aspectRatio: "4 / 3", bgcolor: "#070B14", borderRadius: 3 }}>
                     <Box component="video" ref={videoRef} autoPlay playsInline muted sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+
+                    {/* Biometric Oval Reticle with Corner Brackets */}
                     <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", pointerEvents: "none" }}>
-                      <Box sx={{ width: 140, height: 140, border: 2, borderColor: "primary.main", borderRadius: "50%", opacity: 0.75 }} />
+                      <Box
+                        sx={{
+                          width: { xs: 150, sm: 180 },
+                          height: { xs: 200, sm: 240 },
+                          borderRadius: "48%",
+                          border: "2px solid rgba(16, 185, 129, 0.8)",
+                          boxShadow: "0 0 20px rgba(16, 185, 129, 0.4), inset 0 0 20px rgba(16, 185, 129, 0.2)",
+                          position: "relative",
+                        }}
+                      />
                     </Box>
+
                     {loading && (
-                      <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.65)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.25}>
-                        <Spin size="large" />
-                        <Typography variant="body2">{statusText}</Typography>
+                      <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(7, 11, 20, 0.75)", backdropFilter: "blur(6px)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.5}>
+                        <CircularProgress size={44} sx={{ color: "#10b981" }} />
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{statusText}</Typography>
                       </Stack>
                     )}
                   </Paper>
@@ -807,12 +822,13 @@ export default function GatePage() {
                     onClick={reset}
                     fullWidth
                     sx={{
-                      background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                      background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
                       borderRadius: 2,
                       fontWeight: 700,
                       textTransform: "none",
+                      boxShadow: "0 4px 14px rgba(139,0,0,0.3)",
                       "&:hover": {
-                        background: "linear-gradient(135deg, #818cf8 0%, #6366f1 100%)",
+                        background: "linear-gradient(135deg, #700000 0%, #500000 100%)",
                       },
                     }}
                   >
@@ -852,7 +868,16 @@ export default function GatePage() {
                     startIcon={<RestartAltOutlinedIcon />}
                     onClick={reset}
                     fullWidth
-                    sx={{ background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)", borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                    sx={{
+                      background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+                      borderRadius: 2,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      boxShadow: "0 4px 14px rgba(139,0,0,0.3)",
+                      "&:hover": {
+                        background: "linear-gradient(135deg, #700000 0%, #500000 100%)",
+                      },
+                    }}
                   >
                     Quay lại
                   </Button>
@@ -876,6 +901,24 @@ export default function GatePage() {
             Hệ thống đang hoạt động
           </Alert>
         </Box>
+
+        <Snackbar
+          open={Boolean(toast)}
+          autoHideDuration={6000}
+          onClose={() => setToast(null)}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          {toast ? (
+            <Alert
+              onClose={() => setToast(null)}
+              severity={toast.severity}
+              variant="filled"
+              sx={{ width: "100%", borderRadius: "8px", fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
+            >
+              {toast.msg}
+            </Alert>
+          ) : undefined}
+        </Snackbar>
       </Box>
     </Box>
   );

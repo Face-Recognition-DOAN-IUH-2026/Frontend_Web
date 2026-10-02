@@ -158,7 +158,7 @@ export default function AssignStaffDialog({
     >
       <div style={{ display: "flex", gap: 8, marginBottom: 16, fontSize: "0.75rem" }}>
         <span style={{ color: isDark ? "#B8B0A4" : "#344054" }}>Ngày: {date}</span>
-        <span style={{ color: "#1A73E8", fontWeight: 600 }}>Ca: {shiftName}</span>
+        <span style={{ color: isDark ? "#D4AF37" : "#8B0000", fontWeight: 700 }}>Ca: {shiftName}</span>
         {shift && (
           <span style={{ color: isDark ? "#B8B0A4" : "#999" }}>
             {shift.startTime?.slice(0, 5)} – {shift.endTime?.slice(0, 5)}
@@ -208,7 +208,7 @@ export default function AssignStaffDialog({
         </Form.Item>
       </Form>
 
-      {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginBottom: 12 }} />}
+      {error && <Alert title={error} type="error" showIcon closable onClose={() => setError(null)} style={{ marginBottom: 12 }} />}
 
       {warnings.length > 0 && (
         <div style={{ marginBottom: 12 }}>

@@ -119,7 +119,7 @@ export default function DashboardPage() {
           label="Đang có mặt"
           value={stats?.active_patrons ?? "—"}
           icon={UserCheckIcon}
-          gradient="linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%)"
+          gradient="linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)"
           pct={occupancyPct}
           delta={occupancyPct != null ? `${occupancyPct}% sức chứa (${activeCount}/${LIBRARY_CAPACITY} chỗ)` : undefined}
           deltaColor={occupancyPct && occupancyPct >= 90 ? "error" : occupancyPct && occupancyPct >= 75 ? "warning" : "default"}
@@ -131,7 +131,7 @@ export default function DashboardPage() {
           label="Lượt vào hôm nay"
           value={stats?.today_entries ?? "—"}
           icon={LoginIcon}
-          gradient="linear-gradient(135deg, #0284C7 0%, #0369A1 100%)"
+          gradient="linear-gradient(135deg, #D4AF37 0%, #B89628 100%)"
           pct={entryPct}
           delta={stats ? `Đã check-out: ${todayExits} lượt` : undefined}
           deltaColor="default"
@@ -143,7 +143,7 @@ export default function DashboardPage() {
           label="Sách đang mượn"
           value={borrowStats ? activeBorrows : "—"}
           icon={MenuBookIcon}
-          gradient={hasOverdue ? "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)"}
+          gradient={hasOverdue ? "linear-gradient(135deg, #8B0000 0%, #700000 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)"}
           pct={borrowPct}
           delta={borrowStats ? (hasOverdue ? `⚠ ${overdueBorrows} cuốn quá hạn cần thu hồi` : "✓ 0 quá hạn (Đúng hạn)") : undefined}
           deltaColor={hasOverdue ? "error" : "success"}

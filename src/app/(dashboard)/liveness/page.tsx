@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Alert, Button, Checkbox, Stack, Typography } from "@mui/material";
-import Progress from "antd/es/progress";
+import { Box, Alert, Button, Checkbox, LinearProgress, Stack, Typography } from "@mui/material";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
@@ -17,6 +16,7 @@ import { staggerSx } from "@/lib/useStaggeredAnimation";
 function LivenessResultCard({ result }: { result: any }) {
   const isLive = Boolean(result.is_live);
   const score = Number(result.liveness_score ?? 0);
+  const pct = Math.min(Math.round(score * 100), 100);
 
   return (
     <DashboardCard>
@@ -31,12 +31,17 @@ function LivenessResultCard({ result }: { result: any }) {
           </Box>
         </Stack>
 
-        <Progress
-          percent={Math.min(Math.round(score * 100), 100)}
-          status={isLive ? "success" : "exception"}
-          strokeColor={isLive ? "#10b981" : "#ef4444"}
-          trailColor="rgba(0,0,0,0.06)"
-        />
+        <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+          <LinearProgress
+            variant="determinate"
+            value={pct}
+            color={isLive ? "success" : "error"}
+            sx={{ flex: 1, height: 10, borderRadius: 5 }}
+          />
+          <Typography variant="body2" sx={{ fontWeight: 700, minWidth: 40 }}>
+            {pct}%
+          </Typography>
+        </Stack>
       </Stack>
     </DashboardCard>
   );

@@ -17,6 +17,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Snackbar,
 } from "@mui/material";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
@@ -31,8 +32,8 @@ import UserCheckIcon from "@mui/icons-material/HowToRegOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-import notification from "antd/es/notification";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
@@ -86,7 +87,14 @@ function normalizeQuery(value: string) {
 }
 
 export default function ActivePage() {
-  const [apiAnt, contextHolder] = notification.useNotification();
+  const { can } = usePermission();
+  const canUpdate = can("borrows", "update");
+
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
   const [patrons, setPatrons] = useState<ActivePatron[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -219,11 +227,19 @@ export default function ActivePage() {
     setExiting(true);
     try {
       await api.forceExitPatron(exitPatron.id);
-      apiAnt.success({ title: `Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra`, placement: "topRight" });
+      setToast({
+        open: true,
+        message: `Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra`,
+        severity: "success",
+      });
       setExitPatron(null);
       await load();
     } catch (err) {
-      apiAnt.error({ title: getErrorMessage(err) || "Lỗi khi đánh dấu ra", placement: "topRight" });
+      setToast({
+        open: true,
+        message: getErrorMessage(err) || "Lỗi khi đánh dấu ra",
+        severity: "error",
+      });
     } finally {
       setExiting(false);
     }
@@ -235,14 +251,13 @@ export default function ActivePage() {
         title="Độc giả đang có mặt"
         subtitle="Giám sát phòng đọc thời gian thực qua hệ thống camera AI & cổng kiểm soát"
         icon={PeopleIcon}
-        gradient="linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)"
         statBadges={`${patrons.length} độc giả đang ở trong thư viện — cập nhật ${lastUpdate.toLocaleTimeString("vi-VN")}`}
         onRefresh={load}
         actions={
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
               <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: error ? "error.main" : sseConnected ? "#6ee7b7" : "#fcd34d", animation: sseConnected ? "pulse 2s ease-in-out infinite" : undefined }} />
-              <Typography variant="caption" sx={{ color: "rgba(199,210,254,0.7)" }}>
+              <Typography variant="caption" color="text.secondary">
                 {error ? "Lỗi" : sseConnected ? "Live" : "Polling"}
               </Typography>
             </Stack>
@@ -258,7 +273,7 @@ export default function ActivePage() {
             label="Đang trong phòng đọc"
             value={activeCount}
             icon={UserCheckIcon}
-            gradient="linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%)"
+            gradient="linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)"
             pct={occupancyPct}
             delta={`${occupancyPct}% sức chứa (${activeCount}/${LIBRARY_CAPACITY} chỗ)`}
             deltaColor={occupancyPct >= 90 ? "error" : occupancyPct >= 75 ? "warning" : "default"}
@@ -272,7 +287,7 @@ export default function ActivePage() {
             label="Lưu lại quá 8 giờ"
             value={stalePatrons.length}
             icon={WarningAmberOutlinedIcon}
-            gradient={stalePatrons.length > 0 ? "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)"}
+            gradient={stalePatrons.length > 0 ? "linear-gradient(135deg, #8B0000 0%, #700000 100%)" : "linear-gradient(135deg, #475569 0%, #334155 100%)"}
             pct={activeCount > 0 ? Math.round((stalePatrons.length / activeCount) * 100) : 0}
             delta={stalePatrons.length > 0 ? "⚠ Nghi vấn quên check-out, cần xử lý" : "✓ 0 độc giả quá thời gian quy định"}
             deltaColor={stalePatrons.length > 0 ? "error" : "success"}
@@ -286,7 +301,7 @@ export default function ActivePage() {
             label="Thời gian lưu lại TB"
             value={avgDurationText}
             icon={AccessTimeOutlinedIcon}
-            gradient="linear-gradient(135deg, #0284C7 0%, #0369A1 100%)"
+            gradient="linear-gradient(135deg, #D4AF37 0%, #B89628 100%)"
             delta={activeCount > 0 ? `Tính trên ${activeCount} độc giả hiện diện` : "Chưa có lượt vào"}
             deltaColor="default"
             index={2}
@@ -452,15 +467,21 @@ export default function ActivePage() {
                               </Stack>
                             </Stack>
                           </Box>
-                          <Tooltip title="Đánh dấu đã ra">
-                            <IconButton
-                              size="small"
-                              color="warning"
-                              onClick={() => setExitPatron(patron)}
-                              sx={{ flexShrink: 0, mt: 0.5 }}
-                            >
-                              <LogoutIcon fontSize="small" />
-                            </IconButton>
+                          <Tooltip title={!canUpdate ? getPermissionDeniedReason("borrows", "update") : "Đánh dấu đã ra"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="warning"
+                                disabled={!canUpdate}
+                                onClick={() => {
+                                  if (!canUpdate) return;
+                                  setExitPatron(patron);
+                                }}
+                                sx={{ flexShrink: 0, mt: 0.5 }}
+                              >
+                                <LogoutIcon fontSize="small" />
+                              </IconButton>
+                            </span>
                           </Tooltip>
                         </Stack>
                       </Box>
@@ -491,7 +512,16 @@ export default function ActivePage() {
         </DialogActions>
       </Dialog>
 
-      {contextHolder}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))} sx={{ borderRadius: 2 }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

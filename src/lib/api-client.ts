@@ -56,6 +56,9 @@ import type {
   AIBookRecommendationResponse,
   Notification,
   NotificationListResponse,
+  RolePermissionConfig,
+  UserPermissionOverride,
+  EffectivePermissions,
 } from "./types";
 
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:80";
@@ -1525,6 +1528,16 @@ class ApiClient {
     return response.data;
   }
 
+  async getAdminResourceSchema(resource: string): Promise<any> {
+    const response = await this.client.get<any>(`/api/borrow/admin/schema/${resource}`);
+    return response.data;
+  }
+
+  async getAllAdminSchemas(): Promise<Record<string, any>> {
+    const response = await this.client.get<Record<string, any>>("/api/borrow/admin/schema");
+    return response.data;
+  }
+
   async forgotPassword(email: string): Promise<{ message: string }> {
     const response = await this.client.post<{ message: string }>("/api/auth/forgot-password", { email });
     return response.data;
@@ -1538,6 +1551,65 @@ class ApiClient {
   async resetPassword(email: string, code: string, newPassword: string): Promise<{ message: string }> {
     const response = await this.client.post<{ message: string }>("/api/auth/reset-password", { email, code, new_password: newPassword });
     return response.data;
+  }
+
+  // --- Permissions & Dynamic RBAC ---
+  async getPermissionMatrix(): Promise<{
+    roles: Record<string, RolePermissionConfig>;
+    metadata: {
+      routes: { path: string; label: string }[];
+      resources: string[];
+      actions: string[];
+    };
+  }> {
+    const response = await this.client.get<{
+      success: boolean;
+      data: {
+        roles: Record<string, RolePermissionConfig>;
+        metadata: {
+          routes: { path: string; label: string }[];
+          resources: string[];
+          actions: string[];
+        };
+      };
+    }>("/api/permissions/matrix");
+    return response.data.data;
+  }
+
+  async updateRolePermissions(
+    role: string,
+    config: RolePermissionConfig
+  ): Promise<RolePermissionConfig> {
+    const response = await this.client.put<{ success: boolean; data: RolePermissionConfig }>(
+      `/api/permissions/roles/${encodeURIComponent(role)}`,
+      config
+    );
+    return response.data.data;
+  }
+
+  async getUserPermissionOverride(userId: string): Promise<UserPermissionOverride> {
+    const response = await this.client.get<{ success: boolean; data: UserPermissionOverride }>(
+      `/api/permissions/users/${encodeURIComponent(userId)}`
+    );
+    return response.data.data;
+  }
+
+  async updateUserPermissionOverride(
+    userId: string,
+    override: UserPermissionOverride
+  ): Promise<UserPermissionOverride> {
+    const response = await this.client.put<{ success: boolean; data: UserPermissionOverride }>(
+      `/api/permissions/users/${encodeURIComponent(userId)}`,
+      override
+    );
+    return response.data.data;
+  }
+
+  async getMyPermissions(): Promise<EffectivePermissions> {
+    const response = await this.client.get<{ success: boolean; data: EffectivePermissions }>(
+      "/api/permissions/me"
+    );
+    return response.data.data;
   }
 }
 

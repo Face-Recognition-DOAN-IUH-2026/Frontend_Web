@@ -47,79 +47,81 @@ function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
   const shouldReduceMotion = reducedMotion === "reduce";
   const transitionDuration = shouldReduceMotion ? 0 : 200;
 
-  // ── IUH Library Brand Colors ──────────────────────────────────────────────
-  // Primary: Navy Blue — học thuật, tin cậy (phù hợp logo IUH)
-  // Secondary: Warm Amber — ấm áp, thư viện, sách vở
-  // Không dùng generic indigo (#4F46E5) — đó là màu AI mặc định
+  // ── IUH Brand Identity Colors ─────────────────────────────────────────────
+  // Primary Accent: Đỏ đô IUH (#8B0000 / #900C3F)
+  // Secondary Accent: Vàng hoàng gia / Vàng đồng (#D4AF37 / #E6A100)
+  // Navy Accent: Xanh Navy công nghiệp (#0A2540)
+  // Background: Xám sáng (#F8F9FA)
   // ─────────────────────────────────────────────────────────────────────────
   const brand = {
-    navy:         "#1E6091",   // Primary — IUH Navy Blue
-    navyDark:     "#154E78",   // Primary hover
-    navyLight:    "#E8F4FD",   // Primary container (light)
-    navyDarkBg:   "#1A3A52",   // Primary container (dark)
-    amber:        "#D97706",   // Secondary — Warm Amber
-    amberLight:   "#FEF3C7",   // Secondary container (light)
-    amberDark:    "#92400E",   // Secondary container (dark)
+    iuhRed:       "#8B0000",   // Primary — IUH Red
+    iuhRedDark:   "#700000",   // Primary dark / hover
+    iuhRedLight:  "#FFF5F5",   // Primary container light
+    iuhGold:      "#D4AF37",   // Secondary — IUH Royal Gold
+    iuhGoldDark:  "#B38E22",   // Secondary dark
+    iuhGoldLight: "#FFF8E7",   // Secondary container light
+    iuhNavy:      "#0A2540",   // Navy accent
+    iuhNavyDark:  "#061729",   // Dark Navy
+    iuhNavyLight: "#E8EEF5",   // Navy container light
   };
 
   return createTheme({
     palette: {
       mode,
       primary: {
-        main: brand.navy,
-        dark: brand.navyDark,
-        light: dark ? "#3B85B5" : "#2980B9",
+        main: brand.iuhRed,
+        dark: brand.iuhRedDark,
+        light: dark ? "#A31D1D" : "#900C3F",
         contrastText: "#FFFFFF",
       },
       secondary: {
-        main: brand.amber,
-        dark: "#B45309",
-        light: "#F59E0B",
-        contrastText: "#FFFFFF",
+        main: brand.iuhGold,
+        dark: brand.iuhGoldDark,
+        light: "#E6A100",
+        contrastText: dark ? "#1C1917" : "#0A2540",
       },
       success: {
-        main: dark ? "#34D399" : "#059669",
+        main: "#198754",
         contrastText: "#FFFFFF",
       },
       warning: {
-        main: dark ? "#FCD34D" : "#D97706",
-        contrastText: dark ? "#1C1917" : "#FFFFFF",
+        main: "#D97706",
+        contrastText: "#FFFFFF",
       },
       error: {
-        main: dark ? "#F87171" : "#DC2626",
+        main: "#8B0000",
         contrastText: "#FFFFFF",
       },
       info: {
-        main: dark ? "#60A5FA" : "#2563EB",
+        main: brand.iuhNavy,
         contrastText: "#FFFFFF",
       },
       background: {
-        default: dark ? "#0D1B2A" : "#F7FAFC",
-        paper:   dark ? "#132232" : "#FFFFFF",
+        default: dark ? "#071524" : "#F8F9FA",
+        paper:   dark ? "#0C1E32" : "#FFFFFF",
       },
       text: {
-        primary:   dark ? "#EEF2F7" : "#1A2744",
-        secondary: dark ? "#8FA8BF" : "#4B6484",
-        disabled:  dark ? "#4A6275" : "#9DB2C4",
+        primary:   dark ? "#F8F9FA" : "#0A2540",
+        secondary: dark ? "#94A3B8" : "#4B5563",
+        disabled:  dark ? "#64748B" : "#9CA3AF",
       },
-      divider: dark ? "#1E3347" : "#D5E3EE",
+      divider: dark ? "#1E3347" : "#DEE2E6",
       action: {
-        hover:    dark ? "rgba(30, 96, 145, 0.10)" : "rgba(30, 96, 145, 0.07)",
-        selected: dark ? "rgba(30, 96, 145, 0.16)" : "rgba(30, 96, 145, 0.12)",
+        hover:    dark ? "rgba(139, 0, 0, 0.12)" : "rgba(139, 0, 0, 0.06)",
+        selected: dark ? "rgba(139, 0, 0, 0.20)" : "rgba(139, 0, 0, 0.12)",
       },
     },
     shape: {
-      borderRadius: 10,
+      borderRadius: 4, // 2px - 4px industrial crisp border radius
     },
     typography: {
-      // Be Vietnam Pro — hỗ trợ tiếng Việt đẹp, chuyên nghiệp, hiện đại
-      fontFamily: "'Be Vietnam Pro', 'Inter', system-ui, -apple-system, sans-serif",
-      h1: { fontWeight: 800, letterSpacing: "-0.03em" },
-      h2: { fontWeight: 700, letterSpacing: "-0.02em" },
-      h3: { fontWeight: 700, letterSpacing: "-0.01em" },
-      h4: { fontWeight: 700 },
-      h5: { fontWeight: 700 },
-      h6: { fontWeight: 700 },
+      fontFamily: "'Source Sans 3', sans-serif",
+      h1: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, letterSpacing: "-0.03em" },
+      h2: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, letterSpacing: "-0.02em" },
+      h3: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, letterSpacing: "-0.01em" },
+      h4: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 },
+      h5: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 },
+      h6: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 },
       subtitle1: { fontWeight: 600 },
       subtitle2: { fontWeight: 600 },
       button: {
@@ -128,7 +130,7 @@ function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
         letterSpacing: "0.01em",
       },
       caption: { letterSpacing: "0.02em" },
-      overline: { fontWeight: 700, letterSpacing: "0.08em" },
+      overline: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, letterSpacing: "0.08em" },
     },
     transitions: {
       duration: {
@@ -149,8 +151,7 @@ function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
           },
           body: {
             backgroundColor: dark ? "#0D1B2A" : "#F0F6FB",
-            // Be Vietnam Pro từ Google Fonts
-            fontFamily: "'Be Vietnam Pro', 'Inter', system-ui, sans-serif",
+            fontFamily: "'Source Sans 3', sans-serif",
           },
           // Scrollbar styling
           "::-webkit-scrollbar": { width: "6px", height: "6px" },

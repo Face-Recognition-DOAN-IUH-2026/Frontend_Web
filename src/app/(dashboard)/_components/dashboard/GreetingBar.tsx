@@ -19,7 +19,7 @@ function getTimeGreeting() {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return { text: "Chào buổi sáng", icon: <WbSunnyOutlinedIcon sx={{ fontSize: 18, color: "#f59e0b" }} /> };
   if (hour >= 12 && hour < 18) return { text: "Chào buổi chiều", icon: <WbTwilightOutlinedIcon sx={{ fontSize: 18, color: "#f97316" }} /> };
-  return { text: "Chào buổi tối", icon: <NightlightOutlinedIcon sx={{ fontSize: 18, color: "#6366f1" }} /> };
+  return { text: "Chào buổi tối", icon: <NightlightOutlinedIcon sx={{ fontSize: 18, color: "#D4AF37" }} /> };
 }
 
 export default function GreetingBar({ userName, onRefresh, liveConnected }: GreetingBarProps) {
@@ -53,12 +53,10 @@ export default function GreetingBar({ userName, onRefresh, liveConnected }: Gree
         justifyContent: "space-between",
         gap: 1.5,
         p: { xs: 2, sm: 2.5 },
-        borderRadius: 3,
+        borderRadius: 2,
         border: "1px solid",
         borderColor: "divider",
-        bgcolor: theme.palette.mode === "dark" ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.8)",
-        backdropFilter: "blur(12px)",
-        boxShadow: "0 4px 20px -4px rgba(0, 0, 0, 0.05)",
+        bgcolor: "background.paper",
         animation: `${fadeInUp} 0.4s ease-out`,
       }}
     >

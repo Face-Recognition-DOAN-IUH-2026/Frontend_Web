@@ -15,6 +15,7 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
 import { useAuth } from "@/lib/auth-context";
+import { usePermission } from "@/lib/permission-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { useScheduleData, formatDateRange } from "@/hooks/useScheduleData";
 import { useScheduleFilters } from "@/hooks/useScheduleFilters";
@@ -48,21 +49,28 @@ const FILTERS = [
 ] as const;
 
 const STAT_GRADIENT = {
-  total: "linear-gradient(135deg, #1E6091 0%, #154E78 100%)",
+  total: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
   active: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-  staff: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+  staff: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
 };
 
 export default function StaffSchedulesPage() {
   const { user } = useAuth();
+  const { can } = usePermission();
   const isAdmin = user?.role === "admin";
   const isStaff = !!user;
+
+  // Quyền thao tác lịch: Admin toàn quyền, hoặc nhân viên được cấp quyền riêng qua RBAC
+  const canCreate = isAdmin || can("schedules", "create");
+  const canUpdate = isAdmin || can("schedules", "update");
+  const canDelete = isAdmin || can("schedules", "delete");
+  const canManage = isAdmin || canCreate || canUpdate || canDelete;
 
   const {
     staff, zones, shifts, assignments, loading, error, setError,
     weekStart, days, from, to,
     goPrevWeek, goNextWeek, goToday, loadData,
-  } = useScheduleData();
+  } = useScheduleData(canManage);
 
   const {
     filter, zoneFilter, shiftFilter,
@@ -70,7 +78,7 @@ export default function StaffSchedulesPage() {
     shiftList, filteredAssignments, filteredShifts, weekStats,
   } = useScheduleFilters(assignments, shifts, staff, zones);
 
-  const { pendingManualCount } = usePendingCounts(isAdmin, loading);
+  const { pendingManualCount } = usePendingCounts(isAdmin || canUpdate, loading);
 
   const auto = useAutoSchedule(loadData, setError);
 
@@ -125,79 +133,89 @@ export default function StaffSchedulesPage() {
   const headerActions = (
     <>
       <Tooltip title="Tuần trước">
-        <IconButton onClick={goPrevWeek} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+        <IconButton onClick={goPrevWeek} size="small" sx={{ border: "1px solid", borderColor: "divider", color: "text.secondary", "&:hover": { bgcolor: "action.hover", color: "primary.main" } }}>
           <PrevIcon fontSize="small" />
         </IconButton>
       </Tooltip>
       <Button onClick={goToday} size="small" variant={isCurrentWeek ? "contained" : "outlined"} startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
         sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem",
           ...(isCurrentWeek
-            ? { bgcolor: "#6366f1", "&:hover": { bgcolor: "#4f46e5" } }
-            : { color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)", "&:hover": { borderColor: "#a5b4fc", bgcolor: "rgba(165,180,252,0.08)" } }
+            ? { bgcolor: "primary.main", "&:hover": { bgcolor: "primary.dark" } }
+            : { color: "text.secondary", borderColor: "divider", "&:hover": { borderColor: "primary.main", color: "primary.main" } }
           ),
         }}
       >
         Hôm nay
       </Button>
       <Tooltip title="Tuần sau">
-        <IconButton onClick={goNextWeek} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+        <IconButton onClick={goNextWeek} size="small" sx={{ border: "1px solid", borderColor: "divider", color: "text.secondary", "&:hover": { bgcolor: "action.hover", color: "primary.main" } }}>
           <NextIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      {isAdmin && (
-        <>
-          <Tooltip title="Gợi ý lịch tự động">
-            <IconButton onClick={() => auto.setShowAutoSchedule(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
-              <AutoAwesomeIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Quản lý ca/khu vực">
-            <IconButton onClick={() => setShowManagement(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <SettingsIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Mẫu lịch">
-            <IconButton onClick={() => setShowTemplates(true)} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
-              <TotalIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Geofence">
-            <IconButton onClick={() => setShowGeofence(true)} size="small" sx={{ color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)", "&:hover": { bgcolor: "rgba(245,158,11,0.1)" } }}>
-              <MapIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Check-in thủ công">
-            <IconButton onClick={() => setShowManualCheckIn(true)} size="small" sx={{ color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.3)", "&:hover": { bgcolor: "rgba(139,92,246,0.1)" }, position: "relative" }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              {pendingManualCount > 0 ? (
-                <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingManualCount > 9 ? "9+" : pendingManualCount}</Typography>
-                </Box>
-              ) : null}
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Nhật ký">
-            <IconButton onClick={() => setShowAuditLogs(true)} size="small" sx={{ color: "#6b7280", border: "1px solid rgba(107,114,128,0.3)", "&:hover": { bgcolor: "rgba(107,114,128,0.1)" } }}>
-              <HistoryIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Xóa lịch tuần này">
-            <IconButton
-              onClick={() => setShowDeleteWeek(true)}
-              size="small"
-              sx={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.35)", "&:hover": { bgcolor: "rgba(239,68,68,0.1)" } }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </IconButton>
-          </Tooltip>
-        </>
+      {canCreate && (
+        <Tooltip title="Gợi ý lịch tự động">
+          <IconButton onClick={() => auto.setShowAutoSchedule(true)} size="small" sx={{ color: "#D4AF37", border: "1px solid rgba(212,175,55,0.4)", "&:hover": { bgcolor: "rgba(212,175,55,0.1)" } }}>
+            <AutoAwesomeIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+      {(isAdmin || canUpdate) && (
+        <Tooltip title="Quản lý ca/khu vực">
+          <IconButton onClick={() => setShowManagement(true)} size="small" sx={{ border: "1px solid", borderColor: "divider", color: "text.secondary", "&:hover": { bgcolor: "action.hover", color: "primary.main" } }}>
+            <SettingsIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+      {(isAdmin || canCreate) && (
+        <Tooltip title="Mẫu lịch">
+          <IconButton onClick={() => setShowTemplates(true)} size="small" sx={{ border: "1px solid", borderColor: "divider", color: "text.secondary", "&:hover": { bgcolor: "action.hover", color: "primary.main" } }}>
+            <TotalIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+      {(isAdmin || canUpdate) && (
+        <Tooltip title="Geofence">
+          <IconButton onClick={() => setShowGeofence(true)} size="small" sx={{ color: "#D97706", border: "1px solid rgba(217,119,6,0.3)", "&:hover": { bgcolor: "rgba(217,119,6,0.1)" } }}>
+            <MapIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+      {(isAdmin || canUpdate) && (
+        <Tooltip title="Check-in thủ công">
+          <IconButton onClick={() => setShowManualCheckIn(true)} size="small" sx={{ color: "primary.main", border: "1px solid", borderColor: "primary.light", "&:hover": { bgcolor: "action.hover" }, position: "relative" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            {pendingManualCount > 0 ? (
+              <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingManualCount > 9 ? "9+" : pendingManualCount}</Typography>
+              </Box>
+            ) : null}
+          </IconButton>
+        </Tooltip>
+      )}
+      {canManage && (
+        <Tooltip title="Nhật ký">
+          <IconButton onClick={() => setShowAuditLogs(true)} size="small" sx={{ border: "1px solid", borderColor: "divider", color: "text.secondary", "&:hover": { bgcolor: "action.hover", color: "primary.main" } }}>
+            <HistoryIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+      {canDelete && (
+        <Tooltip title="Xóa lịch tuần này">
+          <IconButton
+            onClick={() => setShowDeleteWeek(true)}
+            size="small"
+            sx={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.35)", "&:hover": { bgcolor: "rgba(239,68,68,0.1)" } }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </IconButton>
+        </Tooltip>
       )}
       <Tooltip title="In lịch">
-        <IconButton onClick={() => window.print()} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.3)", "&:hover": { bgcolor: "rgba(165,180,252,0.1)" } }}>
+        <IconButton onClick={() => window.print()} size="small" sx={{ border: "1px solid", borderColor: "divider", color: "text.secondary", "&:hover": { bgcolor: "action.hover", color: "primary.main" } }}>
           <PrintIcon fontSize="small" />
         </IconButton>
       </Tooltip>
@@ -272,10 +290,10 @@ export default function StaffSchedulesPage() {
         <DashboardCard noPadding>
           <TimetableGrid
             days={days} shifts={filteredShifts} assignments={filteredAssignmentsWithUndo}
-            filter={filter} isAdmin={isAdmin}
-            onCellClick={isAdmin ? handleCellClick : undefined}
-            onDeleteAssignment={isAdmin ? handleDeleteAssignment : undefined}
-            onViewStaff={isAdmin ? handleViewStaff : undefined}
+            filter={filter} isAdmin={canManage}
+            onCellClick={canCreate ? handleCellClick : undefined}
+            onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
+            onViewStaff={canManage ? handleViewStaff : undefined}
           />
         </DashboardCard>
       </LoadingOverlay>

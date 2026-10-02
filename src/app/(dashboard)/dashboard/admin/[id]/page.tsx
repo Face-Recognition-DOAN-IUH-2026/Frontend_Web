@@ -27,6 +27,7 @@ import {
   Tabs,
   TextField,
   Typography,
+  Snackbar,
 } from "@mui/material";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
@@ -50,9 +51,9 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
-import notification from "antd/es/notification";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { initials, formatDate, formatDateTime, roleLabel, statusLabel, statusColor } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 import type { UserPublic } from "@/lib/types";
 
 const ROLE_OPTIONS = [
@@ -84,13 +85,28 @@ function MetaRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 }
 
 export default function UserDetailPage() {
-  const [apiAnt, contextHolder] = notification.useNotification();
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user: currentUser, isLoading: isAuthLoading, isAuthenticated } = useAuth();
 
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthLoading) {
+      if (!isAuthenticated) {
+        router.push("/login");
+      } else if (currentUser?.role !== "admin") {
+        router.push("/dashboard");
+      }
+    }
+  }, [isAuthLoading, isAuthenticated, currentUser, router]);
 
   const [editForm, setEditForm] = useState({
     full_name: "",
@@ -178,7 +194,7 @@ export default function UserDetailPage() {
       const updated = await api.updateUser(id, data);
       setUser(updated);
       setShowEdit(false);
-      apiAnt.success({ title: "Đã cập nhật thông tin người dùng.", placement: "topRight" });
+      setToast({ open: true, message: "Đã cập nhật thông tin người dùng.", severity: "success" });
       await loadUser();
     } catch (err: any) {
       const status = err?.response?.status;
@@ -197,10 +213,10 @@ export default function UserDetailPage() {
     if (!user || deleteConfirmText !== "XÓA") return;
     try {
       await api.deleteUser(user.id);
-      apiAnt.success({ title: "Đã xóa người dùng.", placement: "topRight" });
+      setToast({ open: true, message: "Đã xóa người dùng.", severity: "success" });
       router.push("/dashboard/admin");
     } catch (err: any) {
-      apiAnt.error({ title: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, placement: "topRight" });
+      setToast({ open: true, message: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, severity: "error" });
     }
   };
 
@@ -255,10 +271,10 @@ export default function UserDetailPage() {
                   sx={{
                     height: 100,
                     background: user.role === "admin"
-                      ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                      ? "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)"
                       : user.role === "staff"
-                        ? "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
-                        : "linear-gradient(135deg, #64748b 0%, #475569 100%)",
+                        ? "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)"
+                        : "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
                   }}
                 />
                 <Box sx={{ px: 2.5, pb: 2.5, mt: -5, textAlign: "center" }}>
@@ -460,7 +476,16 @@ export default function UserDetailPage() {
             </DialogActions>
           </Dialog>
 
-          {contextHolder}
+          <Snackbar
+            open={toast.open}
+            autoHideDuration={4000}
+            onClose={() => setToast((t) => ({ ...t, open: false }))}
+            anchorOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))} sx={{ borderRadius: 2 }}>
+              {toast.message}
+            </Alert>
+          </Snackbar>
         </Stack>
       )}
     </LoadingOverlay>

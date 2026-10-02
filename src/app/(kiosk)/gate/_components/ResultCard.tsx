@@ -1,7 +1,6 @@
 'use client';
 
-import { Box, Typography } from '@mui/material';
-import Spin from 'antd/es/spin';
+import { Box, CircularProgress, Typography } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -28,38 +27,38 @@ const statusConfig: Record<string, {
 }> = {
   success: {
     borderColor: 'success.main',
-    bgColor: 'rgba(16,185,129,0.1)',
+    bgColor: 'rgba(16,185,129,0.12)',
     pulseColor: 'emerald',
     iconColor: 'success.main',
-    icon: <CheckCircleIcon sx={{ fontSize: 64 }} />,
+    icon: <CheckCircleIcon sx={{ fontSize: 68 }} />,
   },
   error: {
     borderColor: 'error.main',
-    bgColor: 'rgba(239,68,68,0.1)',
+    bgColor: 'rgba(239,68,68,0.12)',
     pulseColor: 'red',
     iconColor: 'error.main',
-    icon: <ErrorIcon sx={{ fontSize: 64 }} />,
+    icon: <ErrorIcon sx={{ fontSize: 68 }} />,
   },
   unregistered: {
-    borderColor: 'primary.main',
-    bgColor: 'rgba(59,130,246,0.1)',
+    borderColor: 'warning.main',
+    bgColor: 'rgba(245,158,11,0.12)',
     pulseColor: 'blue',
-    iconColor: 'primary.main',
-    icon: <CancelIcon sx={{ fontSize: 64 }} />,
+    iconColor: 'warning.main',
+    icon: <CancelIcon sx={{ fontSize: 68 }} />,
   },
   processing: {
-    borderColor: 'grey.500',
-    bgColor: 'rgba(107,114,128,0.1)',
+    borderColor: 'primary.main',
+    bgColor: 'rgba(139,0,0,0.08)',
     pulseColor: 'none',
-    iconColor: 'grey.500',
-    icon: <Spin size="large" />,
+    iconColor: 'primary.main',
+    icon: <CircularProgress size={56} sx={{ color: 'primary.main' }} />,
   },
 };
 
 const messageColors: Record<string, string> = {
-  success: 'success.light',
-  error: 'error.light',
-  unregistered: 'primary.light',
+  success: 'success.main',
+  error: 'error.main',
+  unregistered: 'warning.main',
   processing: 'text.secondary',
 };
 
@@ -73,9 +72,11 @@ export default function ResultCard({ status, patronInfo, message }: ResultCardPr
         border: 2,
         borderColor: config.borderColor,
         bgcolor: config.bgColor,
+        backdropFilter: 'blur(12px)',
         borderRadius: 4,
         p: 4,
         textAlign: 'center',
+        transition: 'all 0.3s ease',
       }}
     >
       {config.pulseColor !== 'none' && (
@@ -94,11 +95,11 @@ export default function ResultCard({ status, patronInfo, message }: ResultCardPr
             <Typography variant="h5" sx={{ fontWeight: 800, color: "text.primary" }}>
               {patronInfo.fullName}
             </Typography>
-            <Typography variant="subtitle1" color="primary.main" sx={{ fontFamily: "monospace", fontWeight: 700 }}>
-              {patronInfo.mssv}
+            <Typography variant="subtitle1" color="primary.main" sx={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, mt: 0.5 }}>
+              MSSV: {patronInfo.mssv}
             </Typography>
             {patronInfo.faculty && (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
                 {patronInfo.faculty}
               </Typography>
             )}
@@ -106,7 +107,7 @@ export default function ResultCard({ status, patronInfo, message }: ResultCardPr
         )}
 
         {message && (
-          <Typography variant="h6" color={messageColors[status]}>
+          <Typography variant="h6" color={messageColors[status]} sx={{ fontWeight: 700 }}>
             {message}
           </Typography>
         )}

@@ -76,7 +76,7 @@ export default function ScheduleManagementPanel({
       title: "Xác nhận xóa",
       content: (
         <div>
-          {warning && <Alert message={warning} type="warning" showIcon style={{ marginBottom: 8 }} />}
+          {warning && <Alert title={warning} type="warning" showIcon style={{ marginBottom: 8 }} />}
           <span>Xóa khu vực này?</span>
         </div>
       ),
@@ -108,7 +108,7 @@ export default function ScheduleManagementPanel({
       title: "Xác nhận xóa",
       content: (
         <div>
-          {warning && <Alert message={warning} type="warning" showIcon style={{ marginBottom: 8 }} />}
+          {warning && <Alert title={warning} type="warning" showIcon style={{ marginBottom: 8 }} />}
           <span>Xóa ca trực này?</span>
         </div>
       ),
@@ -197,7 +197,7 @@ export default function ScheduleManagementPanel({
           </Tabs>
 
           <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-            {error && <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} />}
+            {error && <Alert title={error} type="error" showIcon closable onClose={() => setError(null)} />}
 
             {tab === "zones" && (
               <>

@@ -1,9 +1,10 @@
 "use client";
 
-import { Box, Button, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { Box, Button, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
 import AddIcon from "@mui/icons-material/AddOutlined";
 import SearchField from "./SearchField";
 import type { FilterValue } from "@/app/(dashboard)/patrons/page";
+import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 
 interface PatronToolbarProps {
   query: string;
@@ -24,6 +25,9 @@ const FILTERS: { value: FilterValue; label: string }[] = [
 ];
 
 export default function PatronToolbar({ query, onQueryChange, filter, onFilterChange, onAddPatron }: PatronToolbarProps) {
+  const { can } = usePermission();
+  const canCreate = can("patrons", "create");
+
   return (
     <Box
       sx={{
@@ -79,20 +83,28 @@ export default function PatronToolbar({ query, onQueryChange, filter, onFilterCh
         ))}
       </ToggleButtonGroup>
 
-      <Button
-        variant="contained"
-        startIcon={<AddIcon />}
-        onClick={onAddPatron}
-        sx={{
-          borderRadius: 2,
-          fontWeight: 700,
-          px: 2.5,
-          py: 1,
-          boxShadow: "0 2px 8px rgba(30,96,145,0.25)",
-        }}
-      >
-        Thêm độc giả
-      </Button>
+      <Tooltip title={!canCreate ? getPermissionDeniedReason("patrons", "create") : ""}>
+        <span>
+          <Button
+            variant="contained"
+            disabled={!canCreate}
+            startIcon={<AddIcon />}
+            onClick={() => {
+              if (!canCreate) return;
+              onAddPatron();
+            }}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 700,
+              px: 2.5,
+              py: 1,
+              boxShadow: "0 2px 8px rgba(30,96,145,0.25)",
+            }}
+          >
+            Thêm độc giả
+          </Button>
+        </span>
+      </Tooltip>
     </Box>
   );
 }

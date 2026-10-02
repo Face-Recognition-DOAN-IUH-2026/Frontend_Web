@@ -1,4 +1,4 @@
-import { Avatar, Box, LinearProgress, Paper, Stack, Typography } from "@mui/material";
+import { Avatar, Box, LinearProgress, Paper, Stack, Typography, useTheme } from "@mui/material";
 import { fadeInUp } from "@/lib/animations";
 import type { SvgIconComponent } from "@mui/icons-material";
 
@@ -15,6 +15,15 @@ interface MuiStatCardProps {
   deltaColor?: "success" | "warning" | "error" | "default";
 }
 
+/**
+ * Flat, data-first stat card — Anti-Slop compliant.
+ *
+ * Thiết kế:
+ *  - Flat icon (no gradient avatar, no glow circle)
+ *  - Left accent border 3px (color từ gradient parse)
+ *  - Không hover dance (translateY / rotate)
+ *  - Progress bar dùng flat color
+ */
 export default function MuiStatCard({
   label,
   value,
@@ -25,6 +34,8 @@ export default function MuiStatCard({
   delta,
   deltaColor = "default",
 }: MuiStatCardProps) {
+  const theme = useTheme();
+
   const deltaColors = {
     success: "#059669",
     warning: "#D97706",
@@ -32,54 +43,41 @@ export default function MuiStatCard({
     default: "text.secondary",
   };
 
+  // Parse accent color from gradient string (e.g. "linear-gradient(135deg, #1E40AF 0%, ...)")
+  const accentColor = (() => {
+    const match = gradient.match(/#[0-9A-Fa-f]{6}/);
+    return match ? match[0] : theme.palette.primary.main;
+  })();
+
   return (
     <Paper
       variant="outlined"
       sx={{
-        borderRadius: 3,
-        p: 2.5,
+        borderRadius: 2,
+        p: 2,
         position: "relative",
         overflow: "hidden",
-        transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-        animation: `${fadeInUp} 0.45s ease-out both`,
+        transition: "border-color 0.2s ease",
+        animation: `${fadeInUp} 0.4s ease-out both`,
         animationDelay: `${index * 0.06}s`,
+        // Left accent bar — flat, purposeful color
+        borderLeft: `3px solid ${accentColor}`,
         "&:hover": {
-          transform: "translateY(-3px)",
-          boxShadow: "0 12px 24px -6px rgba(0, 0, 0, 0.12)",
-          "& .stat-icon-avatar": {
-            transform: "scale(1.1) rotate(-4deg)",
-          },
+          borderColor: accentColor,
         },
       }}
     >
-      {/* Subtle background glow (toned-down, no rainbow) */}
-      <Box
-        sx={{
-          position: "absolute",
-          top: -24,
-          right: -24,
-          width: 96,
-          height: 96,
-          borderRadius: "50%",
-          background: gradient,
-          opacity: 0.08,
-          pointerEvents: "none",
-        }}
-      />
-
       {/* Icon + Label row */}
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 2 }}>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 1.5 }}>
         <Avatar
-          className="stat-icon-avatar"
           sx={{
-            background: gradient,
-            width: 40,
-            height: 40,
-            borderRadius: 2,
-            transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            bgcolor: `${accentColor}18`, // 10% opacity flat bg
+            width: 36,
+            height: 36,
+            borderRadius: 1,
           }}
         >
-          <Icon sx={{ color: "#fff", fontSize: 20 }} />
+          <Icon sx={{ color: accentColor, fontSize: 18 }} />
         </Avatar>
         <Typography
           variant="caption"
@@ -110,7 +108,7 @@ export default function MuiStatCard({
         </Typography>
       )}
 
-      {/* Progress bar */}
+      {/* Progress bar — flat color, no gradient */}
       {pct != null && (
         <LinearProgress
           variant="determinate"
@@ -120,7 +118,7 @@ export default function MuiStatCard({
             borderRadius: 2,
             bgcolor: "action.hover",
             mt: delta ? 0.75 : 0,
-            "& .MuiLinearProgress-bar": { background: gradient, borderRadius: 2 },
+            "& .MuiLinearProgress-bar": { bgcolor: accentColor, borderRadius: 2 },
           }}
         />
       )}

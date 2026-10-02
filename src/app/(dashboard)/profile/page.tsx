@@ -18,6 +18,7 @@ import {
   Stack,
   TextField,
   Typography,
+  Snackbar,
 } from "@mui/material";
 import EmailIcon from "@mui/icons-material/EmailOutlined";
 import PhoneIcon from "@mui/icons-material/PhoneOutlined";
@@ -35,15 +36,16 @@ import type { UserPublic } from "@/lib/types";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
-import notification from "antd/es/notification";
 import { useAuth } from "@/lib/auth-context";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 
-type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
-
 export default function ProfilePage() {
   const { updateUser } = useAuth();
-  const [apiAnt, contextHolder] = notification.useNotification();
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" | "warning" | "info" }>({
+    open: false,
+    message: "",
+    severity: "info",
+  });
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,12 +69,8 @@ export default function ProfilePage() {
   const [emailStep, setEmailStep] = useState<"request" | "verify">("request");
   const [emailLoading, setEmailLoading] = useState(false);
 
-  const [notice, setNotice] = useState<Notice>(null);
-  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => {
-    if (severity === "success") apiAnt.success({ title: message, placement: "topRight" });
-    else if (severity === "error") apiAnt.error({ title: message, placement: "topRight" });
-    else if (severity === "warning") apiAnt.warning({ title: message, placement: "topRight" });
-    else apiAnt.info({ title: message, placement: "topRight" });
+  const showNotice = (severity: "success" | "error" | "warning" | "info", message: string) => {
+    setToast({ open: true, message, severity });
   };
 
   useEffect(() => { fetchProfile(); }, []);
@@ -180,17 +178,17 @@ export default function ProfilePage() {
     }
   };
 
-  const roleLabel = (role?: string) => {
-    if (role === "admin") return "Quản trị viên";
-    if (role === "staff") return "Nhân viên";
-    return "Độc giả";
+  const roleMeta = (role?: string) => {
+    if (role === "admin") return { label: "Quản trị viên", color: "#D4AF37", bg: "rgba(212,175,55,0.12)" };
+    if (role === "staff") return { label: "Nhân viên", color: "#0A2540", bg: "rgba(10,37,64,0.08)" };
+    return { label: "Độc giả", color: "#8B0000", bg: "rgba(139,0,0,0.08)" };
   };
-
-  const roleColor: "error" | "warning" | "info" = user?.role === "admin" ? "error" : user?.role === "staff" ? "warning" : "info";
 
   if (loading) {
     return <LoadingOverlay message="Đang tải hồ sơ..." />;
   }
+
+  const role = roleMeta(user?.role);
 
   return (
     <Stack spacing={3}>
@@ -231,7 +229,17 @@ export default function ProfilePage() {
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   {user?.full_name || "Chưa cập nhật"}
                 </Typography>
-                <Chip label={roleLabel(user?.role)} color={roleColor} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
+                <Chip
+                  label={role.label}
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    color: role.color,
+                    bgcolor: role.bg,
+                    border: "1px solid",
+                    borderColor: role.color,
+                  }}
+                />
 
                 <Stack spacing={1} sx={{ width: "100%", pt: 2, borderTop: 1, borderColor: "divider" }}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center", overflow: "hidden" }}>
@@ -384,7 +392,16 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
-      {contextHolder}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))} sx={{ borderRadius: 2 }}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

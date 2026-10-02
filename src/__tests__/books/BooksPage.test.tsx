@@ -192,7 +192,7 @@ describe("BooksPage", () => {
     await userEvent.clear(quantityInput);
     await userEvent.type(quantityInput, "-1");
 
-    const saveButton = screen.getByText(/lưu/i);
+    const saveButton = screen.getByRole("button", { name: /lưu/i });
     await userEvent.click(saveButton);
 
     expect(mockApi.updateBookQuantity).not.toHaveBeenCalled();

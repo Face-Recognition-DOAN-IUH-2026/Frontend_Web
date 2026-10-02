@@ -28,6 +28,7 @@ import api from "@/lib/api-client";
 import Sidebar from "@/app/(dashboard)/_components/Sidebar";
 import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationDropdown";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
+import BreadcrumbsNav from "@/app/(dashboard)/_components/ui/BreadcrumbsNav";
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();
@@ -94,11 +95,51 @@ function Topbar({ user }: { user: any }) {
         sx={{
           borderBottom: 1,
           borderColor: "divider",
+          borderTop: `3px solid ${theme.palette.primary.main}`, // IUH Red Brand Accent Stripe
           bgcolor: "background.paper",
+          color: "text.primary",
         }}
       >
-        <Toolbar sx={{ justifyContent: "flex-end", gap: 1.5, minHeight: 64 }}>
-          <Box sx={{ position: "relative" }}>
+        <Toolbar sx={{ justifyContent: "space-between", gap: 1.5, minHeight: 64, pl: { xs: 6.5, md: 3 }, pr: { xs: 2, md: 3 } }}>
+          {/* IUH Academic Branding Title */}
+          <Stack direction="row" spacing={1.5} sx={{ display: { xs: "none", md: "flex" }, alignItems: "center" }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                bgcolor: theme.palette.primary.main,
+              }}
+            />
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700,
+                letterSpacing: "0.02em",
+                color: "text.primary",
+                fontSize: "0.88rem",
+              }}
+            >
+              TRƯỜNG ĐẠI HỌC CÔNG NGHIỆP TP.HCM • TRẠM THỦ THƯ
+            </Typography>
+            <Chip
+              label="HỌC THUẬT & KỸ THUẬT"
+              size="small"
+              sx={{
+                height: 20,
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                borderRadius: "2px",
+                bgcolor: alpha(theme.palette.secondary.main, 0.12),
+                color: theme.palette.mode === "dark" ? theme.palette.secondary.light : theme.palette.secondary.dark,
+                border: `1px solid ${alpha(theme.palette.secondary.main, 0.35)}`,
+              }}
+            />
+          </Stack>
+
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Box sx={{ position: "relative" }}>
             <Tooltip title="Thông báo">
               <IconButton color="inherit" onClick={handleBellClick}>
                 <Badge badgeContent={unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : 0} color="error" invisible={unreadCount === 0}>
@@ -124,10 +165,80 @@ function Topbar({ user }: { user: any }) {
               </Typography>
             </Box>
           </Stack>
-        </Toolbar>
-      </AppBar>
+        </Stack>
+      </Toolbar>
+    </AppBar>
     </>
   );
+}
+
+import { PermissionProvider, usePermission } from "@/lib/permission-context";
+import { usePathname } from "next/navigation";
+import { Button } from "@mui/material";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+
+function DashboardGuard({ children }: { children: React.ReactNode }) {
+  const { canAccessPage, loading, permissions } = usePermission();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const isAllowed = canAccessPage(pathname);
+
+  if (loading && !permissions) {
+    return (
+      <Box sx={{ flex: 1, display: "grid", placeItems: "center", minHeight: 300 }}>
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
+
+  if (!isAllowed) {
+    return (
+      <Box
+        sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          p: 4,
+          textAlign: "center",
+          bgcolor: "background.paper",
+          borderRadius: 3,
+          border: 1,
+          borderColor: "divider",
+          my: "auto",
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 56,
+            height: 56,
+            bgcolor: "error.light",
+            color: "error.main",
+            mb: 2,
+          }}
+        >
+          <LockOutlinedIcon fontSize="large" />
+        </Avatar>
+        <Typography variant="h5" color="error.main" gutterBottom sx={{ fontWeight: 700 }}>
+          Truy cập bị từ chối (403 Forbidden)
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 500 }}>
+          Tài khoản của bạn chưa được cấp quyền truy cập trang này (<code>{pathname}</code>). Vui lòng liên hệ Quản trị viên để được cấp quyền.
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={() => router.push("/dashboard")}
+          sx={{ textTransform: "none", borderRadius: 2 }}
+        >
+          Quay lại Bảng điều khiển
+        </Button>
+      </Box>
+    );
+  }
+
+  return <>{children}</>;
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -154,14 +265,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!isAuthenticated) return null;
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
-      <Sidebar />
-      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <Topbar user={user} />
-        <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 2, md: 3 } }}>
-          {children}
+    <PermissionProvider>
+      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+        <Sidebar />
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <Topbar user={user} />
+          <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column", p: { xs: 2, md: 3 } }}>
+            <BreadcrumbsNav />
+            <DashboardGuard>{children}</DashboardGuard>
+          </Box>
         </Box>
       </Box>
-    </Box>
+    </PermissionProvider>
   );
 }

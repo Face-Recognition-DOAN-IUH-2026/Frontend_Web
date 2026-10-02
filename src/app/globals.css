@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,93 +6,94 @@
 
 @layer base {
   :root {
-    --color-bg: 246 248 251;
-    --color-surface: 255 255 255;
-    --color-surface-2: 241 245 249;
-    --color-surface-3: 226 232 240;
-    --color-primary: 26 115 232;
-    --color-primary-dark: 21 87 176;
-    --color-primary-dim: 210 100% 85%;
-    --color-secondary: 34 107 66;
-    --color-secondary-dark: 27 84 52;
-    --color-tertiary: 23 92 211;
-    --color-success: 34 107 66;
+    /* ── IUH Brand Identity — Single Source of Truth ── */
+    --color-bg: 240 246 251;           /* #F0F6FB */
+    --color-surface: 255 255 255;       /* #FFFFFF */
+    --color-surface-2: 232 238 245;     /* #E8EEF5 - Navy container */
+    --color-surface-3: 222 226 230;     /* #DEE2E6 */
+    --color-primary: 139 0 0;           /* #8B0000 - IUH Red */
+    --color-primary-dark: 112 0 0;      /* #700000 */
+    --color-primary-dim: 0 100% 27%;    /* IUH Red dim */
+    --color-secondary: 212 175 55;      /* #D4AF37 - IUH Gold */
+    --color-secondary-dark: 179 142 34; /* #B38E22 */
+    --color-tertiary: 10 37 64;         /* #0A2540 - IUH Navy */
+    --color-success: 25 135 84;         /* #198754 */
     --color-success-bg: 232 246 238;
-    --color-error: 180 35 24;
-    --color-error-bg: 254 243 242;
-    --color-warning: 154 98 15;
+    --color-error: 139 0 0;             /* #8B0000 - same as primary */
+    --color-error-bg: 255 245 245;
+    --color-warning: 217 119 6;         /* #D97706 */
     --color-warning-bg: 255 248 235;
-    --color-info: 23 92 211;
-    --color-info-bg: 239 248 255;
-    --color-text: 16 24 40;
-    --color-text-2: 52 64 84;
-    --color-text-3: 102 112 133;
-    --color-border: 208 215 226;
-    --color-border-2: 180 190 205;
-    /* Light mode — not used but kept for compatibility */
+    --color-info: 10 37 64;             /* #0A2540 - IUH Navy */
+    --color-info-bg: 232 238 245;
+    --color-text: 10 37 64;             /* #0A2540 - IUH Navy */
+    --color-text-2: 75 85 99;           /* #4B5563 */
+    --color-text-3: 148 163 184;        /* #94A3B8 */
+    --color-border: 222 226 230;        /* #DEE2E6 */
+    --color-border-2: 203 213 225;      /* #CBD5E1 */
+    /* Shadcn/Radix compat tokens — synced with IUH */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 210 73% 14%;          /* #0A2540 as HSL */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --card-foreground: 210 73% 14%;
+    --primary: 0 100% 27%;              /* #8B0000 as HSL */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 43 71% 52%;            /* #D4AF37 as HSL */
+    --secondary-foreground: 210 73% 14%;
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 20% 94%;
+    --accent-foreground: 210 73% 14%;
+    --destructive: 0 100% 27%;          /* IUH Red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 18% 86%;              /* #DEE2E6 */
+    --input: 214 18% 86%;
+    --ring: 0 100% 27%;                 /* IUH Red focus ring */
+    --radius: 0.25rem;                  /* 4px — industrial crisp */
   }
 
-  /* Dark mode — primary design system */
+  /* Dark mode — IUH Navy-based dark theme */
   .dark {
-    --color-bg: 18 21 30;
-    --color-surface: 28 32 48;
-    --color-surface-2: 36 40 56;
-    --color-surface-3: 44 48 66;
-    --color-primary: 26 115 232;
-    --color-primary-dark: 21 87 176;
-    --color-primary-dim: 210 100% 85%;
-    --color-secondary: 74 140 92;
-    --color-secondary-dark: 61 115 80;
-    --color-tertiary: 91 155 213;
-    --color-success: 74 140 92;
-    --color-success-bg: 26 46 31;
-    --color-error: 196 78 78;
-    --color-error-bg: 46 26 26;
-    --color-warning: 196 154 60;
-    --color-warning-bg: 46 37 24;
-    --color-info: 91 155 213;
-    --color-info-bg: 26 37 48;
-    --color-text: 237 232 223;
-    --color-text-2: 184 176 164;
-    --color-text-3: 122 115 104;
-    --color-border: 46 51 69;
-    --color-border-2: 58 64 82;
-    --background: 222 30% 7%;
-    --foreground: 35 18% 91%;
-    --card: 222 30% 11%;
-    --card-foreground: 35 18% 91%;
-    --primary: 212 100% 51%; /* #1A73E8 */
-    --primary-foreground: 222 30% 7%;
-    --secondary: 150 28% 38%; /* #4A8C5C */
-    --secondary-foreground: 35 18% 91%;
-    --muted: 222 22% 15%;
-    --muted-foreground: 35 12% 60%;
-    --accent: 222 22% 18%;
-    --accent-foreground: 35 18% 91%;
-    --destructive: 0 50% 55%; /* #C44E4E */
-    --destructive-foreground: 35 18% 91%;
-    --border: 222 20% 22%;
-    --input: 222 20% 22%;
-    --ring: 212 100% 51%;
-    --radius: 0.5rem;
+    --color-bg: 7 21 36;              /* #071524 - IUH Navy deep */
+    --color-surface: 12 30 50;        /* #0C1E32 */
+    --color-surface-2: 30 51 69;      /* #1E3347 */
+    --color-surface-3: 51 65 81;      /* #334155 */
+    --color-primary: 139 0 0;         /* #8B0000 - IUH Red */
+    --color-primary-dark: 112 0 0;    /* #700000 */
+    --color-primary-dim: 0 100% 27%;
+    --color-secondary: 212 175 55;    /* #D4AF37 - IUH Gold */
+    --color-secondary-dark: 179 142 34;
+    --color-tertiary: 148 163 184;    /* #94A3B8 */
+    --color-success: 5 150 105;       /* #059669 */
+    --color-success-bg: 6 78 59;      /* #064E3B */
+    --color-error: 163 29 29;         /* #A31D1D */
+    --color-error-bg: 69 10 10;       /* #450A0A */
+    --color-warning: 245 158 11;      /* #F59E0B */
+    --color-warning-bg: 120 53 15;    /* #78350F */
+    --color-info: 148 163 184;        /* #94A3B8 */
+    --color-info-bg: 30 51 69;
+    --color-text: 248 249 250;        /* #F8F9FA */
+    --color-text-2: 148 163 184;      /* #94A3B8 */
+    --color-text-3: 100 116 139;      /* #64748B */
+    --color-border: 30 51 69;         /* #1E3347 */
+    --color-border-2: 51 65 81;       /* #334155 */
+    --background: 207 67% 8%;         /* #071524 */
+    --foreground: 210 20% 97%;        /* #F8F9FA */
+    --card: 207 62% 12%;              /* #0C1E32 */
+    --card-foreground: 210 20% 97%;
+    --primary: 0 100% 27%;            /* #8B0000 - IUH Red */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 43 71% 52%;          /* #D4AF37 - IUH Gold */
+    --secondary-foreground: 210 20% 97%;
+    --muted: 207 40% 16%;
+    --muted-foreground: 215 16% 55%;
+    --accent: 207 40% 20%;
+    --accent-foreground: 210 20% 97%;
+    --destructive: 0 100% 32%;        /* #A31D1D */
+    --destructive-foreground: 210 20% 97%;
+    --border: 207 36% 19%;            /* #1E3347 */
+    --input: 207 36% 19%;
+    --ring: 0 100% 27%;               /* IUH Red focus ring */
+    --radius: 0.25rem;
   }
 
   * {
@@ -104,7 +105,8 @@
   }
 
   body {
-    @apply bg-bg text-text font-body antialiased;
+    @apply bg-bg text-text antialiased;
+    font-family: 'Source Sans 3', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
@@ -114,94 +116,94 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #1C2030;
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #3A4052;
+    background: #2A4A62;
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #1A73E8;
+    background: #3B6180;
   }
 }
 
 @layer utilities {
   .text-display-4xl {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 3.75rem;
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1.1;
   }
   .text-display-3xl {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 3rem;
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.15;
   }
   .text-display-2xl {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 2.25rem;
     font-weight: 600;
     letter-spacing: -0.01em;
     line-height: 1.2;
   }
   .text-display-xl {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 1.875rem;
     font-weight: 600;
     line-height: 1.25;
   }
   .text-heading-xl {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 1.5rem;
     font-weight: 600;
     line-height: 1.3;
   }
   .text-heading-lg {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 1.25rem;
     font-weight: 600;
     line-height: 1.35;
   }
   .text-heading-md {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 1rem;
     font-weight: 600;
     line-height: 1.4;
   }
   .text-body-lg {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Source Sans 3', sans-serif;
     font-size: 1rem;
     font-weight: 400;
     line-height: 1.6;
   }
   .text-body-md {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Source Sans 3', sans-serif;
     font-size: 0.875rem;
     font-weight: 400;
     line-height: 1.5;
   }
   .text-body-sm {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Source Sans 3', sans-serif;
     font-size: 0.8125rem;
     font-weight: 400;
     line-height: 1.4;
   }
   .text-label {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 0.75rem;
     font-weight: 500;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: #7A7368;
+    color: #94A3B8;
   }
   .text-caption {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Source Sans 3', sans-serif;
     font-size: 0.6875rem;
     font-weight: 400;
-    color: #7A7368;
+    color: #94A3B8;
   }
   .text-mono {
     font-family: 'JetBrains Mono', monospace;
@@ -228,41 +230,42 @@
     border: 1px solid #3A4052;
   }
 
-  /* Button styles */
+  /* Button styles — IUH brand colors */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 font-body font-medium text-sm rounded-md transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 font-medium text-sm rounded-md transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed;
+    font-family: 'Source Sans 3', sans-serif;
   }
   .btn-primary {
     @apply btn bg-primary px-4 py-2.5 active:scale-[0.98];
     color: #FFFFFF;
   }
   .btn-primary:hover {
-    background-color: #1557B0;
+    background-color: #700000; /* IUH Red dark */
   }
   .btn-secondary {
     @apply btn bg-surface-2 text-text border px-4 py-2.5 active:scale-[0.98];
-    border-color: #2E3345;
+    border-color: #1E3347;
   }
   .btn-secondary:hover {
-    background-color: #2C3042;
-    border-color: #3A4052;
+    background-color: #0C1E32;
+    border-color: #1E3347;
   }
   .btn-ghost {
     @apply btn bg-transparent px-3 py-2;
-    color: #B8B0A4;
+    color: #94A3B8;
   }
   .btn-ghost:hover {
-    background-color: #242838;
-    color: #EDE8DF;
+    background-color: #0C1E32;
+    color: #F8F9FA;
   }
   .btn-danger {
     @apply btn px-4 py-2.5 active:scale-[0.98];
-    background-color: rgba(196, 78, 78, 0.1);
-    color: #C44E4E;
-    border: 1px solid rgba(196, 78, 78, 0.2);
+    background-color: rgba(139, 0, 0, 0.1);
+    color: #8B0000;
+    border: 1px solid rgba(139, 0, 0, 0.2);
   }
   .btn-danger:hover {
-    background-color: rgba(196, 78, 78, 0.2);
+    background-color: rgba(139, 0, 0, 0.2);
   }
 
   /* Input styles */
@@ -345,20 +348,20 @@
     @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-bg;
   }
 
-  /* Selection color */
+  /* Selection color — IUH Red accent */
   ::selection {
-    background: rgba(26, 115, 232, 0.3);
-    color: #EDE8DF;
+    background: rgba(139, 0, 0, 0.2);
+    color: #F8F9FA;
   }
 }
 
-/* Shimmer loading animation */
+/* Shimmer loading animation — IUH Navy-based */
 .shimmer {
   background: linear-gradient(
     90deg,
-    #1C2030 0%,
-    #242838 50%,
-    #1C2030 100%
+    #0C1E32 0%,
+    #1E3347 50%,
+    #0C1E32 100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
@@ -427,5 +430,69 @@
   .space-y-5 .dot-grid-bg {
     display: grid !important;
   }
+}
+
+/* ── IUH LIBRARY DESIGN SYSTEM (IUH-LDS) UTILITIES ── */
+@keyframes iuh-scan-success {
+  0% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7); border-color: #198754; }
+  50% { box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.35); border-color: #198754; }
+  100% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0); border-color: #DEE2E6; }
+}
+
+@keyframes iuh-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.iuh-scanner-success {
+  animation: iuh-scan-success 0.2s ease-out;
+}
+
+.iuh-scanner-error {
+  animation: iuh-shake 0.25s ease-in-out;
+  border-color: #8B0000 !important;
+}
+
+.iuh-hard-shadow {
+  box-shadow: 2px 2px 0px #0A2540;
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.iuh-hard-shadow:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px #0A2540;
+}
+
+.iuh-hard-shadow:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0px 0px 0px #0A2540;
+}
+
+.iuh-hard-shadow-red {
+  box-shadow: 2px 2px 0px #8B0000;
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.iuh-hard-shadow-red:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px #8B0000;
+}
+
+.iuh-hard-shadow-red:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0px 0px 0px #8B0000;
+}
+
+.font-heading {
+  font-family: 'Space Grotesk', sans-serif !important;
+}
+
+.font-body {
+  font-family: 'Source Sans 3', sans-serif !important;
+}
+
+.font-mono, .font-mono-code {
+  font-family: 'JetBrains Mono', monospace !important;
 }
 
