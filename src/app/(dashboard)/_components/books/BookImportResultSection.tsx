@@ -16,6 +16,7 @@ import {
 import PrintIcon from "@mui/icons-material/PrintOutlined";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import type { BookImportResultRow } from "@/lib/types";
+import { BarcodeRangeList } from "./BarcodeRangeList";
 
 export interface BookImportResultSectionProps {
   showResults: boolean;
@@ -74,7 +75,9 @@ export function BookImportResultSection({
                 <TableCell sx={{ fontFamily: "'JetBrains Mono', monospace" }}>{row.isbn || "-"}</TableCell>
                 <TableCell>{row.title || "-"}</TableCell>
                 <TableCell>{row.quantity}</TableCell>
-                <TableCell sx={{ fontFamily: "'JetBrains Mono', monospace" }}>{row.barcodes[0] || "-"}</TableCell>
+                <TableCell>
+                  <BarcodeRangeList barcodes={row.barcodes} />
+                </TableCell>
                 <TableCell>
                   <Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} />
                 </TableCell>

@@ -90,7 +90,7 @@ export default function BorrowPage() {
   const [faceScanning, setFaceScanning] = useState(false);
 
   const { state: sseState, start: startSSE } = useTaskSSE(30000);
-  const [borrowConfig, setBorrowConfig] = useState<{ max_borrow_books: number }>({ max_borrow_books: 3 });
+  const [borrowConfig, setBorrowConfig] = useState<{ max_borrow_books: number; max_borrow_days?: number; fine?: any }>({ max_borrow_books: 3 });
 
   const borrowCamUrl = useMemo(() => {
     const raw = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
@@ -296,7 +296,13 @@ export default function BorrowPage() {
       setError("Vui lòng xác minh độc giả trước khi quét sách.");
       return;
     }
-    if (cartItems.some((item) => item.barcode === raw || item.isbn === raw)) {
+    const normRaw = raw.replace(/[-\s]/g, "").toLowerCase();
+    if (cartItems.some((item) => {
+      const bNorm = item.barcode.replace(/[-\s]/g, "").toLowerCase();
+      const cNorm = (item.copy_barcode || "").replace(/[-\s]/g, "").toLowerCase();
+      const iNorm = (item.isbn || "").replace(/[-\s]/g, "").toLowerCase();
+      return bNorm === normRaw || cNorm === normRaw || iNorm === normRaw;
+    })) {
       showNotice("warning", "Sách này đã có trong danh sách mượn.");
       setManualIsbn("");
       return;
@@ -309,9 +315,10 @@ export default function BorrowPage() {
     setIsLookingUpBook(true);
     setError("");
     try {
+      const isCopy = /^LIB/i.test(raw.replace(/[-\s]/g, ""));
       const result = await api.lookupBorrowSlip({
         patron_id: patronId,
-        items: [{ barcode: raw, isbn: raw }],
+        items: [{ barcode: raw, isbn: isCopy ? undefined : raw }],
       });
       const item = result.items[0];
       if (!item) {
@@ -319,7 +326,14 @@ export default function BorrowPage() {
         return;
       }
       if (!item.can_borrow) {
-        showNotice("error", `Không thể mượn "${item.book?.title || raw}": ${item.reason || "Sách không có sẵn để mượn."}`);
+        const msg = item.reason || "Sách không có sẵn để mượn.";
+        const title = item.book?.title;
+        showNotice("error", title && !msg.includes(title) ? `Không thể mượn "${title}": ${msg}` : msg);
+        return;
+      }
+
+      if (item.book?.id && cartItems.some((c) => c.book_id === item.book?.id)) {
+        showNotice("warning", `Đầu sách "${item.book.title}" đã có trong danh sách mượn.`);
         return;
       }
 
@@ -336,6 +350,8 @@ export default function BorrowPage() {
           book_id: item.book?.id || null,
           copy_barcode: item.copy?.barcode || null,
           shelf_location: item.copy?.shelf_location || null,
+          condition: (item.copy as any)?.condition || null,
+          status: (item.copy as any)?.status || null,
         },
       ]);
       setManualIsbn("");
@@ -543,6 +559,8 @@ export default function BorrowPage() {
           creatingSlip={creatingSlip}
           handleConfirmBorrowSlip={handleConfirmBorrowSlip}
           setCurrentStep={setCurrentStep}
+          finePerDay={borrowConfig?.fine?.fine_per_day}
+          maxBorrowDays={borrowConfig?.max_borrow_days}
         />
       )}
 
@@ -561,17 +579,19 @@ export default function BorrowPage() {
       <BorrowScannerDialog
         open={webcamScannerOpen}
         patronId={patronId || ""}
-        maxItems={remaining - cartItems.length > 0 ? remaining - cartItems.length : undefined}
+        maxItems={Math.max(remaining, 0)}
+        initialItems={cartItems}
         onClose={() => setWebcamScannerOpen(false)}
-        onSuccess={() => {
+        onSuccess={(result) => {
           setWebcamScannerOpen(false);
+          setCartItems([]);
           if (patronCode.trim()) {
             api.getActiveBorrowsByStudentCode(patronCode.trim()).then((data) => {
               setActiveCount(data.total);
               setOverdueCount(data.overdue_count);
             }).catch(() => {});
           }
-          setSlipSuccess({ message: "Mượn sách thành công", count: remaining });
+          setSlipSuccess({ message: result.message, count: result.count });
         }}
       />
 
@@ -580,18 +600,20 @@ export default function BorrowPage() {
           open={ipScannerOpen}
           patronId={patronId || ""}
           patronName={patronName}
-          maxItems={remaining - cartItems.length > 0 ? remaining - cartItems.length : undefined}
+          maxItems={Math.max(remaining, 0)}
+          initialItems={cartItems}
           cameraUrl={borrowCamUrl}
           onClose={() => setIpScannerOpen(false)}
-          onSuccess={() => {
+          onSuccess={(result) => {
             setIpScannerOpen(false);
+            setCartItems([]);
             if (patronCode.trim()) {
               api.getActiveBorrowsByStudentCode(patronCode.trim()).then((data) => {
                 setActiveCount(data.total);
                 setOverdueCount(data.overdue_count);
               }).catch(() => {});
             }
-            setSlipSuccess({ message: "Mượn sách thành công", count: remaining });
+            setSlipSuccess({ message: result.message, count: result.count });
           }}
         />
       )}

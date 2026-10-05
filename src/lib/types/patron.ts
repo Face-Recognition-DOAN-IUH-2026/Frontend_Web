@@ -1,5 +1,6 @@
 export interface PatronPublic {
   id: string;
+  // snake_case fields (primary)
   full_name: string;
   student_code: string;
   class_name: string | null;
@@ -16,6 +17,15 @@ export interface PatronPublic {
   has_face: boolean;
   course: string | null;
   permanent_address: string | null;
+  // avatar – both naming conventions supported
+  avatar_url?: string | null;
+  avatarUrl?: string | null;
+  // camelCase aliases (from backend PatronPublicDto)
+  fullName?: string;
+  studentCode?: string | null;
+  className?: string | null;
+  cardNumber?: string;
+  hasFace?: boolean;
 }
 
 export interface PatronCreate {

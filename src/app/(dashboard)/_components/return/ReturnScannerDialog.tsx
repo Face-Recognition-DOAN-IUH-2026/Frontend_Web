@@ -33,6 +33,8 @@ import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import VideocamIcon from "@mui/icons-material/VideocamOutlined";
 import api from "@/lib/api-client";
 import type { BorrowRecord, StaffPatronActiveBorrowsResponse } from "@/lib/types";
+import { CONDITION_LABELS, CopyCondition, getConditionColor } from "@/lib/constants/copy";
+import { estimateOverdueFine, estimateDamageFee, FineConfigDto } from "@/lib/fee-estimate";
 
 const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.7:8080/shot.jpg";
 const BORROW_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
@@ -42,6 +44,38 @@ export interface ScannedReturnItem {
   record: BorrowRecord;
   condition: string;
 }
+
+export const RETURN_CONDITION_OPTIONS: Array<{
+  value: CopyCondition;
+  label: string;
+  desc: string;
+}> = [
+  {
+    value: "good",
+    label: "Bình thường / Tốt",
+    desc: "Không phạt (0 đ)",
+  },
+  {
+    value: "new",
+    label: "Còn mới nguyên vẹn",
+    desc: "Không phạt (0 đ)",
+  },
+  {
+    value: "minor_damage",
+    label: "Hư hỏng nhẹ",
+    desc: "Phạt 30% giá sách + 5.000 đ",
+  },
+  {
+    value: "major_damage",
+    label: "Hư hỏng nặng",
+    desc: "Phạt 70% giá sách + 10.000 đ",
+  },
+  {
+    value: "lost",
+    label: "Mất sách",
+    desc: "Đền bù 100% giá sách + 10.000 đ",
+  },
+];
 
 function daysUntil(value: string) {
   const today = new Date();
@@ -62,6 +96,7 @@ interface ReturnScannerDialogProps {
   open: boolean;
   onClose: () => void;
   detail: StaffPatronActiveBorrowsResponse | null;
+  fineConfig?: FineConfigDto | null;
   onBatchComplete: () => Promise<void>;
   showNotice: (type: "success" | "warning" | "error" | "info", msg: string, duration?: number) => void;
 }
@@ -70,6 +105,7 @@ export default function ReturnScannerDialog({
   open,
   onClose,
   detail,
+  fineConfig,
   onBatchComplete,
   showNotice,
 }: ReturnScannerDialogProps) {
@@ -139,7 +175,11 @@ export default function ReturnScannerDialog({
     setCameraReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+        },
         audio: false,
       });
       streamRef.current = stream;
@@ -182,17 +222,45 @@ export default function ReturnScannerDialog({
       }
 
       // Check matching record in detail.records
+      const normTarget = normalized.toLowerCase();
+      const isCopyBarcode = /^lib/i.test(normTarget);
+
+      // 1. Check exact match
       const match = detail?.records.find((r) => {
         const recordIsbn = (r.book?.isbn || "").replace(/[-\s]/g, "").toLowerCase();
         const copyBarcode = ((r as any).copy?.barcode || (r as any).barcode || "").replace(/[-\s]/g, "").toLowerCase();
-        const normTarget = normalized.toLowerCase();
-        return recordIsbn === normTarget || copyBarcode === normTarget;
+
+        if (isCopyBarcode) {
+          // If scanned a copy barcode (e.g. LIB-9780140328721-074), MUST match the exact copy barcode!
+          return copyBarcode === normTarget;
+        }
+
+        // If scanned a pure ISBN (printed on the book cover), match by ISBN:
+        return recordIsbn === normTarget;
       });
 
       if (match) {
         toast = `Đã nhận diện: ${match.book?.title || cleaned}`;
         toastType = "success";
-        return [...prev, { isbn: cleaned, record: match, condition: "" }];
+        const initialCondition = (match as any).copy?.condition || "good";
+        return [...prev, { isbn: cleaned, record: match, condition: initialCondition }];
+      }
+
+      // If user scanned a copy barcode, check if patron borrowed another copy of this same title
+      if (isCopyBarcode) {
+        const libMatch = normTarget.match(/^lib(\d{10,13})/i);
+        const scannedIsbn = libMatch ? libMatch[1] : "";
+        const otherCopyRecord = detail?.records.find((r) => {
+          const recordIsbn = (r.book?.isbn || "").replace(/[-\s]/g, "").toLowerCase();
+          return recordIsbn === scannedIsbn;
+        });
+
+        if (otherCopyRecord) {
+          const actualBarcode = (otherCopyRecord as any).copy?.barcode || (otherCopyRecord as any).barcode || "khác";
+          toast = `⚠️ Nhầm bản sao! Độc giả đang mượn bản sao "${actualBarcode}", không phải bản sao "${cleaned}"`;
+          toastType = "warning";
+          return prev;
+        }
       }
 
       toast = `Độc giả này không mượn sách có mã: ${cleaned}`;
@@ -239,11 +307,61 @@ export default function ReturnScannerDialog({
   useEffect(() => {
     if (!open || camMode !== "webcam" || !cameraReady || !videoRef.current) return;
     let active = true;
+    let animId: number | null = null;
+
     (async () => {
+      // 1. Native BarcodeDetector (only if browser/OS actually supports code_128 or ean_13)
+      let usedNative = false;
+      if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+        try {
+          const supported: string[] = await (window as any).BarcodeDetector.getSupportedFormats?.() || [];
+          if (supported.includes("code_128") || supported.includes("ean_13")) {
+            const detector = new (window as any).BarcodeDetector({
+              formats: supported.filter((f) => ["code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "qr_code"].includes(f)),
+            });
+            const detectNative = async () => {
+              if (!active || !videoRef.current) return;
+              if (videoRef.current.readyState >= 2) {
+                try {
+                  const barcodes = await detector.detect(videoRef.current);
+                  if (active && barcodes && barcodes.length > 0) {
+                    const val = barcodes[0].rawValue;
+                    if (val) handleScanned(val);
+                  }
+                } catch {}
+              }
+              if (active) animId = requestAnimationFrame(detectNative);
+            };
+            animId = requestAnimationFrame(detectNative);
+            usedNative = true;
+          }
+        } catch {
+          usedNative = false;
+        }
+      }
+
+      if (usedNative) return;
+
+      // 2. Fallback to ZXing with Hints
       try {
         const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        const { BarcodeFormat, DecodeHintType } = await import("@zxing/library");
         if (!active) return;
-        const reader = new BrowserMultiFormatReader();
+        const hints = new Map();
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.CODE_128,
+          BarcodeFormat.EAN_13,
+          BarcodeFormat.CODE_39,
+          BarcodeFormat.EAN_8,
+          BarcodeFormat.UPC_A,
+          BarcodeFormat.UPC_E,
+          BarcodeFormat.QR_CODE,
+        ]);
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        const reader = new BrowserMultiFormatReader(hints, {
+          delayBetweenScanAttempts: 150,
+          delayBetweenScanSuccess: 1000,
+        });
         readerRef.current = reader;
         reader.decodeFromVideoElement(videoRef.current!, (result, _err) => {
           if (!active) return;
@@ -253,11 +371,12 @@ export default function ReturnScannerDialog({
           }
         });
       } catch (err) {
-        console.error("Failed to decode webcam:", err);
+        console.error("Failed to decode webcam with ZXing:", err);
       }
     })();
     return () => {
       active = false;
+      if (animId) cancelAnimationFrame(animId);
       if (readerRef.current) {
         try { readerRef.current.reset(); } catch {}
         readerRef.current = null;
@@ -551,29 +670,95 @@ export default function ReturnScannerDialog({
                       <Typography variant="caption" sx={{ fontFamily: "JetBrains Mono, monospace", color: "primary.main", fontWeight: 700 }}>
                         Mã: {item.isbn}
                       </Typography>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", pt: 0.5 }}>
-                        {dueChip(item.record)}
-                        {item.condition ? <Chip size="small" variant="outlined" label={item.condition} /> : null}
-                      </Stack>
-                      <Select
-                        value={item.condition}
-                        onChange={(e) => updateCondition(item.isbn, e.target.value)}
-                        displayEmpty
-                        fullWidth
-                        size="small"
-                        sx={{ mt: 1, borderRadius: 1 }}
-                      >
-                        <MenuItem value="">Tình trạng sách khi trả (tuỳ chọn)</MenuItem>
-                        <MenuItem value="Còn mới">Còn mới</MenuItem>
-                        <MenuItem value="Bình thường">Bình thường</MenuItem>
-                        <MenuItem value="Sách cũ">Sách cũ</MenuItem>
-                        <MenuItem value="Rách bìa">Rách bìa</MenuItem>
-                        <MenuItem value="Rách trang">Rách trang</MenuItem>
-                        <MenuItem value="Thiếu trang">Thiếu trang</MenuItem>
-                        <MenuItem value="Ẩm mốc">Ẩm mốc</MenuItem>
-                        <MenuItem value="Viết/bôi bẩn">Viết/bôi bẩn</MenuItem>
-                        <MenuItem value="Hư hỏng nặng">Hư hỏng nặng</MenuItem>
-                      </Select>
+                      {(() => {
+                        const overdueDays = Math.max(0, -daysUntil(item.record.due_at));
+                        const overdueFine = estimateOverdueFine(overdueDays, fineConfig);
+                        const bookPrice = (item.record as any).book?.price ?? null;
+                        const damageFee = estimateDamageFee(item.condition || "good", bookPrice, fineConfig);
+                        const itemTotal = overdueFine + damageFee;
+                        const currentCondition = (item.condition as CopyCondition) || "good";
+
+                        return (
+                          <>
+                            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", pt: 0.5 }}>
+                              {dueChip(item.record)}
+                              <Chip
+                                size="small"
+                                color={getConditionColor(currentCondition)}
+                                variant="outlined"
+                                label={CONDITION_LABELS[currentCondition] || currentCondition}
+                                sx={{ height: 20, fontSize: 11 }}
+                              />
+                            </Stack>
+                            <Select
+                              value={item.condition || "good"}
+                              onChange={(e) => updateCondition(item.isbn, e.target.value)}
+                              fullWidth
+                              size="small"
+                              sx={{ mt: 1, borderRadius: 1 }}
+                            >
+                              {RETURN_CONDITION_OPTIONS.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>
+                                  <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+                                    <span>{opt.label}</span>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: opt.value === "good" || opt.value === "new" ? "success.main" : "error.main",
+                                        ml: 1,
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {opt.desc}
+                                    </Typography>
+                                  </Box>
+                                </MenuItem>
+                              ))}
+                            </Select>
+                            {itemTotal > 0 ? (
+                              <Paper
+                                variant="outlined"
+                                sx={{
+                                  p: 1,
+                                  mt: 0.8,
+                                  bgcolor: "warning.50",
+                                  borderColor: "warning.300",
+                                  borderRadius: 1,
+                                }}
+                              >
+                                <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5 }}>
+                                  <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                                    Phí phạt ước tính:
+                                  </Typography>
+                                  <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+                                    {overdueFine > 0 && (
+                                      <Chip
+                                        size="small"
+                                        color="error"
+                                        variant="outlined"
+                                        label={`Trễ: ${overdueFine.toLocaleString("vi-VN")} đ`}
+                                        sx={{ height: 20, fontSize: 11 }}
+                                      />
+                                    )}
+                                    {damageFee > 0 && (
+                                      <Chip
+                                        size="small"
+                                        color="warning"
+                                        variant="outlined"
+                                        label={`Hư hỏng: ${damageFee.toLocaleString("vi-VN")} đ`}
+                                        sx={{ height: 20, fontSize: 11 }}
+                                      />
+                                    )}
+                                    <Typography variant="caption" sx={{ fontWeight: 800, color: "error.main", ml: 0.5 }}>
+                                      Tổng = {itemTotal.toLocaleString("vi-VN")} đ
+                                    </Typography>
+                                  </Stack>
+                                </Stack>
+                              </Paper>
+                            ) : null}
+                          </>
+                        );
+                      })()}
                     </Stack>
                     <IconButton size="small" color="error" onClick={() => removeScanned(item.isbn)} sx={{ mt: 0.5 }}>
                       <DeleteIcon fontSize="small" />
@@ -645,19 +830,43 @@ export default function ReturnScannerDialog({
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ px: 2.5, py: 1.5 }}>
-        <Button onClick={onClose} disabled={batchReturning} sx={{ textTransform: "none" }}>Đóng</Button>
-        <Button
-          variant="contained"
-          color="success"
-          disabled={batchReturning || scannedReturns.length === 0}
-          onClick={handleBatchReturn}
-          startIcon={batchReturning ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
-          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5, px: 2.5 }}
-        >
-          {batchReturning ? "Đang trả sách..." : `Xác nhận trả (${scannedReturns.length} cuốn)`}
-        </Button>
-      </DialogActions>
+      {(() => {
+        const totalBatchDue = scannedReturns.reduce((sum, item) => {
+          const overdueDays = Math.max(0, -daysUntil(item.record.due_at));
+          const overdueFine = estimateOverdueFine(overdueDays, fineConfig);
+          const bookPrice = (item.record as any).book?.price ?? null;
+          const damageFee = estimateDamageFee(item.condition || "good", bookPrice, fineConfig);
+          return sum + overdueFine + damageFee;
+        }, 0);
+
+        return (
+          <DialogActions sx={{ px: 2.5, py: 1.5, justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              {totalBatchDue > 0 ? (
+                <>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: "error.main" }}>
+                    Tổng phí phạt ước tính: {totalBatchDue.toLocaleString("vi-VN")} đ
+                  </Typography>
+                  <Chip size="small" color="error" label="Cần thu phí" sx={{ height: 22, fontSize: 11, fontWeight: 700 }} />
+                </>
+              ) : null}
+            </Box>
+            <Stack direction="row" spacing={1}>
+              <Button onClick={onClose} disabled={batchReturning} sx={{ textTransform: "none" }}>Đóng</Button>
+              <Button
+                variant="contained"
+                color={totalBatchDue > 0 ? "warning" : "success"}
+                disabled={batchReturning || scannedReturns.length === 0}
+                onClick={handleBatchReturn}
+                startIcon={batchReturning ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5, px: 2.5 }}
+              >
+                {batchReturning ? "Đang trả sách..." : `Xác nhận trả (${scannedReturns.length} cuốn)`}
+              </Button>
+            </Stack>
+          </DialogActions>
+        );
+      })()}
     </Dialog>
   );
 }

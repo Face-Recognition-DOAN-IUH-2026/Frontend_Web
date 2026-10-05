@@ -116,7 +116,7 @@ export default function LandingOverlay() {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "transparent", color: "text.primary", display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
       {/* ── Top Navigation Bar ────────────────────────────────────────── */}
       <Box
         component="header"
@@ -124,11 +124,12 @@ export default function LandingOverlay() {
           position: "sticky",
           top: 0,
           zIndex: 50,
-          bgcolor: "background.paper",
+          bgcolor: isDark ? "rgba(7, 19, 33, 0.78)" : "rgba(255, 255, 255, 0.82)",
           borderBottom: "1px solid",
-          borderColor: "divider",
-          backdropFilter: "blur(12px)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+          borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(30, 96, 145, 0.12)",
+          backdropFilter: "blur(16px)",
+          boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.35)" : "0 4px 20px rgba(10,37,64,0.04)",
+          transition: "all 0.3s ease",
         }}
       >
         <Container maxWidth="lg">
@@ -145,7 +146,7 @@ export default function LandingOverlay() {
                   objectFit: "contain",
                 }}
               />
-              <Box sx={{ borderLeft: "1.5px solid", borderColor: "divider", pl: 1.5, display: { xs: "none", sm: "block" } }}>
+              <Box sx={{ borderLeft: "1.5px solid", borderColor: isDark ? "rgba(255,255,255,0.15)" : "divider", pl: 1.5, display: { xs: "none", sm: "block" } }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "primary.main", lineHeight: 1.1 }}>
                   THƯ VIỆN THÔNG MINH
                 </Typography>
@@ -166,7 +167,19 @@ export default function LandingOverlay() {
               <Button component={Link} href="/register" variant="outlined" startIcon={<HowToRegIcon />} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}>
                 Đăng ký thẻ
               </Button>
-              <Button component={Link} href="/login" variant="contained" startIcon={<LoginIcon />} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, px: 2.5 }}>
+              <Button
+                component={Link}
+                href="/login"
+                variant="contained"
+                startIcon={<LoginIcon />}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  px: 2.5,
+                  boxShadow: "0 4px 14px rgba(30,96,145,0.25)",
+                }}
+              >
                 Đăng nhập
               </Button>
             </Stack>
@@ -177,53 +190,75 @@ export default function LandingOverlay() {
       {/* ── Hero Section ────────────────────────────────────────────── */}
       <Box
         sx={{
-          background: "linear-gradient(180deg, rgba(30,96,145,0.06) 0%, rgba(255,255,255,0) 100%)",
-          pt: { xs: 6, md: 10 },
-          pb: { xs: 8, md: 12 },
+          pt: { xs: 7, md: 11 },
+          pb: { xs: 8, md: 13 },
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Subtle decorative shapes */}
-        <Box sx={{ position: "absolute", top: -80, right: -80, width: 320, height: 320, borderRadius: "50%", bgcolor: "rgba(30,96,145,0.04)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: -60, width: 260, height: 260, borderRadius: "50%", bgcolor: "rgba(217,119,6,0.04)", pointerEvents: "none" }} />
-
         <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
-          <Stack spacing={4} sx={{ alignItems: "center", textAlign: "center", maxWidth: 840, mx: "auto" }}>
+          <Stack spacing={4} sx={{ alignItems: "center", textAlign: "center", maxWidth: 880, mx: "auto" }}>
             {/* Top Pill Badge */}
-            <Chip
-              icon={<SecurityIcon sx={{ fontSize: "16px !important", color: "primary.main" }} />}
-              label="Hệ thống Quản lý Thư viện Thông minh Thế hệ mới"
-              size="small"
+            <Box
               sx={{
-                bgcolor: "action.selected",
-                color: "primary.main",
-                fontWeight: 700,
-                border: "1px solid",
-                borderColor: "primary.light",
-                px: 1,
-                py: 2,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 1.2,
+                px: 2,
+                py: 0.8,
                 borderRadius: 99,
+                bgcolor: isDark ? "rgba(56, 189, 248, 0.1)" : "rgba(30, 96, 145, 0.08)",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(56, 189, 248, 0.3)" : "rgba(30, 96, 145, 0.22)",
+                backdropFilter: "blur(12px)",
+                boxShadow: isDark
+                  ? "0 4px 16px rgba(0,0,0,0.2)"
+                  : "0 4px 16px rgba(30, 96, 145, 0.08)",
               }}
-            />
+            >
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  bgcolor: "#059669",
+                  boxShadow: "0 0 10px #059669",
+                }}
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 750,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: isDark ? "#38BDF8" : "#1E6091",
+                  fontSize: "0.78rem",
+                }}
+              >
+                Hệ Thống Thư Viện Thông Minh Thế Hệ Mới IUH
+              </Typography>
+            </Box>
 
             {/* Main Headline */}
             <Typography
               variant="h2"
               sx={{
                 fontWeight: 900,
-                fontSize: { xs: "2.2rem", sm: "3rem", md: "3.5rem" },
+                fontSize: { xs: "2.3rem", sm: "3.2rem", md: "3.85rem" },
                 lineHeight: 1.15,
-                letterSpacing: "-0.02em",
+                letterSpacing: "-0.025em",
               }}
             >
               Không Gian Tri Thức &{" "}
               <Box
                 component="span"
                 sx={{
-                  background: "linear-gradient(135deg, #1E6091 0%, #0F3C5C 100%)",
+                  background: isDark
+                    ? "linear-gradient(135deg, #38BDF8 0%, #818CF8 50%, #F59E0B 100%)"
+                    : "linear-gradient(135deg, #0A2540 0%, #1E6091 50%, #0284C7 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
+                  display: "inline-block",
                 }}
               >
                 Công Nghệ Số IUH
@@ -231,8 +266,16 @@ export default function LandingOverlay() {
             </Typography>
 
             {/* Subtitle */}
-            <Typography variant="body1" sx={{ color: "text.secondary", fontSize: { xs: "1rem", md: "1.15rem" }, lineHeight: 1.7, maxWidth: 680 }}>
-              Tra cứu tài liệu, mượn trả tự động, kiểm soát ra vào bằng nhận diện khuôn mặt và trợ lý AI thông minh phục vụ học tập, nghiên cứu.
+            <Typography
+              variant="body1"
+              sx={{
+                color: "text.secondary",
+                fontSize: { xs: "1rem", md: "1.18rem" },
+                lineHeight: 1.75,
+                maxWidth: 720,
+              }}
+            >
+              Tra cứu tài liệu số, mượn trả tự động, kiểm soát ra vào bằng công nghệ nhận diện khuôn mặt và trợ lý AI thông minh phục vụ học tập, nghiên cứu.
             </Typography>
 
             {/* Search Bar on Landing Page */}
@@ -241,15 +284,25 @@ export default function LandingOverlay() {
               onSubmit={handleSearch}
               sx={{
                 width: "100%",
-                maxWidth: 640,
-                bgcolor: "background.paper",
-                p: 0.75,
-                borderRadius: 3,
-                boxShadow: "0 8px 30px rgba(30,96,145,0.12)",
+                maxWidth: 680,
+                bgcolor: isDark ? "rgba(15, 23, 42, 0.78)" : "rgba(255, 255, 255, 0.88)",
+                backdropFilter: "blur(20px)",
+                p: 0.85,
+                borderRadius: 3.5,
+                boxShadow: isDark
+                  ? "0 12px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.1)"
+                  : "0 12px 40px rgba(10, 37, 64, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.8)",
                 border: "1px solid",
-                borderColor: "divider",
+                borderColor: isDark ? "rgba(56, 189, 248, 0.25)" : "rgba(30, 96, 145, 0.22)",
                 display: "flex",
                 gap: 1,
+                transition: "all 0.3s ease",
+                "&:focus-within": {
+                  boxShadow: isDark
+                    ? "0 16px 48px rgba(14, 165, 233, 0.3), 0 0 0 2px rgba(56, 189, 248, 0.4)"
+                    : "0 16px 48px rgba(30, 96, 145, 0.18), 0 0 0 2px rgba(30, 96, 145, 0.3)",
+                  borderColor: "primary.main",
+                },
               }}
             >
               <TextField
@@ -268,18 +321,18 @@ export default function LandingOverlay() {
                     ),
                   },
                 }}
-                sx={{ input: { py: 1.2, fontSize: "0.95rem" } }}
+                sx={{ input: { py: 1.3, fontSize: "0.98rem" } }}
               />
               <Button
                 type="submit"
                 variant="contained"
                 sx={{
-                  px: 3,
-                  py: 1,
-                  borderRadius: 2,
+                  px: 3.5,
+                  py: 1.2,
+                  borderRadius: 2.5,
                   fontWeight: 700,
                   flexShrink: 0,
-                  boxShadow: "0 2px 8px rgba(30,96,145,0.25)",
+                  boxShadow: "0 4px 14px rgba(30,96,145,0.3)",
                 }}
               >
                 Tìm sách
@@ -294,7 +347,14 @@ export default function LandingOverlay() {
                 variant="contained"
                 size="large"
                 endIcon={<ArrowForwardIcon />}
-                sx={{ px: 4, py: 1.5, borderRadius: 2.5, fontWeight: 700, fontSize: "1rem" }}
+                sx={{
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: 2.5,
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  boxShadow: "0 4px 16px rgba(30,96,145,0.3)",
+                }}
               >
                 Vào trang quản lý
               </Button>
@@ -304,7 +364,15 @@ export default function LandingOverlay() {
                 variant="outlined"
                 size="large"
                 startIcon={<ExploreIcon />}
-                sx={{ px: 4, py: 1.5, borderRadius: 2.5, fontWeight: 700, fontSize: "1rem" }}
+                sx={{
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: 2.5,
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  backdropFilter: "blur(8px)",
+                  bgcolor: isDark ? "rgba(15, 23, 42, 0.4)" : "rgba(255, 255, 255, 0.5)",
+                }}
               >
                 Khám phá 3D Tour
               </Button>
@@ -316,13 +384,13 @@ export default function LandingOverlay() {
       {/* ── Key Features Grid ────────────────────────────────────────── */}
       <Container maxWidth="lg" sx={{ py: { xs: 6, md: 10 } }}>
         <Stack spacing={2} sx={{ textAlign: "center", mb: 6 }}>
-          <Typography variant="overline" sx={{ color: "primary.main", fontWeight: 800, letterSpacing: "0.1em" }}>
+          <Typography variant="overline" sx={{ color: "primary.main", fontWeight: 800, letterSpacing: "0.12em" }}>
             TÍNH NĂNG NỔI BẬT
           </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 850, letterSpacing: "-0.01em" }}>
+          <Typography variant="h4" sx={{ fontWeight: 850, letterSpacing: "-0.015em" }}>
             Giải Pháp Thư Viện Toàn Diện & Hiện Đại
           </Typography>
-          <Typography variant="body1" sx={{ color: "text.secondary", maxWidth: 600, mx: "auto" }}>
+          <Typography variant="body1" sx={{ color: "text.secondary", maxWidth: 640, mx: "auto" }}>
             Tích hợp công nghệ AI tiên tiến giúp tối ưu hóa trải nghiệm mượn trả và quản lý tài nguyên.
           </Typography>
         </Stack>
@@ -331,17 +399,26 @@ export default function LandingOverlay() {
           {features.map((f) => (
             <Card
               key={f.title}
-              variant="outlined"
               sx={{
-                p: 3,
-                borderRadius: 3,
-                transition: "all 0.25s ease",
-                bgcolor: "background.paper",
+                p: 3.5,
+                borderRadius: 3.5,
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                bgcolor: isDark ? "rgba(15, 23, 42, 0.7)" : "rgba(255, 255, 255, 0.78)",
+                backdropFilter: "blur(16px)",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.7)",
+                boxShadow: isDark
+                  ? "0 8px 30px rgba(0,0,0,0.35)"
+                  : "0 8px 30px rgba(10, 37, 64, 0.06)",
                 display: "flex",
                 flexDirection: "column",
+                position: "relative",
+                overflow: "hidden",
                 "&:hover": {
-                  transform: "translateY(-4px)",
-                  boxShadow: "0 12px 30px rgba(30,96,145,0.1)",
+                  transform: "translateY(-6px)",
+                  boxShadow: isDark
+                    ? `0 20px 40px rgba(0,0,0,0.5), 0 0 20px ${alpha(f.color, 0.25)}`
+                    : `0 20px 40px rgba(10,37,64,0.12), 0 0 16px ${alpha(f.color, 0.18)}`,
                   borderColor: f.color,
                 },
               }}
@@ -373,7 +450,17 @@ export default function LandingOverlay() {
       </Container>
 
       {/* ── Live Stats Strip ────────────────────────────────────────── */}
-      <Box sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider", py: 6 }}>
+      <Box
+        sx={{
+          bgcolor: isDark ? "rgba(15, 23, 42, 0.65)" : "rgba(255, 255, 255, 0.72)",
+          backdropFilter: "blur(18px)",
+          borderTop: "1px solid",
+          borderBottom: "1px solid",
+          borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(30, 96, 145, 0.1)",
+          py: 6,
+          boxShadow: isDark ? "inset 0 1px 0 rgba(255,255,255,0.05)" : "inset 0 1px 0 rgba(255,255,255,0.8)",
+        }}
+      >
         <Container maxWidth="lg">
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }, gap: 4, textAlign: "center" }}>
             {stats.map((s) => (
@@ -393,10 +480,10 @@ export default function LandingOverlay() {
       {/* ── 3-Step Process Guide ────────────────────────────────────── */}
       <Container maxWidth="lg" sx={{ py: { xs: 8, md: 12 } }}>
         <Stack spacing={2} sx={{ textAlign: "center", mb: 8 }}>
-          <Typography variant="overline" sx={{ color: "secondary.main", fontWeight: 800, letterSpacing: "0.1em" }}>
+          <Typography variant="overline" sx={{ color: "secondary.main", fontWeight: 800, letterSpacing: "0.12em" }}>
             QUY TRÌNH TIỆN LỢI
           </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 850, letterSpacing: "-0.01em" }}>
+          <Typography variant="h4" sx={{ fontWeight: 850, letterSpacing: "-0.015em" }}>
             Mượn Sách Dễ Dàng Chỉ Với 3 Bước
           </Typography>
         </Stack>
@@ -405,12 +492,21 @@ export default function LandingOverlay() {
           {steps.map((st) => (
             <Paper
               key={st.num}
-              variant="outlined"
               sx={{
                 p: 4,
-                borderRadius: 3,
+                borderRadius: 3.5,
                 position: "relative",
-                bgcolor: "background.paper",
+                bgcolor: isDark ? "rgba(15, 23, 42, 0.7)" : "rgba(255, 255, 255, 0.78)",
+                backdropFilter: "blur(16px)",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.7)",
+                boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.3)" : "0 8px 32px rgba(10, 37, 64, 0.05)",
+                transition: "all 0.3s ease",
+                "&:hover": {
+                  transform: "translateY(-4px)",
+                  borderColor: "primary.main",
+                  boxShadow: isDark ? "0 16px 36px rgba(0,0,0,0.4)" : "0 16px 36px rgba(10, 37, 64, 0.1)",
+                },
               }}
             >
               <Typography

@@ -90,9 +90,22 @@ export function createAuthMethods(client: AxiosInstance) {
       return response.data;
     },
 
+    requestPasswordChangeOtp: async (data: {
+      old_password: string;
+      new_password: string;
+    }): Promise<{ message: string }> => {
+      const response = await client.post<{ message: string }>(
+        "/users/me/password/request-otp",
+        data
+      );
+      return response.data;
+    },
+
     changePassword: async (data: {
       old_password?: string;
       new_password?: string;
+      code?: string;
+      otp?: string;
     }): Promise<{ message: string }> => {
       const response = await client.put<{ message: string }>(
         "/users/me/password",

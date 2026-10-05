@@ -31,6 +31,7 @@ import type { BookWithStats } from "@/lib/types";
 import { getAlertSeverity } from "@/lib/alert-utils";
 import { slideInRight, successPop } from "@/lib/animations";
 import IPCameraStream from "./IPCameraStream";
+import type { BorrowCartItem } from "./borrow/types";
 
 interface ScannedBorrowItem {
   barcode: string;
@@ -44,14 +45,31 @@ interface ScannedBorrowItem {
   copy_barcode: string | null;
 }
 
+function toScannedItem(item: BorrowCartItem): ScannedBorrowItem {
+  return {
+    barcode: item.barcode,
+    isbn: item.isbn,
+    loading: false,
+    can_borrow: item.can_borrow,
+    reason: item.reason ?? null,
+    // Cart books come from lookupBorrowSlip (serializeBookWithStats) at runtime,
+    // even though BorrowCartItem declares the base BookInfo type.
+    book: (item.book as BookWithStats | null) ?? null,
+    copy_id: item.copy_id ?? null,
+    book_id: item.book_id ?? null,
+    copy_barcode: item.copy_barcode ?? null,
+  };
+}
+
 interface Props {
   open: boolean;
   patronId: string;
   patronName: string;
   maxItems?: number;
   cameraUrl: string;
+  initialItems?: BorrowCartItem[];
   onClose: () => void;
-  onSuccess: (message: string) => void;
+  onSuccess: (result: { message: string; count: number }) => void;
 }
 
 export default function BorrowIPCameraDialog({
@@ -60,9 +78,12 @@ export default function BorrowIPCameraDialog({
   patronName,
   maxItems,
   cameraUrl,
+  initialItems,
   onClose,
   onSuccess,
 }: Props) {
+  const initialItemsRef = useRef<BorrowCartItem[]>([]);
+  initialItemsRef.current = initialItems ?? [];
   const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
   const [lookingUp, setLookingUp] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -82,16 +103,24 @@ export default function BorrowIPCameraDialog({
         patron_id: patronId,
         items: [{ barcode, isbn }],
       });
-      const item = result.items.find((i) => i.barcode === barcode);
+      const normBarcode = barcode.replace(/[-\s]/g, "").toLowerCase();
+      const item = result.items.find((i) => {
+        const iBarcode = (i.barcode || "").replace(/[-\s]/g, "").toLowerCase();
+        const iCopyBarcode = (i.copy?.barcode || "").replace(/[-\s]/g, "").toLowerCase();
+        const iIsbn = (i.isbn || "").replace(/[-\s]/g, "").toLowerCase();
+        return iBarcode === normBarcode || iCopyBarcode === normBarcode || iIsbn === normBarcode;
+      }) || result.items[0];
+
       if (!item) {
         setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
-        setLookupError(`Sách ISBN ${barcode} không tồn tại trong thư viện`);
+        setLookupError(`Mã sách "${barcode}" không tồn tại trong thư viện`);
         return;
       }
       if (!item.can_borrow) {
         setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
         const msg = item.reason || "Sách không thể mượn";
-        setLookupError(msg);
+        const title = item.book?.title || "";
+        setLookupError(title ? `"${title}": ${msg}` : `${msg} (Mã: ${barcode})`);
         return;
       }
       setScanned((prev) => prev.map((i) =>
@@ -152,7 +181,10 @@ export default function BorrowIPCameraDialog({
       setNote("");
       setDuplicateFlash(null);
       lastScannedRef.current = null;
+      return;
     }
+    // Prefill with books already added on the manual step so one session creates one slip.
+    setScanned(initialItemsRef.current.map(toScannedItem));
   }, [open]);
 
   const removeItem = (barcode: string) => {
@@ -176,7 +208,7 @@ export default function BorrowIPCameraDialog({
       });
       if (confirmResult.status === "success") {
         setScanned([]);
-        onSuccess(confirmResult.message);
+        onSuccess({ message: confirmResult.message, count: validItems.length });
         onClose();
       }
     } catch (err) {

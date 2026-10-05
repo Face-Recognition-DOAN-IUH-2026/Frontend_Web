@@ -28,6 +28,7 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import type { BookImportPreviewRow } from "@/lib/types";
+import { BarcodeRangeList } from "./BarcodeRangeList";
 
 export interface BookImportPreviewSectionProps {
   previewFile: File | null;
@@ -178,7 +179,9 @@ export function BookImportPreviewSection({
                         <TableCell sx={{ py: 0.5 }}>{row.author || "-"}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>{row.publisher || "-"}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>{row.quantity}</TableCell>
-                        <TableCell sx={{ fontFamily: "'JetBrains Mono', monospace", py: 0.5 }}>{row.barcodes[0] || "-"}</TableCell>
+                        <TableCell sx={{ py: 0.5 }}>
+                          <BarcodeRangeList barcodes={row.barcodes} />
+                        </TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip size="small" color={statusColor(row.status)} label={statusLabel(row.status)} />
                         </TableCell>

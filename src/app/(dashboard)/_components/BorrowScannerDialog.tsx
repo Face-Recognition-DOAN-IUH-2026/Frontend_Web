@@ -31,10 +31,12 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import ErrorIcon from "@mui/icons-material/ReportOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
+
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { BookWithStats } from "@/lib/types";
 import { getAlertSeverity } from "@/lib/alert-utils";
 import { slideInRight, successPop } from "@/lib/animations";
+import type { BorrowCartItem } from "./borrow/types";
 
 interface ScannedBorrowItem {
   barcode: string;
@@ -48,26 +50,50 @@ interface ScannedBorrowItem {
   copy_barcode: string | null;
 }
 
+function toScannedItem(item: BorrowCartItem): ScannedBorrowItem {
+  return {
+    barcode: item.barcode,
+    isbn: item.isbn,
+    loading: false,
+    can_borrow: item.can_borrow,
+    reason: item.reason ?? null,
+    // Cart books come from lookupBorrowSlip (serializeBookWithStats) at runtime,
+    // even though BorrowCartItem declares the base BookInfo type.
+    book: (item.book as BookWithStats | null) ?? null,
+    copy_id: item.copy_id ?? null,
+    book_id: item.book_id ?? null,
+    copy_barcode: item.copy_barcode ?? null,
+  };
+}
+
 export default function BorrowScannerDialog({
   open,
   patronId,
   maxItems,
+  initialItems,
   onClose,
   onSuccess,
 }: {
   open: boolean;
   patronId: string;
   maxItems?: number;
+  initialItems?: BorrowCartItem[];
   onClose: () => void;
-  onSuccess: (message: string) => void;
+  onSuccess: (result: { message: string; count: number }) => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const readerRef = useRef<any>(null);
+  const initialItemsRef = useRef<BorrowCartItem[]>([]);
+  initialItemsRef.current = initialItems ?? [];
+  const initializedRef = useRef(false);
+  const html5QrCodeRef = useRef<any>(null);
   const lastScannedRef = useRef<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
+  const scannedRef = useRef<ScannedBorrowItem[]>([]);
+  scannedRef.current = scanned;
+  // Debug: last raw decoded value (shown in UI so user can see if camera reads OK)
+  const [debugRaw, setDebugRaw] = useState<string | null>(null);
+
   const [lookingUp, setLookingUp] = useState(false);
   const [createError, setCreateError] = useState("");
   const [scanToast, setScanToast] = useState("");
@@ -75,16 +101,19 @@ export default function BorrowScannerDialog({
   const [manualIsbn, setManualIsbn] = useState("");
   const [successResult, setSuccessResult] = useState<{ message: string; bookCount: number } | null>(null);
 
-  const stopCamera = useCallback(() => {
-    if (readerRef.current) {
-      try { readerRef.current.reset(); } catch {}
-      readerRef.current = null;
+  const stopCamera = useCallback(async () => {
+    if (html5QrCodeRef.current) {
+      const qr = html5QrCodeRef.current;
+      html5QrCodeRef.current = null;
+      try {
+        if (qr.isScanning) {
+          await qr.stop();
+        }
+        qr.clear();
+      } catch (e) {
+        console.warn("Error stopping Html5Qrcode:", e);
+      }
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
     setCameraReady(false);
   }, []);
 
@@ -93,23 +122,47 @@ export default function BorrowScannerDialog({
       item.barcode === barcode ? { ...item, loading: true } : item
     ));
     try {
+      const isCopy = /^LIB/i.test(barcode.replace(/[-\s]/g, ""));
       const result = await api.lookupBorrowSlip({
         patron_id: patronId,
-        items: [{ barcode, isbn }],
+        items: [{ barcode, isbn: isCopy ? undefined : isbn }],
       });
-      const item = result.items.find((i) => i.barcode === barcode);
+      const normBarcode = barcode.replace(/[-\s]/g, "").toLowerCase();
+      const item = result.items.find((i) => {
+        const iBarcode = (i.barcode || "").replace(/[-\s]/g, "").toLowerCase();
+        const iCopyBarcode = (i.copy?.barcode || "").replace(/[-\s]/g, "").toLowerCase();
+        const iIsbn = (i.isbn || "").replace(/[-\s]/g, "").toLowerCase();
+        return iBarcode === normBarcode || iCopyBarcode === normBarcode || iIsbn === normBarcode;
+      }) || result.items[0];
+
       if (!item) {
+        lastScannedRef.current = null;
         setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
-        setLookupError(`Sách ISBN ${barcode} không tồn tại trong thư viện`);
+        setLookupError(`Mã sách "${barcode}" không tồn tại trong thư viện`);
         return;
       }
       if (!item.can_borrow) {
+        lastScannedRef.current = null;
         setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
         const msg = item.reason || 'Sách không thể mượn';
         const title = item.book?.title || '';
-        setLookupError(title ? `"${title}": ${msg}` : `${msg} (ISBN: ${barcode})`);
+        setLookupError(title && !msg.includes(title) ? `"${title}": ${msg}` : msg);
         return;
       }
+
+      // Check if book title is already in other scanned items
+      if (item.book?.id) {
+        const isDuplicateTitle = scannedRef.current.some(
+          (s) => s.barcode !== barcode && s.book_id === item.book?.id
+        );
+        if (isDuplicateTitle) {
+          lastScannedRef.current = null;
+          setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
+          setLookupError(`Đầu sách "${item.book?.title}" đã có trong danh sách mượn. Không thể mượn nhiều bản sao cùng đầu sách.`);
+          return;
+        }
+      }
+
       setScanned((prev) => prev.map((i) =>
         i.barcode === barcode ? {
           ...i,
@@ -122,29 +175,51 @@ export default function BorrowScannerDialog({
           copy_barcode: item.copy?.barcode || null,
         } : i
       ));
+      setScanToast(`✓ Đã nhận: ${item.book?.title || barcode}`);
     } catch {
+      lastScannedRef.current = null;
       setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
       setLookupError(`Lỗi tra cứu: ${barcode}`);
     }
   }, [patronId]);
 
-  const addScanned = useCallback((isbn: string) => {
-    if (!/^\d{10,13}$/.test(isbn.replace(/-/g, ""))) return;
-    const normalized = isbn.replace(/-/g, "");
-    lastScannedRef.current = normalized;
-    setScanToast(normalized);
-    setScanned((prev) => {
-      if (prev.some((item) => item.barcode === normalized)) {
-        setScanToast(`Sách ${normalized} đã có trong danh sách`);
-        return prev;
+  const addScanned = useCallback((rawCode: string) => {
+    const trimmed = rawCode.trim();
+    if (!trimmed || trimmed.length < 3) return;
+    const normKey = trimmed.replace(/[-\s]/g, "").toLowerCase();
+
+    // Check if already in scanned list
+    const isDuplicate = scannedRef.current.some((item) => {
+      const itemBarcode = item.barcode.replace(/[-\s]/g, "").toLowerCase();
+      const itemCopyBarcode = (item.copy_barcode || "").replace(/[-\s]/g, "").toLowerCase();
+      const itemIsbn = (item.isbn || "").replace(/[-\s]/g, "").toLowerCase();
+      return itemBarcode === normKey || itemCopyBarcode === normKey || itemIsbn === normKey;
+    });
+
+    if (isDuplicate) {
+      setScanToast(`⚠️ Sách/Mã "${trimmed}" đã có trong danh sách`);
+      return;
+    }
+
+    if (lastScannedRef.current === normKey) return;
+    lastScannedRef.current = normKey;
+    setTimeout(() => {
+      if (lastScannedRef.current === normKey) {
+        lastScannedRef.current = null;
       }
-      if (maxItems !== undefined && prev.length >= maxItems) {
-        setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
-        return prev;
-      }
-      return [...prev, {
-        barcode: normalized,
-        isbn: normalized,
+    }, 1500);
+
+    if (maxItems !== undefined && scannedRef.current.length >= maxItems) {
+      setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
+      return;
+    }
+
+    setScanToast(`Đang tra cứu: ${trimmed}`);
+    setScanned((prev) => [
+      ...prev,
+      {
+        barcode: trimmed,
+        isbn: trimmed,
         loading: true,
         can_borrow: false,
         reason: null,
@@ -152,10 +227,35 @@ export default function BorrowScannerDialog({
         copy_id: null,
         book_id: null,
         copy_barcode: null,
-      }];
-    });
-    lookupItem(normalized, normalized);
+      },
+    ]);
+    lookupItem(trimmed, trimmed);
   }, [lookupItem, maxItems]);
+
+  const validateIsbn13 = (digits: string): boolean => {
+    if (!digits.startsWith('978') && !digits.startsWith('979')) return false;
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      sum += parseInt(digits[i], 10) * (i % 2 === 0 ? 1 : 3);
+    }
+    const check = (10 - (sum % 10)) % 10;
+    return check === parseInt(digits[12], 10);
+  };
+
+  const isValidCode = (text: string): boolean => {
+    const clean = text.replace(/[-\s]/g, "");
+    // 1. Copy barcode: LIB-<isbn>-<seq> (e.g. LIB-9780140328721-001)
+    if (/^LIB\d{11,18}$/i.test(clean)) return true;
+    // 2. Glued barcode without LIB prefix: e.g. 9780140328721001 (14-17 digits)
+    if (/^\d{14,17}$/.test(clean) && (clean.startsWith('978') || clean.startsWith('979'))) {
+      return validateIsbn13(clean.slice(0, 13));
+    }
+    // 3. EAN-13: 13 digits starting 978/979 with valid checksum
+    if (/^\d{13}$/.test(clean)) return validateIsbn13(clean);
+    // 4. ISBN-10: 10 chars
+    if (/^\d{9}[\dX]$/i.test(clean)) return true;
+    return false;
+  };
 
   useEffect(() => {
     if (!open) {
@@ -166,58 +266,118 @@ export default function BorrowScannerDialog({
       setScanToast("");
       setSuccessResult(null);
       lastScannedRef.current = null;
+      initializedRef.current = false;
       return;
     }
+
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      setScanned(initialItemsRef.current.map(toScannedItem));
+    }
+
     let active = true;
+
     (async () => {
       try {
         setCameraError("");
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        setCameraReady(false);
+
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
         if (!active) return;
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
+
+        // Ensure container is rendered
+        await new Promise((r) => setTimeout(r, 200));
+        if (!active) return;
+
+        const container = document.getElementById("borrow-camera-reader");
+        if (!container) return;
+
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+        ];
+
+        const qr = new Html5Qrcode("borrow-camera-reader", {
+          formatsToSupport,
+          verbose: false,
         });
-        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => { setCameraReady(true); };
+        html5QrCodeRef.current = qr;
+
+        // Configuration:
+        // - DO NOT pass qrbox so canvas uses full 1280x720 video resolution
+        //   (long Code 128 barcodes have ~286 modules; downsizing to a small box makes bars blend together)
+        // - Disable Windows BarcodeDetector to avoid 0118521823333 corruption
+        const config = {
+          fps: 20,
+          disableFlip: false,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: false },
+          videoConstraints: {
+            facingMode: { ideal: "environment" },
+            width: { min: 1024, ideal: 1280, max: 1920 },
+            height: { min: 720, ideal: 720, max: 1080 },
+            focusMode: { ideal: "continuous" },
+          },
+        };
+
+        let cooldownUntil = 0;
+
+        // Choose camera: prefer environment/back camera if mobile, or first camera on desktop/laptop
+        let cameraIdOrConfig: any = { facingMode: "environment" };
+        try {
+          const cameras = await Html5Qrcode.getCameras();
+          if (cameras && cameras.length > 0) {
+            const backCam = cameras.find((c: any) => /back|rear|environment/i.test(c.label));
+            cameraIdOrConfig = backCam ? backCam.id : cameras[0].id;
+          }
+        } catch { /* fallback to facingMode */ }
+
+        await qr.start(
+          cameraIdOrConfig,
+          config,
+          (decodedText: string) => {
+            if (!active) return;
+            if (Date.now() < cooldownUntil) return;
+
+            const clean = decodedText.trim();
+            setDebugRaw(clean);
+            console.debug("[Scanner] decoded:", clean);
+
+            if (isValidCode(clean)) {
+              cooldownUntil = Date.now() + 1500;
+              addScanned(clean);
+            }
+          },
+          () => {} // silent on frame decode failure
+        );
+
+        if (active) {
+          setCameraReady(true);
+        } else {
+          qr.stop().catch(() => {});
         }
       } catch (err: any) {
         if (!active) return;
-        if (err.name === "NotAllowedError") setCameraError("Không có quyền truy cập camera. Hãy cấp quyền camera cho trình duyệt.");
-        else if (err.name === "NotFoundError") setCameraError("Không tìm thấy camera trên thiết bị.");
-        else setCameraError("Không thể khởi động camera.");
+        console.error("Html5Qrcode start error:", err);
+        const errStr = String(err?.message || err);
+        if (errStr.includes("NotAllowed") || errStr.includes("Permission")) {
+          setCameraError("Không có quyền truy cập camera. Hãy cấp quyền camera cho trình duyệt.");
+        } else if (errStr.includes("NotFound") || errStr.includes("DevicesNotFoundError")) {
+          setCameraError("Không tìm thấy camera trên thiết bị.");
+        } else {
+          setCameraError("Không thể bật camera: " + errStr);
+        }
       }
     })();
-    return () => { active = false; };
-  }, [open, stopCamera]);
 
-  useEffect(() => {
-    if (!cameraReady || !videoRef.current || !open) return;
-    let active = true;
-    (async () => {
-      try {
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
-        if (!active) return;
-        const reader = new BrowserMultiFormatReader();
-        readerRef.current = reader;
-        reader.decodeFromVideoElement(videoRef.current!, (result, err) => {
-          if (!active) return;
-          if (result) {
-            const code = result.getText();
-            if (/^\d{10,13}$/.test(code.replace(/-/g, ""))) {
-              addScanned(code);
-            }
-          }
-        });
-      } catch {}
-    })();
-    return () => { active = false; };
-  }, [cameraReady, open, addScanned]);
-
-  useEffect(() => () => stopCamera(), [stopCamera]);
+    return () => {
+      active = false;
+      stopCamera();
+    };
+  }, [open, stopCamera, addScanned]);
 
   const removeItem = (barcode: string) => {
     setScanned((prev) => prev.filter((item) => item.barcode !== barcode));
@@ -292,7 +452,13 @@ export default function BorrowScannerDialog({
 
   return (
     <>
-      <Dialog open={open} onClose={lookingUp ? undefined : onClose} fullWidth maxWidth="xl" fullScreen={isMobile}>
+      <Dialog
+        open={open}
+        onClose={lookingUp ? undefined : onClose}
+        fullWidth
+        maxWidth="xl"
+        fullScreen={isMobile}
+      >
         <DialogTitle>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -342,12 +508,12 @@ export default function BorrowScannerDialog({
               </Typography>
               <Button
                 variant="contained"
-                onClick={() => {
-                  setSuccessResult(null);
-                  setScanned([]);
-                  onSuccess(successResult.message);
-                  onClose();
-                }}
+                  onClick={() => {
+                    setSuccessResult(null);
+                    setScanned([]);
+                    onSuccess({ message: successResult.message, count: successResult.bookCount });
+                    onClose();
+                  }}
                 sx={{ mt: 1, borderRadius: 2 }}
               >
                 Đóng
@@ -355,44 +521,98 @@ export default function BorrowScannerDialog({
             </Stack>
           ) : (
           <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: "column", md: "row" }, flex: 1, overflow: "hidden" }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                position: "relative",
-                overflow: "hidden",
-                bgcolor: "black",
-                width: { md: "50%" },
-                aspectRatio: { xs: "16/9", md: "4/3" },
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              {cameraError ? (
-                <Stack spacing={1} sx={{ alignItems: "center", color: "grey.300", p: 3 }}>
-                  <CameraAltIcon sx={{ fontSize: 42 }} />
-                  <Typography>{cameraError}</Typography>
-                </Stack>
-              ) : (
-                <>
-                  <Box
-                    component="video"
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    sx={{ width: "100%", height: "100%", objectFit: "contain" }}
-                  />
-                  {!cameraReady && (
-                    <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,.55)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1}>
-                      <CircularProgress size={26} color="inherit" />
-                      <Typography variant="body2">Đang kết nối camera...</Typography>
-                    </Stack>
-                  )}
-                </>
-              )}
-            </Paper>
+            <Box sx={{ width: { md: "50%" }, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  position: "relative",
+                  overflow: "hidden",
+                  bgcolor: "black",
+                  width: "100%",
+                  aspectRatio: { xs: "16/9", md: "4/3" },
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 2,
+                }}
+              >
+                {cameraError ? (
+                  <Stack spacing={1} sx={{ alignItems: "center", color: "grey.300", p: 3, textAlign: "center" }}>
+                    <CameraAltIcon sx={{ fontSize: 42 }} />
+                    <Typography variant="body2">{cameraError}</Typography>
+                  </Stack>
+                ) : (
+                  <>
+                    <Box
+                      id="borrow-camera-reader"
+                      sx={{
+                        width: "100%",
+                        height: "100%",
+                        position: "relative",
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        "& video": {
+                          width: "100% !important",
+                          height: "100% !important",
+                          objectFit: "cover !important",
+                        },
+                        "& #borrow-camera-reader__scan_region": {
+                          display: "flex !important",
+                          alignItems: "center !important",
+                          justifyContent: "center !important",
+                        },
+                        "& #borrow-camera-reader__dashboard_section_csr": {
+                          display: "none !important",
+                        },
+                      }}
+                    />
+                    {!cameraReady && (
+                      <Stack
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          bgcolor: "rgba(0,0,0,.7)",
+                          color: "common.white",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          zIndex: 5,
+                        }}
+                        spacing={1}
+                      >
+                        <CircularProgress size={28} color="inherit" />
+                        <Typography variant="body2">Đang kết nối camera...</Typography>
+                      </Stack>
+                    )}
+                    {debugRaw && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          bottom: 8,
+                          left: 8,
+                          right: 8,
+                          bgcolor: "rgba(0,0,0,0.8)",
+                          color: "#4eff91",
+                          borderRadius: 1,
+                          px: 1,
+                          py: 0.5,
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          textAlign: "center",
+                          zIndex: 10,
+                          pointerEvents: "none",
+                        }}
+                      >
+                        {"📷"} {debugRaw}
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Paper>
+
+              
+            </Box>
 
             <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto" }}>
               <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -425,7 +645,7 @@ export default function BorrowScannerDialog({
                       }}
                       sx={{ textTransform: "none", fontWeight: 600, alignSelf: "flex-start" }}
                     >
-                      Nhập ISBN thủ công
+                      Nhập mã sách thủ công
                     </Button>
                   </Stack>
                 </Paper>
@@ -433,7 +653,7 @@ export default function BorrowScannerDialog({
 
               <TextField
                 size="small"
-                placeholder="Nhập ISBN thủ công..."
+                placeholder="Quét hoặc nhập mã bản sao (VD: LIB-9780140328721-001) hoặc ISBN..."
                 value={manualIsbn}
                 onChange={(e) => setManualIsbn(e.target.value)}
                 onKeyDown={(e) => {
@@ -457,7 +677,7 @@ export default function BorrowScannerDialog({
 
               {scanned.length === 0 ? (
                 <Alert severity="info" sx={{ flex: 1, display: "flex", alignItems: "center" }}>
-                  Đưa mã vạch ISBN vào camera. Sách sẽ xuất hiện tại đây.
+                  Đưa mã vạch sách (ISBN hoặc mã bản sao LIB-...) vào trước camera, hoặc nhập mã ở trên.
                 </Alert>
               ) : (
                 scanned.map((item) => {

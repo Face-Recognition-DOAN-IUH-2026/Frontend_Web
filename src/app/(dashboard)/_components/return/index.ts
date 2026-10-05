@@ -5,3 +5,6 @@ export { default as ReturnActiveBorrows } from "./ReturnActiveBorrows";
 export { default as ReturnScannerDialog } from "./ReturnScannerDialog";
 export type { ScannedReturnItem } from "./ReturnScannerDialog";
 export { default as ReturnConfirmDialog } from "./ReturnConfirmDialog";
+export { default as ReturnReceipt } from "./ReturnReceipt";
+export { default as DynamicQrPaymentDialog } from "./DynamicQrPaymentDialog";
+

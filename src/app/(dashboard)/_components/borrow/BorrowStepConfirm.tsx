@@ -19,6 +19,7 @@ import LocalLibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
 
 import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
+import { CONDITION_LABELS, getConditionColor, type CopyCondition } from "@/lib/constants/copy";
 import type { BorrowCartItem } from "./types";
 
 export interface BorrowStepConfirmProps {
@@ -30,6 +31,8 @@ export interface BorrowStepConfirmProps {
   creatingSlip: boolean;
   handleConfirmBorrowSlip: () => void;
   setCurrentStep: (step: number) => void;
+  finePerDay?: number;
+  maxBorrowDays?: number;
 }
 
 export function BorrowStepConfirm({
@@ -41,9 +44,13 @@ export function BorrowStepConfirm({
   creatingSlip,
   handleConfirmBorrowSlip,
   setCurrentStep,
+  finePerDay,
+  maxBorrowDays,
 }: BorrowStepConfirmProps) {
   const { can } = usePermission();
   const canCreateBorrow = can("borrows", "create") || can("borrows", "approve");
+  const standardBorrowDays = maxBorrowDays ?? 14;
+  const finePerDayStr = Number(finePerDay ?? 5000).toLocaleString("vi-VN");
 
   return (
     <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
@@ -114,7 +121,18 @@ export function BorrowStepConfirm({
                       Mã bản sao: {item.copy_barcode || item.barcode} • Kệ: {item.shelf_location || "Chung"}
                     </Typography>
                   </Box>
-                  <Chip size="small" color="success" variant="outlined" label="Hợp lệ" sx={{ fontWeight: 600 }} />
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                    {item.condition ? (
+                      <Chip
+                        size="small"
+                        label={CONDITION_LABELS[item.condition as CopyCondition] || item.condition}
+                        color={getConditionColor(item.condition)}
+                        variant="outlined"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    ) : null}
+                    <Chip size="small" color="success" variant="outlined" label="Hợp lệ" sx={{ fontWeight: 600 }} />
+                  </Stack>
                 </Box>
               ))}
             </Stack>
@@ -129,8 +147,8 @@ export function BorrowStepConfirm({
             <Alert severity="info" sx={{ borderRadius: "4px" }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Lưu ý mượn trả:</Typography>
               <Typography variant="caption" sx={{ display: "block", mt: 0.5 }}>
-                • Thời hạn mượn sách tiêu chuẩn: <strong>14 ngày</strong>.<br />
-                • Phí phạt quá hạn: <strong>5.000 đ/ngày/cuốn</strong>.<br />
+                • Thời hạn mượn sách tiêu chuẩn: <strong>{standardBorrowDays} ngày</strong>.<br />
+                • Phí phạt quá hạn: <strong>{finePerDayStr} đ/ngày/cuốn</strong>.<br />
                 • Độc giả có trách nhiệm bảo quản sách nguyên vẹn khi hoàn trả.
               </Typography>
             </Alert>

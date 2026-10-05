@@ -17,10 +17,15 @@ export interface BorrowRecord {
   slip_id?: string | null;
   fine_amount?: number;
   fine_paid?: boolean;
+  damage_fee?: number;
+  total_due?: number;
+  payment_method?: string | null;
+  payment_ref?: string | null;
+  paid_at?: string | null;
   renewal_count?: number;
-  created_at?: string;
-  updated_at?: string;
+  return_condition?: string | null;
   book?: import("./book").BookInfo | null;
+  copy?: import("./book").BookCopy | null;
 }
 
 export interface StaffPatronSummary {
@@ -55,6 +60,7 @@ export interface StaffActiveBorrowersResponse {
 export interface BorrowResponse {
   status: string;
   message: string;
+  condition_warning?: string | null;
   record: BorrowRecord | null;
   book: import("./book").BookInfo | null;
 }
@@ -69,6 +75,65 @@ export interface ReturnResponse {
 export interface StaffReturnRequest {
   barcode: string;
   note?: string | null;
+  condition?: import("./book").CopyCondition | string | null;
+  is_paid_immediately?: boolean;
+  payment_method?: "cash" | "qr_code";
+}
+
+export interface FineLedgerItem {
+  record_id: string;
+  patron: { id: string; full_name: string | null; student_code: string | null };
+  book: { title: string; isbn: string } | null;
+  barcode: string | null;
+  overdue_fine: number;
+  damage_fee: number;
+  total: number;
+  return_at: string | null;
+}
+
+export interface PatronFineItem {
+  record_id: string;
+  book: { title: string; isbn: string } | null;
+  barcode: string | null;
+  overdue_fine: number;
+  damage_fee: number;
+  total: number;
+  return_at: string | null;
+}
+
+export interface PayFinesResponse {
+  ok: boolean;
+  paid: Array<{ record_id: string; payment_ref: string | null; already_paid: boolean }>;
+  activated: string[];
+}
+
+export interface CreatePaymentOrderRequest {
+  patron_id?: string;
+  record_ids: string[];
+  payment_method?: "vietqr" | "payos" | "vnpay";
+}
+
+export interface PaymentOrderResponse {
+  id: string;
+  orderCode: string;
+  patronId: string;
+  amount: number;
+  status: "pending" | "completed" | "expired" | "cancelled";
+  paymentMethod: "vietqr" | "payos" | "vnpay" | "cash";
+  qrUrl: string | null;
+  qrData: string | null;
+  expiresAt: string;
+  recordIds: string[];
+}
+
+export interface PaymentOrderStatusResponse {
+  orderCode: string;
+  status: "pending" | "completed" | "expired" | "cancelled";
+  amount: number;
+  paymentMethod: "vietqr" | "payos" | "vnpay" | "cash";
+  paidAt: string | null;
+  expiresAt: string;
+  recordIds: string[];
 }
 
 export interface BorrowSlipItem {
