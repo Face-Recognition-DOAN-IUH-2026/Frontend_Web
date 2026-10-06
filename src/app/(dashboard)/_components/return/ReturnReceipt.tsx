@@ -62,6 +62,7 @@ export default function ReturnReceipt({ record, patron, onClose }: ReturnReceipt
     : patron?.student_code ?? "—";
 
   const refCode = record.payment_ref || `RET-${record.id.slice(0, 8).toUpperCase()}`;
+  const hasRealRef = Boolean(record.payment_ref);
 
   const rows: Array<{ label: string; value: string; strong?: boolean; color?: string }> = [
     { label: "Mã giao dịch", value: refCode },
@@ -155,12 +156,18 @@ export default function ReturnReceipt({ record, patron, onClose }: ReturnReceipt
 
         <Divider sx={{ my: 1.5, borderStyle: "dashed" }} />
 
+        {hasRealRef ? (
         <Stack sx={{ alignItems: "center", my: 1 }} spacing={0.5}>
           <QRCodeSVG value={refCode} size={96} />
           <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace", fontSize: "0.7rem" }}>
             {refCode}
           </Typography>
         </Stack>
+        ) : (
+        <Typography variant="body2" color="text.secondary" align="center" sx={{ my: 1 }}>
+          Chưa thanh toán — vui lòng thanh toán sau tại quầy hoặc qua VietQR ở sổ nợ.
+        </Typography>
+        )}
 
         <Typography variant="caption" color="text.secondary" align="center" sx={{ display: "block", fontStyle: "italic", mt: 1 }}>
           Cảm ơn bạn đã sử dụng dịch vụ Thư viện IUH!

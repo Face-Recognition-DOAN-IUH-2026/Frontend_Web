@@ -68,6 +68,12 @@ const mockBooksResponse = {
   total: 2,
   skip: 0,
   limit: 10,
+  aggregateStats: {
+    totalCopies: 7,
+    availableCopies: 5,
+    borrowedCopies: 2,
+    outOfStockBooks: 7,
+  },
 };
 
 describe("BooksPage", () => {
@@ -93,6 +99,16 @@ describe("BooksPage", () => {
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/tìm kiếm/i)).toBeInTheDocument();
     });
+  });
+
+  it("shows the warehouse-wide out-of-stock count from aggregate stats, not the current page", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("HẾT BẢN SAO SẴN CÓ")).toBeInTheDocument();
+    });
+    // Page has 1 out-of-stock book but the warehouse total is 7
+    expect(screen.getByText("7 đầu sách cần bổ sung")).toBeInTheDocument();
   });
 
   it("opens quantity modal on row click", async () => {

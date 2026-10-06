@@ -108,6 +108,27 @@ describe('DynamicQrPaymentDialog', () => {
     expect(screen.getByText(/Đơn thanh toán đã hết hạn/i)).toBeInTheDocument();
   });
 
+  it('calls onRegenerate when the regenerate button is clicked on an expired order', () => {
+    const expiredOrder: PaymentOrderResponse = {
+      ...mockOrder,
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    };
+    const onRegenerate = jest.fn();
+
+    render(
+      <DynamicQrPaymentDialog
+        open={true}
+        order={expiredOrder}
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+        onRegenerate={onRegenerate}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo mã mới' }));
+    expect(onRegenerate).toHaveBeenCalled();
+  });
+
   it('calls onClose when close/cancel button is clicked', () => {
     const onClose = jest.fn();
     render(

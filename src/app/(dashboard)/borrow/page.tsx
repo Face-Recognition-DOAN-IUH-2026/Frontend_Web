@@ -34,7 +34,9 @@ import {
   BorrowStepScanBooks,
   BorrowStepConfirm,
   BorrowStepSuccess,
+  BorrowSlipReceipt,
   type BorrowCartItem,
+  type SlipReceiptItem,
 } from "@/app/(dashboard)/_components/borrow";
 
 export default function BorrowPage() {
@@ -74,6 +76,8 @@ export default function BorrowPage() {
   const [isLookingUpBook, setIsLookingUpBook] = useState(false);
   const [creatingSlip, setCreatingSlip] = useState(false);
   const [slipSuccess, setSlipSuccess] = useState<{ message: string; count: number } | null>(null);
+  const [slipReceiptItems, setSlipReceiptItems] = useState<SlipReceiptItem[]>([]);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   // Dialogs
   const [webcamScannerOpen, setWebcamScannerOpen] = useState(false);
@@ -232,6 +236,8 @@ export default function BorrowPage() {
     setPatronCode("");
     setCartItems([]);
     setSlipSuccess(null);
+    setSlipReceiptItems([]);
+    setReceiptOpen(false);
     setCurrentStep(0);
     setError("");
     stopCamera();
@@ -384,6 +390,14 @@ export default function BorrowPage() {
         })),
       });
       if (confirmResult.status === "success") {
+        setSlipReceiptItems(
+          validItems.map((item) => ({
+            title: (item.book?.title as string) || item.copy_barcode || item.barcode,
+            barcode: item.copy_barcode || item.barcode,
+            author: (item.book?.author as string) ?? null,
+          }))
+        );
+        setReceiptOpen(true);
         setSlipSuccess({
           message: confirmResult.message || "Tạo phiếu mượn thành công!",
           count: validItems.length,
@@ -399,13 +413,14 @@ export default function BorrowPage() {
 
   const faceVerifyDisabled = faceScanning || !patronCode.trim() || !!patronId;
 
-  // Date summaries for Step 3
+  // Date summaries for Step 3 — due date follows the configured max borrow days
   const borrowDateStr = useMemo(() => new Date().toLocaleDateString("vi-VN"), []);
   const dueDateStr = useMemo(() => {
+    const days = borrowConfig.max_borrow_days ?? 14;
     const due = new Date();
-    due.setDate(due.getDate() + 14);
+    due.setDate(due.getDate() + days);
     return due.toLocaleDateString("vi-VN");
-  }, []);
+  }, [borrowConfig.max_borrow_days]);
 
   return (
     <Stack spacing={3} sx={{ height: "calc(100vh - 120px)" }}>
@@ -458,17 +473,37 @@ export default function BorrowPage() {
             }}
           >
             {[
-              { label: "Xác minh độc giả", disabled: false },
-              { label: "Quét mã vạch sách", disabled: !patronId || !canBorrow },
-              { label: "Xác nhận & Hoàn tất", disabled: !patronId || cartItems.length === 0 },
+              { label: "Xác minh độc giả", disabled: false, reason: "" },
+              {
+                label: "Quét mã vạch sách",
+                disabled: !patronId || !canBorrow,
+                reason: !patronId
+                  ? "Cần xác minh độc giả trước"
+                  : !canBorrow
+                    ? overdueCount > 0
+                      ? "Độc giả đang có sách quá hạn — cần trả trước"
+                      : "Độc giả đã hết lượt mượn"
+                    : "",
+              },
+              {
+                label: "Xác nhận & Hoàn tất",
+                disabled: !patronId || cartItems.length === 0,
+                reason: !patronId
+                  ? "Cần xác minh độc giả trước"
+                  : cartItems.length === 0
+                    ? "Chưa có sách nào trong giỏ"
+                    : "",
+              },
             ].map((stepItem, idx) => (
               <Step key={idx} completed={idx < currentStep || !!slipSuccess}>
-                <StepButton
-                  onClick={() => setCurrentStep(idx)}
-                  disabled={stepItem.disabled}
-                >
-                  <StepLabel>{stepItem.label}</StepLabel>
-                </StepButton>
+                <span title={stepItem.disabled ? stepItem.reason : undefined}>
+                  <StepButton
+                    onClick={() => setCurrentStep(idx)}
+                    disabled={stepItem.disabled}
+                  >
+                    <StepLabel>{stepItem.label}</StepLabel>
+                  </StepButton>
+                </span>
               </Step>
             ))}
           </Stepper>
@@ -518,6 +553,7 @@ export default function BorrowPage() {
           faceVerifyDisabled={faceVerifyDisabled}
           handleLookupAndOpenCamera={handleLookupAndOpenCamera}
           startWebcam={startWebcam}
+          stopWebcam={stopCamera}
           handleFaceVerify={handleFaceVerify}
           setOverdueGuideOpen={setOverdueGuideOpen}
           setCurrentStep={setCurrentStep}
@@ -560,6 +596,7 @@ export default function BorrowPage() {
           handleConfirmBorrowSlip={handleConfirmBorrowSlip}
           setCurrentStep={setCurrentStep}
           finePerDay={borrowConfig?.fine?.fine_per_day}
+          fineBrackets={borrowConfig?.fine?.fine_brackets}
           maxBorrowDays={borrowConfig?.max_borrow_days}
         />
       )}
@@ -572,8 +609,19 @@ export default function BorrowPage() {
           patronCode={patronCode}
           dueDateStr={dueDateStr}
           handleClearSession={handleClearSession}
+          onPrintReceipt={() => setReceiptOpen(true)}
         />
       )}
+
+      <BorrowSlipReceipt
+        open={receiptOpen}
+        patronName={patronName}
+        patronCode={patronCode}
+        borrowDateStr={borrowDateStr}
+        dueDateStr={dueDateStr}
+        items={slipReceiptItems}
+        onClose={() => setReceiptOpen(false)}
+      />
 
       {/* Camera Barcode Scanner Dialogs */}
       <BorrowScannerDialog
@@ -585,6 +633,8 @@ export default function BorrowPage() {
         onSuccess={(result) => {
           setWebcamScannerOpen(false);
           setCartItems([]);
+          setSlipReceiptItems(result.items);
+          setReceiptOpen(true);
           if (patronCode.trim()) {
             api.getActiveBorrowsByStudentCode(patronCode.trim()).then((data) => {
               setActiveCount(data.total);
@@ -604,10 +654,12 @@ export default function BorrowPage() {
           initialItems={cartItems}
           cameraUrl={borrowCamUrl}
           onClose={() => setIpScannerOpen(false)}
-          onSuccess={(result) => {
-            setIpScannerOpen(false);
-            setCartItems([]);
-            if (patronCode.trim()) {
+        onSuccess={(result) => {
+          setIpScannerOpen(false);
+          setCartItems([]);
+          setSlipReceiptItems(result.items);
+          setReceiptOpen(true);
+          if (patronCode.trim()) {
               api.getActiveBorrowsByStudentCode(patronCode.trim()).then((data) => {
                 setActiveCount(data.total);
                 setOverdueCount(data.overdue_count);

@@ -32,6 +32,8 @@ import { getAlertSeverity } from "@/lib/alert-utils";
 import { slideInRight, successPop } from "@/lib/animations";
 import IPCameraStream from "./IPCameraStream";
 import type { BorrowCartItem } from "./borrow/types";
+import type { SlipReceiptItem } from "./borrow/BorrowSlipReceipt";
+import { toSlipReceiptItems } from "./borrow/BorrowSlipReceipt";
 
 interface ScannedBorrowItem {
   barcode: string;
@@ -69,7 +71,7 @@ interface Props {
   cameraUrl: string;
   initialItems?: BorrowCartItem[];
   onClose: () => void;
-  onSuccess: (result: { message: string; count: number }) => void;
+  onSuccess: (result: { message: string; count: number; items: SlipReceiptItem[] }) => void;
 }
 
 export default function BorrowIPCameraDialog({
@@ -208,7 +210,7 @@ export default function BorrowIPCameraDialog({
       });
       if (confirmResult.status === "success") {
         setScanned([]);
-        onSuccess({ message: confirmResult.message, count: validItems.length });
+        onSuccess({ message: confirmResult.message, count: validItems.length, items: toSlipReceiptItems(validItems) });
         onClose();
       }
     } catch (err) {

@@ -91,6 +91,39 @@ export interface FineLedgerItem {
   return_at: string | null;
 }
 
+export interface ConditionAttentionItem {
+  copy_id: string;
+  barcode: string;
+  condition: string;
+  status: string | null;
+  shelf_location: string | null;
+  book: { id: string; title: string; isbn: string } | null;
+  recommendation: { action: "repair" | "review" | "dispose"; label: string; reason: string };
+}
+
+export interface ConditionAttentionReport {
+  summary: { minor_damage: number; major_damage: number; lost: number; maintenance: number; disposed: number; total: number };
+  items: ConditionAttentionItem[];
+}
+
+export interface PatronFineItem {
+  record_id: string;
+  book: { title: string; isbn: string } | null;
+  barcode: string | null;
+  overdue_fine: number;
+  damage_fee: number;
+  total: number;
+  return_at: string | null;
+  payment_method?: string | null;
+  payment_ref?: string | null;
+}
+
+export interface ConditionDistribution {
+  conditions: Record<string, number>;
+  statuses: Record<string, number>;
+  total_copies: number;
+}
+
 export interface PatronFineItem {
   record_id: string;
   book: { title: string; isbn: string } | null;
@@ -201,4 +234,37 @@ export interface ConfirmBorrowSlipRequest {
     copy_id: string;
   }[];
   note?: string | null;
+}
+
+export interface FinanceStats {
+  collected_total: number;
+  by_method: {
+    cash: number;
+    qr: number;
+    qr_code?: number;
+  };
+  outstanding_total: number;
+  paid_count: number;
+  unpaid_count: number;
+  monthly: Array<{
+    month: string;
+    collected: number;
+    outstanding_snapshot: number;
+  }>;
+}
+
+export interface InventoryStats {
+  books_total: number;
+  copies_total: number;
+  copies_by_status: Record<string, number>;
+  copies_by_condition: Record<string, number>;
+  categories: Array<{
+    name: string;
+    count: number;
+  }>;
+  price_coverage: {
+    priced: number;
+    unpriced: number;
+  };
+  imports_last_30d: number;
 }

@@ -46,6 +46,17 @@ export interface StatsResponse {
   active_patrons: number;
   today_entries: number;
   today_exits: number;
+  today_spoof?: number;
+  today_no_match?: number;
+}
+
+export interface LivenessActiveResult {
+  is_live: boolean;
+  liveness_score: number;
+  verdict: "live" | "inconclusive" | "spoof";
+  frames_evaluated: number;
+  detail: string;
+  student_code?: string | null;
 }
 
 export interface KioskResult {
@@ -94,4 +105,21 @@ export interface FaceResultEvent {
   camera_id?: string;
   occurred_at: string;
   source: string;
+}
+
+export interface RecognitionStatItem {
+  date: string;
+  granted: number;
+  spoof: number;
+  no_match: number;
+  other: number;
+  avg_confidence: number | null;
+  accuracy: number;
+}
+
+export interface HourlyStatItem {
+  hour: number;
+  entries: number;
+  exits: number;
+  total: number;
 }

@@ -37,6 +37,8 @@ import type { BookWithStats } from "@/lib/types";
 import { getAlertSeverity } from "@/lib/alert-utils";
 import { slideInRight, successPop } from "@/lib/animations";
 import type { BorrowCartItem } from "./borrow/types";
+import type { SlipReceiptItem } from "./borrow/BorrowSlipReceipt";
+import { toSlipReceiptItems } from "./borrow/BorrowSlipReceipt";
 
 interface ScannedBorrowItem {
   barcode: string;
@@ -79,7 +81,7 @@ export default function BorrowScannerDialog({
   maxItems?: number;
   initialItems?: BorrowCartItem[];
   onClose: () => void;
-  onSuccess: (result: { message: string; count: number }) => void;
+  onSuccess: (result: { message: string; count: number; items: SlipReceiptItem[] }) => void;
 }) {
   const initialItemsRef = useRef<BorrowCartItem[]>([]);
   initialItemsRef.current = initialItems ?? [];
@@ -99,7 +101,7 @@ export default function BorrowScannerDialog({
   const [scanToast, setScanToast] = useState("");
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [manualIsbn, setManualIsbn] = useState("");
-  const [successResult, setSuccessResult] = useState<{ message: string; bookCount: number } | null>(null);
+  const [successResult, setSuccessResult] = useState<{ message: string; bookCount: number; items: SlipReceiptItem[] } | null>(null);
 
   const stopCamera = useCallback(async () => {
     if (html5QrCodeRef.current) {
@@ -399,7 +401,7 @@ export default function BorrowScannerDialog({
       });
       if (confirmResult.status === "success") {
         stopCamera();
-        setSuccessResult({ message: confirmResult.message, bookCount: validItems.length });
+        setSuccessResult({ message: confirmResult.message, bookCount: validItems.length, items: toSlipReceiptItems(validItems) });
       }
     } catch (err) {
       const detail = getErrorMessage(err);
@@ -511,7 +513,7 @@ export default function BorrowScannerDialog({
                   onClick={() => {
                     setSuccessResult(null);
                     setScanned([]);
-                    onSuccess({ message: successResult.message, count: successResult.bookCount });
+                    onSuccess({ message: successResult.message, count: successResult.bookCount, items: successResult.items });
                     onClose();
                   }}
                 sx={{ mt: 1, borderRadius: 2 }}

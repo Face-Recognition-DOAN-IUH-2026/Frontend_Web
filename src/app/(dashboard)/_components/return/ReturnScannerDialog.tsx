@@ -421,7 +421,7 @@ export default function ReturnScannerDialog({
     let fail = 0;
     for (const item of scannedReturns) {
       try {
-        await api.staffReturnBorrowRecord(item.record.id, item.condition || null);
+        await api.staffReturnBorrowRecord(item.record.id, null, item.condition || "good");
         ok++;
       } catch {
         fail++;

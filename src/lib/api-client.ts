@@ -15,6 +15,7 @@ import type {
   FaceResultEvent,
   LoginRequest,
   KioskResult,
+  LivenessActiveResult,
   PatronCreate,
   PatronLookupResult,
   PatronPublic,
@@ -34,6 +35,12 @@ import type {
   StaffPatronActiveBorrowsResponse,
   StaffReturnRequest,
   FineLedgerItem,
+  ConditionAttentionReport,
+  ConditionDistribution,
+  FinanceStats,
+  InventoryStats,
+  RecognitionStatItem,
+  HourlyStatItem,
   PatronFineItem,
   PayFinesResponse,
   CreatePaymentOrderRequest,
@@ -666,6 +673,44 @@ class ApiClient {
     return response.data;
   }
 
+  async kioskLivenessActive(files: File[], studentCode?: string, patronId?: string): Promise<LivenessActiveResult> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("frames", file);
+    }
+    if (studentCode) formData.append("student_code", studentCode);
+    if (patronId) formData.append("patron_id", patronId);
+    const response = await this.client.post<LivenessActiveResult>("/api/kiosk/liveness-active", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async getAccessStats(): Promise<{ today_entries: number; today_exits: number; today_spoof: number; today_no_match: number }> {
+    const response = await this.client.get<any>("/api/access/stats");
+    const data = response.data || {};
+    return {
+      today_entries: data.today_entries ?? data.todayEntries ?? 0,
+      today_exits: data.today_exits ?? data.todayExits ?? 0,
+      today_spoof: data.today_spoof ?? data.todaySpoof ?? 0,
+      today_no_match: data.today_no_match ?? data.todayNoMatch ?? 0,
+    };
+  }
+
+  async getRecognitionStats(days = 30): Promise<RecognitionStatItem[]> {
+    const response = await this.client.get<RecognitionStatItem[]>("/api/access/stats/recognition", {
+      params: { days },
+    });
+    return response.data || [];
+  }
+
+  async getHourlyStats(date?: string): Promise<HourlyStatItem[]> {
+    const response = await this.client.get<HourlyStatItem[]>("/api/access/stats/hourly", {
+      params: date ? { date } : undefined,
+    });
+    return response.data || [];
+  }
+
   async deleteFaceData(userId: string): Promise<{ message: string }> {
     const response = await this.client.delete<{ message: string }>(`/api/face/${userId}`);
     return response.data;
@@ -1113,8 +1158,37 @@ class ApiClient {
     return response.data;
   }
 
+  async bulkDisposeCopies(copyIds: string[]): Promise<{ success: boolean; deleted: number; deleted_ids: string[]; skipped: Array<{ copy_id: string; reason: string }> }> {
+    const response = await this.client.post("/api/borrow/copies/bulk-dispose", { copy_ids: copyIds });
+    return response.data;
+  }
+
   async getBorrowStats(): Promise<{ total: number; active: number; overdue: number }> {
     const response = await this.client.get("/api/borrow/stats");
+    return response.data;
+  }
+
+  async getConditionAttention(limit = 200): Promise<ConditionAttentionReport> {
+    const response = await this.client.get<ConditionAttentionReport>("/api/borrow/stats/condition-attention", {
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  async getConditionDistribution(): Promise<ConditionDistribution> {
+    const response = await this.client.get<ConditionDistribution>("/api/borrow/stats/condition-distribution");
+    return response.data;
+  }
+
+  async getFinanceStats(months = 6): Promise<FinanceStats> {
+    const response = await this.client.get<FinanceStats>("/api/borrow/stats/finance", {
+      params: { months },
+    });
+    return response.data;
+  }
+
+  async getInventoryStats(): Promise<InventoryStats> {
+    const response = await this.client.get<InventoryStats>("/api/borrow/stats/inventory");
     return response.data;
   }
 
@@ -1199,6 +1273,7 @@ class ApiClient {
   async importBooksFiltered(rows: Array<{
     isbn: string;
     quantity: number;
+    price?: number | null;
     title: string | null;
     subtitle: string | null;
     author: string | null;
@@ -1253,6 +1328,14 @@ class ApiClient {
 
   async updateBook(bookId: string, data: Record<string, any>): Promise<BookWithStats> {
     const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}`, data);
+    return response.data;
+  }
+
+  async bulkUpdateBookPrices(bookIds: string[], price: number): Promise<{ success: boolean; updated: number }> {
+    const response = await this.client.post<{ success: boolean; updated: number }>("/api/borrow/books/bulk-price", {
+      book_ids: bookIds,
+      price,
+    });
     return response.data;
   }
 

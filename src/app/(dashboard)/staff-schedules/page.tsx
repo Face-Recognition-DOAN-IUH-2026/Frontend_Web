@@ -51,7 +51,7 @@ const FILTERS = [
 const STAT_GRADIENT = {
   total: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
   active: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-  staff: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+  staff: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
 };
 
 export default function StaffSchedulesPage() {
@@ -113,10 +113,6 @@ export default function StaffSchedulesPage() {
   );
 
   const handleDeleteAssignment = (id: string) => markForDelete(id);
-
-  const handleViewStaff = (_staffId: string) => {
-    // placeholder for staff detail navigation
-  };
 
   if (!isStaff) {
     return (
@@ -293,7 +289,6 @@ export default function StaffSchedulesPage() {
             filter={filter} isAdmin={canManage}
             onCellClick={canCreate ? handleCellClick : undefined}
             onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
-            onViewStaff={canManage ? handleViewStaff : undefined}
           />
         </DashboardCard>
       </LoadingOverlay>

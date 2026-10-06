@@ -20,6 +20,7 @@ import LocalLibraryIcon from "@mui/icons-material/LocalLibraryOutlined";
 import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import { CONDITION_LABELS, getConditionColor, type CopyCondition } from "@/lib/constants/copy";
+import type { FineBracket } from "@/lib/fee-estimate";
 import type { BorrowCartItem } from "./types";
 
 export interface BorrowStepConfirmProps {
@@ -32,6 +33,7 @@ export interface BorrowStepConfirmProps {
   handleConfirmBorrowSlip: () => void;
   setCurrentStep: (step: number) => void;
   finePerDay?: number;
+  fineBrackets?: FineBracket[];
   maxBorrowDays?: number;
 }
 
@@ -45,12 +47,16 @@ export function BorrowStepConfirm({
   handleConfirmBorrowSlip,
   setCurrentStep,
   finePerDay,
+  fineBrackets,
   maxBorrowDays,
 }: BorrowStepConfirmProps) {
   const { can } = usePermission();
   const canCreateBorrow = can("borrows", "create") || can("borrows", "approve");
   const standardBorrowDays = maxBorrowDays ?? 14;
   const finePerDayStr = Number(finePerDay ?? 5000).toLocaleString("vi-VN");
+
+  const formatBracketRange = (from: number, to: number | null) =>
+    to === null || to === undefined ? `${from}+ ngày` : `${from}–${to} ngày`;
 
   return (
     <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
@@ -84,7 +90,7 @@ export function BorrowStepConfirm({
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 6 }}>
-                  <Typography variant="caption" color="text.secondary">Hạn trả quy định (+14 ngày):</Typography>
+                  <Typography variant="caption" color="text.secondary">Hạn trả quy định (+{standardBorrowDays} ngày):</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 800, color: "error.main" }}>
                     {dueDateStr}
                   </Typography>
@@ -148,7 +154,20 @@ export function BorrowStepConfirm({
               <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Lưu ý mượn trả:</Typography>
               <Typography variant="caption" sx={{ display: "block", mt: 0.5 }}>
                 • Thời hạn mượn sách tiêu chuẩn: <strong>{standardBorrowDays} ngày</strong>.<br />
-                • Phí phạt quá hạn: <strong>{finePerDayStr} đ/ngày/cuốn</strong>.<br />
+                {fineBrackets && fineBrackets.length > 0 ? (
+                  <>
+                    • Phí phạt quá hạn theo bậc:<br />
+                    {fineBrackets.map((b) => (
+                      <span key={`${b.from}-${b.to ?? "max"}`} style={{ display: "block", paddingLeft: 8 }}>
+                        {formatBracketRange(Number(b.from), b.to)}: <strong>{Number(b.amount).toLocaleString("vi-VN")}đ</strong>
+                      </span>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    • Phí phạt quá hạn: <strong>{finePerDayStr} đ/ngày/cuốn</strong>.<br />
+                  </>
+                )}
                 • Độc giả có trách nhiệm bảo quản sách nguyên vẹn khi hoàn trả.
               </Typography>
             </Alert>

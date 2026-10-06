@@ -81,6 +81,21 @@ describe('ReturnReceipt', () => {
     expect(printSpy).toHaveBeenCalled();
     printSpy.mockRestore();
   });
+
+  it('hides the QR code and shows a pay-later note for unpaid records', () => {
+    const unpaidRecord: BorrowRecord = {
+      ...mockRecord,
+      id: 'rec-unpaid',
+      fine_paid: false,
+      payment_method: null,
+      payment_ref: null,
+      paid_at: null,
+    };
+    const { container } = render(<ReturnReceipt record={unpaidRecord} onClose={jest.fn()} />);
+
+    expect(container.querySelector('svg')).toBeNull();
+    expect(screen.getByText(/vui lòng thanh toán sau tại quầy/i)).toBeInTheDocument();
+  });
 });
 
 describe('ReturnConfirmDialog payment flow', () => {
@@ -91,7 +106,7 @@ describe('ReturnConfirmDialog payment flow', () => {
       <ReturnConfirmDialog
         record={mockRecord}
         detail={mockDetail}
-        condition="good"
+        condition="minor_damage"
         onConditionChange={jest.fn()}
         onClose={jest.fn()}
         onConfirm={onConfirm}
@@ -123,6 +138,67 @@ describe('ReturnConfirmDialog payment flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Xác nhận trả' }));
     expect(onConfirm).toHaveBeenLastCalledWith({
       isPaidImmediately: false,
+      paymentMethod: 'cash',
+    });
+  });
+
+  it('hides the payment method select when the condition is normal (good)', () => {
+    const onConfirm = jest.fn();
+
+    render(
+      <ReturnConfirmDialog
+        record={mockRecord}
+        detail={mockDetail}
+        condition="good"
+        onConditionChange={jest.fn()}
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        loading={false}
+      />
+    );
+
+    // Checkbox stays (still relevant for overdue fines), method select is hidden
+    expect(screen.getByLabelText('Đã thu phí ngay')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /phương thức thanh toán/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận trả' }));
+    expect(onConfirm).toHaveBeenCalledWith({
+      isPaidImmediately: true,
+      paymentMethod: 'cash',
+    });
+  });
+
+  it('hides the whole payment block and note when there is no fee, with a finish button', () => {
+    const onConfirm = jest.fn();
+    const noFeeRecord: BorrowRecord = {
+      ...mockRecord,
+      id: 'rec-nofee',
+      due_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+      fine_amount: 0,
+      book: { ...(mockRecord.book as any), price: null },
+      copy: { ...(mockRecord.copy as any), condition: 'good' },
+    };
+
+    render(
+      <ReturnConfirmDialog
+        record={noFeeRecord}
+        detail={mockDetail}
+        condition="good"
+        onConditionChange={jest.fn()}
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        loading={false}
+      />
+    );
+
+    expect(screen.getByText(/Không phát sinh phí/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Đã thu phí ngay')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /phương thức thanh toán/i })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Ghi chú thêm nếu sách có hư hỏng/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hoàn tất' }));
+    expect(onConfirm).toHaveBeenCalledWith({
+      isPaidImmediately: true,
       paymentMethod: 'cash',
     });
   });

@@ -9,6 +9,7 @@ import {
   Box,
   Button,
   Chip,
+  Paper,
   Stack,
   Table,
   TableBody,
@@ -36,6 +37,7 @@ import GreetingBar from "@/app/(dashboard)/_components/dashboard/GreetingBar";
 import HourlyActivityChart from "@/app/(dashboard)/_components/dashboard/HourlyActivityChart";
 import CameraStatusGrid from "@/app/(dashboard)/_components/dashboard/CameraStatusGrid";
 import BorrowSummaryCard from "@/app/(dashboard)/_components/dashboard/BorrowSummaryCard";
+import ConditionAttentionSection from "@/app/(dashboard)/_components/books/ConditionAttentionSection";
 import TodayScheduleCard from "@/app/(dashboard)/_components/dashboard/TodayScheduleCard";
 import RecentNotificationsCard from "@/app/(dashboard)/_components/dashboard/RecentNotificationsCard";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -163,11 +165,49 @@ export default function DashboardPage() {
         />
       </Box>
 
+      {/* Cảnh báo quá hạn có lối xử lý: KPI chỉ báo, banner này dẫn đi thu hồi */}
+      {hasOverdue ? (
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 3,
+            borderColor: "error.main",
+            borderWidth: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 1.5,
+          }}
+        >
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Avatar sx={{ bgcolor: "error.main", width: 40, height: 40 }}>
+              <HistoryIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "error.main" }}>
+                {overdueBorrows} cuốn quá hạn cần thu hồi
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Liên hệ độc giả và xử lý tại trang trả sách
+              </Typography>
+            </Box>
+          </Stack>
+          <Button component={Link} href="/return" variant="contained" color="error" endIcon={<ArrowForwardIcon />}>
+            Đi đến trang trả sách
+          </Button>
+        </Paper>
+      ) : null}
+
       {/* Hàng 2: Trọng tâm giám sát mật độ cao điểm & Tác nghiệp mượn trả */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
         <HourlyActivityChart logs={data.hourlyLogs} loading={data.loading} />
         <BorrowSummaryCard borrowStats={data.borrowStats} borrows={data.activeBorrows} loading={data.loading} />
       </Box>
+
+      {/* Sách cần xử lý: sửa chữa / thanh lý */}
+      <ConditionAttentionSection />
 
       {/* Hàng 3: Giám sát chi tiết Camera & Nhật ký ra vào thời gian thực */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
@@ -190,11 +230,11 @@ export default function DashboardPage() {
               <TableContainer sx={{ maxHeight: 320, overflowY: "auto" }}>
                 <Table size="small">
                   <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Thời gian</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Độc giả</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Loại</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Trạng thái</TableCell>
+                    <TableRow sx={{ "& .MuiTableCell-head": { fontWeight: 700, bgcolor: "action.hover", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: 0.5, color: "text.secondary" } }}>
+                      <TableCell>Thời gian</TableCell>
+                      <TableCell>Độc giả</TableCell>
+                      <TableCell>Loại</TableCell>
+                      <TableCell>Trạng thái</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>

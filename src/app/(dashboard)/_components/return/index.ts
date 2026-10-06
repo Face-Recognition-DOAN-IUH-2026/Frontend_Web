@@ -7,4 +7,5 @@ export type { ScannedReturnItem } from "./ReturnScannerDialog";
 export { default as ReturnConfirmDialog } from "./ReturnConfirmDialog";
 export { default as ReturnReceipt } from "./ReturnReceipt";
 export { default as DynamicQrPaymentDialog } from "./DynamicQrPaymentDialog";
+export { default as FinesLedger } from "./FinesLedger";
 

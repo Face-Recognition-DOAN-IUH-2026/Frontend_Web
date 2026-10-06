@@ -72,6 +72,7 @@ export interface BooksListResponse {
     totalCopies: number;
     availableCopies: number;
     borrowedCopies: number;
+    outOfStockBooks?: number;
   };
 }
 
@@ -91,6 +92,7 @@ export interface BookCopyData {
 export interface BookImportPreviewRow {
   isbn: string;
   quantity: number;
+  price?: number | null;
   title: string | null;
   subtitle: string | null;
   author: string | null;
@@ -120,6 +122,7 @@ export interface BookImportResultRow {
   isbn: string;
   title: string;
   quantity: number;
+  price?: number | null;
   barcodes: string[];
   status: string;
   message: string | null;

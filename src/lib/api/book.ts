@@ -69,6 +69,7 @@ export function createBookMethods(client: AxiosInstance) {
       rows: Array<{
         isbn: string;
         quantity: number;
+        price?: number | null;
         title: string | null;
         subtitle: string | null;
         author: string | null;
@@ -150,6 +151,17 @@ export function createBookMethods(client: AxiosInstance) {
         `/api/borrow/books/${bookId}`,
         data
       );
+      return response.data;
+    },
+
+    bulkUpdateBookPrices: async (
+      bookIds: string[],
+      price: number
+    ): Promise<{ updated: number; success: boolean }> => {
+      const response = await client.post<{
+        updated: number;
+        success: boolean;
+      }>("/api/borrow/books/bulk-price", { book_ids: bookIds, price });
       return response.data;
     },
 

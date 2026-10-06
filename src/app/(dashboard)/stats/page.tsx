@@ -56,7 +56,13 @@ import type {
   CameraEvent,
   CameraStatus,
   StatsResponse,
+  HourlyStatItem,
 } from "@/lib/types";
+import BookConditionCard from "@/app/(dashboard)/_components/dashboard/BookConditionCard";
+import OverdueBooksCard from "@/app/(dashboard)/_components/dashboard/OverdueBooksCard";
+import FinanceSection from "@/app/(dashboard)/_components/stats/FinanceSection";
+import InventorySection from "@/app/(dashboard)/_components/stats/InventorySection";
+import RecognitionSection from "@/app/(dashboard)/_components/stats/RecognitionSection";
 
 type RealtimeState = "connecting" | "connected" | "disconnected";
 
@@ -141,6 +147,7 @@ function StatusChip({ status }: { status?: string }) {
 
 export default function StatsPage() {
   const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [todayLogs, setTodayLogs] = useState<AccessLogPublic[]>([]);
   const [activePatrons, setActivePatrons] = useState<ActivePatron[]>([]);
@@ -148,6 +155,7 @@ export default function StatsPage() {
   const [borrowStats, setBorrowStats] = useState<{ total: number; active: number; overdue: number } | null>(null);
   const [cameraStatuses, setCameraStatuses] = useState<CameraStatus[]>([]);
   const [weeklyData, setWeeklyData] = useState<{ thisWeek: number[]; lastWeek: number[] }>({ thisWeek: [], lastWeek: [] });
+  const [hourlyBuckets, setHourlyBuckets] = useState<HourlyStatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [realtimeState, setRealtimeState] = useState<RealtimeState>("connecting");
 
@@ -181,6 +189,7 @@ export default function StatsPage() {
           camerasRes,
           thisWeekRes,
           lastWeekRes,
+          hourlyRes,
         ] = await Promise.allSettled([
           api.getStats(),
           api.getAccessLogs({ dateFrom: today, limit: 100 }),
@@ -190,6 +199,7 @@ export default function StatsPage() {
           api.getCameraStatus(),
           api.getAccessFrequency({ dateFrom: toDateStr(thisMonday), dateTo: today }),
           api.getAccessFrequency({ dateFrom: toDateStr(lastMonday), dateTo: toDateStr(lastSunday) }),
+          api.getHourlyStats(today),
         ]);
 
         if (sRes.status === "fulfilled") setStats(sRes.value);
@@ -198,6 +208,7 @@ export default function StatsPage() {
         if (bStatsRes.status === "fulfilled") setBorrowStats(bStatsRes.value);
         if (allActiveRes.status === "fulfilled") setActiveBorrows(allActiveRes.value || []);
         if (camerasRes.status === "fulfilled") setCameraStatuses(camerasRes.value);
+        if (hourlyRes.status === "fulfilled") setHourlyBuckets(hourlyRes.value);
 
         const thisWeekDaily = thisWeekRes.status === "fulfilled" ? thisWeekRes.value.daily || [] : [];
         const lastWeekDaily = lastWeekRes.status === "fulfilled" ? lastWeekRes.value.daily || [] : [];
@@ -248,6 +259,9 @@ export default function StatsPage() {
   }), []);
 
   const hourlyData = useMemo(() => {
+    if (hourlyBuckets && hourlyBuckets.length === 24) {
+      return hourlyBuckets;
+    }
     const buckets = Array.from({ length: 24 }, (_, hour) => ({ hour, entry: 0, exit: 0, total: 0 }));
     todayLogs.forEach((log) => {
       const hour = new Date(log.access_time).getHours();
@@ -256,7 +270,7 @@ export default function StatsPage() {
       buckets[hour].total += 1;
     });
     return buckets;
-  }, [todayLogs]);
+  }, [hourlyBuckets, todayLogs]);
 
   const hasHourlyData = hourlyData.some((item) => item.total > 0);
 
@@ -391,12 +405,23 @@ export default function StatsPage() {
                     <XAxis dataKey="day" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />
                     <YAxis allowDecimals={false} tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />
                     <Tooltip
-                      contentStyle={{ background: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: 8 }}
+                      contentStyle={{
+                        backgroundColor: theme.palette.background.paper,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 8,
+                        color: theme.palette.text.primary,
+                        boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.5)" : "0 4px 20px rgba(0,0,0,0.08)",
+                      }}
+                      itemStyle={{ color: theme.palette.text.primary, fontWeight: 600 }}
+                      labelStyle={{ color: theme.palette.text.secondary, fontWeight: 700 }}
                       formatter={(value: any, name: any) => [value, name === "thisWeek" ? "Tuần này" : "Tuần trước"]}
                     />
-                    <Legend wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 12 }} />
+                    <Legend
+                      wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 12 }}
+                      formatter={(value) => <span style={{ color: theme.palette.text.primary, fontWeight: 600 }}>{value}</span>}
+                    />
                     <Bar dataKey="lastWeek" name="Tuần trước" fill={alpha(theme.palette.primary.main, 0.25)} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="thisWeek" name="Tuần này" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="thisWeek" name="Tuần này" fill={isDark ? "#38bdf8" : "#0284c7"} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </Box>
@@ -406,7 +431,7 @@ export default function StatsPage() {
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                       Trung bình / ngày
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: "#06b6d4" }}>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: isDark ? "#38bdf8" : "#0284c7" }}>
                       {weeklyAvg.toLocaleString("vi-VN")}
                     </Typography>
                   </Box>
@@ -449,13 +474,24 @@ export default function StatsPage() {
                       <XAxis dataKey="hour" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} interval={1} />
                       <YAxis allowDecimals={false} tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />
                       <Tooltip
-                        contentStyle={{ background: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: 8 }}
+                        contentStyle={{
+                          backgroundColor: theme.palette.background.paper,
+                          border: `1px solid ${theme.palette.divider}`,
+                          borderRadius: 8,
+                          color: theme.palette.text.primary,
+                          boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.5)" : "0 4px 20px rgba(0,0,0,0.08)",
+                        }}
+                        itemStyle={{ color: theme.palette.text.primary, fontWeight: 600 }}
+                        labelStyle={{ color: theme.palette.text.secondary, fontWeight: 700 }}
                         labelFormatter={(label) => `${label}:00 - ${label}:59`}
                         formatter={(value: any, name: any) => [value, name === "entry" ? "Vào" : "Ra"]}
                       />
-                      <Legend wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 12 }} />
-                      <Bar dataKey="entry" name="Vào" fill="#0A2540" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="exit" name="Ra" fill="#D4AF37" radius={[4, 4, 0, 0]} />
+                      <Legend
+                        wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 12 }}
+                        formatter={(value) => <span style={{ color: theme.palette.text.primary, fontWeight: 600 }}>{value}</span>}
+                      />
+                      <Bar dataKey="entry" name="Vào" fill={isDark ? "#38bdf8" : "#0A2540"} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="exit" name="Ra" fill={isDark ? "#fbbf24" : "#D4AF37"} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </Box>
@@ -631,6 +667,13 @@ export default function StatsPage() {
             )}
           </DashboardCard>
 
+          {/* Phân tích Tài chính & Kiểm kê */}
+          <FinanceSection />
+          <InventorySection />
+
+          {/* Phân tích Nhận diện Khuôn mặt (AI Face Recognition) */}
+          <RecognitionSection />
+
           <DashboardCard title="Hoạt động hôm nay" subtitle="Các lượt ra/vào mới nhất từ entry_gate, exit_gate và kiosk">
             {todayLogs.length === 0 ? (
               <EmptyState
@@ -773,6 +816,12 @@ export default function StatsPage() {
           </DashboardCard>
         </Stack>
       )}
+
+      {/* Tình trạng sách & Sách quá hạn cần thu hồi */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", xl: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
+        <BookConditionCard />
+        <OverdueBooksCard borrows={activeBorrows} />
+      </Box>
     </LoadingOverlay>
   );
 }

@@ -35,12 +35,20 @@ export interface BorrowStepPatronProps {
   patronName: string;
   activeCount: number;
   overdueCount: number;
-  borrowConfig: { max_borrow_books: number };
+  borrowConfig: {
+    max_borrow_books: number;
+    max_borrow_days?: number;
+    fine?: {
+      fine_brackets?: Array<{ from: number; to: number | null; amount: number }>;
+      fine_per_day?: number;
+    } | null;
+  };
   remaining: number;
   canBorrow: boolean;
   faceVerifyDisabled: boolean;
   handleLookupAndOpenCamera: () => void;
   startWebcam: () => void;
+  stopWebcam: () => void;
   handleFaceVerify: () => void;
   setOverdueGuideOpen: (open: boolean) => void;
   setCurrentStep: (step: number) => void;
@@ -65,6 +73,7 @@ export function BorrowStepPatron({
   faceVerifyDisabled,
   handleLookupAndOpenCamera,
   startWebcam,
+  stopWebcam,
   handleFaceVerify,
   setOverdueGuideOpen,
   setCurrentStep,
@@ -97,6 +106,7 @@ export function BorrowStepPatron({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleLookupAndOpenCamera();
                 }}
+                label="Mã số sinh viên (MSSV)"
                 placeholder="Nhập mã số sinh viên (MSSV)..."
                 size="small"
                 fullWidth
@@ -186,6 +196,15 @@ export function BorrowStepPatron({
                         >
                           Xem hướng dẫn xử lý
                         </Button>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          component="a"
+                          href="/return"
+                          sx={{ textTransform: "none", fontWeight: 600, borderRadius: "4px" }}
+                        >
+                          Đi đến trang trả sách
+                        </Button>
                       </>
                     ) : null}
                     <Typography variant="body2" color={remaining > 0 ? "text.secondary" : "error"} sx={{ fontWeight: 600 }}>
@@ -227,8 +246,77 @@ export function BorrowStepPatron({
         )}
       </Grid>
 
-      {/* Right Column: Face Camera Feed */}
+      {/* Right Column: Face Camera Feed (before verification) / Ready summary (after) */}
       <Grid size={{ xs: 12, md: 7, lg: 8 }} sx={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", minHeight: 0 }}>
+        {patronId ? (
+        <Box sx={staggerSx(1)}>
+          <DashboardCard
+            title="Sẵn sàng quét sách"
+            actions={<CheckCircleIcon color="success" />}
+          >
+            <Stack spacing={2} sx={{ alignItems: "center", textAlign: "center", py: 3 }}>
+              <Avatar sx={{ bgcolor: "success.main", width: 64, height: 64 }}>
+                <CheckCircleIcon sx={{ fontSize: 36 }} />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  Đã xác minh khuôn mặt
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {patronName} • Đang mượn {activeCount}/{borrowConfig.max_borrow_books} • Được mượn thêm {remaining} cuốn
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  width: "100%",
+                  maxWidth: 460,
+                  p: 2,
+                  borderRadius: "4px",
+                  border: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: "background.paper",
+                  textAlign: "left",
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+                  Quy định mượn trả
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ display: "block" }}>
+                  • Thời hạn mượn: <strong>{borrowConfig.max_borrow_days ?? 14} ngày</strong>.
+                </Typography>
+                {borrowConfig.fine?.fine_brackets && borrowConfig.fine.fine_brackets.length > 0 ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                    • Phí phạt quá hạn theo bậc:{" "}
+                    <strong>
+                      {borrowConfig.fine.fine_brackets
+                        .map((b) => `${b.to === null || b.to === undefined ? `${b.from}+` : `${b.from}–${b.to}`} ngày: ${Number(b.amount).toLocaleString("vi-VN")}đ`)
+                        .join(" • ")}
+                    </strong>
+                    .
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                    • Phí phạt quá hạn: <strong>{Number(borrowConfig.fine?.fine_per_day ?? 5000).toLocaleString("vi-VN")} đ/ngày/cuốn</strong>.
+                  </Typography>
+                )}
+                <Typography variant="body2" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                  • Bảo quản sách nguyên vẹn khi hoàn trả.
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                size="large"
+                endIcon={<ArrowForwardIcon />}
+                disabled={!canBorrow}
+                onClick={() => setCurrentStep(1)}
+                sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none", py: 1.4, minWidth: 280 }}
+              >
+                {canBorrow ? "Tiếp tục: Quét mã vạch sách" : overdueCount > 0 ? "Cần trả sách quá hạn" : "Đã đạt giới hạn mượn"}
+              </Button>
+            </Stack>
+          </DashboardCard>
+        </Box>
+        ) : (
         <Box sx={staggerSx(1)}>
           <DashboardCard title="Camera nhận diện khuôn mặt" actions={<VideocamIcon color="primary" />} noPadding>
             <Box
@@ -322,12 +410,30 @@ export function BorrowStepPatron({
                     >
                       {faceScanning ? "Đang xác minh..." : "Xác minh khuôn mặt"}
                     </Button>
+                    <Button
+                      variant="outlined"
+                      size="large"
+                      onClick={stopWebcam}
+                      disabled={faceScanning}
+                      sx={{
+                        display: cameraReady ? undefined : "none",
+                        borderRadius: "4px",
+                        fontWeight: 700,
+                        textTransform: "none",
+                        color: "common.white",
+                        borderColor: "rgba(255,255,255,0.5)",
+                        "&:hover": { borderColor: "common.white", bgcolor: "rgba(255,255,255,0.08)" },
+                      }}
+                    >
+                      Tắt camera
+                    </Button>
                   </Stack>
                 </>
               )}
             </Box>
           </DashboardCard>
         </Box>
+        )}
       </Grid>
     </Grid>
   );

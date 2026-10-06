@@ -77,6 +77,7 @@ export function BorrowStepScanBooks({
                 <TextField
                   size="small"
                   fullWidth
+                  label="Mã sách (Barcode / ISBN)"
                   placeholder="Quét hoặc nhập mã bản sao (VD: LIB-9780140328721-001) hoặc ISBN..."
                   value={manualIsbn}
                   onChange={(e) => setManualIsbn(e.target.value)}

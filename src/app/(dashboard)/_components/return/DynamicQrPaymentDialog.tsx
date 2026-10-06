@@ -28,6 +28,7 @@ export interface DynamicQrPaymentDialogProps {
   studentCode?: string;
   onClose: () => void;
   onSuccess: (orderCode: string) => void;
+  onRegenerate?: () => void;
 }
 
 export default function DynamicQrPaymentDialog({
@@ -37,6 +38,7 @@ export default function DynamicQrPaymentDialog({
   studentCode,
   onClose,
   onSuccess,
+  onRegenerate,
 }: DynamicQrPaymentDialogProps) {
   const [timeLeft, setTimeLeft] = useState<number>(15 * 60); // 15 mins in seconds
   const [status, setStatus] = useState<"pending" | "completed" | "expired">("pending");
@@ -143,6 +145,11 @@ export default function DynamicQrPaymentDialog({
             <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
               Đơn thanh toán đã hết hạn. Vui lòng đóng và tạo lại mã QR mới.
             </Alert>
+            {onRegenerate ? (
+              <Button onClick={onRegenerate} variant="contained" sx={{ borderRadius: 2, fontWeight: 700 }}>
+                Tạo mã mới
+              </Button>
+            ) : null}
           </Box>
         ) : (
           <Stack spacing={2} sx={{ alignItems: "center" }}>

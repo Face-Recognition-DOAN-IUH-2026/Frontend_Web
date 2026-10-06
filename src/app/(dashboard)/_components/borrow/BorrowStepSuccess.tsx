@@ -18,6 +18,7 @@ export interface BorrowStepSuccessProps {
   patronCode: string;
   dueDateStr: string;
   handleClearSession: () => void;
+  onPrintReceipt: () => void;
 }
 
 export function BorrowStepSuccess({
@@ -26,6 +27,7 @@ export function BorrowStepSuccess({
   patronCode,
   dueDateStr,
   handleClearSession,
+  onPrintReceipt,
 }: BorrowStepSuccessProps) {
   const theme = useTheme();
   const { can } = usePermission();
@@ -87,7 +89,7 @@ export function BorrowStepSuccess({
                   startIcon={<PrintIcon />}
                   onClick={() => {
                     if (!canPrintBorrow) return;
-                    window.print();
+                    onPrintReceipt();
                   }}
                   sx={{
                     borderRadius: 2.5,

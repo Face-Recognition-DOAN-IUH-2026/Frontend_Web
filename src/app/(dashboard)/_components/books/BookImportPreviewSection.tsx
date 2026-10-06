@@ -20,6 +20,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 import AlertIcon from "@mui/icons-material/WarningAmberOutlined";
@@ -131,6 +132,7 @@ export function BookImportPreviewSection({
                   <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Tác giả</TableCell>
                   <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>NXB</TableCell>
                   <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Số lượng</TableCell>
+                  <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider", minWidth: 120 }}>Đơn giá (VNĐ)</TableCell>
                   <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Mã vạch mẫu</TableCell>
                   <TableCell sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>Trạng thái</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700, borderBottom: "2px solid", borderColor: "divider" }}>
@@ -141,7 +143,7 @@ export function BookImportPreviewSection({
               <TableBody>
                 {previewData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 3, color: "text.secondary" }}>
+                    <TableCell colSpan={11} align="center" sx={{ py: 3, color: "text.secondary" }}>
                       Không có dòng nào
                     </TableCell>
                   </TableRow>
@@ -179,6 +181,36 @@ export function BookImportPreviewSection({
                         <TableCell sx={{ py: 0.5 }}>{row.author || "-"}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>{row.publisher || "-"}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>{row.quantity}</TableCell>
+                        <TableCell sx={{ py: 0.5, minWidth: 120 }}>
+                          <TextField
+                            size="small"
+                            variant="standard"
+                            value={row.price != null ? row.price : ""}
+                            placeholder="Chưa đặt"
+                            type="number"
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                              const val = e.target.value === "" ? null : Number(e.target.value);
+                              setPreviewData((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev];
+                                next[index] = { ...next[index], price: val };
+                                return next;
+                              });
+                            }}
+                            slotProps={{
+                              input: {
+                                endAdornment: (
+                                  <Typography variant="caption" sx={{ color: "text.secondary", ml: 0.5 }}>
+                                    đ
+                                  </Typography>
+                                ),
+                                sx: { fontSize: "0.85rem", fontWeight: 600 },
+                              },
+                            }}
+                            sx={{ width: 110 }}
+                          />
+                        </TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <BarcodeRangeList barcodes={row.barcodes} />
                         </TableCell>

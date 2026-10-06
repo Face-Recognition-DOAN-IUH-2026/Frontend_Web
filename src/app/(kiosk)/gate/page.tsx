@@ -35,6 +35,7 @@ import Divider from "@mui/material/Divider";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
 import CameraFeed from "@/app/(kiosk)/gate/_components/CameraFeed";
+import ChallengeStep from "@/app/(kiosk)/gate/_components/ChallengeStep";
 import ResultCard from "@/app/(kiosk)/gate/_components/ResultCard";
 import { useColorMode } from "@/lib/mui-theme";
 import { fadeInUp, shimmer, slideInRight, successPop } from "@/lib/animations";
@@ -47,7 +48,7 @@ interface TodayCounts {
   spoof: number;
 }
 
-type Step = "idle" | "verify" | "result";
+type Step = "idle" | "verify" | "challenge" | "result";
 
 const _ENTRY_CAM = process.env.NEXT_PUBLIC_ENTRY_CAM;
 if (!_ENTRY_CAM) throw new Error("NEXT_PUBLIC_ENTRY_CAM is not set");
@@ -202,6 +203,20 @@ export default function GatePage() {
     return () => resetSSE();
   }, [resetSSE]);
 
+  const startCamera = useCallback(async () => {
+    try {
+      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch {
+      showToast("error", "Không thể mở camera.");
+    }
+  }, [showToast]);
+
   // Handle SSE result for kiosk face verification
   useEffect(() => {
     if (sseState.status === "SUCCESS") {
@@ -214,6 +229,15 @@ export default function GatePage() {
           patron_id: lookup?.patron?.id || "",
           student_code: mssv,
         }).then((approval) => setApprovalEventCode(approval.event_code)).catch(() => {});
+      }
+      if (success) {
+        // Provisional: kiosk always challenges on a passive match — passive
+        // score alone never grants entry (phone-screen replay risk).
+        setStatusText("Kiểm tra khuôn mặt thật...");
+        setStep("challenge");
+        setLoading(false);
+        startCamera();
+        return;
       }
       setResult({
         success: !!success,
@@ -243,21 +267,7 @@ export default function GatePage() {
     } else if (sseState.status === "WAITING") {
       setStatusText("Đang xử lý...");
     }
-  }, [sseState.status, sseState.result, sseState.error, lookup, mssv, showToast]);
-
-  const startCamera = useCallback(async () => {
-    try {
-      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch {
-      showToast("error", "Không thể mở camera.");
-    }
-  }, [showToast]);
+  }, [sseState.status, sseState.result, sseState.error, lookup, mssv, showToast, startCamera]);
 
   const captureImage = useCallback((): Promise<File> => (
     new Promise((resolve, reject) => {
@@ -349,6 +359,64 @@ export default function GatePage() {
     }
   };
 
+  const handleChallengeLive = useCallback(() => {
+    stopCamera();
+    setResult({
+      success: true,
+      message: "Xác thực thành công (qua kiểm tra thử thách) - Vào thư viện",
+      patron: lookup?.patron || null,
+      job_id: null,
+    });
+    setStep("result");
+    setLoading(false);
+    setStatusText("");
+    playGateSound("granted");
+    if (lookup?.patron?.id) {
+      api.confirmEntry(lookup.patron.id).catch(() => {});
+    }
+  }, [lookup, stopCamera]);
+
+  const handleChallengeSpoof = useCallback((detail: string) => {
+    stopCamera();
+    playGateSound("denied");
+    if (lookup?.patron?.id) {
+      api.createKioskApprovalRequest({
+        device_id: "kiosk-1",
+        patron_id: lookup.patron.id,
+        student_code: mssv,
+      }).then((approval) => setApprovalEventCode(approval.event_code)).catch(() => {});
+    }
+    setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
+    setResult({
+      success: false,
+      message: `Phát hiện khuôn mặt giả (${detail}). Vui lòng chờ nhân viên hỗ trợ.`,
+      patron: lookup?.patron || null,
+      job_id: null,
+    });
+    setStep("result");
+    setLoading(false);
+    setStatusText("");
+    showToast("error", "Phát hiện khuôn mặt giả.");
+  }, [lookup, mssv, stopCamera, showToast]);
+
+  const handleChallengeDisabled = useCallback(() => {
+    // Provisional fail-open: admin tắt thử thách nên giữ nguyên kết quả passive match.
+    stopCamera();
+    setResult({
+      success: true,
+      message: "Xác thực thành công - Vào thư viện",
+      patron: lookup?.patron || null,
+      job_id: null,
+    });
+    setStep("result");
+    setLoading(false);
+    setStatusText("");
+    playGateSound("granted");
+    if (lookup?.patron?.id) {
+      api.confirmEntry(lookup.patron.id).catch(() => {});
+    }
+  }, [lookup, stopCamera]);
+
   useEffect(() => {
     if (!approvalEventCode) return;
     if (approvalTimer <= 0) return;
@@ -370,11 +438,21 @@ export default function GatePage() {
   useEffect(() => {
     api.getStats().then((stats) => {
       if (!stats) return;
-      const fresh: TodayCounts = { entries: stats.today_entries ?? 0, exits: stats.today_exits ?? 0, no_match: 0, spoof: 0 };
+      const fresh: TodayCounts = {
+        entries: stats.today_entries ?? 0,
+        exits: stats.today_exits ?? 0,
+        no_match: (stats as { today_no_match?: number }).today_no_match ?? 0,
+        spoof: (stats as { today_spoof?: number }).today_spoof ?? 0,
+      };
       setTodayCounts(fresh);
       setActivePatrons(stats.active_patrons ?? Math.max(0, (stats.today_entries ?? 0) - (stats.today_exits ?? 0)));
       localStorage.setItem("gate_today_counts", JSON.stringify(fresh));
     }).catch(() => {});
+    if (typeof api.getAccessStats === "function") {
+      api.getAccessStats().then((a) => {
+        setTodayCounts((prev) => ({ ...prev, spoof: a.today_spoof, no_match: a.today_no_match }));
+      }).catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -779,7 +857,7 @@ export default function GatePage() {
                 </Stack>
               )}
 
-              {step === "verify" && (
+              {(step === "verify" || step === "challenge") && (
                 <Stack spacing={2}>
                   <Box sx={{ textAlign: "center" }}>
                     <Typography variant="h5" sx={{ fontWeight: 850 }}>Xác thực khuôn mặt</Typography>
@@ -809,26 +887,40 @@ export default function GatePage() {
                       </Stack>
                     )}
                   </Paper>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<CheckCircleOutlineOutlinedIcon />}
-                    onClick={handleVerify}
-                    disabled={loading}
-                    fullWidth
-                    sx={{
-                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                      borderRadius: 2,
-                      fontWeight: 700,
-                      textTransform: "none",
-                      "&:hover": {
-                        background: "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
-                      },
-                    }}
-                  >
-                    Xác thực
-                  </Button>
-                  <Button onClick={reset} disabled={loading} fullWidth>Hủy</Button>
+                  {step === "verify" ? (
+                    <>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<CheckCircleOutlineOutlinedIcon />}
+                        onClick={handleVerify}
+                        disabled={loading}
+                        fullWidth
+                        sx={{
+                          background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          borderRadius: 2,
+                          fontWeight: 700,
+                          textTransform: "none",
+                          "&:hover": {
+                            background: "linear-gradient(135deg, #34d399 0%, #10b981 100%)",
+                          },
+                        }}
+                      >
+                        Xác thực
+                      </Button>
+                      <Button onClick={reset} disabled={loading} fullWidth>Hủy</Button>
+                    </>
+                  ) : (
+                    <ChallengeStep
+                      studentCode={mssv}
+                      patronId={lookup?.patron?.id ?? null}
+                      captureFrame={captureImage}
+                      onLive={handleChallengeLive}
+                      onSpoof={handleChallengeSpoof}
+                      onDisabled={handleChallengeDisabled}
+                      onCancel={reset}
+                    />
+                  )}
                 </Stack>
               )}
 

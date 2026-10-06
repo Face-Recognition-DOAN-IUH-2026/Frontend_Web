@@ -39,6 +39,7 @@ import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import UploadIcon from "@mui/icons-material/UploadFileOutlined";
 import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
 
 import api, { getErrorMessage } from "@/lib/api-client";
 import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
@@ -53,6 +54,7 @@ import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@
 import {
   BookQuantityDialog,
   BookBulkDeleteDialog,
+  BookBulkPriceDialog,
   BookImportPreviewSection,
   BookImportResultSection,
 } from "../_components/books";
@@ -73,7 +75,7 @@ export default function BooksPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [books, setBooks] = useState<BookWithStats[]>([]);
   const [total, setTotal] = useState(0);
-  const [aggregateStats, setAggregateStats] = useState<{ totalCopies: number; availableCopies: number; borrowedCopies: number } | null>(null);
+  const [aggregateStats, setAggregateStats] = useState<{ totalCopies: number; availableCopies: number; borrowedCopies: number; outOfStockBooks?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<BookWithStats[]>([]);
@@ -98,6 +100,8 @@ export default function BooksPage() {
   const [deleteInput, setDeleteInput] = useState("");
   const [deleting, setDeleting] = useState(false);
   const deleteConfirmed = deleteInput === "XÓA";
+  const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
+  const [singlePriceBook, setSinglePriceBook] = useState<BookWithStats | null>(null);
 
   const showNotice = useCallback((severity: "success" | "error" | "warning" | "info", message: string) => {
     setNotice({ severity, message });
@@ -111,17 +115,15 @@ export default function BooksPage() {
   const loadBooks = useCallback(async () => {
     setLoading(true);
     try {
-      const [res, statsRes] = await Promise.all([
-        api.listBooks({ skip: page * limit, limit }),
-        typeof (api as any).getBookStats === "function" ? (api as any).getBookStats().catch(() => null) : Promise.resolve(null),
-      ]);
+      const res = await api.listBooks({ skip: page * limit, limit });
       setBooks(res.items);
       setTotal(res.total);
-      if (statsRes) {
+      if (res.aggregateStats) {
         setAggregateStats({
-          totalCopies: statsRes.totalCopies,
-          availableCopies: statsRes.availableCopies,
-          borrowedCopies: statsRes.borrowedCopies,
+          totalCopies: res.aggregateStats.totalCopies,
+          availableCopies: res.aggregateStats.availableCopies,
+          borrowedCopies: res.aggregateStats.borrowedCopies,
+          outOfStockBooks: res.aggregateStats.outOfStockBooks,
         });
       }
     } catch (err) {
@@ -184,6 +186,7 @@ export default function BooksPage() {
         result = await api.importBooksFiltered(previewData.map((row) => ({
           isbn: row.isbn,
           quantity: row.quantity,
+          price: row.price ?? null,
           title: row.title,
           subtitle: row.subtitle ?? null,
           author: row.author ?? null,
@@ -328,15 +331,15 @@ export default function BooksPage() {
     list.sort((a, b) => {
       let valA: any = "";
       let valB: any = "";
-      if (orderBy === "isbn") {
-        valA = a.isbn || "";
-        valB = b.isbn || "";
-      } else if (orderBy === "title") {
+      if (orderBy === "title") {
         valA = a.title || "";
         valB = b.title || "";
       } else if (orderBy === "author") {
         valA = a.author || "";
         valB = b.author || "";
+      } else if (orderBy === "price") {
+        valA = a.price != null ? Number(a.price) : -1;
+        valB = b.price != null ? Number(b.price) : -1;
       } else if (orderBy === "total_copies") {
         valA = a.total_copies ?? 0;
         valB = b.total_copies ?? 0;
@@ -383,7 +386,7 @@ export default function BooksPage() {
     setSelectedIds(next);
   };
 
-  const outOfStockCount = books.filter((b) => b.available_copies === 0).length;
+  const outOfStockCount = aggregateStats?.outOfStockBooks ?? books.filter((b) => b.available_copies === 0).length;
 
   const statItems = [
     {
@@ -599,15 +602,6 @@ export default function BooksPage() {
                     size="small"
                   />
                 </TableCell>
-                <TableCell sx={{ fontWeight: 700, minWidth: 130 }}>
-                  <TableSortLabel
-                    active={orderBy === "isbn"}
-                    direction={orderBy === "isbn" ? order : "asc"}
-                    onClick={() => handleRequestSort("isbn")}
-                  >
-                    ISBN
-                  </TableSortLabel>
-                </TableCell>
                 <TableCell sx={{ fontWeight: 700, minWidth: 260 }}>
                   <TableSortLabel
                     active={orderBy === "title"}
@@ -628,6 +622,15 @@ export default function BooksPage() {
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700, minWidth: 130 }}>
                   Nhà xuất bản
+                </TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, minWidth: 130 }}>
+                  <TableSortLabel
+                    active={orderBy === "price"}
+                    direction={orderBy === "price" ? order : "asc"}
+                    onClick={() => handleRequestSort("price")}
+                  >
+                    Đơn giá
+                  </TableSortLabel>
                 </TableCell>
                 <TableCell align="center" sx={{ fontWeight: 700, minWidth: 80 }}>
                   <TableSortLabel
@@ -697,19 +700,6 @@ export default function BooksPage() {
                         <Checkbox checked={isSelected} size="small" />
                       </TableCell>
                       <TableCell>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            color: "primary.main",
-                            fontWeight: 700,
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          {record.isbn || "-"}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
                         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                           {record.cover_url ? (
                             <Box
@@ -768,6 +758,45 @@ export default function BooksPage() {
                         <Typography variant="body2" color="text.secondary">
                           {record.publisher || "-"}
                         </Typography>
+                      </TableCell>
+                      <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                        {record.price != null && Number(record.price) > 0 ? (
+                          <Chip
+                            size="small"
+                            icon={<PaidOutlinedIcon style={{ fontSize: 14 }} />}
+                            label={`${Number(record.price).toLocaleString("vi-VN")} đ`}
+                            onClick={() => {
+                              if (!canUpdateBook) return;
+                              setSinglePriceBook(record);
+                            }}
+                            variant="outlined"
+                            clickable={canUpdateBook}
+                            sx={{
+                              fontWeight: 600,
+                              fontFamily: "'JetBrains Mono', monospace",
+                              borderColor: "success.main",
+                              color: "success.main",
+                              "&:hover": { bgcolor: "success.lighter" },
+                            }}
+                          />
+                        ) : (
+                          <Chip
+                            size="small"
+                            label="Chưa có giá"
+                            variant="outlined"
+                            color="warning"
+                            clickable={canUpdateBook}
+                            onClick={() => {
+                              if (!canUpdateBook) return;
+                              setSinglePriceBook(record);
+                            }}
+                            sx={{
+                              fontSize: "0.75rem",
+                              fontStyle: "italic",
+                              "&:hover": { bgcolor: "warning.lighter" },
+                            }}
+                          />
+                        )}
                       </TableCell>
                       <TableCell align="center">
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -913,6 +942,24 @@ export default function BooksPage() {
           >
             Bỏ chọn
           </Button>
+          <Tooltip title={!canUpdateBook ? getPermissionDeniedReason("books", "update") : ""}>
+            <span>
+              <Button
+                size="small"
+                variant="contained"
+                color="primary"
+                disabled={!canUpdateBook}
+                startIcon={<PaidOutlinedIcon />}
+                onClick={() => {
+                  if (!canUpdateBook) return;
+                  setBulkPriceOpen(true);
+                }}
+                sx={{ textTransform: "none", fontWeight: 700 }}
+              >
+                Sửa giá ({selectedIds.size})
+              </Button>
+            </span>
+          </Tooltip>
           <Tooltip title={!canDeleteBook ? getPermissionDeniedReason("books", "delete") : ""}>
             <span>
               <Button
@@ -950,6 +997,33 @@ export default function BooksPage() {
         deleting={deleting}
         onDelete={handleBulkDelete}
       />
+
+      {/* Book Bulk Price Dialog Component */}
+      <BookBulkPriceDialog
+        open={bulkPriceOpen}
+        onClose={() => setBulkPriceOpen(false)}
+        selectedIds={selectedIds}
+        displayBooks={displayBooks}
+        onSuccess={() => {
+          setSelectedIds(new Set());
+          loadBooks();
+        }}
+        showNotice={showNotice}
+      />
+
+      {/* Single Book Quick Price Dialog Component */}
+      {singlePriceBook && (
+        <BookBulkPriceDialog
+          open={Boolean(singlePriceBook)}
+          onClose={() => setSinglePriceBook(null)}
+          selectedIds={new Set([singlePriceBook.id])}
+          displayBooks={[singlePriceBook]}
+          onSuccess={() => {
+            loadBooks();
+          }}
+          showNotice={showNotice}
+        />
+      )}
     </Stack>
   );
 }

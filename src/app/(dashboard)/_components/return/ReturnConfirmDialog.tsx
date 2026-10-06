@@ -66,6 +66,9 @@ export default function ReturnConfirmDialog({
     : 0;
   const overdueFine = overdueDays > 0 ? estimateOverdueFine(overdueDays, fineConfig) : 0;
   const damageFee = estimateDamageFee(selectedCondition, (record as any)?.book?.price ?? null, fineConfig);
+  const isNormalCondition = selectedCondition === "good" || selectedCondition === "new";
+  const estimatedTotal = overdueFine + damageFee;
+  const hasFee = estimatedTotal > 0;
 
   return (
     <Dialog open={!!record} onClose={loading ? undefined : onClose} maxWidth="sm" fullWidth>
@@ -112,6 +115,7 @@ export default function ReturnConfirmDialog({
             </Select>
           </FormControl>
 
+          {hasFee ? (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <input
               type="checkbox"
@@ -123,8 +127,13 @@ export default function ReturnConfirmDialog({
               Đã thu phí ngay
             </Typography>
           </Box>
+          ) : (
+          <Typography variant="body2" color="text.secondary">
+            Không phát sinh phí — chỉ cần xác nhận trả sách.
+          </Typography>
+          )}
 
-          {isPaidImmediately && (
+          {isPaidImmediately && hasFee && !isNormalCondition && (
             <FormControl fullWidth size="small">
               <InputLabel id="payment-method-label">Phương thức thanh toán</InputLabel>
               <Select
@@ -140,6 +149,7 @@ export default function ReturnConfirmDialog({
             </FormControl>
           )}
 
+          {hasFee ? (
           <TextField
             label="Ghi chú thêm (tuỳ chọn)"
             value={note}
@@ -150,6 +160,7 @@ export default function ReturnConfirmDialog({
             rows={2}
             placeholder="Ghi chú thêm nếu sách có hư hỏng..."
           />
+          ) : null}
         </Box>
       </DialogContent>
       <DialogActions>
@@ -166,7 +177,7 @@ export default function ReturnConfirmDialog({
               disabled={loading || !canUpdateBorrow}
               sx={{ textTransform: "none", fontWeight: 700 }}
             >
-              {loading ? "Đang trả..." : "Xác nhận trả"}
+              {loading ? "Đang trả..." : hasFee ? "Xác nhận trả" : "Hoàn tất"}
             </Button>
           </span>
         </Tooltip>

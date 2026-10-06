@@ -14,7 +14,7 @@ const mockRecord: BorrowRecord = {
   book_id: 'book-1',
   copy_id: 'copy-1',
   borrow_at: new Date().toISOString(),
-  due_at: new Date(Date.now() + 86400000).toISOString(),
+  due_at: new Date(Date.now() - 86400000).toISOString(),
   return_at: null,
   shelf_location: 'K-A1',
   status: 'active',
