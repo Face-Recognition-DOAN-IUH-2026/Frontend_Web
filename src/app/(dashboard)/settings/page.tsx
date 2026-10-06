@@ -19,7 +19,6 @@ import {
   LinearProgress,
   Paper,
   Skeleton,
-  Snackbar,
   Stack,
   Switch,
   Tab,
@@ -34,6 +33,7 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import CloseIcon from "@mui/icons-material/Close";
@@ -352,12 +352,12 @@ export default function SettingsPage() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState(0);
+  const { toast } = useToast();
   const [settings, setSettings] = useState<Record<string, SystemConfigEntry[]> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [modified, setModified] = useState<Record<string, Record<string, any>>>({});
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
   const [testEmailOpen, setTestEmailOpen] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [testEmailSending, setTestEmailSending] = useState(false);
@@ -412,15 +412,15 @@ export default function SettingsPage() {
         const to = row.to === "" || row.to == null ? null : Number(row.to);
         const amount = row.amount === "" || row.amount == null ? null : Number(row.amount);
         if (from == null || !Number.isFinite(from) || from < 1) {
-          setSnackbar({ open: true, message: `Bậc ${i + 1}: "Từ ngày" phải là số từ 1 trở lên.`, severity: "error" });
+          toast.error(`Bậc ${i + 1}: "Từ ngày" phải là số từ 1 trở lên.`);
           return;
         }
         if (amount == null || !Number.isFinite(amount) || amount < 0) {
-          setSnackbar({ open: true, message: `Bậc ${i + 1}: "Số tiền" phải là số từ 0 trở lên.`, severity: "error" });
+          toast.error(`Bậc ${i + 1}: "Số tiền" phải là số từ 0 trở lên.`);
           return;
         }
         if (to !== null && (!Number.isFinite(to) || to < from)) {
-          setSnackbar({ open: true, message: `Bậc ${i + 1}: "Đến ngày" phải để trống (∞) hoặc từ ${from} trở lên.`, severity: "error" });
+          toast.error(`Bậc ${i + 1}: "Đến ngày" phải để trống (∞) hoặc từ ${from} trở lên.`);
           return;
         }
       }
@@ -434,10 +434,10 @@ export default function SettingsPage() {
         return next;
       });
       load();
-      setSnackbar({ open: true, message: "Lưu cài đặt thành công.", severity: "success" });
+      toast.success("Lưu cài đặt thành công.");
     } catch (err: any) {
       const msg = getErrorMessage(err) || "Lưu cài đặt thất bại.";
-      setSnackbar({ open: true, message: msg, severity: "error" });
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -457,7 +457,7 @@ export default function SettingsPage() {
     const passEntry = settings.smtp.find((e) => e.config_key === "pass" || e.config_key === "password");
     const passValue = passEntry ? getCurrentValue(passEntry) : "";
     if (!passValue || /^•+$/.test(String(passValue))) {
-      setSnackbar({ open: true, message: "Vui lòng nhập mật khẩu SMTP mới trước khi gửi email test.", severity: "error" });
+      toast.error("Vui lòng nhập mật khẩu SMTP mới trước khi gửi email test.");
       return;
     }
     try {
@@ -466,14 +466,14 @@ export default function SettingsPage() {
       settings.smtp.forEach((e) => { smtpConfig[e.config_key] = e.config_value; });
       const res = await api.testSmtpConfig({ to: testEmail, ...smtpConfig } as any);
       if (res.success) {
-        setSnackbar({ open: true, message: "Gửi email test thành công.", severity: "success" });
+        toast.success("Gửi email test thành công.");
       } else {
-        setSnackbar({ open: true, message: res.message || "Gửi email test thất bại.", severity: "error" });
+        toast.error(res.message || "Gửi email test thất bại.");
       }
       setTestEmailOpen(false);
     } catch (err: any) {
       const msg = getErrorMessage(err) || "Gửi email test thất bại.";
-      setSnackbar({ open: true, message: msg, severity: "error" });
+      toast.error(msg);
     } finally {
       setTestEmailSending(false);
     }
@@ -737,21 +737,6 @@ export default function SettingsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* ─── Save Feedback ─── */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          icon={snackbar.severity === "success" ? <CheckCircleOutlineOutlinedIcon fontSize="small" /> : <ErrorOutlineOutlinedIcon fontSize="small" />}
-          severity={snackbar.severity}
-          sx={{ borderRadius: 2, fontWeight: 600, boxShadow: 4 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

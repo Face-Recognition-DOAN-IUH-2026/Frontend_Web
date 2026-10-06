@@ -28,6 +28,7 @@ export interface TokenResponse {
   access_token: string;
   refresh_token: string | null;
   token_type: string;
+  require_password_change?: boolean;
 }
 
 export interface UserPublic {
@@ -65,12 +66,13 @@ export interface AuthUser {
   role: string;
   full_name?: string | null;
   avatar_url?: string | null;
+  require_password_change?: boolean;
 }
 
 export interface AuthContextType {
   user: AuthUser | null;
   accessToken: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<TokenResponse>;
   setAuthFromToken: (accessToken: string, refreshToken: string | null, email: string, role?: string) => void;
   updateUser: (fields: Partial<AuthUser>) => void;
   refreshUser: () => Promise<void>;
@@ -89,4 +91,5 @@ export interface UserServiceAuthResponse {
   user: UserPublic;
   access_token: string;
   refresh_token?: string;
+  require_password_change?: boolean;
 }

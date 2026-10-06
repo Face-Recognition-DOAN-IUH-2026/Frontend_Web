@@ -1,8 +1,14 @@
+jest.unmock("@/lib/toast-context");
+
 import React from "react";
-import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
+import { render as rtlRender, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SettingsPage from "@/app/(dashboard)/settings/page";
 import * as apiClient from "@/lib/api-client";
+import { ToastProvider } from "@/lib/toast-context";
+
+const render = (ui: React.ReactElement, options?: any) =>
+  rtlRender(<ToastProvider>{ui}</ToastProvider>, options);
 
 let mockSettingsVal: any;
 let mockUserRole = "admin";

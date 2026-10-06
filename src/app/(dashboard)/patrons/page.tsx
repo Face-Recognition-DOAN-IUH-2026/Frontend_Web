@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Alert,
   Avatar,
   Box,
   Button,
@@ -16,13 +15,11 @@ import {
   Drawer,
   IconButton,
   MenuItem,
-  Snackbar,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -31,6 +28,7 @@ import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
 import { initials } from "@/lib/utils";
+import { useToast } from "@/lib/toast-context";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
@@ -38,11 +36,10 @@ import ConfirmDialog from "@/app/(dashboard)/_components/ui/ConfirmDialog";
 import PatronStatCards from "@/app/(dashboard)/_components/ui/PatronStatCards";
 import PatronToolbar from "@/app/(dashboard)/_components/ui/PatronToolbar";
 import PatronListView from "@/app/(dashboard)/_components/ui/PatronListView";
-import PatronWizard from "@/app/(dashboard)/_components/ui/PatronWizard";
+import PatronImportWizard from "@/app/(dashboard)/_components/ui/PatronImportWizard";
 import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 
 export type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face" | "deleted";
-type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
 
 const STAT_GRADIENT = {
   total: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
@@ -54,7 +51,7 @@ const STAT_GRADIENT = {
 export default function PatronsPage() {
   const router = useRouter();
   const { can } = usePermission();
-  const canCreatePatron = can("patrons", "create");
+  const { toast } = useToast();
   const canUpdatePatron = can("patrons", "update");
   const canDeletePatron = can("patrons", "delete");
 
@@ -71,7 +68,7 @@ export default function PatronsPage() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const [editTarget, setEditTarget] = useState<PatronPublic | null>(null);
   const [editForm, setEditForm] = useState<PatronUpdate>({});
@@ -86,22 +83,17 @@ export default function PatronsPage() {
   const [renewTarget, setRenewTarget] = useState<PatronPublic | null>(null);
   const [renewMonths, setRenewMonths] = useState(12);
 
-  const [notice, setNotice] = useState<Notice>(null);
-  const showNotice = (severity: NonNullable<Notice>["severity"], message: string) => {
-    setNotice({ severity, message });
-  };
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { items } = await api.searchPatrons(debouncedQuery || undefined);
+      const { items } = await api.searchPatrons(debouncedQuery || undefined, undefined, 0, 1000);
       setPatrons(items);
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Không thể tải danh sách độc giả");
+      toast.error(getErrorMessage(err) || "Không thể tải danh sách độc giả");
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery]);
+  }, [debouncedQuery, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -109,7 +101,7 @@ export default function PatronsPage() {
     let list = patrons;
     if (filter === "active") list = list.filter((p) => p.status === "active");
     else if (filter === "inactive") list = list.filter((p) => p.status === "inactive");
-    else if (filter === "expired") list = list.filter((p) => p.status === "expired");
+    else if (filter === "expired") list = list.filter((p) => !!p.membership_expiry && new Date(p.membership_expiry) < new Date());
     else if (filter === "deleted") list = list.filter((p) => p.status === "deleted");
     else if (filter === "has_face") list = list.filter((p) => p.has_face);
     else if (filter === "no_face") list = list.filter((p) => !p.has_face);
@@ -139,11 +131,28 @@ export default function PatronsPage() {
       setEditTarget(null);
       setEditForm({});
       await load();
-      showNotice("success", "Đã cập nhật độc giả");
+      toast.success("Đã cập nhật độc giả");
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Cập nhật thất bại");
+      toast.error(getErrorMessage(err) || "Cập nhật thất bại");
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await api.downloadPatronTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "patron_import_template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Đã tải xuống biểu mẫu Excel.");
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Không thể tải biểu mẫu Excel");
     }
   };
 
@@ -157,9 +166,9 @@ export default function PatronsPage() {
       setRenewTarget(null);
       setRenewMonths(12);
       await load();
-      showNotice("success", `Đã gia hạn thẻ ${renewTarget.full_name} ${renewMonths} tháng`);
+      toast.success(`Đã gia hạn thẻ ${renewTarget.full_name} ${renewMonths} tháng`);
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Gia hạn thất bại");
+      toast.error(getErrorMessage(err) || "Gia hạn thất bại");
     }
   };
 
@@ -171,10 +180,10 @@ export default function PatronsPage() {
     setPatrons((prev) => prev.filter((p) => p.id !== target.id));
     try {
       await api.deletePatron(target.id);
-      showNotice("success", `Đã xóa độc giả ${target.full_name}`);
+      toast.success(`Đã xóa độc giả ${target.full_name}`);
     } catch (err: any) {
-      if (err?.response?.status === 404) showNotice("info", "Độc giả đã bị xóa trước đó");
-      else { showNotice("error", getErrorMessage(err) || "Xóa thất bại"); await load(); }
+      if (err?.response?.status === 404) toast.info("Độc giả đã bị xóa trước đó");
+      else { toast.error(getErrorMessage(err) || "Xóa thất bại"); await load(); }
     }
   };
 
@@ -186,9 +195,9 @@ export default function PatronsPage() {
     setPatrons((prev) => prev.filter((p) => p.id !== target.id));
     try {
       await api.restorePatron(target.id);
-      showNotice("success", `Đã khôi phục độc giả ${target.full_name}`);
+      toast.success(`Đã khôi phục độc giả ${target.full_name}`);
     } catch (err: any) {
-      showNotice("error", getErrorMessage(err) || "Khôi phục thất bại");
+      toast.error(getErrorMessage(err) || "Khôi phục thất bại");
       await load();
     }
   };
@@ -202,37 +211,6 @@ export default function PatronsPage() {
         icon={PeopleIcon}
         statBadges={statBadges}
         onRefresh={load}
-        actions={
-          <Tooltip title={!canCreatePatron ? getPermissionDeniedReason("patrons", "create") : ""}>
-            <span>
-              <Button
-                variant="contained"
-                disabled={!canCreatePatron}
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  if (!canCreatePatron) return;
-                  setShowCreate(true);
-                }}
-                sx={{
-                  background: !canCreatePatron
-                    ? undefined
-                    : "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
-                  borderRadius: 2,
-                  fontWeight: 700,
-                  textTransform: "none",
-                  boxShadow: !canCreatePatron ? "none" : "0 4px 14px rgba(139,0,0,0.3)",
-                  "&:hover": {
-                    background: !canCreatePatron
-                      ? undefined
-                      : "linear-gradient(135deg, #700000 0%, #500000 100%)",
-                  },
-                }}
-              >
-                Thêm độc giả
-              </Button>
-            </span>
-          </Tooltip>
-        }
       />
 
       <PatronStatCards patrons={patrons} />
@@ -242,7 +220,8 @@ export default function PatronsPage() {
         onQueryChange={setQuery}
         filter={filter}
         onFilterChange={setFilter}
-        onAddPatron={() => setShowCreate(true)}
+        onImportExcel={() => setShowImport(true)}
+        onDownloadTemplate={handleDownloadTemplate}
       />
 
       {loading && filtered.length === 0 ? (
@@ -263,7 +242,7 @@ export default function PatronsPage() {
         />
       )}
 
-      <PatronWizard open={showCreate} onClose={() => setShowCreate(false)} onComplete={load} />
+      <PatronImportWizard open={showImport} onClose={() => setShowImport(false)} onSuccess={load} />
 
       <Drawer
         anchor="right"
@@ -302,7 +281,6 @@ export default function PatronsPage() {
               <TextField select label="Trạng thái" value={editForm.status || "active"} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} fullWidth>
                 <MenuItem value="active">Hoạt động</MenuItem>
                 <MenuItem value="inactive">Tạm khóa</MenuItem>
-                <MenuItem value="expired">Hết hạn</MenuItem>
               </TextField>
             </Stack>
           ) : null}
@@ -426,24 +404,6 @@ export default function PatronsPage() {
           </Tooltip>
         </DialogActions>
       </Dialog>
-
-      <Snackbar
-        open={Boolean(notice)}
-        autoHideDuration={4000}
-        onClose={() => setNotice(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        {notice ? (
-          <Alert
-            onClose={() => setNotice(null)}
-            severity={notice.severity}
-            variant="filled"
-            sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
-          >
-            {notice.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
     </Stack>
   );
 }

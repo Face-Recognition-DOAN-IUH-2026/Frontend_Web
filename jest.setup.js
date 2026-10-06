@@ -84,3 +84,16 @@ jest.mock('antd/es/table', () => ({
     );
   },
 }));
+
+const mockToastFn = Object.assign(jest.fn(), {
+  success: jest.fn(),
+  error: jest.fn(),
+  warning: jest.fn(),
+  info: jest.fn(),
+});
+
+jest.mock('@/lib/toast-context', () => ({
+  __esModule: true,
+  useToast: () => ({ toast: mockToastFn }),
+  ToastProvider: ({ children }) => children,
+}));

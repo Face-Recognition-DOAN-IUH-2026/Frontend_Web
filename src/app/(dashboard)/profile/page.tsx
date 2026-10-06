@@ -18,9 +18,9 @@ import {
   Stack,
   TextField,
   Typography,
-  Snackbar,
   LinearProgress,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import EmailIcon from "@mui/icons-material/EmailOutlined";
 import PhoneIcon from "@mui/icons-material/PhoneOutlined";
 import LockIcon from "@mui/icons-material/LockOutlined";
@@ -53,11 +53,7 @@ import PatronDebtSection from "@/app/(dashboard)/_components/profile/PatronDebtS
 
 export default function ProfilePage() {
   const { updateUser } = useAuth();
-  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" | "warning" | "info" }>({
-    open: false,
-    message: "",
-    severity: "info",
-  });
+  const { toast } = useToast();
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -104,7 +100,7 @@ export default function ProfilePage() {
   }, [resendCooldown]);
 
   const showNotice = (severity: "success" | "error" | "warning" | "info", message: string) => {
-    setToast({ open: true, message, severity });
+    toast(message, severity);
   };
 
   useEffect(() => { fetchProfile(); }, []);
@@ -1244,17 +1240,6 @@ export default function ProfilePage() {
           )}
         </DialogContent>
       </Dialog>
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))} sx={{ borderRadius: 2 }}>
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

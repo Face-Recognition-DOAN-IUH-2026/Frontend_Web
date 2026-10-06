@@ -21,6 +21,7 @@ import {
   LoginFormPassword,
   LoginFormFace,
   ForgotPasswordDialog,
+  ForcePasswordChangeDialog,
 } from "./_components";
 
 type LoginMode = "password" | "face";
@@ -38,6 +39,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
+  const [submittedPassword, setSubmittedPassword] = useState("");
 
   const faceFailCountRef = useRef(0);
 
@@ -46,7 +49,12 @@ export default function LoginPage() {
     setError("");
     setIsLoading(true);
     try {
-      await login(email, password);
+      const res = await login(email, password);
+      if (res?.require_password_change) {
+        setSubmittedPassword(password);
+        setForcePasswordChange(true);
+        return;
+      }
       window.location.href = "/dashboard";
     } catch (err: any) {
       setError(getErrorMessage(err) || "Đăng nhập thất bại.");
@@ -228,20 +236,13 @@ export default function LoginPage() {
               />
             )}
 
-            {/* Register Link */}
+            {/* Patron Notice */}
             <Box sx={{ mt: 3.5, pt: 2.5, borderTop: "1px solid", borderColor: "divider", textAlign: "center" }}>
               <Typography variant="body2" color="text.secondary">
-                Chưa có tài khoản thư viện?{" "}
-                <Link
-                  href="/register"
-                  style={{
-                    color: theme.palette.primary.main,
-                    fontWeight: 700,
-                    textDecoration: "none",
-                  }}
-                >
-                  Đăng ký thẻ độc giả
-                </Link>
+                Tài khoản độc giả do Thư viện cấp theo mã sinh viên.
+              </Typography>
+              <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5 }}>
+                Độc giả mới vui lòng liên hệ quầy dịch vụ thư viện để kích hoạt thẻ.
               </Typography>
             </Box>
 
@@ -257,6 +258,15 @@ export default function LoginPage() {
       <ForgotPasswordDialog
         open={forgotOpen}
         onClose={() => setForgotOpen(false)}
+      />
+
+      {/* Force Password Change Dialog on First Login */}
+      <ForcePasswordChangeDialog
+        open={forcePasswordChange}
+        initialOldPassword={submittedPassword}
+        onSuccess={() => {
+          window.location.href = "/dashboard";
+        }}
       />
     </>
   );

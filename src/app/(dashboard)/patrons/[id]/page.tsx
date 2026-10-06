@@ -14,10 +14,10 @@ import {
   DialogTitle,
   Divider,
   Grid,
+  IconButton,
   LinearProgress,
   MenuItem,
   Paper,
-  Snackbar,
   Stack,
   Tab,
   Table,
@@ -34,6 +34,7 @@ import AutoStoriesOutlinedIcon from "@mui/icons-material/AutoStoriesOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import CalendarTodayIcon from "@mui/icons-material/CalendarTodayOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import CloseIcon from "@mui/icons-material/Close";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
@@ -52,7 +53,14 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
+import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
+import { useToast } from "@/lib/toast-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import {
+  mapEnrollError,
+  extractFailedAngles,
+  buildAngleErrorMessage,
+} from "@/lib/face-enroll-errors";
 import { initials, formatDate, formatDateTime, statusLabel, statusColor } from "@/lib/utils";
 import type { AccessLogPublic, BorrowRecord, PatronPublic, PatronUpdate } from "@/lib/types";
 import type { CaptureAngle } from "@/app/(dashboard)/_components/MultiAngleCapture";
@@ -64,8 +72,7 @@ const CAMERA_LABELS: Record<string, string> = {
   web_login: "Đăng nhập web",
 };
 
-function borrowStatus(record: BorrowRecord) {
-  const overdue = record.status === "borrowed" && new Date(record.due_at) < new Date();
+function borrowStatus(record: BorrowRecord) {  const overdue = record.status === "borrowed" && new Date(record.due_at) < new Date();
   if (record.status === "returned") return { label: "Đã trả", color: "default" as const };
   if (overdue) return { label: "Quá hạn", color: "error" as const };
   return { label: "Đang mượn", color: "success" as const };
@@ -107,15 +114,12 @@ export default function PatronDetailPage() {
   const [showRestore, setShowRestore] = useState(false);
   const [restoreConfirmText, setRestoreConfirmText] = useState("");
   const [showEnroll, setShowEnroll] = useState(false);
+  const { toast } = useToast();
+  const enrollTask = useTaskSSE(120000);
   const [consent, setConsent] = useState(false);
   const [enrollError, setEnrollError] = useState("");
   const [enrollSuccess, setEnrollSuccess] = useState("");
   const [enrollLoading, setEnrollLoading] = useState(false);
-  const [notice, setNotice] = useState<{ severity: "success" | "error" | "warning" | "info"; message: string } | null>(null);
-
-  const showNotice = (severity: "success" | "error" | "warning" | "info", message: string) => {
-    setNotice({ severity, message });
-  };
 
   const loadPatron = useCallback(async () => {
     try {
@@ -173,7 +177,7 @@ export default function PatronDetailPage() {
     if (!patron) return;
     await api.updatePatron(patron.id, editForm);
     setShowEdit(false);
-    showNotice("success", "Đã cập nhật thông tin độc giả.");
+    toast.success("Đã cập nhật thông tin độc giả.");
     await loadPatron();
   };
 
@@ -183,7 +187,7 @@ export default function PatronDetailPage() {
     if (next < new Date()) next.setTime(Date.now());
     next.setFullYear(next.getFullYear() + 1);
     await api.updatePatron(patron.id, { membership_expiry: next.toISOString().split("T")[0] });
-    showNotice("success", "Đã gia hạn thẻ thêm 1 năm.");
+    toast.success("Đã gia hạn thẻ thêm 1 năm.");
     await loadPatron();
   };
 
@@ -191,13 +195,14 @@ export default function PatronDetailPage() {
     if (!patron || deleteConfirmText !== "XÓA") return;
     try {
       await api.deletePatron(patron.id);
+      toast.success(`Đã xóa độc giả ${patron.full_name}`);
       router.push("/patrons");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        showNotice("error", "Độc giả không tồn tại hoặc đã bị xóa.");
+        toast.error("Độc giả không tồn tại hoặc đã bị xóa.");
         router.push("/patrons");
       } else {
-        showNotice("error", `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
+        toast.error(`Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
       }
     }
   };
@@ -208,10 +213,10 @@ export default function PatronDetailPage() {
       await api.restorePatron(patron.id);
       setShowRestore(false);
       setRestoreConfirmText("");
-      showNotice("success", "Đã khôi phục độc giả.");
+      toast.success("Đã khôi phục độc giả.");
       await loadPatron();
     } catch (err: any) {
-      showNotice("error", `Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
+      toast.error(`Khôi phục thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
     }
   };
 
@@ -221,30 +226,59 @@ export default function PatronDetailPage() {
     setEnrollError("");
     setEnrollSuccess("");
     try {
-      await api.enrollPatronFaceBatch(patron.id, {
+      const res = await api.enrollPatronFaceBatch(patron.id, {
         frontal: files.frontal,
         right: files.right,
         left: files.left,
         down: files.down,
       });
-      setEnrollSuccess("Đăng ký khuôn mặt thành công.");
-      setShowEnroll(false);
-      setConsent(false);
-      await loadPatron();
+      // Enroll chạy bất đồng bộ trên worker: chờ job hoàn tất qua SSE rồi mới báo kết quả
+      if (res?.job_id) {
+        enrollTask.start(res.job_id);
+      } else {
+        finishEnrollSuccess();
+        await loadPatron();
+      }
     } catch (err: any) {
-      const errCode = err?.response?.data?.error || err?.response?.data?.detail;
-      const errorMessages: Record<string, string> = {
-        LIVENESS_FAILED: "Ảnh không phải khuôn mặt thật, vui lòng chụp trực tiếp.",
-        NO_FACE_DETECTED: "Không tìm thấy khuôn mặt trong ảnh, vui lòng thử lại.",
-        MULTIPLE_FACES: "Có nhiều hơn 1 khuôn mặt trong ảnh, vui lòng chụp lại.",
-        LOW_QUALITY: "Ảnh quá mờ hoặc thiếu sáng, vui lòng chụp lại với ánh sáng tốt hơn.",
-        FACE_DETECTION_FAILED: "Không thể trích xuất khuôn mặt, vui lòng thử lại.",
-      };
-      setEnrollError(errorMessages[errCode] || getErrorMessage(err) || "Đăng ký thất bại.");
-    } finally {
       setEnrollLoading(false);
+      const message = mapEnrollError(
+        err?.response?.data?.error || err?.response?.data?.detail,
+        getErrorMessage(err) || "Đăng ký thất bại."
+      );
+      setEnrollError(message);
+      toast(message, "error");
     }
   };
+
+  const finishEnrollSuccess = () => {
+    setEnrollSuccess("Đăng ký khuôn mặt thành công.");
+    setShowEnroll(false);
+    setConsent(false);
+    setEnrollLoading(false);
+  };
+
+  // Lắng nghe kết quả job enroll từ SSE: thành công mới reload (has_face) và toast
+  useEffect(() => {
+    const s = enrollTask.state.status;
+    if (s === "SUCCESS") {
+      enrollTask.reset();
+      finishEnrollSuccess();
+      toast("Đăng ký khuôn mặt thành công.", "success");
+      loadPatron();
+    } else if (s === "FAILURE" || s === "ERROR" || s === "TIMEOUT") {
+      enrollTask.reset();
+      setEnrollLoading(false);
+      // Ưu tiên hiện rõ góc nào lỗi để chụp lại, thay vì câu chung "N angle(s) failed"
+      const failedAngles = extractFailedAngles(enrollTask.state.result);
+      const message =
+        failedAngles.length > 0
+          ? `${buildAngleErrorMessage(failedAngles, "Đăng ký khuôn mặt thất bại.")} Toàn bộ đã được rollback, vui lòng chụp lại các góc lỗi.`
+          : mapEnrollError(enrollTask.state.error, "Đăng ký khuôn mặt thất bại.");
+      setEnrollError(message);
+      toast(message, "error");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrollTask.state.status]);
 
   const logsPageCount = Math.max(1, Math.ceil(logsTotal / logsLimit));
   const logsCurrentPage = Math.floor(logsSkip / logsLimit) + 1;
@@ -269,7 +303,11 @@ export default function PatronDetailPage() {
           <Button variant="contained" startIcon={<FaceRetouchingNaturalOutlinedIcon />} onClick={() => setShowEnroll(true)}>
             Đăng ký khuôn mặt
           </Button>
-        ) : null}
+        ) : (
+          <Button variant="outlined" startIcon={<FaceRetouchingNaturalOutlinedIcon />} onClick={() => setShowEnroll(true)}>
+            Cập nhật khuôn mặt
+          </Button>
+        )}
         <Button color="error" variant="outlined" startIcon={<DeleteOutlineOutlinedIcon />} onClick={() => setShowDelete(true)}>
           Xóa
         </Button>
@@ -302,7 +340,7 @@ export default function PatronDetailPage() {
 
           {patron.status === "deleted" && <Alert severity="error" sx={{ fontWeight: 600 }}>Độc giả này đã bị xóa. Dữ liệu sẽ được giữ lại và có thể khôi phục.</Alert>}
           {patron.status === "inactive" && <Alert severity="warning" sx={{ fontWeight: 600 }}>Thẻ độc giả đang bị tạm khóa.</Alert>}
-          {patron.status === "expired" && <Alert severity="warning" sx={{ fontWeight: 600 }}>Thẻ độc giả đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.</Alert>}
+          {expired && <Alert severity="warning" sx={{ fontWeight: 600 }}>Thẻ độc giả đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.</Alert>}
           {enrollSuccess && <Alert severity="success">{enrollSuccess}</Alert>}
 
           <Grid container spacing={3}>
@@ -312,9 +350,9 @@ export default function PatronDetailPage() {
                 <Box
                   sx={{
                     height: 100,
-                    background: patron.status === "active"
+                    background: patron.status === "active" && !expired
                       ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                      : patron.status === "expired"
+                      : expired
                         ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
                         : "linear-gradient(135deg, #64748b 0%, #475569 100%)",
                   }}
@@ -536,18 +574,32 @@ export default function PatronDetailPage() {
             </Grid>
           </Grid>
 
-          {/* Face enrollment */}
-          {showEnroll && !patron.has_face && (
-            <DashboardCard
-              title="Đăng ký khuôn mặt 4 góc"
-              subtitle="Chụp đủ các góc để tăng độ chính xác khi nhận diện."
-              actions={<Button onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}>Đóng</Button>}
-            >
+          {/* Face enrollment dialog */}
+          <Dialog open={showEnroll} onClose={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }} fullWidth maxWidth="md">
+            <DialogTitle sx={{ m: 0, px: 3, py: 2 }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                <Avatar sx={{ bgcolor: "primary.main", width: 44, height: 44 }}>
+                  <FaceRetouchingNaturalOutlinedIcon />
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.25 }}>
+                    {patron.has_face ? "Cập nhật khuôn mặt" : "Đăng ký khuôn mặt 4 góc"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {patron.full_name} · MSSV {patron.student_code} · Chụp đủ các góc để tăng độ chính xác khi nhận diện
+                  </Typography>
+                </Box>
+                <IconButton aria-label="Đóng" onClick={() => { setShowEnroll(false); setEnrollError(""); setConsent(false); }}>
+                  <CloseIcon />
+                </IconButton>
+              </Stack>
+            </DialogTitle>
+            <DialogContent dividers sx={{ px: 3, py: 2.5 }}>
               <MultiAngleCapture consent={consent} setConsent={setConsent} onFilesReady={handleEnroll} />
               {enrollError && <Alert severity="error" sx={{ mt: 2 }}>{enrollError}</Alert>}
-              {enrollLoading && <Alert severity="info" sx={{ mt: 2 }}>Đang đăng ký khuôn mặt...</Alert>}
-            </DashboardCard>
-          )}
+              {enrollLoading && <Alert severity="info" sx={{ mt: 2 }}>Đang xử lý khuôn mặt trên máy chủ, vui lòng chờ...</Alert>}
+            </DialogContent>
+          </Dialog>
 
           {/* Edit dialog */}
           <Dialog open={showEdit} onClose={() => setShowEdit(false)} fullWidth maxWidth="sm">
@@ -564,7 +616,6 @@ export default function PatronDetailPage() {
                 <TextField select label="Trạng thái" value={editForm.status || "active"} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} fullWidth>
                   <MenuItem value="active">Đang hoạt động</MenuItem>
                   <MenuItem value="inactive">Tạm khóa</MenuItem>
-                  <MenuItem value="expired">Hết hạn</MenuItem>
                 </TextField>
               </Stack>
             </DialogContent>
@@ -613,24 +664,6 @@ export default function PatronDetailPage() {
               <Button color="success" variant="contained" onClick={handleRestore} disabled={restoreConfirmText !== "KHÔI PHỤC"}>Khôi phục</Button>
             </DialogActions>
           </Dialog>
-
-          <Snackbar
-            open={Boolean(notice)}
-            autoHideDuration={4000}
-            onClose={() => setNotice(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          >
-            {notice ? (
-              <Alert
-                onClose={() => setNotice(null)}
-                severity={notice.severity}
-                variant="filled"
-                sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
-              >
-                {notice.message}
-              </Alert>
-            ) : undefined}
-          </Snackbar>
         </Stack>
       )}
     </LoadingOverlay>

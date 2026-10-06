@@ -17,8 +17,8 @@ import {
   TextField,
   Tooltip,
   Typography,
-  Snackbar,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import DoorFrontOutlinedIcon from "@mui/icons-material/DoorFrontOutlined";
@@ -89,12 +89,7 @@ function normalizeQuery(value: string) {
 export default function ActivePage() {
   const { can } = usePermission();
   const canUpdate = can("borrows", "update");
-
-  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+  const { toast } = useToast();
   const [patrons, setPatrons] = useState<ActivePatron[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -227,19 +222,11 @@ export default function ActivePage() {
     setExiting(true);
     try {
       await api.forceExitPatron(exitPatron.id);
-      setToast({
-        open: true,
-        message: `Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra`,
-        severity: "success",
-      });
+      toast.success(`Đã đánh dấu ${exitPatron.full_name || exitPatron.student_code} đã ra`);
       setExitPatron(null);
       await load();
     } catch (err) {
-      setToast({
-        open: true,
-        message: getErrorMessage(err) || "Lỗi khi đánh dấu ra",
-        severity: "error",
-      });
+      toast.error(getErrorMessage(err) || "Lỗi khi đánh dấu ra");
     } finally {
       setExiting(false);
     }
@@ -511,17 +498,6 @@ export default function ActivePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))} sx={{ borderRadius: 2 }}>
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

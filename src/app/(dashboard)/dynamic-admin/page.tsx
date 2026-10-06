@@ -8,12 +8,12 @@ import {
   CircularProgress,
   Paper,
   Skeleton,
-  Snackbar,
   Stack,
   Typography,
   alpha,
   useTheme,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
@@ -124,11 +124,15 @@ export default function DynamicAdminPage() {
   const [routeSearch, setRouteSearch] = useState<string>("");
   const [routeFilter, setRouteFilter] = useState<"all" | "allowed" | "blocked">("all");
 
-  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" | "info" }>({
-    open: false,
-    message: "",
-    severity: "info",
-  });
+  const { toast } = useToast();
+  const setToast = useCallback(
+    (opt: { open?: boolean; message: string; severity?: "success" | "error" | "info" | "warning" }) => {
+      if (opt.open !== false) {
+        toast(opt.message, opt.severity || "info");
+      }
+    },
+    [toast]
+  );
 
   // Role Matrix State
   const [roles, setRoles] = useState<Record<string, RolePermissionConfig>>(DEFAULT_FALLBACK_ROLES);
@@ -915,22 +919,6 @@ export default function DynamicAdminPage() {
         onCreate={handleCreateCustomRole}
       />
 
-      {/* ── NOTIFICATION TOAST ────────────────────────────────────────────── */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={4000}
-        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        <Alert
-          severity={toast.severity}
-          variant="filled"
-          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-          sx={{ borderRadius: 1.5, fontWeight: 600 }}
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

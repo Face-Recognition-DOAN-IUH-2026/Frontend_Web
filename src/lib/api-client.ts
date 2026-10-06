@@ -17,9 +17,10 @@ import type {
   KioskResult,
   LivenessActiveResult,
   PatronCreate,
+  PatronImportPreviewResponse,
+  PatronImportResponse,
   PatronLookupResult,
   PatronPublic,
-  PatronRegisterRequest,
   PatronUpdate,
   AccessFrequencyResponse,
   RegisterRequest,
@@ -303,7 +304,6 @@ class ApiClient {
         const url = config.url || "";
         const isAuthEndpoint =
           url.includes("/api/auth/login") ||
-          url.includes("/api/auth/register") ||
           url.includes("/api/auth/refresh");
 
         let token =
@@ -336,7 +336,6 @@ class ApiClient {
         const url = originalRequest?.url || "";
         const isAuthEndpoint =
           url.includes("/api/auth/login") ||
-          url.includes("/api/auth/register") ||
           url.includes("/api/auth/refresh");
 
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
@@ -371,7 +370,7 @@ class ApiClient {
     clearStoredAuth();
     if (typeof window !== "undefined") {
       const pathname = window.location.pathname;
-      if (pathname !== "/login" && pathname !== "/register") {
+      if (pathname !== "/login") {
         window.location.href = `/login?redirect=${encodeURIComponent(pathname)}&reason=session-expired`;
       }
     }
@@ -728,7 +727,7 @@ class ApiClient {
     return response.data;
   }
 
-  async searchPatrons(query?: string, status?: string, skip = 0, limit = 50): Promise<{ items: PatronPublic[]; total: number }> {
+  async searchPatrons(query?: string, status?: string, skip = 0, limit = 1000): Promise<{ items: PatronPublic[]; total: number }> {
     const params: any = { skip, limit };
     if (query) params.q = query;
     if (status) params.status = status;
@@ -762,8 +761,29 @@ class ApiClient {
     return normalizePatron(response.data);
   }
 
-  async patronRegister(data: PatronRegisterRequest): Promise<{ user: UserPublic; access_token: string; refresh_token?: string }> {
-    const response = await this.client.post<{ user: UserPublic; access_token: string; refresh_token?: string }>("/api/patrons/register", data);
+  async downloadPatronTemplate(): Promise<Blob> {
+    const response = await this.client.get("/api/patrons/template", {
+      responseType: "blob",
+    });
+    return response.data;
+  }
+
+  async previewPatronImport(file: File): Promise<PatronImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await this.client.post<PatronImportPreviewResponse>("/api/patrons/import/preview", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async executePatronImport(file: File, mode: "skip" | "update" = "skip"): Promise<PatronImportResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("mode", mode);
+    const response = await this.client.post<PatronImportResponse>("/api/patrons/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data;
   }
 

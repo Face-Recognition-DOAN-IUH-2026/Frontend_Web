@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -12,7 +11,6 @@ import {
   IconButton,
   LinearProgress,
   Paper,
-  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -43,6 +41,7 @@ import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
 
 import api, { getErrorMessage } from "@/lib/api-client";
 import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
+import { useToast } from "@/lib/toast-context";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
@@ -59,18 +58,16 @@ import {
   BookImportResultSection,
 } from "../_components/books";
 
-type Notice = { severity: "success" | "error" | "warning" | "info"; message: string } | null;
-
 export default function BooksPage() {
   const theme = useTheme();
   const { can } = usePermission();
+  const { toast } = useToast();
   const canCreateBook = can("books", "create");
   const canUpdateBook = can("books", "update");
   const canDeleteBook = can("books", "delete");
   const canReadBook = can("books", "read");
   const canPrintBook = can("books", "print");
 
-  const [notice, setNotice] = useState<Notice>(null);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [books, setBooks] = useState<BookWithStats[]>([]);
@@ -103,10 +100,9 @@ export default function BooksPage() {
   const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
   const [singlePriceBook, setSinglePriceBook] = useState<BookWithStats | null>(null);
 
-  const showNotice = useCallback((severity: "success" | "error" | "warning" | "info", message: string) => {
-    setNotice({ severity, message });
-  }, []);
-
+  const showNotice = useCallback((type: "success" | "warning" | "error" | "info", msg: string) => {
+    toast(msg, type);
+  }, [toast]);
   const showNoticeRef = useRef(showNotice);
   useEffect(() => {
     showNoticeRef.current = showNotice;
@@ -149,13 +145,13 @@ export default function BooksPage() {
         const results = await api.searchBooks(searchQuery);
         setSearchResults(results);
       } catch (err) {
-        showNoticeRef.current("error", getErrorMessage(err) || "Tìm kiếm thất bại");
+        toast.error(getErrorMessage(err) || "Tìm kiếm thất bại");
       } finally {
         setSearching(false);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, toast]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -168,7 +164,7 @@ export default function BooksPage() {
       const data = await api.getBarcodePreview(file);
       setPreviewData(Array.isArray(data) ? data : data.rows);
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Không thể đọc file");
+      toast.error(getErrorMessage(err) || "Không thể đọc file");
       setPreviewFile(null);
     } finally {
       setPreviewLoading(false);
@@ -211,11 +207,13 @@ export default function BooksPage() {
       setSearchQuery("");
       setPage(0);
       await loadBooks();
-      showNotice(result.errors === 0 ? "success" : "warning", result.errors === 0
+      toast(result.errors === 0
         ? `Đã nhập ${result.imported} đầu sách`
-        : `${result.imported} nhập thành công, ${result.errors} lỗi`);
+        : `${result.imported} nhập thành công, ${result.errors} lỗi`,
+        result.errors === 0 ? "success" : "warning"
+      );
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Lỗi nhập kho");
+      toast.error(getErrorMessage(err) || "Lỗi nhập kho");
     } finally {
       setImporting(false);
     }
@@ -237,10 +235,10 @@ export default function BooksPage() {
       const updated = await api.updateBookQuantity(selectedBook.id, editQuantity);
       setBooks((prev) => prev.map((book) => book.id === updated.id ? updated : book));
       setSearchResults((prev) => prev.map((book) => book.id === updated.id ? updated : book));
-      showNotice("success", `Đã cập nhật số lượng: ${updated.total_copies} bản`);
+      toast.success(`Đã cập nhật số lượng: ${updated.total_copies} bản`);
       setSelectedBook(null);
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Cập nhật thất bại");
+      toast.error(getErrorMessage(err) || "Cập nhật thất bại");
     } finally {
       setSavingQuantity(false);
     }
@@ -250,13 +248,13 @@ export default function BooksPage() {
     try {
       const barcodes = await api.getBarcodes(bookId);
       if (barcodes.length === 0) {
-        showNotice("info", "Không tìm thấy mã vạch để in");
+        toast.info("Không tìm thấy mã vạch để in");
         return;
       }
       setRecentlyPrinted(barcodes.map((item) => item.barcode));
-      showNotice("success", `${barcodes.length} mã vạch sẵn sàng in`);
+      toast.success(`${barcodes.length} mã vạch sẵn sàng in`);
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Không thể lấy mã vạch");
+      toast.error(getErrorMessage(err) || "Không thể lấy mã vạch");
     }
   };
 
@@ -268,9 +266,9 @@ export default function BooksPage() {
     const importedCount = results.filter((r) => r.status === "imported" || r.status === "updated").length;
     const errorCount = results.filter((r) => r.status === "error").length;
     if (errorCount === 0) {
-      showNotice("success", `Đã nhập ${importedCount} đầu sách từ ISBN`);
+      toast.success(`Đã nhập ${importedCount} đầu sách từ ISBN`);
     } else {
-      showNotice("warning", `${importedCount} thành công, ${errorCount} lỗi`);
+      toast.warning(`${importedCount} thành công, ${errorCount} lỗi`);
     }
   };
 
@@ -291,12 +289,12 @@ export default function BooksPage() {
       setPage(0);
       await loadBooks();
       if (result.errors.length === 0) {
-        showNotice("success", `Đã xóa ${result.deleted} cuốn sách`);
+        toast.success(`Đã xóa ${result.deleted} cuốn sách`);
       } else {
-        showNotice("warning", `Xóa ${result.deleted} thành công, ${result.errors.length} lỗi: ${result.errors.join("; ")}`);
+        toast.warning(`Xóa ${result.deleted} thành công, ${result.errors.length} lỗi: ${result.errors.join("; ")}`);
       }
     } catch (err) {
-      showNotice("error", getErrorMessage(err) || "Xóa thất bại");
+      toast.error(getErrorMessage(err) || "Xóa thất bại");
     } finally {
       setDeleting(false);
     }
@@ -878,24 +876,6 @@ export default function BooksPage() {
         onSave={handleQuantitySave}
         savingQuantity={savingQuantity}
       />
-
-      <Snackbar
-        open={Boolean(notice)}
-        autoHideDuration={4000}
-        onClose={() => setNotice(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        {notice ? (
-          <Alert
-            onClose={() => setNotice(null)}
-            severity={notice.severity}
-            variant="filled"
-            sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
-          >
-            {notice.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
 
       <IsbnScannerDialog
         open={isbnScannerOpen}

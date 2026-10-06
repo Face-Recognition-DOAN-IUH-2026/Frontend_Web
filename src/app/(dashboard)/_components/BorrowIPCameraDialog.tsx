@@ -15,11 +15,11 @@ import {
   IconButton,
   InputAdornment,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
@@ -84,12 +84,12 @@ export default function BorrowIPCameraDialog({
   onClose,
   onSuccess,
 }: Props) {
+  const { toast } = useToast();
   const initialItemsRef = useRef<BorrowCartItem[]>([]);
   initialItemsRef.current = initialItems ?? [];
   const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
   const [lookingUp, setLookingUp] = useState(false);
   const [createError, setCreateError] = useState("");
-  const [scanToast, setScanToast] = useState("");
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [manualIsbn, setManualIsbn] = useState("");
@@ -152,14 +152,14 @@ export default function BorrowIPCameraDialog({
       if (existing) {
         setDuplicateFlash(normalized);
         setTimeout(() => setDuplicateFlash(null), 1500);
-        setScanToast(`Sách ${existing.book?.title || normalized} đã quét rồi`);
+        toast.warning(`Sách ${existing.book?.title || normalized} đã quét rồi`);
         return prev;
       }
       if (maxItems !== undefined && prev.length >= maxItems) {
-        setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
+        toast.warning(`Chỉ được mượn tối đa ${maxItems} cuốn`);
         return prev;
       }
-      setScanToast(`Đã quét: ${normalized}`);
+      toast.success(`Đã quét: ${normalized}`);
       return [...prev, {
         barcode: normalized,
         isbn: normalized,
@@ -173,13 +173,12 @@ export default function BorrowIPCameraDialog({
       }];
     });
     lookupItem(normalized, normalized);
-  }, [lookupItem, maxItems]);
+  }, [lookupItem, maxItems, toast]);
 
   useEffect(() => {
     if (!open) {
       setScanned([]);
       setCreateError("");
-      setScanToast("");
       setNote("");
       setDuplicateFlash(null);
       lastScannedRef.current = null;
@@ -216,6 +215,7 @@ export default function BorrowIPCameraDialog({
     } catch (err) {
       const detail = getErrorMessage(err);
       setCreateError(detail);
+      toast.error(detail);
     }
   };
 
@@ -419,32 +419,6 @@ export default function BorrowIPCameraDialog({
           </Stack>
         </DialogActions>
       </Dialog>
-
-      <Snackbar
-        open={!!scanToast}
-        autoHideDuration={scanToast?.includes("đã quét rồi") || scanToast?.includes("tối đa") ? 3500 : 2000}
-        onClose={() => setScanToast("")}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        {scanToast ? (
-          <Alert
-            severity={
-              scanToast.includes("đã quét rồi") || scanToast.includes("tối đa")
-                ? "warning"
-                : scanToast.startsWith("Đã quét")
-                ? "success"
-                : "info"
-            }
-            onClose={() => setScanToast("")}
-            sx={{
-              animation: `${slideInRight} 0.3s ease-out`,
-              boxShadow: 4,
-            }}
-          >
-            {scanToast}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
     </>
   );
 }

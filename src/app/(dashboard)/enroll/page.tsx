@@ -14,8 +14,10 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { useToast } from "@/lib/toast-context";
 
 export default function EnrollPage() {
+  const { toast } = useToast();
   const [consent, setConsent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -30,14 +32,22 @@ export default function EnrollPage() {
   useEffect(() => {
     if (sseState.status === "SUCCESS") {
       const inner = sseState.result as Record<string, any> | null;
-      if (inner?.status === "error") setError(String(inner.error) || "Đăng ký thất bại.");
+      if (inner?.status === "error") {
+        const msg = String(inner.error) || "Đăng ký thất bại.";
+        setError(msg);
+        toast.error(msg);
+      } else {
+        toast.success("Đăng ký khuôn mặt thành công.");
+      }
       setResult(inner);
       setIsLoading(false);
     } else if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
-      setError(sseState.error || "Không thể lấy trạng thái tác vụ.");
+      const msg = sseState.error || "Không thể lấy trạng thái tác vụ.";
+      setError(msg);
+      toast.error(msg);
       setIsLoading(false);
     }
-  }, [sseState.status, sseState.result, sseState.error]);
+  }, [sseState.status, sseState.result, sseState.error, toast]);
 
   const handleFilesReady = async (files: Record<CaptureAngle, File>) => {
     setError("");
@@ -49,7 +59,9 @@ export default function EnrollPage() {
       setJobId(data.job_id);
       startSSE(data.job_id);
     } catch (err: any) {
-      setError(getErrorMessage(err) || "Đăng ký nhiều góc thất bại.");
+      const msg = getErrorMessage(err) || "Đăng ký nhiều góc thất bại.";
+      setError(msg);
+      toast.error(msg);
       setIsLoading(false);
     }
   };

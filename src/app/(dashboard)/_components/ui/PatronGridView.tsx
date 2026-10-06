@@ -41,7 +41,7 @@ export default function PatronGridView({ patrons, onEdit, onRenew, onDelete, onR
             sx={{ borderRadius: 3, p: 0, cursor: "pointer", transition: "all 0.25s ease", overflow: "hidden",
               ...staggerSx(idx, 0.05),
               "&:hover": { transform: "translateY(-2px)", boxShadow: 4, borderColor: "primary.main" } }}>
-            <Box sx={{ height: 4, background: patron.status === "active" ? STAT_GRADIENT.active : patron.status === "expired" ? STAT_GRADIENT.expired : "linear-gradient(135deg, #64748b 0%, #475569 100%)" }} />
+            <Box sx={{ height: 4, background: patron.status === "active" && !isExpired ? STAT_GRADIENT.active : isExpired ? STAT_GRADIENT.expired : "linear-gradient(135deg, #64748b 0%, #475569 100%)" }} />
             <Box sx={{ p: 2.5 }}>
               <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start", mb: 2 }}>
                 <AvatarUser user={patron} role="patron" size={44} />

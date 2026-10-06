@@ -15,13 +15,13 @@ import {
   IconButton,
   InputAdornment,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   Typography,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CameraAltIcon from "@mui/icons-material/CameraAltOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
@@ -47,6 +47,7 @@ export default function IsbnScannerDialog({
   onClose: () => void;
   onImportComplete: (results: BookImportResultRow[]) => void;
 }) {
+  const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<any>(null);
@@ -56,7 +57,6 @@ export default function IsbnScannerDialog({
   const [scanned, setScanned] = useState<ScannedItem[]>([]);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
-  const [scanToast, setScanToast] = useState("");
   const [manualInput, setManualInput] = useState("");
 
   const stopCamera = useCallback(() => {
@@ -83,9 +83,9 @@ export default function IsbnScannerDialog({
       ));
     } catch (err) {
       setScanned((prev) => prev.filter((item) => item.isbn !== isbn));
-      setScanToast(`Không tìm thấy: ${isbn}`);
+      toast.error(`Không tìm thấy ISBN: ${isbn}`);
     }
-  }, []);
+  }, [toast]);
 
   const cleanIsbn = (raw: string) => {
     const trimmed = raw.trim();
@@ -98,7 +98,7 @@ export default function IsbnScannerDialog({
     const normalized = cleanIsbn(rawCode);
     if (!/^\d{10,13}$/.test(normalized)) return;
     lastScannedRef.current = normalized;
-    setScanToast(normalized);
+    toast.success(`Đã quét ISBN: ${normalized}`);
     setScanned((prev) => {
       if (prev.some((item) => item.isbn === normalized)) {
         return prev.map((item) =>
@@ -108,7 +108,7 @@ export default function IsbnScannerDialog({
       return [...prev, { isbn: normalized, quantity: 1, lookup: null, loading: true }];
     });
     lookupIsbn(normalized);
-  }, [lookupIsbn]);
+  }, [lookupIsbn, toast]);
 
   useEffect(() => {
     if (!open) {
@@ -116,7 +116,6 @@ export default function IsbnScannerDialog({
       setScanned([]);
       setCameraError("");
       setImportError("");
-      setScanToast("");
       setManualInput("");
       lastScannedRef.current = null;
       return;
@@ -208,7 +207,9 @@ export default function IsbnScannerDialog({
       stopCamera();
       setScanned([]);
     } catch (err) {
-      setImportError(getErrorMessage(err));
+      const msg = getErrorMessage(err);
+      setImportError(msg);
+      toast.error(msg);
     } finally {
       setImporting(false);
     }
@@ -414,19 +415,6 @@ export default function IsbnScannerDialog({
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Snackbar
-        open={!!scanToast}
-        autoHideDuration={2000}
-        onClose={() => setScanToast("")}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        message={
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <CheckCircleIcon sx={{ fontSize: 18 }} />
-            <span>Đã quét ISBN: {scanToast}</span>
-          </Stack>
-        }
-      />
     </>
   );
 }

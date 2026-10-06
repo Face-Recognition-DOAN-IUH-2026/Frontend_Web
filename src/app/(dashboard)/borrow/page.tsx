@@ -8,7 +8,6 @@ import {
   Button,
   Paper,
   Slide,
-  Snackbar,
   Stack,
   Step,
   StepButton,
@@ -24,6 +23,7 @@ import BorrowIPCameraDialog from "@/app/(dashboard)/_components/BorrowIPCameraDi
 import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
+import { useToast } from "@/lib/toast-context";
 import { slideInRight } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { getAlertSeverity, getAlertTitle } from "@/lib/alert-utils";
@@ -41,23 +41,11 @@ import {
 
 export default function BorrowPage() {
   const theme = useTheme();
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "warning" | "error" | "info";
-  }>({
-    open: false,
-    message: "",
-    severity: "info",
-  });
+  const { toast } = useToast();
 
   const showNotice = useCallback((type: "success" | "warning" | "error" | "info", msg: string) => {
-    setSnackbar({
-      open: true,
-      message: msg,
-      severity: type,
-    });
-  }, []);
+    toast(msg, type);
+  }, [toast]);
 
   const [currentStep, setCurrentStep] = useState<number>(0);
 
@@ -674,22 +662,6 @@ export default function BorrowPage() {
         open={overdueGuideOpen}
         onClose={() => setOverdueGuideOpen(false)}
       />
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: "100%", borderRadius: 2 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

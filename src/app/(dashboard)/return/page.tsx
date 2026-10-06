@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -7,7 +7,6 @@ import {
   Button,
   Grid,
   Slide,
-  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
@@ -16,6 +15,7 @@ import api, { getErrorMessage } from "@/lib/api-client";
 import { slideInRight } from "@/lib/animations";
 import { getAlertSeverity, getAlertTitle } from "@/lib/alert-utils";
 import { usePermission } from "@/lib/permission-context";
+import { useToast } from "@/lib/toast-context";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
@@ -34,15 +34,7 @@ import {
 } from "@/app/(dashboard)/_components/return";
 
 export default function ReturnPage() {
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "warning" | "error" | "info";
-  }>({
-    open: false,
-    message: "",
-    severity: "info",
-  });
+  const { toast } = useToast();
   const [borrowers, setBorrowers] = useState<StaffActiveBorrowerSummary[]>([]);
   const [selectedStudentCode, setSelectedStudentCode] = useState<string | null>(null);
   const [detail, setDetail] = useState<StaffPatronActiveBorrowsResponse | null>(null);
@@ -68,12 +60,8 @@ export default function ReturnPage() {
   const [qrPatronInfo, setQrPatronInfo] = useState<{ name?: string; studentCode?: string }>({});
 
   const showNotice = useCallback((type: "success" | "warning" | "error" | "info", msg: string, _duration?: number) => {
-    setSnackbar({
-      open: true,
-      message: msg,
-      severity: type,
-    });
-  }, []);
+    toast(msg, type);
+  }, [toast]);
 
   const showNoticeRef = useRef(showNotice);
   useEffect(() => {
@@ -396,21 +384,6 @@ export default function ReturnPage() {
         onClose={() => setOverdueGuideOpen(false)}
       />
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: "100%", borderRadius: 2 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

@@ -164,9 +164,7 @@ export default function LandingOverlay() {
               <Button component={Link} href="/gate" startIcon={<DoorFrontIcon />} sx={{ textTransform: "none", fontWeight: 600, display: { xs: "none", sm: "inline-flex" } }}>
                 Cổng Kiosk
               </Button>
-              <Button component={Link} href="/register" variant="outlined" startIcon={<HowToRegIcon />} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}>
-                Đăng ký thẻ
-              </Button>
+
               <Button
                 component={Link}
                 href="/login"
@@ -601,9 +599,7 @@ export default function LandingOverlay() {
               <Typography component={Link} href="/library/vr-tour" variant="body2" sx={{ color: "rgba(255,255,255,0.75)", textDecoration: "none", "&:hover": { color: "#FFFFFF" } }}>
                 Tham quan thực tế ảo 3D
               </Typography>
-              <Typography component={Link} href="/register" variant="body2" sx={{ color: "rgba(255,255,255,0.75)", textDecoration: "none", "&:hover": { color: "#FFFFFF" } }}>
-                Đăng ký tài khoản độc giả
-              </Typography>
+
             </Stack>
 
             {/* Column 3: Hours */}

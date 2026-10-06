@@ -51,7 +51,7 @@ function Sparkline({ data, color, id }: { data: number[]; color: string; id: str
 export default function PatronStatCards({ patrons }: PatronStatCardsProps) {
   const stats = useMemo(() => {
     const activeCount = patrons.filter((p) => p.status === "active").length;
-    const expiredCount = patrons.filter((p) => p.status === "expired" || p.status === "inactive").length;
+    const expiredCount = patrons.filter((p) => p.status === "inactive" || (!!p.membership_expiry && new Date(p.membership_expiry) < new Date())).length;
     const faceCount = patrons.filter((p) => p.has_face).length;
 
     const now = new Date();

@@ -40,6 +40,7 @@ import DeleteWeekDialog from "@/app/(dashboard)/_components/staff-schedule/Delet
 import ManualCheckInAdmin from "@/app/(dashboard)/_components/staff-schedule/ManualCheckInAdmin";
 import UndoSnackbar from "@/app/_components/UndoSnackbar";
 import useUndo from "@/lib/hooks/useUndo";
+import { useToast } from "@/lib/toast-context";
 
 const FILTERS = [
   { value: "all", label: "Tất cả" },
@@ -56,6 +57,7 @@ const STAT_GRADIENT = {
 
 export default function StaffSchedulesPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const { can } = usePermission();
   const isAdmin = user?.role === "admin";
   const isStaff = !!user;
@@ -100,9 +102,17 @@ export default function StaffSchedulesPage() {
   const { pendingDelete, countdown, markForDelete, undo } = useUndo<string>({
     onConfirm: async (id) => {
       setConfirmingId(id);
-      try { await api.deleteScheduleAssignment(id); await loadData(); }
-      catch (err) { setError(getErrorMessage(err)); }
-      finally { setConfirmingId(null); }
+      try {
+        await api.deleteScheduleAssignment(id);
+        await loadData();
+        toast.success("Đã xóa vĩnh viễn phân công trực.");
+      } catch (err) {
+        const msg = getErrorMessage(err);
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        setConfirmingId(null);
+      }
     },
   });
 

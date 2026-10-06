@@ -251,6 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       role: ((payload?.roles as string[])?.[0]) || "user",
       full_name: (payload?.full_name as string) || null,
+      require_password_change: response.require_password_change,
     };
     assertWebRole(userData.role);
     localStorage.setItem("user", JSON.stringify(userData));
@@ -272,6 +273,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
+
+    return response;
   };
 
   const setAuthFromToken = (newAccessToken: string, refreshToken: string | null, email: string, role?: string) => {

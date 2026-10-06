@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Alert,
@@ -17,7 +17,6 @@ import {
   Grid,
   IconButton,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -40,6 +39,7 @@ import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
 import PaymentsIcon from "@mui/icons-material/PaymentsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
+import { useToast } from "@/lib/toast-context";
 import type { BookCopy, BookWithStats } from "@/lib/types";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
@@ -109,10 +109,7 @@ function MetaItem({ icon, label, value }: { icon: React.ReactNode; label: string
 }
 
 export default function BookDetailPage() {
-  const [notice, setNotice] = useState<{ severity: "success" | "error" | "warning" | "info"; message: string } | null>(null);
-  const showNotice = (severity: "success" | "error" | "warning" | "info", message: string) => {
-    setNotice({ severity, message });
-  };
+  const { toast } = useToast();
   const theme = useTheme();
   const params = useParams();
   const router = useRouter();
@@ -136,6 +133,10 @@ export default function BookDetailPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
+  const showNotice = useCallback((type: "success" | "warning" | "error" | "info", msg: string) => {
+    toast(msg, type);
+  }, [toast]);
+
   const fetchCopies = async () => {
     if (!bookId) return;
     setCopiesLoading(true);
@@ -151,6 +152,7 @@ export default function BookDetailPage() {
       setCopies(copyList);
     } catch (err) {
       console.error("Failed to load copies", err);
+      toast.error(getErrorMessage(err) || "Không thể tải danh sách bản sao sách");
       setCopies([]);
     } finally {
       setCopiesLoading(false);
@@ -258,9 +260,9 @@ export default function BookDetailPage() {
 
       setBook(updated);
       setEditOpen(false);
-      showNotice("success", "Cập nhật sách thành công");
+      toast.success("Cập nhật sách thành công");
     } catch (err: any) {
-      showNotice("error", getErrorMessage(err) || "Cập nhật sách thất bại");
+      toast.error(getErrorMessage(err) || "Cập nhật sách thất bại");
     } finally {
       setEditSaving(false);
     }
@@ -270,13 +272,14 @@ export default function BookDetailPage() {
     if (!book || deleteConfirmText !== "XÓA") return;
     try {
       await api.bulkDeleteBooks([book.id]);
+      toast.success(`Đã xóa sách ${book.title}`);
       router.push("/books");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        showNotice("error", "Sách không tồn tại hoặc đã bị xóa.");
+        toast.error("Sách không tồn tại hoặc đã bị xóa.");
         router.push("/books");
       } else {
-        showNotice("error", `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
+        toast.error(`Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
       }
     }
   };
@@ -800,24 +803,6 @@ export default function BookDetailPage() {
               </Button>
             </Box>
           </Dialog>
-
-          <Snackbar
-            open={Boolean(notice)}
-            autoHideDuration={4000}
-            onClose={() => setNotice(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          >
-            {notice ? (
-              <Alert
-                onClose={() => setNotice(null)}
-                severity={notice.severity}
-                variant="filled"
-                sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
-              >
-                {notice.message}
-              </Alert>
-            ) : undefined}
-          </Snackbar>
         </Stack>
       )}
     </LoadingOverlay>
