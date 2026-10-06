@@ -3,7 +3,6 @@ import type {
   PatronCreate,
   PatronLookupResult,
   PatronPublic,
-  PatronRegisterRequest,
   PatronUpdate,
   UserPublic,
 } from "../types";
@@ -14,7 +13,7 @@ export function createPatronMethods(client: AxiosInstance) {
       query?: string,
       status?: string,
       skip: number = 0,
-      limit: number = 20
+      limit: number = 1000
     ): Promise<PatronPublic[]> => {
       const params: any = { skip, limit };
       if (query) params.q = query;
@@ -52,14 +51,29 @@ export function createPatronMethods(client: AxiosInstance) {
       return response.data;
     },
 
-    patronRegister: async (
-      data: PatronRegisterRequest
-    ): Promise<{
-      user: UserPublic;
-      access_token: string;
-      refresh_token?: string;
-    }> => {
-      const response = await client.post("/api/patrons/register", data);
+    downloadPatronTemplate: async (): Promise<Blob> => {
+      const response = await client.get("/api/patrons/template", {
+        responseType: "blob",
+      });
+      return response.data;
+    },
+
+    previewPatronImport: async (file: File): Promise<any> => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await client.post("/api/patrons/import/preview", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    },
+
+    executePatronImport: async (file: File, mode: "skip" | "update" = "skip"): Promise<any> => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("mode", mode);
+      const response = await client.post("/api/patrons/import", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       return response.data;
     },
 

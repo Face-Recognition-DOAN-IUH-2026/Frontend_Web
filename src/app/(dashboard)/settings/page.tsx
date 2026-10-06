@@ -19,7 +19,6 @@ import {
   LinearProgress,
   Paper,
   Skeleton,
-  Snackbar,
   Stack,
   Switch,
   Tab,
@@ -34,6 +33,7 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import CloseIcon from "@mui/icons-material/Close";
@@ -141,6 +141,44 @@ function renderField(
     );
   }
 
+  if (value !== null && typeof value === "object") {
+    const KEY_LABELS: Record<string, string> = {
+      minor: "Hư nhẹ",
+      major: "Hư nặng",
+      lost: "Mất",
+    };
+    return (
+      <Box>
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>{label}</Typography>
+        {desc && (
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: "block" }}>
+            {desc}
+          </Typography>
+        )}
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          {Object.entries(value as Record<string, any>).map(([k, v]) => (
+            <TextField
+              key={k}
+              label={KEY_LABELS[k] || k}
+              type="number"
+              size="small"
+              fullWidth
+              value={v ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                onChange(entry.config_key, {
+                  ...(value as Record<string, any>),
+                  [k]: raw === "" ? 0 : Math.max(0, Number(raw)),
+                });
+              }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: "0.9rem" } }}
+            />
+          ))}
+        </Stack>
+      </Box>
+    );
+  }
+
   const isPassword = entry.config_key === "pass" || entry.config_key === "password";
 
   return (
@@ -196,7 +234,17 @@ function EditableTable({ label, description, rows, onChange }: {
   label: string; description?: string | null;
   rows: Record<string, any>[]; onChange: (rows: Record<string, any>[]) => void;
 }) {
-  const keys = rows.length > 0 ? Object.keys(rows[0]) : [];
+  // Stored JSON key order is not reliable (DB returns to/from/amount) —
+  // always show range columns in logical order: Từ → Đến → Số tiền.
+  const KEY_ORDER = ["from", "to", "amount", "bracket"];
+  const keys = (rows.length > 0 ? Object.keys(rows[0]) : []).sort((a, b) => {
+    const ia = KEY_ORDER.indexOf(a);
+    const ib = KEY_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 
   const COLUMN_LABELS: Record<string, string> = {
     from: "Từ ngày",
@@ -222,9 +270,10 @@ function EditableTable({ label, description, rows, onChange }: {
 
   const formatCellValue = (key: string, val: any) => {
     if (val === null || val === undefined) return "";
-    if (key === "to" && val === null) return "∞";
     return val;
   };
+
+  const isRangeKey = (key: string) => key === "from" || key === "to";
 
   return (
     <Box>
@@ -232,7 +281,7 @@ function EditableTable({ label, description, rows, onChange }: {
       {description && (
         <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: "block" }}>{description}</Typography>
       )}
-      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3 }}>
         <Table size="small">
           <TableHead>
             <TableRow sx={{ "& .MuiTableCell-head": { fontWeight: 700, bgcolor: "action.hover", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: 0.5 } }}>
@@ -247,11 +296,12 @@ function EditableTable({ label, description, rows, onChange }: {
               <TableRow key={ri} sx={{ "&:last-child td": { border: 0 } }}>
                 {keys.map((k) => (
                   <TableCell key={k} sx={{ py: 0.5, px: 1 }}>
-                    {k === "amount" ? (
+                    {k === "amount" || isRangeKey(k) ? (
                       <TextField
                         size="small"
                         type="number"
                         value={row[k] ?? ""}
+                        placeholder={k === "to" && row[k] == null ? "∞" : undefined}
                         onChange={(e) => updateCell(ri, k, e.target.value === "" ? null : Number(e.target.value))}
                         sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
                       />
@@ -261,9 +311,8 @@ function EditableTable({ label, description, rows, onChange }: {
                         sx={{
                           px: 1,
                           py: 0.5,
-                          fontWeight: row[k] === null && k === "to" ? 400 : 600,
-                          color: row[k] === null && k === "to" ? "text.disabled" : "text.primary",
-                          fontFamily: k === "to" && row[k] === null ? "monospace" : undefined,
+                          fontWeight: 600,
+                          color: "text.primary",
                           fontSize: "0.9rem",
                         }}
                       >
@@ -288,7 +337,7 @@ function EditableTable({ label, description, rows, onChange }: {
         onClick={addRow}
         sx={{ mt: 1, borderRadius: 2, fontWeight: 600, fontSize: "0.8rem" }}
       >
-        Thêm bậc phạt
+        Thêm dòng
       </Button>
     </Box>
   );
@@ -300,15 +349,15 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 }
 
 export default function SettingsPage() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState(0);
+  const { toast } = useToast();
   const [settings, setSettings] = useState<Record<string, SystemConfigEntry[]> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [modified, setModified] = useState<Record<string, Record<string, any>>>({});
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({ open: false, message: "", severity: "success" });
   const [testEmailOpen, setTestEmailOpen] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [testEmailSending, setTestEmailSending] = useState(false);
@@ -330,7 +379,7 @@ export default function SettingsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (user?.role === "admin") load(); }, [load, user?.role]);
 
   const currentCategory = CATEGORIES[tab] as TabCategory | undefined;
   const entries = currentCategory && settings ? settings[currentCategory] || [] : [];
@@ -354,9 +403,30 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     if (!currentCategory || !hasChanges) return;
+    const values = modified[currentCategory]!;
+    if (currentCategory === "fine" && values.fine_brackets !== undefined) {
+      const rows = values.fine_brackets as Array<Record<string, any>>;
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i] || {};
+        const from = row.from === "" || row.from == null ? null : Number(row.from);
+        const to = row.to === "" || row.to == null ? null : Number(row.to);
+        const amount = row.amount === "" || row.amount == null ? null : Number(row.amount);
+        if (from == null || !Number.isFinite(from) || from < 1) {
+          toast.error(`Bậc ${i + 1}: "Từ ngày" phải là số từ 1 trở lên.`);
+          return;
+        }
+        if (amount == null || !Number.isFinite(amount) || amount < 0) {
+          toast.error(`Bậc ${i + 1}: "Số tiền" phải là số từ 0 trở lên.`);
+          return;
+        }
+        if (to !== null && (!Number.isFinite(to) || to < from)) {
+          toast.error(`Bậc ${i + 1}: "Đến ngày" phải để trống (∞) hoặc từ ${from} trở lên.`);
+          return;
+        }
+      }
+    }
     try {
       setSaving(true);
-      const values = modified[currentCategory]!;
       await api.updateAdminSettings(currentCategory, values);
       setModified((prev) => {
         const next = { ...prev };
@@ -364,10 +434,10 @@ export default function SettingsPage() {
         return next;
       });
       load();
-      setSnackbar({ open: true, message: "Lưu cài đặt thành công.", severity: "success" });
+      toast.success("Lưu cài đặt thành công.");
     } catch (err: any) {
       const msg = getErrorMessage(err) || "Lưu cài đặt thất bại.";
-      setSnackbar({ open: true, message: msg, severity: "error" });
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -384,20 +454,26 @@ export default function SettingsPage() {
 
   const handleTestEmail = async () => {
     if (!testEmail || !settings?.smtp) return;
+    const passEntry = settings.smtp.find((e) => e.config_key === "pass" || e.config_key === "password");
+    const passValue = passEntry ? getCurrentValue(passEntry) : "";
+    if (!passValue || /^•+$/.test(String(passValue))) {
+      toast.error("Vui lòng nhập mật khẩu SMTP mới trước khi gửi email test.");
+      return;
+    }
     try {
       setTestEmailSending(true);
       const smtpConfig: Record<string, any> = {};
       settings.smtp.forEach((e) => { smtpConfig[e.config_key] = e.config_value; });
       const res = await api.testSmtpConfig({ to: testEmail, ...smtpConfig } as any);
       if (res.success) {
-        setSnackbar({ open: true, message: "Gửi email test thành công.", severity: "success" });
+        toast.success("Gửi email test thành công.");
       } else {
-        setSnackbar({ open: true, message: res.message || "Gửi email test thất bại.", severity: "error" });
+        toast.error(res.message || "Gửi email test thất bại.");
       }
       setTestEmailOpen(false);
     } catch (err: any) {
       const msg = getErrorMessage(err) || "Gửi email test thất bại.";
-      setSnackbar({ open: true, message: msg, severity: "error" });
+      toast.error(msg);
     } finally {
       setTestEmailSending(false);
     }
@@ -414,26 +490,43 @@ export default function SettingsPage() {
     );
   }
   if (!isAuthenticated) return null;
+  if (user?.role !== "admin") {
+    return (
+      <Stack spacing={3} sx={{ pb: 4 }}>
+        <Paper variant="outlined" sx={{ borderRadius: 3, p: 6 }}>
+          <Stack sx={{ alignItems: "center", gap: 1.5 }}>
+            <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: "action.hover", display: "grid", placeItems: "center", color: "text.disabled" }}>
+              <SettingsOutlinedIcon fontSize="large" />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Không có quyền truy cập</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 360, textAlign: "center" }}>
+              Chỉ quản trị viên mới được xem và thay đổi cài đặt hệ thống.
+            </Typography>
+          </Stack>
+        </Paper>
+      </Stack>
+    );
+  }
 
   return (
     <Stack spacing={3} sx={{ pb: 4 }}>
       {/* ─── Gradient Header ─── */}
       <Box sx={{
         p: 3, borderRadius: 3,
-        background: "linear-gradient(135deg, #0A2540 0%, #154E78 50%, #0A2540 100%)",
-        border: "1px solid", borderColor: "rgba(212,175,55,0.3)",
+        background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+        border: "1px solid", borderColor: "rgba(99,102,241,0.3)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: 2, position: "relative", overflow: "hidden",
       }}>
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(212,175,55,0.06)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(212,175,55,0.04)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
         <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(212,175,55,0.15)", width: 52, height: 52, border: "1px solid rgba(212,175,55,0.35)" }}>
-            <SettingsOutlinedIcon sx={{ color: "#D4AF37", fontSize: 28 }} />
+          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <SettingsOutlinedIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
           </Avatar>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#ffffff" }}>Cài đặt hệ thống</Typography>
-            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", mt: 0.3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>Cài đặt hệ thống</Typography>
+            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
               {totalConfigs > 0
                 ? `${totalConfigs} cấu hình · ${CATEGORIES.length} nhóm${changedCount > 0 ? ` · ${changedCount} thay đổi chưa lưu` : ""}`
                 : "Quản lý cấu hình vận hành thư viện"}
@@ -441,7 +534,7 @@ export default function SettingsPage() {
           </Box>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ zIndex: 1 }}>
-          <IconButton onClick={load} size="small" sx={{ color: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.25)", "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}>
+          <IconButton onClick={load} size="small" sx={{ color: "#a5b4fc", border: "1px solid rgba(165,180,252,0.4)" }}>
             <RefreshOutlinedIcon fontSize="small" />
           </IconButton>
         </Stack>
@@ -456,37 +549,6 @@ export default function SettingsPage() {
         >
           {error}
         </Alert>
-      )}
-
-      {/* ─── Category Summary Chips ─── */}
-      {settings && !error && (
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-          {CATEGORIES.map((cat) => {
-            const count = settings[cat]?.length || 0;
-            const catMod = modified[cat] ? Object.keys(modified[cat]).length : 0;
-            const meta = CATEGORY_META[cat];
-            return (
-              <Chip
-                key={cat}
-                icon={meta.icon}
-                label={`${meta.label} (${count}${catMod ? `, ${catMod} đã sửa` : ""})`}
-                variant={tab === CATEGORIES.indexOf(cat) ? "filled" : "outlined"}
-                onClick={() => setTab(CATEGORIES.indexOf(cat))}
-                sx={{
-                  borderRadius: 2,
-                  fontWeight: 700,
-                  fontSize: "0.78rem",
-                  cursor: "pointer",
-                  ...(tab === CATEGORIES.indexOf(cat)
-                    ? { bgcolor: alpha(meta.color, 0.12), color: meta.color, borderColor: meta.color }
-                    : {}),
-                  transition: "all 0.15s",
-                  "&:hover": { bgcolor: alpha(meta.color, 0.08) },
-                }}
-              />
-            );
-          })}
-        </Stack>
       )}
 
       {/* ─── Tabs ─── */}
@@ -580,6 +642,21 @@ export default function SettingsPage() {
 
                     <Divider sx={{ borderStyle: "dashed" }} />
 
+                    {/* Consistency hint: per-slip cap above the total cap never takes effect */}
+                    {cat === "borrow" && (() => {
+                      const findVal = (key: string) => {
+                        const e = entries.find((x) => x.config_key === key);
+                        return e ? getCurrentValue(e) : undefined;
+                      };
+                      const total = Number(findVal("max_borrow_books"));
+                      const perSlip = Number(findVal("max_borrow_books_per_slip"));
+                      return Number.isFinite(total) && Number.isFinite(perSlip) && perSlip > total ? (
+                        <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                          Số sách tối đa mỗi phiếu ({perSlip}) đang lớn hơn tổng số sách được mượn ({total}) nên không bao giờ có tác dụng. Đặt mỗi phiếu ≤ {total} để có ý nghĩa.
+                        </Alert>
+                      ) : null;
+                    })()}
+
                     {/* Action buttons */}
                     <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap" }}>
                       {cat === "smtp" && (
@@ -660,21 +737,6 @@ export default function SettingsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* ─── Save Feedback ─── */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          icon={snackbar.severity === "success" ? <CheckCircleOutlineOutlinedIcon fontSize="small" /> : <ErrorOutlineOutlinedIcon fontSize="small" />}
-          severity={snackbar.severity}
-          sx={{ borderRadius: 2, fontWeight: 600, boxShadow: 4 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

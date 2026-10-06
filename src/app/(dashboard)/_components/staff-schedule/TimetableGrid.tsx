@@ -17,7 +17,6 @@ interface TimetableGridProps {
   isAdmin?: boolean;
   onCellClick?: (date: string, shiftId: string) => void;
   onDeleteAssignment?: (id: string) => void;
-  onViewStaff?: (staffId: string) => void;
 }
 
 const DAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -47,7 +46,7 @@ interface ShiftRow {
 }
 
 export default function TimetableGrid({
-  days, shifts, assignments, filter, isAdmin, onCellClick, onDeleteAssignment, onViewStaff,
+  days, shifts, assignments, filter, isAdmin, onCellClick, onDeleteAssignment,
 }: TimetableGridProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -147,7 +146,6 @@ export default function TimetableGrid({
               isAdmin={isAdmin}
               onCellClick={onCellClick}
               onDeleteAssignment={onDeleteAssignment}
-              onViewStaff={onViewStaff}
               shift={row.shift}
             />
           );
@@ -163,7 +161,7 @@ export default function TimetableGrid({
     });
 
     return [shiftCol, ...dayCols];
-  }, [days, dayCounts, isAdmin, onCellClick, onDeleteAssignment, onViewStaff, theme, isDark]);
+  }, [days, dayCounts, isAdmin, onCellClick, onDeleteAssignment, theme, isDark]);
 
   return (
     <Box sx={{

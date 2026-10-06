@@ -12,6 +12,7 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { useToast } from "@/lib/toast-context";
 
 function LivenessResultCard({ result }: { result: any }) {
   const isLive = Boolean(result.is_live);
@@ -48,6 +49,7 @@ function LivenessResultCard({ result }: { result: any }) {
 }
 
 export default function LivenessPage() {
+  const { toast } = useToast();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [consent, setConsent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -78,7 +80,9 @@ export default function LivenessPage() {
       const data = await api.livenessCheck(imageFile, consent);
       setJobId(data.job_id);
     } catch (err: any) {
-      setError(getErrorMessage(err) || "Kiểm tra liveness thất bại.");
+      const msg = getErrorMessage(err) || "Kiểm tra liveness thất bại.";
+      setError(msg);
+      toast.error(msg);
       setIsLoading(false);
     }
   };
@@ -119,8 +123,22 @@ export default function LivenessPage() {
           <DashboardCard>
             <JobPoll
               jobId={jobId}
-              onComplete={(value) => { setResult(value); setIsLoading(false); setJobId(null); }}
-              onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
+              onComplete={(value) => {
+                setResult(value);
+                setIsLoading(false);
+                setJobId(null);
+                if (value?.is_live) {
+                  toast.success("Khuôn mặt thật — kiểm tra liveness đạt!");
+                } else {
+                  toast.warning("Cảnh báo: Phát hiện nghi vấn giả mạo!");
+                }
+              }}
+              onError={(message) => {
+                setError(message);
+                setIsLoading(false);
+                setJobId(null);
+                toast.error(message);
+              }}
             />
           </DashboardCard>
         </Box>

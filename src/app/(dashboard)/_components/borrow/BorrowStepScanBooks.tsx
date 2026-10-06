@@ -27,6 +27,7 @@ import VideocamIcon from "@mui/icons-material/VideocamOutlined";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import BookRecommendations from "@/app/(dashboard)/_components/BookRecommendations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
+import { CONDITION_LABELS, getConditionColor, type CopyCondition } from "@/lib/constants/copy";
 import type { BorrowCartItem } from "./types";
 
 export interface BorrowStepScanBooksProps {
@@ -70,13 +71,14 @@ export function BorrowStepScanBooks({
             {/* Manual Barcode / ISBN Entry */}
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                Nhập mã ISBN hoặc Barcode gáy sách:
+                Nhập mã vạch bản sao (Barcode) hoặc mã ISBN:
               </Typography>
               <Stack direction="row" spacing={1}>
                 <TextField
                   size="small"
                   fullWidth
-                  placeholder="Nhập 10-13 chữ số ISBN..."
+                  label="Mã sách (Barcode / ISBN)"
+                  placeholder="Quét hoặc nhập mã bản sao (VD: LIB-9780140328721-001) hoặc ISBN..."
                   value={manualIsbn}
                   onChange={(e) => setManualIsbn(e.target.value)}
                   onKeyDown={(e) => {
@@ -241,6 +243,15 @@ export function BorrowStepScanBooks({
                         label={`Barcode: ${item.copy_barcode || item.barcode}`}
                         sx={{ fontSize: "0.68rem", fontFamily: "'JetBrains Mono', monospace", height: 20 }}
                       />
+                      {item.condition ? (
+                        <Chip
+                          size="small"
+                          label={CONDITION_LABELS[item.condition as CopyCondition] || item.condition}
+                          color={getConditionColor(item.condition)}
+                          variant="outlined"
+                          sx={{ fontSize: "0.68rem", height: 20 }}
+                        />
+                      ) : null}
                       {item.shelf_location ? (
                         <Chip
                           size="small"

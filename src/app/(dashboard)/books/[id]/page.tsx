@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Alert,
@@ -17,7 +17,6 @@ import {
   Grid,
   IconButton,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -38,12 +37,15 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import StarIcon from "@mui/icons-material/StarOutlined";
 import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
+import PaymentsIcon from "@mui/icons-material/PaymentsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
-import type { BookWithStats } from "@/lib/types";
+import { useToast } from "@/lib/toast-context";
+import type { BookCopy, BookWithStats } from "@/lib/types";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import { BookCopiesTable } from "@/app/(dashboard)/_components/books/BookCopiesTable";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 
 const Book3DViewer = dynamic(
@@ -107,10 +109,7 @@ function MetaItem({ icon, label, value }: { icon: React.ReactNode; label: string
 }
 
 export default function BookDetailPage() {
-  const [notice, setNotice] = useState<{ severity: "success" | "error" | "warning" | "info"; message: string } | null>(null);
-  const showNotice = (severity: "success" | "error" | "warning" | "info", message: string) => {
-    setNotice({ severity, message });
-  };
+  const { toast } = useToast();
   const theme = useTheme();
   const params = useParams();
   const router = useRouter();
@@ -123,6 +122,9 @@ export default function BookDetailPage() {
   const [show3D, setShow3D] = useState(false);
   const [showVR, setShowVR] = useState(false);
 
+  const [copies, setCopies] = useState<BookCopy[]>([]);
+  const [copiesLoading, setCopiesLoading] = useState(false);
+
   const [editOpen, setEditOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
@@ -131,11 +133,38 @@ export default function BookDetailPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
+  const showNotice = useCallback((type: "success" | "warning" | "error" | "info", msg: string) => {
+    toast(msg, type);
+  }, [toast]);
+
+  const fetchCopies = async () => {
+    if (!bookId) return;
+    setCopiesLoading(true);
+    try {
+      const data = await api.getBookCopies(bookId);
+      const copyList = Array.isArray(data)
+        ? data
+        : Array.isArray((data as any)?.items)
+        ? (data as any).items
+        : Array.isArray((data as any)?.data)
+        ? (data as any).data
+        : [];
+      setCopies(copyList);
+    } catch (err) {
+      console.error("Failed to load copies", err);
+      toast.error(getErrorMessage(err) || "Không thể tải danh sách bản sao sách");
+      setCopies([]);
+    } finally {
+      setCopiesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!bookId) return;
     setLoading(true);
     setError(null);
     api.getBookById(bookId).then(setBook).catch((err) => setError(getErrorMessage(err))).finally(() => setLoading(false));
+    fetchCopies();
   }, [bookId]);
 
   const openEdit = () => {
@@ -153,6 +182,7 @@ export default function BookDetailPage() {
       average_rating: book.average_rating ?? "",
       language: book.language || "",
       shelf_location: book.shelf_location || "",
+      price: book.price ?? "",
       cover_url: book.cover_url || "",
       quantity: book.total_copies ?? 0,
     });
@@ -172,6 +202,10 @@ export default function BookDetailPage() {
 
     if (editForm.page_count !== "" && editForm.page_count !== null && Number(editForm.page_count) < 0) {
       errors.page_count = "Số trang không được âm";
+    }
+
+    if (editForm.price !== "" && editForm.price !== null && Number(editForm.price) < 0) {
+      errors.price = "Giá bìa không được âm";
     }
 
     if (editForm.average_rating !== "" && editForm.average_rating !== null) {
@@ -211,7 +245,7 @@ export default function BookDetailPage() {
 
       for (const [k, v] of Object.entries(editForm)) {
         if (k === "quantity") continue;
-        if (k === "page_count" || k === "average_rating") {
+        if (k === "page_count" || k === "average_rating" || k === "price") {
           metadataPayload[k] = v === "" || v === null ? null : Number(v);
         } else {
           metadataPayload[k] = v || null;
@@ -226,9 +260,9 @@ export default function BookDetailPage() {
 
       setBook(updated);
       setEditOpen(false);
-      showNotice("success", "Cập nhật sách thành công");
+      toast.success("Cập nhật sách thành công");
     } catch (err: any) {
-      showNotice("error", getErrorMessage(err) || "Cập nhật sách thất bại");
+      toast.error(getErrorMessage(err) || "Cập nhật sách thất bại");
     } finally {
       setEditSaving(false);
     }
@@ -238,13 +272,14 @@ export default function BookDetailPage() {
     if (!book || deleteConfirmText !== "XÓA") return;
     try {
       await api.bulkDeleteBooks([book.id]);
+      toast.success(`Đã xóa sách ${book.title}`);
       router.push("/books");
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        showNotice("error", "Sách không tồn tại hoặc đã bị xóa.");
+        toast.error("Sách không tồn tại hoặc đã bị xóa.");
         router.push("/books");
       } else {
-        showNotice("error", `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
+        toast.error(`Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
       }
     }
   };
@@ -403,6 +438,13 @@ export default function BookDetailPage() {
                     {book.language ? (
                       <MetaItem icon={<LanguageIcon fontSize="small" />} label="Ngôn ngữ" value={book.language} />
                     ) : null}
+                    {book.price != null ? (
+                      <MetaItem
+                        icon={<PaymentsIcon fontSize="small" />}
+                        label="Giá bìa"
+                        value={`${Number(book.price).toLocaleString("vi-VN")} đ`}
+                      />
+                    ) : null}
                   </Box>
                 </Box>
               </DashboardCard>
@@ -464,6 +506,20 @@ export default function BookDetailPage() {
                     </Stack>
                   </Stack>
                 </DashboardCard>
+
+                <Box sx={staggerSx(2)}>
+                  <BookCopiesTable
+                    bookId={book.id}
+                    isbn={book.isbn13 || book.isbn}
+                    copies={copies}
+                    loading={copiesLoading}
+                    onRefresh={() => {
+                      fetchCopies();
+                      api.getBookById(bookId).then(setBook);
+                    }}
+                    showNotice={showNotice}
+                  />
+                </Box>
 
                 {book.description ? (
                   <Box sx={staggerSx(2)}>
@@ -685,6 +741,16 @@ export default function BookDetailPage() {
                     value={editForm.shelf_location || ""}
                     onChange={(e) => handleEditChange("shelf_location", e.target.value)}
                   />
+                  <TextField
+                    label="Giá bìa (VNĐ)"
+                    type="number"
+                    fullWidth
+                    value={editForm.price ?? ""}
+                    onChange={(e) => handleEditChange("price", e.target.value)}
+                    placeholder="VD: 150000"
+                    error={!!editErrors.price}
+                    helperText={editErrors.price}
+                  />
                 </Stack>
                 <TextField
                   label="URL ảnh bìa"
@@ -737,24 +803,6 @@ export default function BookDetailPage() {
               </Button>
             </Box>
           </Dialog>
-
-          <Snackbar
-            open={Boolean(notice)}
-            autoHideDuration={4000}
-            onClose={() => setNotice(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          >
-            {notice ? (
-              <Alert
-                onClose={() => setNotice(null)}
-                severity={notice.severity}
-                variant="filled"
-                sx={{ width: "100%", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
-              >
-                {notice.message}
-              </Alert>
-            ) : undefined}
-          </Snackbar>
         </Stack>
       )}
     </LoadingOverlay>

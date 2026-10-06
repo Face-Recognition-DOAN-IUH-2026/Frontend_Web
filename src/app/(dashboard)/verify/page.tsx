@@ -22,6 +22,7 @@ import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { getAlertSeverity } from "@/lib/alert-utils";
+import { useToast } from "@/lib/toast-context";
 
 function decodeJwt(token: string): { sub: string } | null {
   try {
@@ -41,6 +42,7 @@ function decodeJwt(token: string): { sub: string } | null {
 
 function BorrowVerifyFlow({ studentCode, onDone }: { studentCode: string; onDone: () => void }) {
   const router = useRouter();
+  const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
@@ -98,26 +100,31 @@ function BorrowVerifyFlow({ studentCode, onDone }: { studentCode: string; onDone
               overdue_count: data.overdue_count,
             }));
             setSuccess(true);
+            toast.success("Xác minh khuôn mặt thành công!");
             setTimeout(() => router.push("/borrow"), 1000);
           } catch (err: any) {
             const status = err?.response?.status || err?.status;
-            if (status === 403) { setError("Độc giả chưa ở trong thư viện hoặc thẻ đã bị khóa."); }
-            else { setError(getErrorMessage(err) || "Không thể kiểm tra thông tin độc giả"); }
+            const errMsg = status === 403 ? "Độc giả chưa ở trong thư viện hoặc thẻ đã bị khóa." : (getErrorMessage(err) || "Không thể kiểm tra thông tin độc giả");
+            setError(errMsg);
+            toast.error(errMsg);
             setVerifying(false);
           }
         })();
         return;
       }
       setError("Khuôn mặt không khớp với độc giả này");
+      toast.error("Khuôn mặt không khớp với độc giả này");
       setVerifying(false);
       return;
     }
     if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
-      setError(sseState.error || "Xác minh thất bại");
+      const errMsg = sseState.error || "Xác minh thất bại";
+      setError(errMsg);
+      toast.error(errMsg);
       setVerifying(false);
       return;
     }
-  }, [sseState, studentCode, stopCamera, router]);
+  }, [sseState, studentCode, stopCamera, router, toast]);
 
   const handleVerify = useCallback(async () => {
     if (!videoRef.current) return;
@@ -225,6 +232,7 @@ function BorrowVerifyFlow({ studentCode, onDone }: { studentCode: string; onDone
 }
 
 export default function VerifyPage() {
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const studentCode = searchParams.get("student_code") || "";
   const { accessToken } = useAuth();
@@ -299,8 +307,22 @@ export default function VerifyPage() {
           <DashboardCard>
             <JobPoll
               jobId={jobId}
-              onComplete={(value) => { setResult(value); setIsLoading(false); setJobId(null); }}
-              onError={(message) => { setError(message); setIsLoading(false); setJobId(null); }}
+              onComplete={(value) => {
+                setResult(value);
+                setIsLoading(false);
+                setJobId(null);
+                if (value?.verified) {
+                  toast.success("Xác thực khuôn mặt thành công!");
+                } else {
+                  toast.error("Xác thực khuôn mặt thất bại!");
+                }
+              }}
+              onError={(message) => {
+                setError(message);
+                setIsLoading(false);
+                setJobId(null);
+                toast.error(message);
+              }}
             />
           </DashboardCard>
         </Box>

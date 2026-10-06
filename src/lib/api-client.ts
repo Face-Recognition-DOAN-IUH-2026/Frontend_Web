@@ -15,10 +15,12 @@ import type {
   FaceResultEvent,
   LoginRequest,
   KioskResult,
+  LivenessActiveResult,
   PatronCreate,
+  PatronImportPreviewResponse,
+  PatronImportResponse,
   PatronLookupResult,
   PatronPublic,
-  PatronRegisterRequest,
   PatronUpdate,
   AccessFrequencyResponse,
   RegisterRequest,
@@ -33,6 +35,18 @@ import type {
   StaffActiveBorrowersResponse,
   StaffPatronActiveBorrowsResponse,
   StaffReturnRequest,
+  FineLedgerItem,
+  ConditionAttentionReport,
+  ConditionDistribution,
+  FinanceStats,
+  InventoryStats,
+  RecognitionStatItem,
+  HourlyStatItem,
+  PatronFineItem,
+  PayFinesResponse,
+  CreatePaymentOrderRequest,
+  PaymentOrderResponse,
+  PaymentOrderStatusResponse,
   CreateBorrowSlipRequest,
   CreateBorrowSlipResponse,
   LookupBorrowSlipRequest,
@@ -82,6 +96,37 @@ function normalizeAccessLog(log: any): AccessLogPublic {
     access_time: log.access_time || log.accessTime || log.timestamp || log.created_at || null,
     status: log.status || null,
   } as AccessLogPublic;
+}
+
+function normalizePatron(p: any): PatronPublic {
+  return {
+    id: p.id,
+    full_name: p.full_name ?? p.fullName ?? "",
+    student_code: p.student_code ?? p.studentCode ?? "",
+    class_name: p.class_name ?? p.className ?? null,
+    identity_number: p.identity_number ?? p.identityNumber ?? null,
+    email: p.email ?? null,
+    phone: p.phone ?? null,
+    card_number: p.card_number ?? p.cardNumber ?? "",
+    issue_date: p.issue_date ?? p.issueDate ?? null,
+    membership_expiry: p.membership_expiry ?? p.membershipExpiry ?? "",
+    status: p.status ?? "",
+    current_status: p.current_status ?? p.currentStatus ?? null,
+    created_at: p.created_at ?? p.createdAt ?? "",
+    updated_at: p.updated_at ?? p.updatedAt ?? "",
+    has_face: p.has_face ?? p.hasFace ?? false,
+    course: p.course ?? null,
+    permanent_address: p.permanent_address ?? p.permanentAddress ?? null,
+    // avatar – support both naming conventions
+    avatar_url: p.avatar_url ?? p.avatarUrl ?? null,
+    avatarUrl: p.avatarUrl ?? p.avatar_url ?? null,
+    // keep camelCase originals for AvatarUser fallback
+    fullName: p.fullName ?? p.full_name,
+    studentCode: p.studentCode ?? p.student_code,
+    className: p.className ?? p.class_name,
+    cardNumber: p.cardNumber ?? p.card_number,
+    hasFace: p.hasFace ?? p.has_face,
+  } as PatronPublic;
 }
 
 function getCookieValue(name: string): string | null {
@@ -259,7 +304,6 @@ class ApiClient {
         const url = config.url || "";
         const isAuthEndpoint =
           url.includes("/api/auth/login") ||
-          url.includes("/api/auth/register") ||
           url.includes("/api/auth/refresh");
 
         let token =
@@ -292,7 +336,6 @@ class ApiClient {
         const url = originalRequest?.url || "";
         const isAuthEndpoint =
           url.includes("/api/auth/login") ||
-          url.includes("/api/auth/register") ||
           url.includes("/api/auth/refresh");
 
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
@@ -327,7 +370,7 @@ class ApiClient {
     clearStoredAuth();
     if (typeof window !== "undefined") {
       const pathname = window.location.pathname;
-      if (pathname !== "/login" && pathname !== "/register") {
+      if (pathname !== "/login") {
         window.location.href = `/login?redirect=${encodeURIComponent(pathname)}&reason=session-expired`;
       }
     }
@@ -408,10 +451,12 @@ class ApiClient {
     return response.data;
   }
 
-  async verifyEmailCorrection(data: { otp: string; new_email: string }): Promise<{ message: string }> {
-    const response = await this.client.post<{ message: string }>("/api/auth/correct-email/verify", data);
+  async verifyEmailCorrection(data: { current_email: string; new_email: string; code: string } | { otp: string; new_email: string; current_email?: string }): Promise<{ message: string }> {
+    const payload = "code" in data ? data : { current_email: data.current_email || "", new_email: data.new_email, code: (data as any).otp };
+    const response = await this.client.post<{ message: string }>("/api/auth/correct-email/verify", payload);
     return response.data;
   }
+
 
   async refreshAuthToken(refreshToken?: string): Promise<TokenResponse> {
     const tokenToUse = refreshToken || getStoredRefreshToken();
@@ -493,7 +538,12 @@ class ApiClient {
     return response.data;
   }
 
-  async changePassword(data: { old_password: string; new_password: string }): Promise<{ message: string }> {
+  async requestPasswordChangeOtp(data: { old_password: string; new_password: string }): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/users/me/password/request-otp", data);
+    return response.data;
+  }
+
+  async changePassword(data: { old_password?: string; new_password?: string; code?: string; otp?: string }): Promise<{ message: string }> {
     const response = await this.client.put<{ message: string }>("/users/me/password", data);
     return response.data;
   }
@@ -503,10 +553,16 @@ class ApiClient {
     return response.data;
   }
 
-  async verifyAndChangeEmail(data: { otp: string; new_email: string }): Promise<{ message: string }> {
-    const response = await this.client.put<{ message: string }>("/users/me/email", data);
+  async verifyAndChangeEmail(data: { otp?: string; code?: string; new_email: string }): Promise<{ message: string }> {
+    const codeVal = data.code || data.otp || "";
+    const response = await this.client.put<{ message: string }>("/users/me/email", {
+      new_email: data.new_email,
+      code: codeVal,
+      otp: codeVal,
+    });
     return response.data;
   }
+
 
   async getFaceEnrollmentStatus(): Promise<{ has_face: boolean; full_name: string | null; role: string }> {
     const response = await this.client.get<{ has_face: boolean; full_name: string | null; role: string }>("/api/users/me");
@@ -616,6 +672,44 @@ class ApiClient {
     return response.data;
   }
 
+  async kioskLivenessActive(files: File[], studentCode?: string, patronId?: string): Promise<LivenessActiveResult> {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("frames", file);
+    }
+    if (studentCode) formData.append("student_code", studentCode);
+    if (patronId) formData.append("patron_id", patronId);
+    const response = await this.client.post<LivenessActiveResult>("/api/kiosk/liveness-active", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async getAccessStats(): Promise<{ today_entries: number; today_exits: number; today_spoof: number; today_no_match: number }> {
+    const response = await this.client.get<any>("/api/access/stats");
+    const data = response.data || {};
+    return {
+      today_entries: data.today_entries ?? data.todayEntries ?? 0,
+      today_exits: data.today_exits ?? data.todayExits ?? 0,
+      today_spoof: data.today_spoof ?? data.todaySpoof ?? 0,
+      today_no_match: data.today_no_match ?? data.todayNoMatch ?? 0,
+    };
+  }
+
+  async getRecognitionStats(days = 30): Promise<RecognitionStatItem[]> {
+    const response = await this.client.get<RecognitionStatItem[]>("/api/access/stats/recognition", {
+      params: { days },
+    });
+    return response.data || [];
+  }
+
+  async getHourlyStats(date?: string): Promise<HourlyStatItem[]> {
+    const response = await this.client.get<HourlyStatItem[]>("/api/access/stats/hourly", {
+      params: date ? { date } : undefined,
+    });
+    return response.data || [];
+  }
+
   async deleteFaceData(userId: string): Promise<{ message: string }> {
     const response = await this.client.delete<{ message: string }>(`/api/face/${userId}`);
     return response.data;
@@ -633,40 +727,69 @@ class ApiClient {
     return response.data;
   }
 
-  async searchPatrons(query?: string, status?: string, skip = 0, limit = 50): Promise<{ items: PatronPublic[]; total: number }> {
+  async searchPatrons(query?: string, status?: string, skip = 0, limit = 1000): Promise<{ items: PatronPublic[]; total: number }> {
     const params: any = { skip, limit };
     if (query) params.q = query;
     if (status) params.status = status;
-    const response = await this.client.get<{ items: PatronPublic[]; total: number }>("/api/patrons/search", { params });
-    return response.data;
+    const response = await this.client.get<{ items: any[]; total: number }>("/api/patrons/search", { params });
+    const data = response.data as any;
+    return {
+      items: (Array.isArray(data?.items) ? data.items : []).map(normalizePatron),
+      total: data?.total ?? 0,
+    };
   }
 
   async lookupPatron(studentCode?: string, cardNumber?: string): Promise<PatronLookupResult> {
     const params: any = {};
     if (studentCode) params.student_code = studentCode;
     if (cardNumber) params.card_number = cardNumber;
-    const response = await this.client.get<PatronLookupResult>("/api/patrons/lookup", { params });
-    return response.data;
+    const response = await this.client.get<any>("/api/patrons/lookup", { params });
+    const d = response.data;
+    return {
+      ...d,
+      patron: d?.patron ? normalizePatron(d.patron) : null,
+    } as PatronLookupResult;
   }
 
   async getPatron(id: string): Promise<PatronPublic> {
-    const response = await this.client.get<PatronPublic>(`/api/patrons/${id}`);
-    return response.data;
+    const response = await this.client.get<any>(`/api/patrons/${id}`);
+    return normalizePatron(response.data);
   }
 
   async createPatron(data: PatronCreate): Promise<PatronPublic> {
-    const response = await this.client.post<PatronPublic>("/api/patrons", data);
+    const response = await this.client.post<any>("/api/patrons", data);
+    return normalizePatron(response.data);
+  }
+
+  async downloadPatronTemplate(): Promise<Blob> {
+    const response = await this.client.get("/api/patrons/template", {
+      responseType: "blob",
+    });
     return response.data;
   }
 
-  async patronRegister(data: PatronRegisterRequest): Promise<{ user: UserPublic; access_token: string; refresh_token?: string }> {
-    const response = await this.client.post<{ user: UserPublic; access_token: string; refresh_token?: string }>("/api/patrons/register", data);
+  async previewPatronImport(file: File): Promise<PatronImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await this.client.post<PatronImportPreviewResponse>("/api/patrons/import/preview", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  }
+
+  async executePatronImport(file: File, mode: "skip" | "update" = "skip"): Promise<PatronImportResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("mode", mode);
+    const response = await this.client.post<PatronImportResponse>("/api/patrons/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data;
   }
 
   async updatePatron(id: string, data: PatronUpdate): Promise<PatronPublic> {
-    const response = await this.client.put<PatronPublic>(`/api/patrons/${id}`, data);
-    return response.data;
+    const response = await this.client.put<any>(`/api/patrons/${id}`, data);
+    return normalizePatron(response.data);
   }
 
   async deletePatron(id: string): Promise<{ message: string }> {
@@ -984,8 +1107,8 @@ class ApiClient {
     return response.data;
   }
 
-  async staffReturnBook(barcode: string, note?: string | null): Promise<ReturnResponse> {
-    const response = await this.client.post<ReturnResponse>("/api/borrow/return", { barcode, note } as StaffReturnRequest);
+  async staffReturnBook(barcode: string, note?: string | null, condition?: string | null, payment?: { is_paid_immediately?: boolean; payment_method?: "cash" | "qr_code" }): Promise<ReturnResponse> {
+    const response = await this.client.post<ReturnResponse>("/api/borrow/return", { barcode, note, condition, ...payment } as StaffReturnRequest);
     return response.data;
   }
 
@@ -1001,8 +1124,62 @@ class ApiClient {
     return response.data;
   }
 
-  async staffReturnBorrowRecord(recordId: string, note?: string | null): Promise<ReturnResponse> {
-    const response = await this.client.post<ReturnResponse>(`/api/borrow/return/record/${recordId}`, { note });
+  async staffReturnBorrowRecord(recordId: string, note?: string | null, condition?: string | null, payment?: { is_paid_immediately?: boolean; payment_method?: "cash" | "qr_code" }): Promise<ReturnResponse> {
+    const response = await this.client.post<ReturnResponse>(`/api/borrow/return/record/${recordId}`, { note, condition, ...payment });
+    return response.data;
+  }
+
+  async getUnpaidFines(): Promise<FineLedgerItem[]> {
+    const response = await this.client.get<FineLedgerItem[]>("/api/borrow/fines?unpaid=true");
+    return response.data;
+  }
+
+  async getMyUnpaidFines(): Promise<PatronFineItem[]> {
+    const response = await this.client.get<PatronFineItem[]>("/api/borrow/patron/fines");
+    return response.data;
+  }
+
+  async payFines(recordIds: string[], paymentMethod?: "cash" | "qr_code"): Promise<PayFinesResponse> {
+    const response = await this.client.post<PayFinesResponse>("/api/borrow/fines/pay", { record_ids: recordIds, ...(paymentMethod ? { payment_method: paymentMethod } : {}) });
+    return response.data;
+  }
+
+  async createPaymentOrder(data: CreatePaymentOrderRequest): Promise<PaymentOrderResponse> {
+    const response = await this.client.post<PaymentOrderResponse>("/api/borrow/payments/create", data);
+    return response.data;
+  }
+
+  async getPaymentOrderStatus(orderCode: string): Promise<PaymentOrderStatusResponse> {
+    const response = await this.client.get<PaymentOrderStatusResponse>(`/api/borrow/payments/${orderCode}/status`);
+    return response.data;
+  }
+
+  async getBookCopies(bookId: string): Promise<import("./types").BookCopyData[]> {
+    const response = await this.client.get<any>(`/api/borrow/books/${bookId}/copies`);
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.items)) return data.items;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  }
+
+  async createBookCopy(data: { book_id: string; barcode?: string; shelf_location?: string; condition?: string; status?: string }): Promise<import("./types").BookCopyData> {
+    const response = await this.client.post<import("./types").BookCopyData>("/api/borrow/copies", data);
+    return response.data;
+  }
+
+  async updateBookCopy(copyId: string, data: { shelf_location?: string; condition?: string; status?: string; note?: string }): Promise<import("./types").BookCopyData> {
+    const response = await this.client.patch<import("./types").BookCopyData>(`/api/borrow/copies/${copyId}`, data);
+    return response.data;
+  }
+
+  async deleteBookCopy(copyId: string): Promise<{ success: boolean }> {
+    const response = await this.client.delete<{ success: boolean }>(`/api/borrow/copies/${copyId}`);
+    return response.data;
+  }
+
+  async bulkDisposeCopies(copyIds: string[]): Promise<{ success: boolean; deleted: number; deleted_ids: string[]; skipped: Array<{ copy_id: string; reason: string }> }> {
+    const response = await this.client.post("/api/borrow/copies/bulk-dispose", { copy_ids: copyIds });
     return response.data;
   }
 
@@ -1011,7 +1188,43 @@ class ApiClient {
     return response.data;
   }
 
-  async getBorrowConfig(): Promise<{ max_borrow_books: number; max_borrow_books_per_slip: number; max_borrow_days: number }> {
+  async getConditionAttention(limit = 200): Promise<ConditionAttentionReport> {
+    const response = await this.client.get<ConditionAttentionReport>("/api/borrow/stats/condition-attention", {
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  async getConditionDistribution(): Promise<ConditionDistribution> {
+    const response = await this.client.get<ConditionDistribution>("/api/borrow/stats/condition-distribution");
+    return response.data;
+  }
+
+  async getFinanceStats(months = 6): Promise<FinanceStats> {
+    const response = await this.client.get<FinanceStats>("/api/borrow/stats/finance", {
+      params: { months },
+    });
+    return response.data;
+  }
+
+  async getInventoryStats(): Promise<InventoryStats> {
+    const response = await this.client.get<InventoryStats>("/api/borrow/stats/inventory");
+    return response.data;
+  }
+
+  async getBorrowConfig(): Promise<{
+    max_borrow_books: number;
+    max_borrow_books_per_slip: number;
+    max_borrow_days: number;
+    fine?: {
+      fine_brackets: Array<{ from: number; to: number | null; amount: number }>;
+      fine_per_day: number;
+      damage_fee_pct: { minor: number; major: number; lost: number };
+      damage_fee_fixed: { minor: number; major: number; lost: number };
+      fallback_book_price: number;
+      fine_lock_threshold_days: number;
+    };
+  }> {
     const response = await this.client.get("/api/borrow/config");
     return response.data;
   }
@@ -1080,6 +1293,7 @@ class ApiClient {
   async importBooksFiltered(rows: Array<{
     isbn: string;
     quantity: number;
+    price?: number | null;
     title: string | null;
     subtitle: string | null;
     author: string | null;
@@ -1134,6 +1348,14 @@ class ApiClient {
 
   async updateBook(bookId: string, data: Record<string, any>): Promise<BookWithStats> {
     const response = await this.client.put<BookWithStats>(`/api/borrow/books/${bookId}`, data);
+    return response.data;
+  }
+
+  async bulkUpdateBookPrices(bookIds: string[], price: number): Promise<{ success: boolean; updated: number }> {
+    const response = await this.client.post<{ success: boolean; updated: number }>("/api/borrow/books/bulk-price", {
+      book_ids: bookIds,
+      price,
+    });
     return response.data;
   }
 

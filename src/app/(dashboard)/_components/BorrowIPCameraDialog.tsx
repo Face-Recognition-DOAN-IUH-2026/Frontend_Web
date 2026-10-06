@@ -15,11 +15,11 @@ import {
   IconButton,
   InputAdornment,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import BookIcon from "@mui/icons-material/MenuBookOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
@@ -31,6 +31,9 @@ import type { BookWithStats } from "@/lib/types";
 import { getAlertSeverity } from "@/lib/alert-utils";
 import { slideInRight, successPop } from "@/lib/animations";
 import IPCameraStream from "./IPCameraStream";
+import type { BorrowCartItem } from "./borrow/types";
+import type { SlipReceiptItem } from "./borrow/BorrowSlipReceipt";
+import { toSlipReceiptItems } from "./borrow/BorrowSlipReceipt";
 
 interface ScannedBorrowItem {
   barcode: string;
@@ -44,14 +47,31 @@ interface ScannedBorrowItem {
   copy_barcode: string | null;
 }
 
+function toScannedItem(item: BorrowCartItem): ScannedBorrowItem {
+  return {
+    barcode: item.barcode,
+    isbn: item.isbn,
+    loading: false,
+    can_borrow: item.can_borrow,
+    reason: item.reason ?? null,
+    // Cart books come from lookupBorrowSlip (serializeBookWithStats) at runtime,
+    // even though BorrowCartItem declares the base BookInfo type.
+    book: (item.book as BookWithStats | null) ?? null,
+    copy_id: item.copy_id ?? null,
+    book_id: item.book_id ?? null,
+    copy_barcode: item.copy_barcode ?? null,
+  };
+}
+
 interface Props {
   open: boolean;
   patronId: string;
   patronName: string;
   maxItems?: number;
   cameraUrl: string;
+  initialItems?: BorrowCartItem[];
   onClose: () => void;
-  onSuccess: (message: string) => void;
+  onSuccess: (result: { message: string; count: number; items: SlipReceiptItem[] }) => void;
 }
 
 export default function BorrowIPCameraDialog({
@@ -60,13 +80,16 @@ export default function BorrowIPCameraDialog({
   patronName,
   maxItems,
   cameraUrl,
+  initialItems,
   onClose,
   onSuccess,
 }: Props) {
+  const { toast } = useToast();
+  const initialItemsRef = useRef<BorrowCartItem[]>([]);
+  initialItemsRef.current = initialItems ?? [];
   const [scanned, setScanned] = useState<ScannedBorrowItem[]>([]);
   const [lookingUp, setLookingUp] = useState(false);
   const [createError, setCreateError] = useState("");
-  const [scanToast, setScanToast] = useState("");
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [manualIsbn, setManualIsbn] = useState("");
@@ -82,16 +105,24 @@ export default function BorrowIPCameraDialog({
         patron_id: patronId,
         items: [{ barcode, isbn }],
       });
-      const item = result.items.find((i) => i.barcode === barcode);
+      const normBarcode = barcode.replace(/[-\s]/g, "").toLowerCase();
+      const item = result.items.find((i) => {
+        const iBarcode = (i.barcode || "").replace(/[-\s]/g, "").toLowerCase();
+        const iCopyBarcode = (i.copy?.barcode || "").replace(/[-\s]/g, "").toLowerCase();
+        const iIsbn = (i.isbn || "").replace(/[-\s]/g, "").toLowerCase();
+        return iBarcode === normBarcode || iCopyBarcode === normBarcode || iIsbn === normBarcode;
+      }) || result.items[0];
+
       if (!item) {
         setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
-        setLookupError(`Sách ISBN ${barcode} không tồn tại trong thư viện`);
+        setLookupError(`Mã sách "${barcode}" không tồn tại trong thư viện`);
         return;
       }
       if (!item.can_borrow) {
         setScanned((prev) => prev.filter((i) => i.barcode !== barcode));
         const msg = item.reason || "Sách không thể mượn";
-        setLookupError(msg);
+        const title = item.book?.title || "";
+        setLookupError(title ? `"${title}": ${msg}` : `${msg} (Mã: ${barcode})`);
         return;
       }
       setScanned((prev) => prev.map((i) =>
@@ -121,14 +152,14 @@ export default function BorrowIPCameraDialog({
       if (existing) {
         setDuplicateFlash(normalized);
         setTimeout(() => setDuplicateFlash(null), 1500);
-        setScanToast(`Sách ${existing.book?.title || normalized} đã quét rồi`);
+        toast.warning(`Sách ${existing.book?.title || normalized} đã quét rồi`);
         return prev;
       }
       if (maxItems !== undefined && prev.length >= maxItems) {
-        setScanToast(`Chỉ được mượn tối đa ${maxItems} cuốn`);
+        toast.warning(`Chỉ được mượn tối đa ${maxItems} cuốn`);
         return prev;
       }
-      setScanToast(`Đã quét: ${normalized}`);
+      toast.success(`Đã quét: ${normalized}`);
       return [...prev, {
         barcode: normalized,
         isbn: normalized,
@@ -142,17 +173,19 @@ export default function BorrowIPCameraDialog({
       }];
     });
     lookupItem(normalized, normalized);
-  }, [lookupItem, maxItems]);
+  }, [lookupItem, maxItems, toast]);
 
   useEffect(() => {
     if (!open) {
       setScanned([]);
       setCreateError("");
-      setScanToast("");
       setNote("");
       setDuplicateFlash(null);
       lastScannedRef.current = null;
+      return;
     }
+    // Prefill with books already added on the manual step so one session creates one slip.
+    setScanned(initialItemsRef.current.map(toScannedItem));
   }, [open]);
 
   const removeItem = (barcode: string) => {
@@ -176,12 +209,13 @@ export default function BorrowIPCameraDialog({
       });
       if (confirmResult.status === "success") {
         setScanned([]);
-        onSuccess(confirmResult.message);
+        onSuccess({ message: confirmResult.message, count: validItems.length, items: toSlipReceiptItems(validItems) });
         onClose();
       }
     } catch (err) {
       const detail = getErrorMessage(err);
       setCreateError(detail);
+      toast.error(detail);
     }
   };
 
@@ -385,32 +419,6 @@ export default function BorrowIPCameraDialog({
           </Stack>
         </DialogActions>
       </Dialog>
-
-      <Snackbar
-        open={!!scanToast}
-        autoHideDuration={scanToast?.includes("đã quét rồi") || scanToast?.includes("tối đa") ? 3500 : 2000}
-        onClose={() => setScanToast("")}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        {scanToast ? (
-          <Alert
-            severity={
-              scanToast.includes("đã quét rồi") || scanToast.includes("tối đa")
-                ? "warning"
-                : scanToast.startsWith("Đã quét")
-                ? "success"
-                : "info"
-            }
-            onClose={() => setScanToast("")}
-            sx={{
-              animation: `${slideInRight} 0.3s ease-out`,
-              boxShadow: 4,
-            }}
-          >
-            {scanToast}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
     </>
   );
 }

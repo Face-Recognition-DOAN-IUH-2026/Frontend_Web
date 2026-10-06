@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/lib/auth-context";
+import { ToastProvider } from "@/lib/toast-context";
 import { MuiThemeProvider } from "@/lib/mui-theme";
 import ClientLayout from "@/app/_components/ClientLayout";
 import "./globals.css";
@@ -28,7 +29,9 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <MuiThemeProvider>
           <AuthProvider>
-            <ClientLayout>{children}</ClientLayout>
+            <ToastProvider>
+              <ClientLayout>{children}</ClientLayout>
+            </ToastProvider>
           </AuthProvider>
         </MuiThemeProvider>
       </body>

@@ -8,7 +8,6 @@ import {
   Button,
   Paper,
   Slide,
-  Snackbar,
   Stack,
   Step,
   StepButton,
@@ -24,6 +23,7 @@ import BorrowIPCameraDialog from "@/app/(dashboard)/_components/BorrowIPCameraDi
 import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useTaskSSE } from "@/lib/hooks/useTaskSSE";
+import { useToast } from "@/lib/toast-context";
 import { slideInRight } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { getAlertSeverity, getAlertTitle } from "@/lib/alert-utils";
@@ -34,28 +34,18 @@ import {
   BorrowStepScanBooks,
   BorrowStepConfirm,
   BorrowStepSuccess,
+  BorrowSlipReceipt,
   type BorrowCartItem,
+  type SlipReceiptItem,
 } from "@/app/(dashboard)/_components/borrow";
 
 export default function BorrowPage() {
   const theme = useTheme();
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "warning" | "error" | "info";
-  }>({
-    open: false,
-    message: "",
-    severity: "info",
-  });
+  const { toast } = useToast();
 
   const showNotice = useCallback((type: "success" | "warning" | "error" | "info", msg: string) => {
-    setSnackbar({
-      open: true,
-      message: msg,
-      severity: type,
-    });
-  }, []);
+    toast(msg, type);
+  }, [toast]);
 
   const [currentStep, setCurrentStep] = useState<number>(0);
 
@@ -74,6 +64,8 @@ export default function BorrowPage() {
   const [isLookingUpBook, setIsLookingUpBook] = useState(false);
   const [creatingSlip, setCreatingSlip] = useState(false);
   const [slipSuccess, setSlipSuccess] = useState<{ message: string; count: number } | null>(null);
+  const [slipReceiptItems, setSlipReceiptItems] = useState<SlipReceiptItem[]>([]);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   // Dialogs
   const [webcamScannerOpen, setWebcamScannerOpen] = useState(false);
@@ -90,7 +82,7 @@ export default function BorrowPage() {
   const [faceScanning, setFaceScanning] = useState(false);
 
   const { state: sseState, start: startSSE } = useTaskSSE(30000);
-  const [borrowConfig, setBorrowConfig] = useState<{ max_borrow_books: number }>({ max_borrow_books: 3 });
+  const [borrowConfig, setBorrowConfig] = useState<{ max_borrow_books: number; max_borrow_days?: number; fine?: any }>({ max_borrow_books: 3 });
 
   const borrowCamUrl = useMemo(() => {
     const raw = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
@@ -232,6 +224,8 @@ export default function BorrowPage() {
     setPatronCode("");
     setCartItems([]);
     setSlipSuccess(null);
+    setSlipReceiptItems([]);
+    setReceiptOpen(false);
     setCurrentStep(0);
     setError("");
     stopCamera();
@@ -296,7 +290,13 @@ export default function BorrowPage() {
       setError("Vui lòng xác minh độc giả trước khi quét sách.");
       return;
     }
-    if (cartItems.some((item) => item.barcode === raw || item.isbn === raw)) {
+    const normRaw = raw.replace(/[-\s]/g, "").toLowerCase();
+    if (cartItems.some((item) => {
+      const bNorm = item.barcode.replace(/[-\s]/g, "").toLowerCase();
+      const cNorm = (item.copy_barcode || "").replace(/[-\s]/g, "").toLowerCase();
+      const iNorm = (item.isbn || "").replace(/[-\s]/g, "").toLowerCase();
+      return bNorm === normRaw || cNorm === normRaw || iNorm === normRaw;
+    })) {
       showNotice("warning", "Sách này đã có trong danh sách mượn.");
       setManualIsbn("");
       return;
@@ -309,9 +309,10 @@ export default function BorrowPage() {
     setIsLookingUpBook(true);
     setError("");
     try {
+      const isCopy = /^LIB/i.test(raw.replace(/[-\s]/g, ""));
       const result = await api.lookupBorrowSlip({
         patron_id: patronId,
-        items: [{ barcode: raw, isbn: raw }],
+        items: [{ barcode: raw, isbn: isCopy ? undefined : raw }],
       });
       const item = result.items[0];
       if (!item) {
@@ -319,7 +320,14 @@ export default function BorrowPage() {
         return;
       }
       if (!item.can_borrow) {
-        showNotice("error", `Không thể mượn "${item.book?.title || raw}": ${item.reason || "Sách không có sẵn để mượn."}`);
+        const msg = item.reason || "Sách không có sẵn để mượn.";
+        const title = item.book?.title;
+        showNotice("error", title && !msg.includes(title) ? `Không thể mượn "${title}": ${msg}` : msg);
+        return;
+      }
+
+      if (item.book?.id && cartItems.some((c) => c.book_id === item.book?.id)) {
+        showNotice("warning", `Đầu sách "${item.book.title}" đã có trong danh sách mượn.`);
         return;
       }
 
@@ -336,6 +344,8 @@ export default function BorrowPage() {
           book_id: item.book?.id || null,
           copy_barcode: item.copy?.barcode || null,
           shelf_location: item.copy?.shelf_location || null,
+          condition: (item.copy as any)?.condition || null,
+          status: (item.copy as any)?.status || null,
         },
       ]);
       setManualIsbn("");
@@ -368,6 +378,14 @@ export default function BorrowPage() {
         })),
       });
       if (confirmResult.status === "success") {
+        setSlipReceiptItems(
+          validItems.map((item) => ({
+            title: (item.book?.title as string) || item.copy_barcode || item.barcode,
+            barcode: item.copy_barcode || item.barcode,
+            author: (item.book?.author as string) ?? null,
+          }))
+        );
+        setReceiptOpen(true);
         setSlipSuccess({
           message: confirmResult.message || "Tạo phiếu mượn thành công!",
           count: validItems.length,
@@ -383,13 +401,14 @@ export default function BorrowPage() {
 
   const faceVerifyDisabled = faceScanning || !patronCode.trim() || !!patronId;
 
-  // Date summaries for Step 3
+  // Date summaries for Step 3 — due date follows the configured max borrow days
   const borrowDateStr = useMemo(() => new Date().toLocaleDateString("vi-VN"), []);
   const dueDateStr = useMemo(() => {
+    const days = borrowConfig.max_borrow_days ?? 14;
     const due = new Date();
-    due.setDate(due.getDate() + 14);
+    due.setDate(due.getDate() + days);
     return due.toLocaleDateString("vi-VN");
-  }, []);
+  }, [borrowConfig.max_borrow_days]);
 
   return (
     <Stack spacing={3} sx={{ height: "calc(100vh - 120px)" }}>
@@ -442,17 +461,37 @@ export default function BorrowPage() {
             }}
           >
             {[
-              { label: "Xác minh độc giả", disabled: false },
-              { label: "Quét mã vạch sách", disabled: !patronId || !canBorrow },
-              { label: "Xác nhận & Hoàn tất", disabled: !patronId || cartItems.length === 0 },
+              { label: "Xác minh độc giả", disabled: false, reason: "" },
+              {
+                label: "Quét mã vạch sách",
+                disabled: !patronId || !canBorrow,
+                reason: !patronId
+                  ? "Cần xác minh độc giả trước"
+                  : !canBorrow
+                    ? overdueCount > 0
+                      ? "Độc giả đang có sách quá hạn — cần trả trước"
+                      : "Độc giả đã hết lượt mượn"
+                    : "",
+              },
+              {
+                label: "Xác nhận & Hoàn tất",
+                disabled: !patronId || cartItems.length === 0,
+                reason: !patronId
+                  ? "Cần xác minh độc giả trước"
+                  : cartItems.length === 0
+                    ? "Chưa có sách nào trong giỏ"
+                    : "",
+              },
             ].map((stepItem, idx) => (
               <Step key={idx} completed={idx < currentStep || !!slipSuccess}>
-                <StepButton
-                  onClick={() => setCurrentStep(idx)}
-                  disabled={stepItem.disabled}
-                >
-                  <StepLabel>{stepItem.label}</StepLabel>
-                </StepButton>
+                <span title={stepItem.disabled ? stepItem.reason : undefined}>
+                  <StepButton
+                    onClick={() => setCurrentStep(idx)}
+                    disabled={stepItem.disabled}
+                  >
+                    <StepLabel>{stepItem.label}</StepLabel>
+                  </StepButton>
+                </span>
               </Step>
             ))}
           </Stepper>
@@ -502,6 +541,7 @@ export default function BorrowPage() {
           faceVerifyDisabled={faceVerifyDisabled}
           handleLookupAndOpenCamera={handleLookupAndOpenCamera}
           startWebcam={startWebcam}
+          stopWebcam={stopCamera}
           handleFaceVerify={handleFaceVerify}
           setOverdueGuideOpen={setOverdueGuideOpen}
           setCurrentStep={setCurrentStep}
@@ -543,6 +583,9 @@ export default function BorrowPage() {
           creatingSlip={creatingSlip}
           handleConfirmBorrowSlip={handleConfirmBorrowSlip}
           setCurrentStep={setCurrentStep}
+          finePerDay={borrowConfig?.fine?.fine_per_day}
+          fineBrackets={borrowConfig?.fine?.fine_brackets}
+          maxBorrowDays={borrowConfig?.max_borrow_days}
         />
       )}
 
@@ -554,24 +597,39 @@ export default function BorrowPage() {
           patronCode={patronCode}
           dueDateStr={dueDateStr}
           handleClearSession={handleClearSession}
+          onPrintReceipt={() => setReceiptOpen(true)}
         />
       )}
+
+      <BorrowSlipReceipt
+        open={receiptOpen}
+        patronName={patronName}
+        patronCode={patronCode}
+        borrowDateStr={borrowDateStr}
+        dueDateStr={dueDateStr}
+        items={slipReceiptItems}
+        onClose={() => setReceiptOpen(false)}
+      />
 
       {/* Camera Barcode Scanner Dialogs */}
       <BorrowScannerDialog
         open={webcamScannerOpen}
         patronId={patronId || ""}
-        maxItems={remaining - cartItems.length > 0 ? remaining - cartItems.length : undefined}
+        maxItems={Math.max(remaining, 0)}
+        initialItems={cartItems}
         onClose={() => setWebcamScannerOpen(false)}
-        onSuccess={() => {
+        onSuccess={(result) => {
           setWebcamScannerOpen(false);
+          setCartItems([]);
+          setSlipReceiptItems(result.items);
+          setReceiptOpen(true);
           if (patronCode.trim()) {
             api.getActiveBorrowsByStudentCode(patronCode.trim()).then((data) => {
               setActiveCount(data.total);
               setOverdueCount(data.overdue_count);
             }).catch(() => {});
           }
-          setSlipSuccess({ message: "Mượn sách thành công", count: remaining });
+          setSlipSuccess({ message: result.message, count: result.count });
         }}
       />
 
@@ -580,18 +638,22 @@ export default function BorrowPage() {
           open={ipScannerOpen}
           patronId={patronId || ""}
           patronName={patronName}
-          maxItems={remaining - cartItems.length > 0 ? remaining - cartItems.length : undefined}
+          maxItems={Math.max(remaining, 0)}
+          initialItems={cartItems}
           cameraUrl={borrowCamUrl}
           onClose={() => setIpScannerOpen(false)}
-          onSuccess={() => {
-            setIpScannerOpen(false);
-            if (patronCode.trim()) {
+        onSuccess={(result) => {
+          setIpScannerOpen(false);
+          setCartItems([]);
+          setSlipReceiptItems(result.items);
+          setReceiptOpen(true);
+          if (patronCode.trim()) {
               api.getActiveBorrowsByStudentCode(patronCode.trim()).then((data) => {
                 setActiveCount(data.total);
                 setOverdueCount(data.overdue_count);
               }).catch(() => {});
             }
-            setSlipSuccess({ message: "Mượn sách thành công", count: remaining });
+            setSlipSuccess({ message: result.message, count: result.count });
           }}
         />
       )}
@@ -600,22 +662,6 @@ export default function BorrowPage() {
         open={overdueGuideOpen}
         onClose={() => setOverdueGuideOpen(false)}
       />
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: "100%", borderRadius: 2 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

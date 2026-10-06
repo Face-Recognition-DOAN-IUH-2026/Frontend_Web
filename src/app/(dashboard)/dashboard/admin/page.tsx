@@ -16,19 +16,14 @@ import {
   Grid,
   IconButton,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
   ToggleButton,
   ToggleButtonGroup,
-  Snackbar,
   alpha,
 } from "@mui/material";
+import DataTable, { type DataTableColumn } from "@/app/(dashboard)/_components/ui/DataTable";
+import { useToast } from "@/lib/toast-context";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
@@ -78,11 +73,12 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ email: "", password: "", role: "staff" });
+  const { toast } = useToast();
   const [createError, setCreateError] = useState("");
-  const [notice, setNotice] = useState("");
-
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "staff" | "patron">("all");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     if (!isLoading && !permLoading) {
@@ -97,7 +93,7 @@ export default function AdminPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const data = await api.listUsers({ skip: 0, limit: 200 });
+      const data = await api.listUsers({ skip: 0, limit: 1000 });
       setUsers(data.users);
       setTotal(data.total);
     } finally {
@@ -106,6 +102,10 @@ export default function AdminPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, roleFilter]);
 
   const filtered = useMemo(() => {
     let list = users;
@@ -121,6 +121,73 @@ export default function AdminPage() {
     return list;
   }, [users, roleFilter, search]);
 
+  const columns: DataTableColumn<UserPublic>[] = [
+    {
+      key: "email",
+      label: "Người dùng",
+      sortable: true,
+      render: (_, item) => (
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+          <AvatarUser user={item} size={36} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: "0.88rem" }} noWrap>
+              {item.email}
+            </Typography>
+            {item.full_name ? (
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {item.full_name}
+              </Typography>
+            ) : null}
+          </Box>
+        </Stack>
+      ),
+    },
+    {
+      key: "role",
+      label: "Vai trò",
+      sortable: true,
+      render: (_, item) => (
+        <Chip
+          size="small"
+          color={roleChipColor(item.role)}
+          label={roleLabel(item.role)}
+          sx={{ fontWeight: 700, fontSize: "0.75rem", borderRadius: 1.5 }}
+        />
+      ),
+    },
+    {
+      key: "has_face",
+      label: "Sinh trắc học",
+      sortable: true,
+      render: (_, item) => (
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+          {item.has_face ? (
+            <CheckCircleOutlinedIcon sx={{ fontSize: 18, color: "success.main" }} />
+          ) : (
+            <RadioButtonUncheckedIcon sx={{ fontSize: 18, color: "text.disabled" }} />
+          )}
+          <Typography variant="body2" color={item.has_face ? "success.main" : "text.disabled"} sx={{ fontWeight: 600 }}>
+            {item.has_face ? "Đã đăng ký" : "Chưa đăng ký"}
+          </Typography>
+        </Stack>
+      ),
+    },
+    {
+      key: "status",
+      label: "Trạng thái",
+      sortable: true,
+      render: (_, item) => (
+        <Chip
+          size="small"
+          color={item.status === "active" ? "success" : item.status === "deleted" ? "error" : "default"}
+          label={item.status === "active" ? "Hoạt động" : item.status === "deleted" ? "Đã xóa" : item.status ?? "—"}
+          variant="outlined"
+          sx={{ fontWeight: 600, fontSize: "0.72rem", borderRadius: 1.5 }}
+        />
+      ),
+    },
+  ];
+
   const handleCreate = async () => {
     if (!createForm.email || !createForm.password) {
       setCreateError("Vui lòng nhập email và mật khẩu.");
@@ -131,10 +198,12 @@ export default function AdminPage() {
       await api.register({ ...createForm, skip_verification: true } as any);
       setShowCreate(false);
       setCreateForm({ email: "", password: "", role: "staff" });
-      setNotice("Tạo người dùng thành công. Tài khoản đã active.");
+      toast.success("Tạo người dùng thành công. Tài khoản đã active.");
       load();
     } catch (err: any) {
-      setCreateError(err?.response?.data?.detail || "Tạo người dùng thất bại.");
+      const errorMsg = err?.response?.data?.detail || "Tạo người dùng thất bại.";
+      setCreateError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
@@ -276,101 +345,24 @@ export default function AdminPage() {
           </Typography>
         </Stack>
 
-      <TableContainer sx={{ overflowX: "auto" }}>
-      <Table sx={{ minWidth: 600 }}>
-            <TableHead>
-              <TableRow sx={{ "& .MuiTableCell-head": { fontWeight: 700, bgcolor: "action.hover", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: 0.5, color: "text.secondary" } }}>
-                <TableCell>Người dùng</TableCell>
-                <TableCell>Vai trò</TableCell>
-                <TableCell>Sinh trắc học</TableCell>
-                <TableCell>Trạng thái</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={4}>
-                    <Stack sx={{ py: 6, alignItems: "center" }}>
-                      <CircularProgress size={28} />
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4}>
-                    <EmptyState
-                      icon={<GroupsOutlinedIcon />}
-                      title="Không tìm thấy người dùng nào"
-                    />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((item, idx) => (
-                  <TableRow
-                    key={item.id}
-                    hover
-                    onClick={() => router.push(`/dashboard/admin/${item.id}`)}
-                    sx={{
-                      cursor: "pointer",
-                      transition: "background 0.15s",
-                      "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.04) },
-                      "&:last-child td": { border: 0 },
-                      ...staggerSx(idx),
-                    }}
-                  >
-                    <TableCell>
-                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                        <AvatarUser user={item} size={38} />
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }} noWrap>
-                            {item.email}
-                          </Typography>
-                          {item.full_name ? (
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              {item.full_name}
-                            </Typography>
-                          ) : null}
-                        </Box>
-                      </Stack>
-                    </TableCell>
-
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        color={roleChipColor(item.role)}
-                        label={roleLabel(item.role)}
-                        sx={{ fontWeight: 700, fontSize: "0.75rem", borderRadius: 1.5 }}
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
-                        {item.has_face ? (
-                          <CheckCircleOutlinedIcon sx={{ fontSize: 18, color: "success.main" }} />
-                        ) : (
-                          <RadioButtonUncheckedIcon sx={{ fontSize: 18, color: "text.disabled" }} />
-                        )}
-                        <Typography variant="body2" color={item.has_face ? "success.main" : "text.disabled"} sx={{ fontWeight: 600 }}>
-                          {item.has_face ? "Đã đăng ký" : "Chưa đăng ký"}
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        color={item.status === "active" ? "success" : item.status === "deleted" ? "error" : "default"}
-                        label={item.status === "active" ? "Hoạt động" : item.status === "deleted" ? "Đã xóa" : item.status ?? "—"}
-                        variant="outlined"
-                        sx={{ fontWeight: 600, fontSize: "0.72rem", borderRadius: 1.5 }}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Box sx={{ p: 2 }}>
+          <DataTable<UserPublic>
+            columns={columns}
+            rows={filtered}
+            loading={loading}
+            getRowId={(row) => row.id}
+            onRowClick={(row) => router.push(`/dashboard/admin/${row.id}`)}
+            emptyTitle="Không tìm thấy người dùng nào"
+            page={page}
+            rowsPerPage={rowsPerPage}
+            totalCount={filtered.length}
+            onPageChange={setPage}
+            onRowsPerPageChange={(ps) => {
+              setRowsPerPage(ps);
+              setPage(0);
+            }}
+          />
+        </Box>
       </DashboardCard>
 
       <Drawer
@@ -476,17 +468,6 @@ export default function AdminPage() {
           </Stack>
         </Box>
       </Drawer>
-
-      <Snackbar
-        open={!!notice}
-        autoHideDuration={4000}
-        onClose={() => setNotice("")}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert severity="success" onClose={() => setNotice("")} sx={{ borderRadius: 2 }}>
-          {notice}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

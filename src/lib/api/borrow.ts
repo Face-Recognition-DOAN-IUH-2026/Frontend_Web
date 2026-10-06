@@ -20,8 +20,8 @@ export function createBorrowMethods(client: AxiosInstance) {
       return response.data;
     },
 
-    async staffReturnBook(barcode: string, note?: string | null): Promise<ReturnResponse> {
-      const response = await client.post<ReturnResponse>("/api/borrow/return", { barcode, note } as StaffReturnRequest);
+    async staffReturnBook(barcode: string, note?: string | null, condition?: string | null): Promise<ReturnResponse> {
+      const response = await client.post<ReturnResponse>("/api/borrow/return", { barcode, note, condition } as StaffReturnRequest);
       return response.data;
     },
 
@@ -37,8 +37,13 @@ export function createBorrowMethods(client: AxiosInstance) {
       return response.data;
     },
 
-    async staffReturnBorrowRecord(recordId: string, note?: string | null): Promise<ReturnResponse> {
-      const response = await client.post<ReturnResponse>(`/api/borrow/return/record/${recordId}`, { note });
+    async staffReturnBorrowRecord(
+      recordId: string,
+      note?: string | null,
+      condition?: string | null,
+      payment?: { is_paid_immediately?: boolean; payment_method?: "cash" | "qr_code" },
+    ): Promise<ReturnResponse> {
+      const response = await client.post<ReturnResponse>(`/api/borrow/return/record/${recordId}`, { note, condition, ...payment });
       return response.data;
     },
 

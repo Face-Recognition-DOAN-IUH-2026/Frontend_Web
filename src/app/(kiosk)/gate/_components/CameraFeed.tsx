@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
+  Button,
   Chip,
   CircularProgress,
   keyframes,
@@ -11,12 +12,15 @@ import {
   Typography,
 } from "@mui/material";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import LaptopOutlinedIcon from "@mui/icons-material/LaptopOutlined";
 import CenterFocusWeakIcon from "@mui/icons-material/CenterFocusWeak";
 
 interface CameraFeedProps {
   src: string;
   cameraId?: string;
   label: string;
+  useWebcam?: boolean;
+  onToggleWebcam?: () => void;
   overlay?: {
     bbox?: [number, number, number, number];
     landmarks?: [number, number][];
@@ -56,8 +60,58 @@ const pulseDot = keyframes`
 const ONLINE_INTERVAL = 1000;
 const OFFLINE_INTERVAL = 5000;
 
-export default function CameraFeed({ src, cameraId, label, overlay, onStatusChange }: CameraFeedProps) {
+let globalWebcamStream: MediaStream | null = null;
+const globalWebcamListeners = new Set<(stream: MediaStream | null) => void>();
+let globalWebcamPromise: Promise<MediaStream> | null = null;
+
+async function getSharedWebcamStream(): Promise<MediaStream> {
+  if (globalWebcamStream && globalWebcamStream.active) {
+    return globalWebcamStream;
+  }
+  if (!globalWebcamPromise) {
+    globalWebcamPromise = navigator.mediaDevices
+      .getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+        audio: false,
+      })
+      .then((stream) => {
+        globalWebcamStream = stream;
+        globalWebcamPromise = null;
+        if (stream.getVideoTracks()[0]) {
+          stream.getVideoTracks()[0].onended = () => {
+            globalWebcamStream = null;
+            globalWebcamListeners.forEach((fn) => fn(null));
+          };
+        }
+        globalWebcamListeners.forEach((fn) => fn(stream));
+        return stream;
+      })
+      .catch((err) => {
+        globalWebcamPromise = null;
+        throw err;
+      });
+  }
+  return globalWebcamPromise;
+}
+
+function releaseSharedWebcamStream() {
+  if (globalWebcamListeners.size === 0 && globalWebcamStream) {
+    globalWebcamStream.getTracks().forEach((track) => track.stop());
+    globalWebcamStream = null;
+  }
+}
+
+export default function CameraFeed({
+  src,
+  cameraId,
+  label,
+  useWebcam = false,
+  onToggleWebcam,
+  overlay,
+  onStatusChange,
+}: CameraFeedProps) {
   const imgRef = useRef<HTMLImageElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ts, setTs] = useState(() => Date.now());
   const [ok, setOk] = useState<boolean | null>(null);
@@ -69,36 +123,137 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
     onStatusChange?.(ok === true);
   }, [ok, onStatusChange]);
 
+  // Webcam stream lifecycle (shares 1 hardware stream across both Cổng vào and Cổng ra)
+  useEffect(() => {
+    if (!useWebcam) {
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      return;
+    }
+
+    let active = true;
+    const listener = (stream: MediaStream | null) => {
+      if (!active) return;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setOk(!!stream);
+    };
+
+    globalWebcamListeners.add(listener);
+
+    getSharedWebcamStream()
+      .then((stream) => {
+        if (!active) return;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setOk(true);
+      })
+      .catch((err) => {
+        console.error("[CameraFeed] Webcam access error:", err);
+        setOk(false);
+      });
+
+    return () => {
+      active = false;
+      globalWebcamListeners.delete(listener);
+      releaseSharedWebcamStream();
+    };
+  }, [useWebcam]);
+
+  // Webcam frame transmission to backend AI
+  useEffect(() => {
+    if (!useWebcam || !cameraId) return;
+    let isMounted = true;
+    let inFlight = false;
+
+    const interval = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2 || inFlight || !isMounted) return;
+      inFlight = true;
+
+      try {
+        const offscreen = document.createElement("canvas");
+        offscreen.width = video.videoWidth || 640;
+        offscreen.height = video.videoHeight || 480;
+        const ctx = offscreen.getContext("2d");
+        if (!ctx) {
+          inFlight = false;
+          return;
+        }
+        ctx.drawImage(video, 0, 0);
+        offscreen.toBlob(async (blob) => {
+          if (blob && isMounted) {
+            const formData = new FormData();
+            formData.append("file", blob, "webcam_frame.jpg");
+            try {
+              await fetch(`/api/camera/frame/${cameraId}`, {
+                method: "POST",
+                body: formData,
+              });
+            } catch {
+              // Ignore transient network errors
+            }
+          }
+          inFlight = false;
+        }, "image/jpeg", 0.85);
+      } catch {
+        inFlight = false;
+      }
+    }, 1500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [useWebcam, cameraId]);
+
   const snapshotUrl = cameraId
     ? `/api/camera/snapshot/${cameraId}`
     : src;
 
   const scheduleNext = useCallback((success: boolean) => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (isStream) return;
+    if (isStream || useWebcam) return;
     timerRef.current = setTimeout(() => setTs(Date.now()), success ? ONLINE_INTERVAL : OFFLINE_INTERVAL);
-  }, [isStream]);
+  }, [isStream, useWebcam]);
 
   useEffect(() => {
-    if (!cameraId) return;
+    if (!cameraId || useWebcam) return;
     scheduleNext(true);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [cameraId, ts, scheduleNext]);
+  }, [cameraId, ts, scheduleNext, useWebcam]);
 
+  // Overlay drawing
   useEffect(() => {
-    if (!overlay?.bbox && !overlay?.landmarks) return;
-    const img = imgRef.current;
     const canvas = canvasRef.current;
-    if (!img || !canvas) return;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const rect = img.getBoundingClientRect();
-    const scaleX = rect.width / (img.naturalWidth || 1);
-    const scaleY = rect.height / (img.naturalHeight || 1);
+    if (!overlay?.bbox && !overlay?.landmarks) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
+    const mediaEl = useWebcam ? videoRef.current : imgRef.current;
+    if (!mediaEl) return;
+
+    const rect = mediaEl.getBoundingClientRect();
+    const naturalW = useWebcam
+      ? (mediaEl as HTMLVideoElement).videoWidth || 1
+      : (mediaEl as HTMLImageElement).naturalWidth || 1;
+    const naturalH = useWebcam
+      ? (mediaEl as HTMLVideoElement).videoHeight || 1
+      : (mediaEl as HTMLImageElement).naturalHeight || 1;
+
+    const scaleX = rect.width / naturalW;
+    const scaleY = rect.height / naturalH;
 
     canvas.width = rect.width;
     canvas.height = rect.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (overlay.bbox) {
@@ -116,7 +271,7 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
         ctx.fill();
       });
     }
-  }, [overlay]);
+  }, [overlay, useWebcam]);
 
   const isGranted = overlay?.status === "granted";
   const isDenied = overlay?.status === "spoof" || overlay?.status === "wrong_direction" || overlay?.status === "expired" || overlay?.status === "denied";
@@ -158,18 +313,47 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
         }}
       >
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <VideocamOutlinedIcon
-            sx={{
-              color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "primary.main",
-              fontSize: 22,
-            }}
-          />
+          {useWebcam ? (
+            <LaptopOutlinedIcon
+              sx={{
+                color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "primary.main",
+                fontSize: 22,
+              }}
+            />
+          ) : (
+            <VideocamOutlinedIcon
+              sx={{
+                color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "primary.main",
+                fontSize: 22,
+              }}
+            />
+          )}
           <Typography sx={{ fontWeight: 800, color: isGranted ? "#10b981" : isDenied ? "#ef4444" : "text.primary" }}>
             {label}
           </Typography>
         </Stack>
 
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          {onToggleWebcam && (
+            <Button
+              size="small"
+              variant={useWebcam ? "contained" : "outlined"}
+              color={useWebcam ? "info" : "inherit"}
+              onClick={onToggleWebcam}
+              startIcon={useWebcam ? <LaptopOutlinedIcon sx={{ fontSize: 16 }} /> : <VideocamOutlinedIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                textTransform: "none",
+                py: 0.2,
+                px: 1,
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                borderRadius: 1.5,
+              }}
+            >
+              {useWebcam ? "Webcam máy tính" : "IP Camera"}
+            </Button>
+          )}
+
           {isGranted && (
             <Chip
               size="small"
@@ -189,7 +373,7 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
           <Chip
             size="small"
             color={ok === null ? "warning" : ok ? "success" : "error"}
-            label={ok === null ? "Đang nối" : ok ? "Live Stream" : "Mất tín hiệu"}
+            label={ok === null ? "Đang nối" : ok ? (useWebcam ? "Live Webcam" : "Live Stream") : "Mất tín hiệu"}
             variant="outlined"
             icon={
               ok ? (
@@ -212,15 +396,26 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
 
       {/* Video Viewport with Cyber Biometric HUD */}
       <Box sx={{ position: "relative", aspectRatio: "16 / 9", bgcolor: "#070B14", overflow: "hidden" }}>
-        <Box
-          component="img"
-          ref={imgRef}
-          src={isStream ? snapshotUrl : `${snapshotUrl}?_t=${ts}`}
-          onLoad={() => { setOk(true); scheduleNext(true); }}
-          onError={() => { setOk(false); scheduleNext(false); }}
-          alt={label}
-          sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-        />
+        {useWebcam ? (
+          <Box
+            component="video"
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+          />
+        ) : (
+          <Box
+            component="img"
+            ref={imgRef}
+            src={isStream ? snapshotUrl : `${snapshotUrl}?_t=${ts}`}
+            onLoad={() => { setOk(true); scheduleNext(true); }}
+            onError={() => { setOk(false); scheduleNext(false); }}
+            alt={label}
+            sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+          />
+        )}
         <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
 
         {/* Cyber HUD Corner Brackets when active */}
@@ -337,15 +532,30 @@ export default function CameraFeed({ src, cameraId, label, overlay, onStatusChan
         {ok === null && (
           <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(7, 11, 20, 0.75)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.5}>
             <CircularProgress size={32} sx={{ color: "primary.light" }} />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>Đang kết nối luồng camera...</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {useWebcam ? "Đang bật camera máy tính..." : "Đang kết nối luồng camera..."}
+            </Typography>
           </Stack>
         )}
 
         {/* Offline overlay */}
         {ok === false && (
           <Stack sx={{ position: "absolute", inset: 0, bgcolor: "rgba(7, 11, 20, 0.85)", color: "common.white", alignItems: "center", justifyContent: "center" }} spacing={1.5}>
-            <VideocamOutlinedIcon sx={{ fontSize: 52, color: "error.light", opacity: 0.7 }} />
-            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>Camera ngoại tuyến — Kiểm tra kết nối</Typography>
+            {useWebcam ? (
+              <>
+                <LaptopOutlinedIcon sx={{ fontSize: 52, color: "error.light", opacity: 0.7 }} />
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>
+                  Không thể truy cập camera máy tính — Vui lòng cấp quyền trình duyệt
+                </Typography>
+              </>
+            ) : (
+              <>
+                <VideocamOutlinedIcon sx={{ fontSize: 52, color: "error.light", opacity: 0.7 }} />
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>
+                  Camera ngoại tuyến — Kiểm tra kết nối
+                </Typography>
+              </>
+            )}
           </Stack>
         )}
       </Box>

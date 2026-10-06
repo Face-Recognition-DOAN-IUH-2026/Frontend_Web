@@ -40,6 +40,7 @@ import DeleteWeekDialog from "@/app/(dashboard)/_components/staff-schedule/Delet
 import ManualCheckInAdmin from "@/app/(dashboard)/_components/staff-schedule/ManualCheckInAdmin";
 import UndoSnackbar from "@/app/_components/UndoSnackbar";
 import useUndo from "@/lib/hooks/useUndo";
+import { useToast } from "@/lib/toast-context";
 
 const FILTERS = [
   { value: "all", label: "Tất cả" },
@@ -51,11 +52,12 @@ const FILTERS = [
 const STAT_GRADIENT = {
   total: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
   active: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-  staff: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+  staff: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
 };
 
 export default function StaffSchedulesPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const { can } = usePermission();
   const isAdmin = user?.role === "admin";
   const isStaff = !!user;
@@ -100,9 +102,17 @@ export default function StaffSchedulesPage() {
   const { pendingDelete, countdown, markForDelete, undo } = useUndo<string>({
     onConfirm: async (id) => {
       setConfirmingId(id);
-      try { await api.deleteScheduleAssignment(id); await loadData(); }
-      catch (err) { setError(getErrorMessage(err)); }
-      finally { setConfirmingId(null); }
+      try {
+        await api.deleteScheduleAssignment(id);
+        await loadData();
+        toast.success("Đã xóa vĩnh viễn phân công trực.");
+      } catch (err) {
+        const msg = getErrorMessage(err);
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        setConfirmingId(null);
+      }
     },
   });
 
@@ -113,10 +123,6 @@ export default function StaffSchedulesPage() {
   );
 
   const handleDeleteAssignment = (id: string) => markForDelete(id);
-
-  const handleViewStaff = (_staffId: string) => {
-    // placeholder for staff detail navigation
-  };
 
   if (!isStaff) {
     return (
@@ -293,7 +299,6 @@ export default function StaffSchedulesPage() {
             filter={filter} isAdmin={canManage}
             onCellClick={canCreate ? handleCellClick : undefined}
             onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
-            onViewStaff={canManage ? handleViewStaff : undefined}
           />
         </DashboardCard>
       </LoadingOverlay>

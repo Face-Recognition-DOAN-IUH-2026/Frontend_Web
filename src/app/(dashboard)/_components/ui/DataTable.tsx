@@ -84,8 +84,14 @@ export default function DataTable<T extends Record<string, any>>({
         pageSizeOptions: ["10", "20", "50", "100"],
         showTotal: (total, range) => `${range[0]}-${range[1]} / ${total}`,
         onChange: (p: number, ps: number) => {
-          onPageChange(p - 1);
-          onRowsPerPageChange?.(ps);
+          // antd bắn onChange cho cả 2 hành động:
+          // - chuyển trang (pageSize giữ nguyên) -> chỉ báo đổi trang
+          // - đổi pageSize (kèm reset trang) -> chỉ báo đổi size, parent tự về trang đầu
+          if (ps && ps !== rowsPerPage) {
+            onRowsPerPageChange?.(ps);
+          } else {
+            onPageChange(p - 1);
+          }
         },
       }
     : false;

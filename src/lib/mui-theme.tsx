@@ -81,19 +81,19 @@ function buildTheme(mode: PaletteMode, reducedMotion: ReducedMotionPreference) {
         contrastText: dark ? "#1C1917" : "#0A2540",
       },
       success: {
-        main: "#198754",
+        main: dark ? "#34D399" : "#198754",
         contrastText: "#FFFFFF",
       },
       warning: {
-        main: "#D97706",
+        main: dark ? "#FBBF24" : "#D97706",
         contrastText: "#FFFFFF",
       },
       error: {
-        main: "#8B0000",
+        main: dark ? "#F87171" : "#8B0000",
         contrastText: "#FFFFFF",
       },
       info: {
-        main: brand.iuhNavy,
+        main: dark ? "#38BDF8" : brand.iuhNavy,
         contrastText: "#FFFFFF",
       },
       background: {

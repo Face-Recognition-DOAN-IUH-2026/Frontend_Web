@@ -11,4 +11,6 @@ export interface BorrowCartItem {
   book_id?: string | null;
   copy_barcode?: string | null;
   shelf_location?: string | null;
+  condition?: string | null;
+  status?: string | null;
 }

@@ -9,7 +9,7 @@ import AIWidgetPanel from "./AIWidgetPanel";
 import { useAIWidgetStore } from "./store/useAIWidgetStore";
 import { useAuth } from "@/lib/auth-context";
 
-const BLACKLIST_PATHS = ["/login", "/register", "/gate", "/liveness", "/identify"];
+const BLACKLIST_PATHS = ["/login", "/gate", "/liveness", "/identify"];
 
 export default function AIWidget() {
   const pathname = usePathname();

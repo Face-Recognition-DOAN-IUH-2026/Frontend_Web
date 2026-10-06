@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Box, Button, Chip, Stack, Tooltip, Typography } from "@mui/material";
 import DataTable, { type DataTableColumn } from "./DataTable";
@@ -22,6 +23,16 @@ export default function PatronListView({ patrons, onEdit, onRenew, onDelete, onR
   const canUpdate = can("patrons", "update");
   const canDelete = can("patrons", "delete");
   const canApproveOrUpdate = can("patrons", "approve") || can("patrons", "update");
+
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Tự động đưa về trang đầu tiên nếu danh sách thay đổi và trang hiện tại vượt quá số lượng
+  useEffect(() => {
+    if (page > 0 && page * rowsPerPage >= patrons.length) {
+      setPage(0);
+    }
+  }, [patrons.length, page, rowsPerPage]);
 
   const columns: DataTableColumn<PatronPublic>[] = [
     {
@@ -166,6 +177,14 @@ export default function PatronListView({ patrons, onEdit, onRenew, onDelete, onR
       getRowId={(row) => row.id}
       onRowClick={(row) => router.push(`/patrons/${row.id}`)}
       emptyTitle="Không tìm thấy độc giả nào"
+      page={page}
+      rowsPerPage={rowsPerPage}
+      totalCount={patrons.length}
+      onPageChange={setPage}
+      onRowsPerPageChange={(ps) => {
+        setRowsPerPage(ps);
+        setPage(0);
+      }}
     />
   );
 }

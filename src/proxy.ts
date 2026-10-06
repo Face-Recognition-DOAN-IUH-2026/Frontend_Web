@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const publicPaths = ["/login", "/register", "/", "/library/vr-tour"];
+const publicPaths = ["/login", "/", "/library/vr-tour"];
 
 const rawSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "";
 const rawRefreshSecret = process.env.JWT_REFRESH_SECRET || rawSecret;

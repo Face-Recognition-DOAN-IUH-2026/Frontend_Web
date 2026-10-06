@@ -1,9 +1,20 @@
+import type { CopyCondition, CopyStatus } from "@/lib/constants/copy";
+
+export type { CopyCondition, CopyStatus };
+
 export interface BookCopy {
   id: string;
   book_id: string;
   barcode: string;
   is_available: boolean;
   shelf_location: string | null;
+  condition?: CopyCondition;
+  status?: CopyStatus;
+  imported_at?: string;
+  condition_label?: string;
+  status_label?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface BookInfo {
@@ -23,6 +34,7 @@ export interface BookInfo {
   isbn10: string | null;
   isbn13: string | null;
   shelf_location: string | null;
+  price?: number | null;
   copies: BookCopy[];
 }
 
@@ -43,6 +55,7 @@ export interface BookWithStats {
   isbn10: string | null;
   isbn13: string | null;
   shelf_location: string | null;
+  price?: number | null;
   is_available: boolean;
   total_copies: number;
   available_copies: number;
@@ -59,6 +72,7 @@ export interface BooksListResponse {
     totalCopies: number;
     availableCopies: number;
     borrowedCopies: number;
+    outOfStockBooks?: number;
   };
 }
 
@@ -68,11 +82,17 @@ export interface BookCopyData {
   barcode: string;
   is_available: boolean;
   shelf_location: string | null;
+  condition?: CopyCondition;
+  status?: CopyStatus;
+  imported_at?: string;
+  condition_label?: string;
+  status_label?: string;
 }
 
 export interface BookImportPreviewRow {
   isbn: string;
   quantity: number;
+  price?: number | null;
   title: string | null;
   subtitle: string | null;
   author: string | null;
@@ -102,6 +122,7 @@ export interface BookImportResultRow {
   isbn: string;
   title: string;
   quantity: number;
+  price?: number | null;
   barcodes: string[];
   status: string;
   message: string | null;

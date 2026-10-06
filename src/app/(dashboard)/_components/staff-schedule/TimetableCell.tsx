@@ -4,7 +4,6 @@ import { useState, useCallback } from "react";
 import { Box, IconButton, Menu, MenuItem, ListItemIcon, ListItemText, Tooltip } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
-import PersonIcon from "@mui/icons-material/PersonOutlined";
 import type { StaffScheduleAssignment, StaffShift } from "@/lib/types";
 import AssignmentCard from "./AssignmentCard";
 
@@ -15,7 +14,6 @@ interface TimetableCellProps {
   isAdmin?: boolean;
   onCellClick?: (date: string, shiftId: string) => void;
   onDeleteAssignment?: (id: string) => void;
-  onViewStaff?: (staffId: string) => void;
   shift?: StaffShift | null;
 }
 
@@ -26,7 +24,7 @@ function isUnderstaffed(assignments: StaffScheduleAssignment[], shift?: StaffShi
 }
 
 export default function TimetableCell({
-  assignments, date, shiftId, isAdmin, onCellClick, onDeleteAssignment, onViewStaff, shift,
+  assignments, date, shiftId, isAdmin, onCellClick, onDeleteAssignment, shift,
 }: TimetableCellProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [menuAssignment, setMenuAssignment] = useState<StaffScheduleAssignment | null>(null);
@@ -109,12 +107,6 @@ export default function TimetableCell({
           transformOrigin={{ vertical: "top", horizontal: "left" }}
           slotProps={{ paper: { sx: { minWidth: 180 } } }}
         >
-          {onViewStaff && menuAssignment.staffId ? (
-            <MenuItem onClick={() => { onViewStaff(menuAssignment.staffId); handleClose(); }}>
-              <ListItemIcon><PersonIcon sx={{ fontSize: 18, color: "primary.main" }} /></ListItemIcon>
-              <ListItemText>Xem nhân viên</ListItemText>
-            </MenuItem>
-          ) : null}
           {onDeleteAssignment ? (
             <MenuItem onClick={() => { onDeleteAssignment(menuAssignment.id); handleClose(); }} sx={{ color: "error.main" }}>
               <ListItemIcon><DeleteIcon sx={{ fontSize: 18, color: "error.main" }} /></ListItemIcon>

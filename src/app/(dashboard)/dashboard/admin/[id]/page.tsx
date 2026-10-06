@@ -27,8 +27,8 @@ import {
   Tabs,
   TextField,
   Typography,
-  Snackbar,
 } from "@mui/material";
+import { useToast } from "@/lib/toast-context";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import CalendarTodayIcon from "@mui/icons-material/CalendarTodayOutlined";
@@ -85,11 +85,7 @@ function MetaRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 }
 
 export default function UserDetailPage() {
-  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+  const { toast } = useToast();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user: currentUser, isLoading: isAuthLoading, isAuthenticated } = useAuth();
@@ -194,16 +190,14 @@ export default function UserDetailPage() {
       const updated = await api.updateUser(id, data);
       setUser(updated);
       setShowEdit(false);
-      setToast({ open: true, message: "Đã cập nhật thông tin người dùng.", severity: "success" });
+      toast.success("Đã cập nhật thông tin người dùng.");
       await loadUser();
     } catch (err: any) {
       const status = err?.response?.status;
       const msg = getErrorMessage(err) || "Lưu thất bại";
-      setEditError(
-        status === 409
-          ? `${msg} — Số thẻ hoặc mã sinh viên đã tồn tại.`
-          : msg
-      );
+      const fullMsg = status === 409 ? `${msg} — Số thẻ hoặc mã sinh viên đã tồn tại.` : msg;
+      setEditError(fullMsg);
+      toast.error(fullMsg);
     } finally {
       setSaving(false);
     }
@@ -213,10 +207,10 @@ export default function UserDetailPage() {
     if (!user || deleteConfirmText !== "XÓA") return;
     try {
       await api.deleteUser(user.id);
-      setToast({ open: true, message: "Đã xóa người dùng.", severity: "success" });
+      toast.success("Đã xóa người dùng.");
       router.push("/dashboard/admin");
     } catch (err: any) {
-      setToast({ open: true, message: `Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`, severity: "error" });
+      toast.error(`Xóa thất bại: ${getErrorMessage(err) || "Lỗi không xác định"}`);
     }
   };
 
@@ -475,17 +469,6 @@ export default function UserDetailPage() {
               <Button color="error" variant="contained" onClick={handleDelete} disabled={deleteConfirmText !== "XÓA"}>Xóa vĩnh viễn</Button>
             </DialogActions>
           </Dialog>
-
-          <Snackbar
-            open={toast.open}
-            autoHideDuration={4000}
-            onClose={() => setToast((t) => ({ ...t, open: false }))}
-            anchorOrigin={{ vertical: "top", horizontal: "right" }}
-          >
-            <Alert severity={toast.severity} onClose={() => setToast((t) => ({ ...t, open: false }))} sx={{ borderRadius: 2 }}>
-              {toast.message}
-            </Alert>
-          </Snackbar>
         </Stack>
       )}
     </LoadingOverlay>

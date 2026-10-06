@@ -136,7 +136,7 @@ export default function AssignmentCard({ assignment, onDelete, understaffed }: A
               bgcolor: "background.paper",
               border: "1px solid rgba(239,68,68,0.3)",
               color: "#ef4444",
-              opacity: hover ? 1 : 0,
+              opacity: { xs: 1, md: hover ? 1 : 0 },
               transition: "opacity 0.15s",
               "&:hover": { bgcolor: "rgba(239,68,68,0.1)" },
               "& .MuiIconButton-root": { p: 0 },

@@ -7,16 +7,19 @@ import {
   Button,
   Grid,
   Slide,
-  Snackbar,
   Stack,
+  Typography,
 } from "@mui/material";
 import ReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { slideInRight } from "@/lib/animations";
 import { getAlertSeverity, getAlertTitle } from "@/lib/alert-utils";
+import { usePermission } from "@/lib/permission-context";
+import { useToast } from "@/lib/toast-context";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
+import type { PaymentOrderResponse } from "@/lib/types/borrow";
 
 import {
   ReturnMetricsBar,
@@ -25,18 +28,13 @@ import {
   ReturnActiveBorrows,
   ReturnScannerDialog,
   ReturnConfirmDialog,
+  ReturnReceipt,
+  DynamicQrPaymentDialog,
+  FinesLedger,
 } from "@/app/(dashboard)/_components/return";
 
 export default function ReturnPage() {
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "warning" | "error" | "info";
-  }>({
-    open: false,
-    message: "",
-    severity: "info",
-  });
+  const { toast } = useToast();
   const [borrowers, setBorrowers] = useState<StaffActiveBorrowerSummary[]>([]);
   const [selectedStudentCode, setSelectedStudentCode] = useState<string | null>(null);
   const [detail, setDetail] = useState<StaffPatronActiveBorrowsResponse | null>(null);
@@ -47,17 +45,23 @@ export default function ReturnPage() {
   const [returningId, setReturningId] = useState<string | null>(null);
   const [confirmRecord, setConfirmRecord] = useState<BorrowRecord | null>(null);
   const [condition, setCondition] = useState("");
+  const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [overdueGuideOpen, setOverdueGuideOpen] = useState(false);
 
+  const [fineConfig, setFineConfig] = useState<any>(null);
+  const [receiptRecord, setReceiptRecord] = useState<BorrowRecord | null>(null);
+  const [receiptPatron, setReceiptPatron] = useState<{ full_name?: string | null; student_code?: string | null } | null>(null);
+  const [unpaidFines, setUnpaidFines] = useState<any[]>([]);
+  const [payingFineId, setPayingFineId] = useState<string | null>(null);
+  const [qrSourceItem, setQrSourceItem] = useState<any | null>(null);
+  const [qrOrder, setQrOrder] = useState<PaymentOrderResponse | null>(null);
+  const [qrPatronInfo, setQrPatronInfo] = useState<{ name?: string; studentCode?: string }>({});
+
   const showNotice = useCallback((type: "success" | "warning" | "error" | "info", msg: string, _duration?: number) => {
-    setSnackbar({
-      open: true,
-      message: msg,
-      severity: type,
-    });
-  }, []);
+    toast(msg, type);
+  }, [toast]);
 
   const showNoticeRef = useRef(showNotice);
   useEffect(() => {
@@ -95,6 +99,22 @@ export default function ReturnPage() {
     }
   }, []);
 
+  const loadUnpaidFines = useCallback(async () => {
+    try {
+      const rows = await api.getUnpaidFines();
+      setUnpaidFines(rows);
+    } catch {
+      setUnpaidFines([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    api.getBorrowConfig()
+      .then((cfg) => setFineConfig(cfg.fine ?? null))
+      .catch(() => setFineConfig(null));
+    void loadUnpaidFines();
+  }, [loadUnpaidFines]);
+
   useEffect(() => {
     loadBorrowers();
   }, [loadBorrowers]);
@@ -131,15 +151,95 @@ export default function ReturnPage() {
     [borrowers, selectedStudentCode],
   );
 
-  const handleReturnRecord = async () => {
+  const { can } = usePermission();
+  const canUpdateBorrow = can("borrows", "update");
+
+  const handlePayFine = async (recordId: string, paymentMethod: "cash" | "qr_code" = "cash") => {
+    setPayingFineId(recordId);
+    try {
+      const res = await api.payFines([recordId], paymentMethod);
+      if (res.activated && res.activated.length > 0) {
+        showNoticeRef.current("success", "Đã thu phí thành công. Thẻ độc giả đã được tự động mở khóa!");
+      } else {
+        showNoticeRef.current("success", "Đã thu phí thành công.");
+      }
+      void loadUnpaidFines();
+      await loadBorrowers();
+      if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
+    } catch (err: any) {
+      showNoticeRef.current("error", getErrorMessage(err) || "Lỗi khi thu phí");
+    } finally {
+      setPayingFineId(null);
+    }
+  };
+
+  const handleOpenQrPayment = async (item: any) => {
+    try {
+      const order = await api.createPaymentOrder({
+        record_ids: [item.record_id],
+        payment_method: "vietqr",
+      });
+      setQrPatronInfo({
+        name: item.patron?.full_name || undefined,
+        studentCode: item.patron?.student_code || undefined,
+      });
+      setQrOrder(order);
+      setQrSourceItem(item);
+    } catch (err: any) {
+      showNoticeRef.current("error", getErrorMessage(err) || "Không thể tạo mã thanh toán VietQR");
+    }
+  };
+
+  const handleQrPaymentSuccess = async (orderCode: string) => {
+    setQrOrder(null);
+    setQrSourceItem(null);
+    showNoticeRef.current("success", `Thanh toán VietQR thành công! (Mã GD: ${orderCode})`);
+    void loadUnpaidFines();
+    await loadBorrowers();
+    if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
+  };
+
+  const handleReturnRecord = async (payment?: { isPaidImmediately: boolean; paymentMethod: "cash" | "qr_code" }) => {
     if (!confirmRecord) return;
     setReturningId(confirmRecord.id);
     setError("");
+    const isQr = payment?.paymentMethod === "qr_code" && (payment?.isPaidImmediately ?? true);
     try {
-      await api.staffReturnBorrowRecord(confirmRecord.id, condition || null);
+      const result = await api.staffReturnBorrowRecord(confirmRecord.id, note || null, condition || "good", {
+        is_paid_immediately: isQr ? false : (payment?.isPaidImmediately ?? true),
+        payment_method: payment?.paymentMethod ?? "cash",
+      });
       showNoticeRef.current("success", "Trả sách thành công");
       setCondition("");
+      setNote("");
       setConfirmRecord(null);
+
+      const returnedRec = result.record;
+      const totalDue = Number(returnedRec?.total_due ?? ((Number(returnedRec?.fine_amount) || 0) + (Number(returnedRec?.damage_fee) || 0)));
+
+      if (isQr && returnedRec && totalDue > 0) {
+        try {
+          const order = await api.createPaymentOrder({
+            patron_id: returnedRec.patron_id,
+            record_ids: [returnedRec.id],
+            payment_method: "vietqr",
+          });
+          setQrPatronInfo({
+            name: detail?.patron.full_name || detail?.patron.student_code || undefined,
+            studentCode: detail?.patron.student_code || undefined,
+          });
+          setQrOrder(order);
+        } catch {
+          showNoticeRef.current("warning", "Đã ghi nhận trả sách. Khoản phí đã được lưu vào sổ nợ.");
+          setReceiptPatron(detail?.patron ? { full_name: detail.patron.full_name, student_code: detail.patron.student_code } : null);
+          setReceiptRecord(returnedRec);
+        }
+      } else {
+        setReceiptPatron(detail?.patron ? { full_name: detail.patron.full_name, student_code: detail.patron.student_code } : null);
+        setReceiptRecord(returnedRec ?? null);
+      }
+
+      void loadUnpaidFines();
       await loadBorrowers();
       if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
     } catch (err: any) {
@@ -219,15 +319,30 @@ export default function ReturnPage() {
             detail={detail}
             loadingDetail={loadingDetail}
             returningId={returningId}
-            onConfirmReturn={(record) => setConfirmRecord(record)}
+            onConfirmReturn={(record) => {
+              setConfirmRecord(record);
+              setCondition(record.copy?.condition || "good");
+              setNote("");
+            }}
           />
         </Grid>
       </Grid>
+
+      {/* Sổ nợ phí phạt (Khoản phí chưa thu) */}
+      <FinesLedger
+        items={unpaidFines}
+        payingFineId={payingFineId}
+        canUpdateBorrow={canUpdateBorrow}
+        onRefresh={() => void loadUnpaidFines()}
+        onPayCash={(recordId) => void handlePayFine(recordId, "cash")}
+        onOpenQr={(item) => void handleOpenQrPayment(item)}
+      />
 
       <ReturnScannerDialog
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
         detail={detail}
+        fineConfig={fineConfig}
         onBatchComplete={handleBatchComplete}
         showNotice={(type, msg, duration) => showNoticeRef.current(type, msg, duration)}
       />
@@ -236,10 +351,32 @@ export default function ReturnPage() {
         record={confirmRecord}
         detail={detail}
         condition={condition}
+        note={note}
+        fineConfig={fineConfig}
         onConditionChange={setCondition}
-        onClose={() => { setConfirmRecord(null); setCondition(""); }}
+        onNoteChange={setNote}
+        onClose={() => { setConfirmRecord(null); setCondition(""); setNote(""); }}
         onConfirm={handleReturnRecord}
         loading={!!returningId}
+      />
+
+      <DynamicQrPaymentDialog
+        open={!!qrOrder}
+        order={qrOrder}
+        patronName={qrPatronInfo.name}
+        studentCode={qrPatronInfo.studentCode}
+        onClose={() => { setQrOrder(null); setQrSourceItem(null); }}
+        onSuccess={handleQrPaymentSuccess}
+        onRegenerate={() => { if (qrSourceItem) void handleOpenQrPayment(qrSourceItem); }}
+      />
+
+      <ReturnReceipt
+        record={receiptRecord}
+        patron={receiptPatron}
+        onClose={() => {
+          setReceiptRecord(null);
+          setReceiptPatron(null);
+        }}
       />
 
       <OverdueGuideModal
@@ -247,21 +384,6 @@ export default function ReturnPage() {
         onClose={() => setOverdueGuideOpen(false)}
       />
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-      >
-        <Alert
-          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: "100%", borderRadius: 2 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Stack>
   );
 }

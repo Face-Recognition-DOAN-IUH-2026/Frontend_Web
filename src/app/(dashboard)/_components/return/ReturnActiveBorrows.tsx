@@ -18,6 +18,14 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
+import {
+  CONDITION_LABELS,
+  COPY_STATUS_LABELS,
+  getConditionColor,
+  getStatusColor,
+  CopyCondition,
+  CopyStatus,
+} from "@/lib/constants/copy";
 
 function isOverdue(record: BorrowRecord) {
   return new Date(record.due_at) < new Date();
@@ -125,9 +133,25 @@ export default function ReturnActiveBorrows({
                       {record.book?.isbn}
                     </Typography>
                     {dueChip(record)}
+                    {record.copy?.condition && (
+                      <Chip
+                        size="small"
+                        color={getConditionColor(record.copy.condition)}
+                        label={CONDITION_LABELS[record.copy.condition as CopyCondition] || record.copy.condition}
+                        sx={{ height: 20, fontSize: 11 }}
+                      />
+                    )}
+                    {record.copy?.status && (
+                      <Chip
+                        size="small"
+                        color={getStatusColor(record.copy.status)}
+                        label={COPY_STATUS_LABELS[record.copy.status as CopyStatus] || record.copy.status}
+                        sx={{ height: 20, fontSize: 11 }}
+                      />
+                    )}
                   </Stack>
                   <Typography variant="caption" color="text.secondary">
-                    Mượn: {formatDate(record.borrow_at)} | Hạn: {formatDate(record.due_at)}
+                    {record.copy?.barcode ? `Mã: ${record.copy.barcode} | ` : ""}Mượn: {formatDate(record.borrow_at)} | Hạn: {formatDate(record.due_at)}
                   </Typography>
                 </Stack>
                 <Tooltip title={!canUpdateBorrow ? getPermissionDeniedReason("borrows", "update") : ""}>

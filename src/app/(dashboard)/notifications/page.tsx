@@ -54,6 +54,7 @@ import DateRangeOutlinedIcon from "@mui/icons-material/DateRangeOutlined";
 
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/lib/toast-context";
 import type { Notification } from "@/lib/types";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
@@ -249,6 +250,7 @@ export default function NotificationsPage() {
   const isDark = theme.palette.mode === "dark";
 
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabCategory>("all");
@@ -296,8 +298,9 @@ export default function NotificationsPage() {
       await api.markAllNotificationsAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
+      toast.success("Đã đánh dấu đọc tất cả thông báo.");
     } catch {
-      // Fallback
+      toast.error("Không thể đánh dấu đọc tất cả thông báo.");
     }
   };
 
@@ -309,8 +312,9 @@ export default function NotificationsPage() {
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
+      toast.success("Đã đánh dấu thông báo là đã đọc.");
     } catch {
-      // Fallback
+      toast.error("Không thể đánh dấu đọc thông báo.");
     }
   };
 
