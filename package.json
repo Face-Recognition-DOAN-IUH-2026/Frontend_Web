@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:design": "npx -y impeccable detect src",
     "test:e2e": "playwright test",
     "test": "jest"
   },
@@ -19,6 +20,7 @@
     "@mediapipe/tasks-vision": "^1.0.1",
     "@mui/icons-material": "^9.1.1",
     "@mui/material": "^9.1.1",
+    "@n8n/chat": "^1.41.5",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@types/three": "^0.184.1",

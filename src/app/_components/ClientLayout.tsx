@@ -6,7 +6,7 @@ import ConfigProvider from "antd/es/config-provider";
 import { setupGlobalErrorHandlers } from "@/lib/error-reporter";
 import { useColorMode } from "@/lib/mui-theme";
 import { getAntdTheme } from "@/lib/antd-theme";
-import AIWidget from "@/app/(dashboard)/_components/AIWidget";
+import N8nChatWidget from "@/app/_components/N8nChatWidget";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { effectiveMode } = useColorMode();
@@ -20,7 +20,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <AntdRegistry>
       <ConfigProvider theme={getAntdTheme(isDark)}>
         {children}
-        <AIWidget />
+        <N8nChatWidget />
       </ConfigProvider>
     </AntdRegistry>
   );

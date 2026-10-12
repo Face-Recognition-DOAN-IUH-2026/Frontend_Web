@@ -42,25 +42,37 @@ export function createBookMethods(client: AxiosInstance) {
     },
 
     getBarcodePreview: async (
-      file: File
+      file: File,
+      mode?: "isbn" | "internal" | "auto"
     ): Promise<BookImportPreviewResponse> => {
       const formData = new FormData();
       formData.append("file", file);
+      if (mode) formData.append("mode", mode);
       const response = await client.post<BookImportPreviewResponse>(
         "/api/borrow/books/import/preview",
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 60000,
+        }
       );
       return response.data;
     },
 
-    importBooks: async (file: File): Promise<BookImportResponse> => {
+    importBooks: async (
+      file: File,
+      mode?: "isbn" | "internal" | "auto"
+    ): Promise<BookImportResponse> => {
       const formData = new FormData();
       formData.append("file", file);
+      if (mode) formData.append("mode", mode);
       const response = await client.post<BookImportResponse>(
         "/api/borrow/books/import",
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 120000,
+        }
       );
       return response.data;
     },
@@ -78,23 +90,27 @@ export function createBookMethods(client: AxiosInstance) {
         page_count: number | null;
         categories: string | null;
         cover_url: string | null;
+        shelf_location?: string | null;
       }>
     ): Promise<BookImportResponse> => {
       const response = await client.post<BookImportResponse>(
         "/api/borrow/books/import/filtered",
-        { rows }
+        { rows },
+        { timeout: 120000 }
       );
       return response.data;
     },
 
-    downloadBookTemplate: async (): Promise<void> => {
+    downloadBookTemplate: async (type?: "basic" | "full"): Promise<void> => {
+      const filename = type === "full" ? "book_import_template_full.xlsx" : "book_import_template_basic.xlsx";
       const response = await client.get("/api/borrow/books/template", {
+        params: { type: type || "basic" },
         responseType: "blob",
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement("a");
       a.href = url;
-      a.download = "book_import_template.xlsx";
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

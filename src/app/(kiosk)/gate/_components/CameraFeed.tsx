@@ -27,6 +27,7 @@ interface CameraFeedProps {
     status?: string;
   } | null;
   onStatusChange?: (ok: boolean) => void;
+  onSpoofDetected?: (reason: string) => void;
 }
 
 const OVERLAY_COLORS: Record<string, string> = {
@@ -109,12 +110,15 @@ export default function CameraFeed({
   onToggleWebcam,
   overlay,
   onStatusChange,
+  onSpoofDetected,
 }: CameraFeedProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ts, setTs] = useState(() => Date.now());
   const [ok, setOk] = useState<boolean | null>(null);
+  const [localSpoofReason, setLocalSpoofReason] = useState<string | null>(null);
+  const lastUploadTimeRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isStream = src.includes("/video") || src.includes("/mjpeg");
@@ -163,44 +167,40 @@ export default function CameraFeed({
     };
   }, [useWebcam]);
 
-  // Webcam frame transmission to backend AI
+  // Direct periodic webcam frame transmission for face recognition (1.5s interval)
   useEffect(() => {
-    if (!useWebcam || !cameraId) return;
-    let isMounted = true;
-    let inFlight = false;
+    if (!useWebcam || !ok || !cameraId) return;
 
+    let isMounted = true;
     const interval = setInterval(() => {
       const video = videoRef.current;
-      if (!video || video.readyState < 2 || inFlight || !isMounted) return;
-      inFlight = true;
+      if (!video || video.readyState < 2 || !video.videoWidth) return;
+
+      const now = Date.now();
+      if (now - lastUploadTimeRef.current < 1500) return;
+      lastUploadTimeRef.current = now;
 
       try {
         const offscreen = document.createElement("canvas");
         offscreen.width = video.videoWidth || 640;
         offscreen.height = video.videoHeight || 480;
         const ctx = offscreen.getContext("2d");
-        if (!ctx) {
-          inFlight = false;
-          return;
-        }
+        if (!ctx) return;
         ctx.drawImage(video, 0, 0);
-        offscreen.toBlob(async (blob) => {
-          if (blob && isMounted) {
-            const formData = new FormData();
-            formData.append("file", blob, "webcam_frame.jpg");
-            try {
-              await fetch(`/api/camera/frame/${cameraId}`, {
-                method: "POST",
-                body: formData,
-              });
-            } catch {
-              // Ignore transient network errors
-            }
-          }
-          inFlight = false;
-        }, "image/jpeg", 0.85);
+
+        offscreen.toBlob((blob) => {
+          if (!blob || !isMounted) return;
+          const formData = new FormData();
+          formData.append("file", blob, "webcam_frame.jpg");
+          fetch(`/api/camera/frame/${cameraId}`, {
+            method: "POST",
+            body: formData,
+          }).catch(() => {
+            // Ignore transient network errors
+          });
+        }, "image/jpeg", 0.9);
       } catch {
-        inFlight = false;
+        // Ignore canvas extraction errors
       }
     }, 1500);
 
@@ -208,7 +208,7 @@ export default function CameraFeed({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [useWebcam, cameraId]);
+  }, [useWebcam, ok, cameraId]);
 
   const snapshotUrl = cameraId
     ? `/api/camera/snapshot/${cameraId}`
@@ -275,6 +275,7 @@ export default function CameraFeed({
 
   const isGranted = overlay?.status === "granted";
   const isDenied = overlay?.status === "spoof" || overlay?.status === "wrong_direction" || overlay?.status === "expired" || overlay?.status === "denied";
+  const isSpoofing = Boolean(localSpoofReason || overlay?.status === "spoof");
 
   return (
     <Paper
@@ -418,6 +419,8 @@ export default function CameraFeed({
         )}
         <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
 
+
+
         {/* Cyber HUD Corner Brackets when active */}
         {ok && (
           <>
@@ -429,10 +432,10 @@ export default function CameraFeed({
                 left: 14,
                 width: 24,
                 height: 24,
-                borderTop: "3px solid #10b981",
-                borderLeft: "3px solid #10b981",
+                borderTop: `3px solid ${isSpoofing ? "#ef4444" : "#10b981"}`,
+                borderLeft: `3px solid ${isSpoofing ? "#ef4444" : "#10b981"}`,
                 pointerEvents: "none",
-                filter: "drop-shadow(0 0 6px #10b981)",
+                filter: `drop-shadow(0 0 6px ${isSpoofing ? "#ef4444" : "#10b981"})`,
               }}
             />
             {/* Top-Right Bracket */}
@@ -443,10 +446,10 @@ export default function CameraFeed({
                 right: 14,
                 width: 24,
                 height: 24,
-                borderTop: "3px solid #10b981",
-                borderRight: "3px solid #10b981",
+                borderTop: `3px solid ${isSpoofing ? "#ef4444" : "#10b981"}`,
+                borderRight: `3px solid ${isSpoofing ? "#ef4444" : "#10b981"}`,
                 pointerEvents: "none",
-                filter: "drop-shadow(0 0 6px #10b981)",
+                filter: `drop-shadow(0 0 6px ${isSpoofing ? "#ef4444" : "#10b981"})`,
               }}
             />
             {/* Bottom-Left Bracket */}
@@ -457,10 +460,10 @@ export default function CameraFeed({
                 left: 14,
                 width: 24,
                 height: 24,
-                borderBottom: "3px solid #10b981",
-                borderLeft: "3px solid #10b981",
+                borderBottom: `3px solid ${isSpoofing ? "#ef4444" : "#10b981"}`,
+                borderLeft: `3px solid ${isSpoofing ? "#ef4444" : "#10b981"}`,
                 pointerEvents: "none",
-                filter: "drop-shadow(0 0 6px #10b981)",
+                filter: `drop-shadow(0 0 6px ${isSpoofing ? "#ef4444" : "#10b981"})`,
               }}
             />
             {/* Bottom-Right Bracket */}
@@ -471,10 +474,10 @@ export default function CameraFeed({
                 right: 14,
                 width: 24,
                 height: 24,
-                borderBottom: "3px solid #10b981",
-                borderRight: "3px solid #10b981",
+                borderBottom: `3px solid ${isSpoofing ? "#ef4444" : "#10b981"}`,
+                borderRight: `3px solid ${isSpoofing ? "#ef4444" : "#10b981"}`,
                 pointerEvents: "none",
-                filter: "drop-shadow(0 0 6px #10b981)",
+                filter: `drop-shadow(0 0 6px ${isSpoofing ? "#ef4444" : "#10b981"})`,
               }}
             />
 

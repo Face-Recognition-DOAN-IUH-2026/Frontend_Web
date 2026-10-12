@@ -1,36 +1,132 @@
 "use client";
 
-import { Box, Stack, Typography } from "@mui/material";
+import React from "react";
+import { Box, Chip, Stack, Typography, alpha, useTheme } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
-const ITEMS = [
-  { bg: "background.paper",       border: "action.hover",         label: "Đã qua",      variant: "outlined" as const },
-  { bg: "rgba(16,185,129,0.08)",  border: "#10b981",              label: "Đang trực",   variant: "filled" as const, accentLeft: true },
-  { bg: "background.paper",       border: "action.hover",         label: "Sắp tới",     variant: "outlined" as const },
-  { bg: "rgba(245,158,11,0.08)",  border: "#f59e0b",              label: "Hôm nay",     variant: "filled" as const, accentLeft: true },
-  { bg: "rgba(251,146,60,0.08)",  border: "rgba(251,146,60,0.35)",label: "Thiếu người", variant: "filled" as const },
-  { bg: "rgba(239,68,68,0.06)",   border: "rgba(239,68,68,0.25)", label: "Đã hủy",      variant: "filled" as const },
+interface LegendItem {
+  label: string;
+  color: string;
+  bgLight: string;
+  bgDark: string;
+  borderLight: string;
+  borderDark: string;
+  description?: string;
+}
+
+const ITEMS: LegendItem[] = [
+  {
+    label: "Đang trực",
+    color: "#10b981",
+    bgLight: "rgba(16, 185, 129, 0.12)",
+    bgDark: "rgba(16, 185, 129, 0.18)",
+    borderLight: "rgba(16, 185, 129, 0.35)",
+    borderDark: "rgba(16, 185, 129, 0.45)",
+  },
+  {
+    label: "Hôm nay",
+    color: "#f59e0b",
+    bgLight: "rgba(245, 158, 11, 0.12)",
+    bgDark: "rgba(245, 158, 11, 0.18)",
+    borderLight: "rgba(245, 158, 11, 0.35)",
+    borderDark: "rgba(245, 158, 11, 0.45)",
+  },
+  {
+    label: "Sắp tới",
+    color: "#3b82f6",
+    bgLight: "rgba(59, 130, 246, 0.1)",
+    bgDark: "rgba(59, 130, 246, 0.15)",
+    borderLight: "rgba(59, 130, 246, 0.3)",
+    borderDark: "rgba(59, 130, 246, 0.4)",
+  },
+  {
+    label: "Đã qua",
+    color: "#94a3b8",
+    bgLight: "rgba(148, 163, 184, 0.1)",
+    bgDark: "rgba(148, 163, 184, 0.12)",
+    borderLight: "rgba(148, 163, 184, 0.25)",
+    borderDark: "rgba(148, 163, 184, 0.3)",
+  },
+  {
+    label: "Thiếu người",
+    color: "#f97316",
+    bgLight: "rgba(249, 115, 22, 0.12)",
+    bgDark: "rgba(249, 115, 22, 0.18)",
+    borderLight: "rgba(249, 115, 22, 0.35)",
+    borderDark: "rgba(249, 115, 22, 0.45)",
+  },
+  {
+    label: "Đã hủy",
+    color: "#ef4444",
+    bgLight: "rgba(239, 68, 68, 0.12)",
+    bgDark: "rgba(239, 68, 68, 0.18)",
+    borderLight: "rgba(239, 68, 68, 0.35)",
+    borderDark: "rgba(239, 68, 68, 0.45)",
+  },
 ];
 
 export default function TimetableLegend() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
-    <Stack direction="row" spacing={2} sx={{ pt: 3, borderTop: "1px solid", borderColor: "divider", alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
-      <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", mr: 0.5, textTransform: "uppercase", letterSpacing: 0.5, fontSize: "0.7rem" }}>
-        Chú thích:
-      </Typography>
+    <Stack
+      direction="row"
+      spacing={1.5}
+      sx={{
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 1,
+      }}
+    >
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", mr: 0.5 }}>
+        <InfoOutlinedIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+        <Typography
+          variant="caption"
+          sx={{
+            fontWeight: 800,
+            color: "text.secondary",
+            textTransform: "uppercase",
+            letterSpacing: 0.6,
+            fontSize: "0.72rem",
+          }}
+        >
+          CHÚ THÍCH TRẠNG THÁI:
+        </Typography>
+      </Stack>
+
       {ITEMS.map((item) => (
-        <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-          <Box sx={{
-            width: 12,
-            height: 12,
-            borderRadius: 0.5,
-            bgcolor: item.bg,
-            border: "1px solid",
-            borderColor: item.border,
-            borderLeftWidth: item.accentLeft ? 3 : 1,
-            borderLeftColor: item.accentLeft ? item.border : undefined,
-          }} />
-          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>{item.label}</Typography>
-        </Box>
+        <Chip
+          key={item.label}
+          size="small"
+          icon={
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                bgcolor: item.color,
+                boxShadow: `0 0 6px ${alpha(item.color, 0.6)}`,
+                ml: "4px !important",
+              }}
+            />
+          }
+          label={item.label}
+          sx={{
+            height: 24,
+            fontSize: "0.74rem",
+            fontWeight: 700,
+            bgcolor: isDark ? item.bgDark : item.bgLight,
+            color: isDark ? "#fff" : "text.primary",
+            border: `1px solid ${isDark ? item.borderDark : item.borderLight}`,
+            borderRadius: "6px",
+            transition: "all 0.2s ease",
+            "&:hover": {
+              bgcolor: isDark ? alpha(item.color, 0.25) : alpha(item.color, 0.18),
+              borderColor: item.color,
+            },
+          }}
+        />
       ))}
     </Stack>
   );

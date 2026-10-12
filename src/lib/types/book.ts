@@ -101,6 +101,7 @@ export interface BookImportPreviewRow {
   page_count: number | null;
   categories: string | null;
   cover_url: string | null;
+  shelf_location?: string | null;
   description: string | null;
   average_rating: number | null;
   language: string | null;

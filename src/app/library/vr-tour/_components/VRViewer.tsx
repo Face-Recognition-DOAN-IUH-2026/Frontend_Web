@@ -605,7 +605,7 @@ export default function VRViewer() {
         <div className="absolute inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 pointer-events-auto">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-2xl w-full shadow-2xl flex flex-col gap-4 animate-fade-in">
             <h2 className="text-white text-lg font-bold flex items-center gap-2 border-b border-slate-800 pb-3">
-              <MapPin className="w-5 h-5 text-blue-400 animate-bounce" />
+              <MapPin className="w-5 h-5 text-blue-400 animate-pulse" />
               Vị trí Thư viện
             </h2>
             <div className="text-slate-300 text-sm flex flex-col gap-3">

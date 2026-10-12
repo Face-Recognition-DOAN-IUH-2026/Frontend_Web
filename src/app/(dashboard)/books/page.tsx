@@ -9,8 +9,8 @@ import {
   Chip,
   Fade,
   IconButton,
-  LinearProgress,
   Paper,
+  Skeleton,
   Stack,
   Table,
   TableBody,
@@ -56,6 +56,7 @@ import {
   BookBulkPriceDialog,
   BookImportPreviewSection,
   BookImportResultSection,
+  BookImportChoiceDialog,
 } from "../_components/books";
 
 export default function BooksPage() {
@@ -75,18 +76,19 @@ export default function BooksPage() {
   const [aggregateStats, setAggregateStats] = useState<{ totalCopies: number; availableCopies: number; borrowedCopies: number; outOfStockBooks?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<BookWithStats[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<BookImportPreviewRow[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedPreviewIndices, setSelectedPreviewIndices] = useState<Set<number>>(new Set());
+  const [importChoiceOpen, setImportChoiceOpen] = useState(false);
+  const [importMode, setImportMode] = useState<"isbn" | "internal" | "auto">("auto");
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState<BookImportResultRow[] | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [recentlyPrinted, setRecentlyPrinted] = useState<string[]>([]);
   const [page, setPage] = useState(0);
-  const limit = 30;
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedBook, setSelectedBook] = useState<BookWithStats | null>(null);
   const [editQuantity, setEditQuantity] = useState(0);
   const [savingQuantity, setSavingQuantity] = useState(false);
@@ -108,10 +110,23 @@ export default function BooksPage() {
     showNoticeRef.current = showNotice;
   }, [showNotice]);
 
-  const loadBooks = useCallback(async () => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const loadBooks = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const res = await api.listBooks({ skip: page * limit, limit });
+      const res = await api.listBooks({
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
+        search: debouncedSearch || undefined,
+        signal,
+      });
       setBooks(res.items);
       setTotal(res.total);
       if (res.aggregateStats) {
@@ -122,54 +137,44 @@ export default function BooksPage() {
           outOfStockBooks: res.aggregateStats.outOfStockBooks,
         });
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === "CanceledError" || err?.name === "AbortError" || err?.code === "ERR_CANCELED") {
+        return;
+      }
       showNoticeRef.current("error", getErrorMessage(err) || "Không thể tải danh sách sách");
     } finally {
       setLoading(false);
     }
-  }, [page, limit]);
+  }, [page, rowsPerPage, debouncedSearch]);
 
   useEffect(() => {
-    loadBooks();
+    const controller = new AbortController();
+    loadBooks(controller.signal);
+    return () => controller.abort();
   }, [loadBooks]);
 
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      setSearching(false);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const results = await api.searchBooks(searchQuery);
-        setSearchResults(results);
-      } catch (err) {
-        toast.error(getErrorMessage(err) || "Tìm kiếm thất bại");
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, toast]);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = async (file: File, mode: "isbn" | "internal" | "auto" = "auto") => {
+    setImportMode(mode);
     setPreviewFile(file);
     setPreviewLoading(true);
     setPreviewData(null);
     setSelectedPreviewIndices(new Set());
     try {
-      const data = await api.getBarcodePreview(file);
+      const data = await api.getBarcodePreview(file, mode);
       setPreviewData(Array.isArray(data) ? data : data.rows);
     } catch (err) {
       toast.error(getErrorMessage(err) || "Không thể đọc file");
       setPreviewFile(null);
     } finally {
       setPreviewLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleFileSelect(file, "auto");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleImport = async () => {
@@ -191,6 +196,7 @@ export default function BooksPage() {
           page_count: row.page_count ?? null,
           categories: row.categories ?? null,
           cover_url: row.cover_url ?? null,
+          shelf_location: (row as any).shelf_location ?? null,
           description: (row as any).description ?? null,
           average_rating: (row as any).average_rating ?? null,
           language: (row as any).language ?? null,
@@ -198,7 +204,7 @@ export default function BooksPage() {
           isbn13: (row as any).isbn13 ?? null,
         })));
       } else {
-        result = await api.importBooks(previewFile);
+        result = await api.importBooks(previewFile, importMode);
       }
       setImportResults(result.results);
       setShowResults(true);
@@ -234,7 +240,6 @@ export default function BooksPage() {
     try {
       const updated = await api.updateBookQuantity(selectedBook.id, editQuantity);
       setBooks((prev) => prev.map((book) => book.id === updated.id ? updated : book));
-      setSearchResults((prev) => prev.map((book) => book.id === updated.id ? updated : book));
       toast.success(`Đã cập nhật số lượng: ${updated.total_copies} bản`);
       setSelectedBook(null);
     } catch (err) {
@@ -313,7 +318,7 @@ export default function BooksPage() {
         availableCopies: books.reduce((sum, book) => sum + book.available_copies, 0),
         borrowedCopies: books.reduce((sum, book) => sum + (book.total_copies - book.available_copies), 0),
       };
-  const displayBooks = searchQuery.trim() ? searchResults : books;
+  const displayBooks = books;
 
   const [orderBy, setOrderBy] = useState<string>("title");
   const [order, setOrder] = useState<"asc" | "desc">("asc");
@@ -474,83 +479,6 @@ export default function BooksPage() {
         ))}
       </Box>
 
-      <DashboardCard>
-        <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} sx={{ alignItems: { lg: "center" } }}>
-          <SearchField
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Tìm kiếm sách theo ISBN, tên, tác giả..."
-            sx={{ flexGrow: 1, minWidth: 240, "& .MuiOutlinedInput-root": { borderRadius: "4px", bgcolor: "background.paper", "&:hover": { "& fieldset": { borderColor: "primary.main" } } } }}
-          />
-          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
-            <Tooltip title={!canCreateBook ? getPermissionDeniedReason("books", "create") : ""}>
-              <span>
-                <Button
-                  variant="contained"
-                  disabled={!canCreateBook}
-                  startIcon={<UploadIcon />}
-                  onClick={() => {
-                    if (!canCreateBook) return;
-                    fileInputRef.current?.click();
-                  }}
-                  sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
-                >
-                  Nhập Excel
-                </Button>
-              </span>
-            </Tooltip>
-            <Tooltip title={!canCreateBook ? getPermissionDeniedReason("books", "create") : ""}>
-              <span>
-                <Button
-                  variant="outlined"
-                  disabled={!canCreateBook}
-                  startIcon={<QrCodeScannerIcon />}
-                  onClick={() => {
-                    if (!canCreateBook) return;
-                    setIsbnScannerOpen(true);
-                  }}
-                  sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
-                >
-                  Quét ISBN
-                </Button>
-              </span>
-            </Tooltip>
-          </Stack>
-        </Stack>
-      </DashboardCard>
-
-      {searchQuery.trim() ? (
-        <DashboardCard>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Kết quả tìm kiếm: <strong>{searchResults.length}</strong> cuốn sách
-              </Typography>
-            </Stack>
-            {searchResults.length > 0 ? (
-              <Tooltip title={!canPrintBook ? getPermissionDeniedReason("books", "print") : ""}>
-                <span>
-                  <Button
-                    color="primary"
-                    size="small"
-                    disabled={!canPrintBook}
-                    startIcon={<PrintIcon />}
-                    onClick={() => {
-                      if (!canPrintBook) return;
-                      handlePrintBarcodes();
-                    }}
-                    sx={{ textTransform: "none", fontWeight: 600 }}
-                  >
-                    In mã vạch
-                  </Button>
-                </span>
-              </Tooltip>
-            ) : null}
-          </Stack>
-        </DashboardCard>
-      ) : null}
-
       {/* Book Import Preview Component */}
       <BookImportPreviewSection
         previewFile={previewFile}
@@ -574,6 +502,7 @@ export default function BooksPage() {
         importResults={importResults}
         onPrintBarcodes={() => handlePrintBarcodes()}
         canPrint={canPrintBook}
+        onClose={() => setShowResults(false)}
       />
 
       {recentlyPrinted.length > 0 ? (
@@ -587,7 +516,66 @@ export default function BooksPage() {
       ) : null}
 
       <DashboardCard noPadding>
-        {loading && <LinearProgress color="primary" sx={{ height: 3 }} />}
+        {/* Search & Actions Toolbar */}
+        <Box sx={{ p: { xs: 1.5, sm: 2 }, borderBottom: 1, borderColor: "divider" }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
+          >
+            <SearchField
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Tìm kiếm sách theo ISBN, tên, tác giả..."
+              sx={{
+                flexGrow: 1,
+                minWidth: { xs: "100%", sm: 260 },
+                maxWidth: { sm: 460 },
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "4px",
+                  bgcolor: "background.paper",
+                  "&:hover": { "& fieldset": { borderColor: "primary.main" } },
+                },
+              }}
+            />
+            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
+              <Tooltip title={!canCreateBook ? getPermissionDeniedReason("books", "create") : ""}>
+                <span>
+                  <Button
+                    variant="contained"
+                    disabled={!canCreateBook}
+                    startIcon={<UploadIcon />}
+                    onClick={() => {
+                      if (!canCreateBook) return;
+                      setImportChoiceOpen(true);
+                    }}
+                    sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
+                  >
+                    Nhập Excel
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title={!canCreateBook ? getPermissionDeniedReason("books", "create") : ""}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    disabled={!canCreateBook}
+                    startIcon={<QrCodeScannerIcon />}
+                    onClick={() => {
+                      if (!canCreateBook) return;
+                      setIsbnScannerOpen(true);
+                    }}
+                    sx={{ borderRadius: "4px", fontWeight: 700, textTransform: "none" }}
+                  >
+                    Quét ISBN
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
+          </Stack>
+        </Box>
+
         <TableContainer sx={{ overflowX: "auto", maxHeight: 720 }}>
           <Table size="small" stickyHeader sx={{ minWidth: 800 }}>
             <TableHead>
@@ -657,18 +645,67 @@ export default function BooksPage() {
                     Mượn
                   </TableSortLabel>
                 </TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, minWidth: 90 }}>
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontWeight: 700,
+                    minWidth: 100,
+                    position: "sticky",
+                    right: 0,
+                    bgcolor: "background.paper",
+                    boxShadow: "-3px 0 6px -2px rgba(0,0,0,0.06)",
+                    zIndex: 3,
+                  }}
+                >
                   Thao tác
                 </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {sortedBooks.length === 0 ? (
+              {loading ? (
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <TableRow key={`skeleton-${idx}`}>
+                    <TableCell padding="checkbox">
+                      <Skeleton variant="rectangular" width={18} height={18} sx={{ borderRadius: "4px" }} />
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                        <Skeleton variant="rectangular" width={34} height={46} sx={{ borderRadius: "4px", flexShrink: 0 }} />
+                        <Box sx={{ width: "100%", maxWidth: 200 }}>
+                          <Skeleton variant="text" width="90%" height={20} />
+                          <Skeleton variant="text" width="60%" height={16} />
+                        </Box>
+                      </Stack>
+                    </TableCell>
+                    <TableCell><Skeleton variant="text" width={110} /></TableCell>
+                    <TableCell><Skeleton variant="text" width={90} /></TableCell>
+                    <TableCell align="right"><Skeleton variant="text" width={70} sx={{ ml: "auto" }} /></TableCell>
+                    <TableCell align="center"><Skeleton variant="text" width={30} sx={{ mx: "auto" }} /></TableCell>
+                    <TableCell align="center"><Skeleton variant="rounded" width={36} height={22} sx={{ mx: "auto" }} /></TableCell>
+                    <TableCell align="center"><Skeleton variant="text" width={30} sx={{ mx: "auto" }} /></TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{
+                        position: "sticky",
+                        right: 0,
+                        bgcolor: "background.paper",
+                        boxShadow: "-3px 0 6px -2px rgba(0,0,0,0.06)",
+                        zIndex: 1,
+                      }}
+                    >
+                      <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
+                        <Skeleton variant="circular" width={28} height={28} />
+                        <Skeleton variant="circular" width={28} height={28} />
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : sortedBooks.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} sx={{ py: 6, textAlign: "center" }}>
                     <EmptyState
                       icon={<BookIcon fontSize="large" />}
-                      title={searchQuery ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}
+                      title={debouncedSearch ? "Không tìm thấy sách phù hợp" : "Chưa có sách nào trong hệ thống"}
                     />
                   </TableCell>
                 </TableRow>
@@ -815,7 +852,17 @@ export default function BooksPage() {
                           {borrowed}
                         </Typography>
                       </TableCell>
-                      <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                      <TableCell
+                        align="right"
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{
+                          position: "sticky",
+                          right: 0,
+                          bgcolor: isSelected ? "action.selected" : "background.paper",
+                          boxShadow: "-3px 0 6px -2px rgba(0,0,0,0.06)",
+                          zIndex: 1,
+                        }}
+                      >
                         <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
                           <Tooltip title={!canUpdateBook ? getPermissionDeniedReason("books", "update") : "Chỉnh số lượng"}>
                             <span>
@@ -851,18 +898,21 @@ export default function BooksPage() {
           </Table>
         </TableContainer>
 
-        {!searchQuery && total > limit ? (
-          <TablePagination
-            component="div"
-            count={total}
-            page={page}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            rowsPerPage={limit}
-            rowsPerPageOptions={[limit]}
-            labelDisplayedRows={({ from, to, count }) => `${from}–${to} trên ${count !== -1 ? count : `hơn ${to}`} đầu sách`}
-            sx={{ borderTop: 1, borderColor: "divider" }}
-          />
-        ) : null}
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 20, 50, 100]}
+          labelRowsPerPage="Số dòng mỗi trang:"
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} trên ${count !== -1 ? count : `hơn ${to}`} đầu sách`}
+          sx={{ borderTop: 1, borderColor: "divider" }}
+        />
       </DashboardCard>
 
       {/* Book Quantity Dialog Component */}
@@ -1004,6 +1054,13 @@ export default function BooksPage() {
           showNotice={showNotice}
         />
       )}
+
+      {/* Book Import Mode Choice Dialog */}
+      <BookImportChoiceDialog
+        open={importChoiceOpen}
+        onClose={() => setImportChoiceOpen(false)}
+        onSelectFile={handleFileSelect}
+      />
     </Stack>
   );
 }

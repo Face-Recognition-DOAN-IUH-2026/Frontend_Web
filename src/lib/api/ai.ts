@@ -5,7 +5,6 @@ import type {
   AIInsightExplanation,
   AIInsightList,
   AIChatResponse,
-  AIConfirmResponse,
   AIBookRecommendationResponse,
   CompanionChunk,
 } from "../types";
@@ -58,26 +57,6 @@ export function createAIMethods(client: AxiosInstance) {
       if (sessionId) body.sessionId = sessionId;
 
       const response = await client.post(endpoint, body);
-      return response.data;
-    },
-
-    async confirmAction(
-      sessionId: string,
-      action: "approve" | "reject",
-      role?: string
-    ): Promise<AIConfirmResponse> {
-      const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-      const userData = storedUser ? JSON.parse(storedUser) : null;
-      const effectiveRole = role || userData?.role || "staff";
-
-      const endpoint =
-        effectiveRole === "patron"
-          ? "/api/ai/patrons/confirm"
-          : effectiveRole === "staff"
-            ? "/api/ai/staff/confirm"
-            : "/api/ai/admin/confirm";
-
-      const response = await client.post(endpoint, { sessionId, action });
       return response.data;
     },
 

@@ -1,4 +1,4 @@
-import { Card, CardContent, CardActions, Stack, Typography } from "@mui/material";
+import { Card, CardContent, Stack, Typography, type SxProps, type Theme } from "@mui/material";
 import { ReactNode } from "react";
 
 interface DashboardCardProps {
@@ -7,6 +7,7 @@ interface DashboardCardProps {
   actions?: ReactNode;
   children?: ReactNode;
   noPadding?: boolean;
+  sx?: SxProps<Theme>;
 }
 
 export default function DashboardCard({
@@ -15,9 +16,21 @@ export default function DashboardCard({
   actions,
   children,
   noPadding = false,
+  sx,
 }: DashboardCardProps) {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+    <Card
+      variant="outlined"
+      sx={[
+        {
+          borderRadius: 3,
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
+    >
       {(title || actions) && (
         <Stack
           direction="row"
@@ -38,7 +51,14 @@ export default function DashboardCard({
           {actions && <Stack direction="row" spacing={0.5}>{actions}</Stack>}
         </Stack>
       )}
-      <CardContent sx={noPadding ? { p: 0 } : { px: 2.5, pb: 2.5 }}>
+      <CardContent
+        sx={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          ...(noPadding ? { p: 0, "&:last-child": { pb: 0 } } : { px: 2.5, pb: 2.5 }),
+        }}
+      >
         {children}
       </CardContent>
     </Card>

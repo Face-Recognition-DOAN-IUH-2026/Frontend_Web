@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Alert, Box, Button, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Divider, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
 import TodayIcon from "@mui/icons-material/TodayOutlined";
@@ -38,16 +38,10 @@ import GeofenceConfigPanel from "@/app/(dashboard)/_components/staff-schedule/Ge
 import TemplateManagementPanel from "@/app/(dashboard)/_components/staff-schedule/TemplateManagementPanel";
 import DeleteWeekDialog from "@/app/(dashboard)/_components/staff-schedule/DeleteWeekDialog";
 import ManualCheckInAdmin from "@/app/(dashboard)/_components/staff-schedule/ManualCheckInAdmin";
+import ScheduleFilterBar from "@/app/(dashboard)/_components/staff-schedule/ScheduleFilterBar";
 import UndoSnackbar from "@/app/_components/UndoSnackbar";
 import useUndo from "@/lib/hooks/useUndo";
 import { useToast } from "@/lib/toast-context";
-
-const FILTERS = [
-  { value: "all", label: "Tất cả" },
-  { value: "active", label: "Đang trực" },
-  { value: "future", label: "Sắp tới" },
-  { value: "past", label: "Đã qua" },
-] as const;
 
 const STAT_GRADIENT = {
   total: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
@@ -250,43 +244,16 @@ export default function StaffSchedulesPage() {
         ))}
       </Box>
 
-      <DashboardCard>
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mr: 1, textTransform: "uppercase", letterSpacing: 0.5, fontSize: "0.7rem" }}>
-            Bộ lọc:
-          </Typography>
-          <ToggleButtonGroup
-            value={filter} exclusive onChange={(_, v) => v ? setFilter(v) : undefined} size="small"
-            sx={{ "& .MuiToggleButton-root": { px: 2, py: 0.6, borderRadius: "20px!important", textTransform: "none", fontWeight: 600, fontSize: "0.78rem", border: "1px solid", borderColor: "divider" }, gap: 0.5 }}
-          >
-            {FILTERS.map((f) => (
-              <ToggleButton key={f.value} value={f.value}>{f.label}</ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-          <TextField
-            select size="small" label="Khu vực" value={zoneFilter}
-            onChange={(e) => setZoneFilter(e.target.value)}
-            sx={{ minWidth: 160, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            slotProps={{ inputLabel: { shrink: true } }}
-          >
-            <MenuItem value="">Tất cả khu vực</MenuItem>
-            {zones.map((z) => (
-              <MenuItem key={z.id} value={z.id}>{z.zoneName}</MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select size="small" label="Ca trực" value={shiftFilter}
-            onChange={(e) => setShiftFilter(e.target.value)}
-            sx={{ minWidth: 140, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            slotProps={{ inputLabel: { shrink: true } }}
-          >
-            <MenuItem value="">Tất cả ca trực</MenuItem>
-            {shiftList.map((s) => (
-              <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
-            ))}
-          </TextField>
-        </Stack>
-      </DashboardCard>
+      <ScheduleFilterBar
+        filter={filter}
+        setFilter={setFilter}
+        zoneFilter={zoneFilter}
+        setZoneFilter={setZoneFilter}
+        shiftFilter={shiftFilter}
+        setShiftFilter={setShiftFilter}
+        zones={zones}
+        shiftList={shiftList}
+      />
 
       {error ? (
         <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>{error}</Alert>
@@ -300,12 +267,12 @@ export default function StaffSchedulesPage() {
             onCellClick={canCreate ? handleCellClick : undefined}
             onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
           />
+          <Divider sx={{ borderColor: "divider" }} />
+          <Box sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(15, 23, 42, 0.4)" : "rgba(248, 250, 252, 0.6)" }}>
+            <TimetableLegend />
+          </Box>
         </DashboardCard>
       </LoadingOverlay>
-
-      <DashboardCard>
-        <TimetableLegend />
-      </DashboardCard>
 
       <AssignStaffDialog
         open={!!assignDialog} date={assignDialog?.date || ""} shiftId={assignDialog?.shiftId || ""} shiftName={assignDialog?.shiftName || ""}

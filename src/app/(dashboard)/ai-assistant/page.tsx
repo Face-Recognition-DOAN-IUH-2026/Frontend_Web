@@ -8,10 +8,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   Paper,
   Stack,
@@ -21,8 +17,6 @@ import {
   alpha,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/SendOutlined";
-import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import CancelIcon from "@mui/icons-material/CancelOutlined";
 import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
 import WarningIcon from "@mui/icons-material/WarningAmberOutlined";
 import GroupsIcon from "@mui/icons-material/GroupsOutlined";
@@ -31,7 +25,6 @@ import RuleIcon from "@mui/icons-material/GavelOutlined";
 import ScheduleIcon from "@mui/icons-material/CalendarTodayOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import AddCommentOutlinedIcon from "@mui/icons-material/AddCommentOutlined";
 
 import Markdown from "react-markdown";
@@ -40,7 +33,7 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-import api, { getApiAccessToken } from "@/lib/api-client";
+import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import BookCard, { parseBookCard } from "@/app/(dashboard)/_components/BookCard";
 import LibraryHoursCard, { type LibraryScheduleData } from "@/app/(dashboard)/_components/AIWidget/cards/LibraryHoursCard";
@@ -51,20 +44,12 @@ interface Message {
   role: "user" | "assistant" | "system";
   content: string;
   toolResults?: ToolResult[];
-  requiresConfirmation?: boolean;
-  pendingAction?: PendingAction;
   timestamp: Date;
 }
 
 interface ToolResult {
   name: string;
   result: { success: boolean; data?: any; error?: string };
-}
-
-interface PendingAction {
-  action: string;
-  description: string;
-  params: Record<string, any>;
 }
 
 const STORAGE_KEY = "ai-assistant-session";
@@ -78,37 +63,11 @@ const SUGGESTIONS = [
   { label: "Độc giả trong thư viện", icon: <GroupsIcon sx={{ fontSize: 16 }} />, color: "#0F3C5C" },
 ];
 
-function buildApiUrl(path: string) {
-  const base = process.env.NEXT_PUBLIC_API_URL || "";
-  return `${base}/api/ai${path}`;
-}
-
-function getAuthHeaders(): Record<string, string> {
-  const token = getApiAccessToken();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
-
-async function chat(message: string, sessionId?: string, patronId?: string) {
-  const body: Record<string, any> = { message, sessionId, patronId };
-  const res = await fetch(buildApiUrl("/chat"), {
-    method: "POST",
-    headers: getAuthHeaders(),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-async function confirmAction(sessionId: string, action: "approve" | "reject") {
-  const res = await fetch(buildApiUrl("/confirm"), {
-    method: "POST",
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ sessionId, action }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+async function chat(message: string, sessionId?: string, role?: string) {
+  // Endpoint theo role (staff -> /api/ai/staff/chat, admin -> /api/ai/admin/chat),
+  // khop voi tool registry da tach theo role trong ai-service.
+  // Doc gia (patron) khong dung trang nay — dung chatbot n8n.
+  return api.askAiChat(message, sessionId, role);
 }
 
 function extractSchedule(text: string): {
@@ -208,9 +167,6 @@ export default function AiAssistantPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState<string>("");
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; pending?: PendingAction }>({
-    open: false,
-  });
   const [mounted, setMounted] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -281,7 +237,7 @@ export default function AiAssistantPage() {
     setError("");
 
     try {
-      const data = await chat(textToSend, sessionId || undefined);
+      const data = await chat(textToSend, sessionId || undefined, user?.role);
       if (data.sessionId && !sessionId) setSessionId(data.sessionId);
 
       let responseText = data.response || "";
@@ -298,60 +254,26 @@ export default function AiAssistantPage() {
         role: "assistant",
         content: responseText,
         toolResults: data.toolResults,
-        requiresConfirmation: data.requiresConfirmation,
-        pendingAction: data.pendingAction,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
-
-      if (data.requiresConfirmation && data.pendingAction) {
-        setConfirmDialog({ open: true, pending: data.pendingAction });
-      }
-    } catch {
-      setError("Không thể kết nối AI. Vui lòng thử lại.");
+    } catch (e: any) {
+      const status = e?.response?.status;
+      setError(
+        status === 401
+          ? "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại."
+          : status === 403
+            ? "Tài khoản của bạn không có quyền dùng kênh chat này."
+            : status === 429
+              ? "Hệ thống đang bận. Vui lòng thử lại sau vài giây."
+              : status === 503
+                ? "Dịch vụ AI tạm thời không khả dụng. Vui lòng thử lại sau."
+                : "Không thể kết nối AI. Vui lòng thử lại.",
+      );
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
     } finally {
       setLoading(false);
       inputRef.current?.focus();
-    }
-  };
-
-  const handleConfirm = async (action: "approve" | "reject") => {
-    if (!sessionId) return;
-    setConfirmDialog({ open: false });
-    setLoading(true);
-
-    const confirmMsg: Message = {
-      id: Date.now().toString(),
-      role: "assistant",
-      content:
-        action === "approve"
-          ? "Đang xử lý yêu cầu của bạn..."
-          : "Đã hủy thao tác theo yêu cầu của bạn.",
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, confirmMsg]);
-
-    try {
-      const result = await confirmAction(sessionId, action);
-      const resultMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content:
-          result.result || result.response || (action === "approve" ? "Thao tác đã được thực hiện thành công." : "Đã hủy."),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev.slice(0, -1), resultMsg]);
-    } catch {
-      const errMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "Thao tác thất bại. Vui lòng thử lại.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev.slice(0, -1), errMsg]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -377,15 +299,8 @@ export default function AiAssistantPage() {
     }
   };
 
-  const toolCount = useMemo(() => {
-    const names = new Set<string>();
-    messages.forEach((m) => m.toolResults?.forEach((t) => names.add(t.name)));
-    return names.size;
-  }, [messages]);
-
   const stats = [
     { key: "msg", label: "Tin nhắn", value: messages.length, gradient: "linear-gradient(135deg, #8B0000 0%, #700000 100%)" },
-    { key: "tool", label: "Công cụ", value: toolCount, gradient: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)" },
     { key: "session", label: "Phiên", value: sessionId ? sessionId.slice(0, 6) : "Mới", gradient: "linear-gradient(135deg, #059669 0%, #047857 100%)" },
     { key: "status", label: "Trạng thái", value: loading ? "Xử lý..." : "Sẵn sàng", gradient: "linear-gradient(135deg, #D97706 0%, #B45309 100%)" },
   ];
@@ -395,6 +310,32 @@ export default function AiAssistantPage() {
   const statBadges = stats
     .map((s) => `${s.label}: ${typeof s.value === "number" ? s.value.toLocaleString("vi-VN") : s.value}`)
     .join(" • ");
+
+  // Trang nay chi danh cho staff/admin. Doc gia (patron) dung chatbot n8n
+  // (bong bong chat goc man hinh), khong dung kenh chat noi bo nay.
+  if (user?.role === "patron") {
+    return (
+      <Stack spacing={3}>
+        <PageHeader title="AI Trợ lý" icon={SmartToyIcon} />
+        <DashboardCard>
+          <EmptyState
+            icon={
+              <Avatar sx={{ width: 72, height: 72, bgcolor: "rgba(139,0,0,0.12)", border: "2px solid rgba(139,0,0,0.25)" }}>
+                <SmartToyIcon sx={{ fontSize: 36, color: "primary.main" }} />
+              </Avatar>
+            }
+            title="Kênh chat này dành cho thủ thư"
+            description="Độc giả vui lòng dùng chatbot Trợ lý AI (biểu tượng chat ở góc màn hình) để tra cứu sách và hỏi đáp."
+            action={
+              <Button variant="contained" href="/dashboard" sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
+                Quay lại Bảng điều khiển
+              </Button>
+            }
+          />
+        </DashboardCard>
+      </Stack>
+    );
+  }
 
   return (
     <Stack spacing={3} sx={{ height: "100%", overflow: "hidden" }}>
@@ -489,6 +430,11 @@ export default function AiAssistantPage() {
         </Box>
 
         <Box sx={{ px: 3, py: 2, borderTop: 1, borderColor: "divider", bgcolor: "background.paper" }}>
+          {error ? (
+            <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2 }} onClose={() => setError("")}>
+              {error}
+            </Alert>
+          ) : null}
           <Paper
             variant="outlined"
             sx={{
@@ -553,60 +499,6 @@ export default function AiAssistantPage() {
         </Box>
       </DashboardCard>
       </Box>
-
-      <Dialog open={confirmDialog.open} onClose={() => handleConfirm("reject")} maxWidth="sm" fullWidth>
-        <Box sx={{ background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)", p: 2.5, color: "white" }}>
-          <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", width: 40, height: 40 }}>
-                <AutoAwesomeIcon />
-              </Avatar>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                Xác nhận thao tác
-              </Typography>
-            </Stack>
-            <IconButton onClick={() => handleConfirm("reject")} size="small" sx={{ color: "white", bgcolor: "rgba(255,255,255,0.15)", "&:hover": { bgcolor: "rgba(255,255,255,0.25)" } }}>
-              <CancelIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-        </Box>
-        <DialogContent sx={{ pt: 3 }}>
-          {confirmDialog.pending ? (
-            <Stack spacing={2}>
-              <Alert severity="warning" sx={{ borderRadius: 2, fontWeight: 600 }}>
-                Thao tác này sẽ ảnh hưởng đến dữ liệu. Vui lòng xác nhận.
-              </Alert>
-              <Paper variant="outlined" sx={{ p: 2, bgcolor: "background.default", borderRadius: 2 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                  Mô tả thao tác
-                </Typography>
-                <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{confirmDialog.pending.description}</Typography>
-              </Paper>
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                  Hành động
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: "monospace", mt: 0.5, bgcolor: "action.hover", p: 1, borderRadius: 1 }}>
-                  {confirmDialog.pending.action}
-                </Typography>
-              </Box>
-            </Stack>
-          ) : null}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button onClick={() => handleConfirm("reject")} variant="outlined" color="inherit" startIcon={<CancelIcon />} sx={{ borderRadius: 2 }}>
-            Hủy bỏ
-          </Button>
-          <Button
-            onClick={() => handleConfirm("approve")}
-            variant="contained"
-            startIcon={<CheckCircleIcon />}
-            sx={{ borderRadius: 2, fontWeight: 700, background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)", "&:hover": { background: "linear-gradient(135deg, #700000 0%, #500000 100%)" } }}
-          >
-            Xác nhận
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Stack>
   );
 }
@@ -939,14 +831,9 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
     );
   }
 
-  return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
-      <Chip label={tr.name} size="small" color="primary" variant="outlined" sx={{ fontWeight: 800, fontSize: 10, mb: 0.75, height: 20, borderRadius: 1.5 }} />
-      <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace", fontSize: 11, whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto" }}>
-        {typeof data === "string" ? data : JSON.stringify(data, null, 2)}
-      </Typography>
-    </Paper>
-  );
+  // An raw tool payload — chi hien thi curated cards (BookCard, LibraryHoursCard,
+  // lich truc, qua han, thong tin doc gia). Khong do JSON tho ra UI.
+  return null;
 }
 
 function MessageBubble({ msg }: { msg: Message }) {
@@ -996,7 +883,7 @@ function MessageBubble({ msg }: { msg: Message }) {
               "& table": { width: "100%", borderCollapse: "collapse", mt: 1, mb: 1, fontSize: "0.875rem" },
               "& th": { bgcolor: isUser ? "rgba(255,255,255,0.1)" : "action.hover", fontWeight: 800, textAlign: "left", px: 1.5, py: 1, border: "1px solid", borderColor: isUser ? "rgba(255,255,255,0.2)" : "divider" },
               "& td": { px: 1.5, py: 0.75, border: "1px solid", borderColor: isUser ? "rgba(255,255,255,0.2)" : "divider" },
-              "& blockquote": { borderLeft: "3px solid", borderColor: isUser ? "rgba(255,255,255,0.5)" : "primary.main", pl: 1.5, ml: 0, mt: 1, mb: 1, color: isUser ? "rgba(255,255,255,0.8)" : "text.secondary" },
+              "& blockquote": { borderLeft: "2px solid", borderColor: isUser ? "rgba(255,255,255,0.5)" : "primary.main", pl: 1.5, ml: 0, mt: 1, mb: 1, color: isUser ? "rgba(255,255,255,0.8)" : "text.secondary" },
               "& hr": { border: "none", borderTop: `1px solid ${isUser ? "rgba(255,255,255,0.2)" : "divider"}`, my: 1.5 },
               "& a": { color: isUser ? "white" : "primary.main", textDecoration: "none", "&:hover": { textDecoration: "underline" } },
             }}
