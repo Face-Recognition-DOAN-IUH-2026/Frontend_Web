@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAIWidgetStore } from "./store/useAIWidgetStore";
 import AIWidgetHeader from "./AIWidgetHeader";
 import ScoreTab from "./tabs/ScoreTab";
-import ChatTab from "./tabs/ChatTab";
 import ActionsTab from "./tabs/ActionsTab";
 
 interface AIWidgetPanelProps {
@@ -15,8 +14,7 @@ interface AIWidgetPanelProps {
 export default function AIWidgetPanel({ role }: AIWidgetPanelProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const { isOpen, activeTab, minimize, setActiveTab } = useAIWidgetStore();
-  const isPatron = role === 'patron';
+  const { isOpen, activeTab, minimize } = useAIWidgetStore();
 
   const panelWidth = isMobile ? "100vw" : 420;
 
@@ -68,18 +66,13 @@ export default function AIWidgetPanel({ role }: AIWidgetPanelProps) {
             >
               <AIWidgetHeader onMinimize={minimize} />
 
-              {!isPatron && <TabNavigation />}
+              <TabNavigation />
 
               <Box sx={{ flex: 1, overflow: "auto" }}>
-                {isPatron ? (
-                  <ChatTab />
-                ) : (
-                  <AnimatePresence mode="wait">
-                    {activeTab === "score" && <ScoreTab key="score" />}
-                    {activeTab === "chat" && <ChatTab key="chat" />}
-                    {activeTab === "actions" && <ActionsTab key="actions" />}
-                  </AnimatePresence>
-                )}
+                <AnimatePresence mode="wait">
+                  {activeTab === "score" && <ScoreTab key="score" />}
+                  {activeTab === "actions" && <ActionsTab key="actions" />}
+                </AnimatePresence>
               </Box>
             </Box>
           </motion.div>
@@ -90,17 +83,16 @@ export default function AIWidgetPanel({ role }: AIWidgetPanelProps) {
 }
 
 function TabNavigation() {
-  const theme = useTheme();
   const { activeTab, setActiveTab } = useAIWidgetStore();
 
-  const handleChange = (_: React.SyntheticEvent, newValue: 'score' | 'chat' | 'actions') => {
+  const handleChange = (_: React.SyntheticEvent, newValue: 'score' | 'actions') => {
     setActiveTab(newValue);
   };
 
   return (
     <Box sx={{ borderBottom: 1, borderColor: "divider", bgcolor: "background.default" }}>
       <Tabs
-        value={activeTab}
+        value={activeTab === 'actions' ? 'actions' : 'score'}
         onChange={handleChange}
         variant="fullWidth"
         sx={{
@@ -119,9 +111,8 @@ function TabNavigation() {
           },
         }}
       >
-        <Tab label="Score" value="score" />
-        <Tab label="Chat" value="chat" />
-        <Tab label="Actions" value="actions" />
+        <Tab label="Chỉ số vận hành" value="score" />
+        <Tab label="Tác vụ nhanh" value="actions" />
       </Tabs>
     </Box>
   );

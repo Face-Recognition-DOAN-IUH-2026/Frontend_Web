@@ -212,12 +212,12 @@ export function createAccessMethods(client: AxiosInstance) {
     },
 
     async confirmEntry(patronId: string): Promise<{ current_status: string; message: string }> {
-      const response = await client.post(`/api/internal/access/patrons/${patronId}/confirm-entry`);
+      const response = await client.post(`/api/access/patrons/${patronId}/confirm-entry`);
       return response.data;
     },
 
     async revertPending(patronId: string): Promise<{ current_status: string; message: string }> {
-      const response = await client.post(`/api/internal/access/patrons/${patronId}/revert-pending`);
+      const response = await client.post(`/api/access/patrons/${patronId}/revert-pending`);
       return response.data;
     },
 

@@ -21,7 +21,7 @@ export default function ReturnMetricsBar({ totals }: ReturnMetricsProps) {
       value: totals.borrowers,
       icon: <UsersIcon sx={{ fontSize: 20, color: "primary.main" }} />,
       color: "primary.main",
-      borderLeft: "3px solid #8B0000",
+      accentColor: "#8B0000",
     },
     {
       key: "books",
@@ -29,7 +29,7 @@ export default function ReturnMetricsBar({ totals }: ReturnMetricsProps) {
       value: totals.books,
       icon: <BookIcon sx={{ fontSize: 20, color: "secondary.main" }} />,
       color: "secondary.main",
-      borderLeft: "3px solid #0A2540",
+      accentColor: "#0A2540",
     },
     {
       key: "overdue",
@@ -37,7 +37,7 @@ export default function ReturnMetricsBar({ totals }: ReturnMetricsProps) {
       value: totals.overdue,
       icon: <AlertIcon sx={{ fontSize: 20, color: totals.overdue > 0 ? "error.main" : "text.secondary" }} />,
       color: totals.overdue > 0 ? "error.main" : "text.secondary",
-      borderLeft: totals.overdue > 0 ? "3px solid #dc2626" : "3px solid #64748b",
+      accentColor: totals.overdue > 0 ? "#dc2626" : "#64748b",
     },
   ];
 
@@ -50,11 +50,14 @@ export default function ReturnMetricsBar({ totals }: ReturnMetricsProps) {
           sx={{
             p: 2,
             borderRadius: 2,
-            borderLeft: item.borderLeft,
             bgcolor: "background.paper",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            transition: "border-color 0.2s ease",
+            "&:hover": {
+              borderColor: item.accentColor,
+            },
           }}
         >
           <Box>

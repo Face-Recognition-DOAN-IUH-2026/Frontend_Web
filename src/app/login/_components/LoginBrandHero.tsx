@@ -96,7 +96,7 @@ export default function LoginBrandHero() {
 
       {/* Bottom quote */}
       <Box sx={{ position: "relative", zIndex: 1 }}>
-        <Box sx={{ borderLeft: "3px solid rgba(252,211,77,0.6)", pl: 2 }}>
+        <Box sx={{ borderLeft: "2px solid rgba(252,211,77,0.6)", pl: 2 }}>
           <Typography sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.82rem", fontStyle: "italic" }}>
             &ldquo;Tri thức là nền tảng của sự phát triển&rdquo;
           </Typography>

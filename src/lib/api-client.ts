@@ -66,7 +66,6 @@ import type {
   AIInsightExplanation,
   AIInsightList,
   AIChatResponse,
-  AIConfirmResponse,
   AIBookRecommendationResponse,
   Notification,
   NotificationListResponse,
@@ -1041,12 +1040,12 @@ class ApiClient {
   }
 
   async confirmEntry(patronId: string): Promise<{ current_status: string; message: string }> {
-    const response = await this.client.post(`/api/internal/access/patrons/${patronId}/confirm-entry`);
+    const response = await this.client.post(`/api/access/patrons/${patronId}/confirm-entry`);
     return response.data;
   }
 
   async revertPending(patronId: string): Promise<{ current_status: string; message: string }> {
-    const response = await this.client.post(`/api/internal/access/patrons/${patronId}/revert-pending`);
+    const response = await this.client.post(`/api/access/patrons/${patronId}/revert-pending`);
     return response.data;
   }
 
@@ -1253,12 +1252,12 @@ class ApiClient {
     }
   }
 
-  async listBooks(params?: { skip?: number; limit?: number; search?: string }): Promise<BooksListResponse> {
+  async listBooks(params?: { skip?: number; limit?: number; search?: string; signal?: AbortSignal }): Promise<BooksListResponse> {
     const query: any = {};
     if (params?.skip !== undefined) query.skip = params.skip;
     if (params?.limit !== undefined) query.limit = params.limit;
     if (params?.search) query.search = params.search;
-    const response = await this.client.get<BooksListResponse>("/api/borrow/books", { params: query });
+    const response = await this.client.get<BooksListResponse>("/api/borrow/books", { params: query, signal: params?.signal });
     return response.data;
   }
 
@@ -1272,20 +1271,24 @@ class ApiClient {
     return response.data;
   }
 
-  async getBarcodePreview(file: File): Promise<BookImportPreviewResponse> {
+  async getBarcodePreview(file: File, mode?: "isbn" | "internal" | "auto"): Promise<BookImportPreviewResponse> {
     const formData = new FormData();
     formData.append("file", file);
+    if (mode) formData.append("mode", mode);
     const response = await this.client.post<BookImportPreviewResponse>("/api/borrow/books/import/preview", formData, {
       headers: { "Content-Type": "multipart/form-data" },
+      timeout: 60000,
     });
     return response.data;
   }
 
-  async importBooks(file: File): Promise<BookImportResponse> {
+  async importBooks(file: File, mode?: "isbn" | "internal" | "auto"): Promise<BookImportResponse> {
     const formData = new FormData();
     formData.append("file", file);
+    if (mode) formData.append("mode", mode);
     const response = await this.client.post<BookImportResponse>("/api/borrow/books/import", formData, {
       headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
     });
     return response.data;
   }
@@ -1302,17 +1305,24 @@ class ApiClient {
     page_count: number | null;
     categories: string | null;
     cover_url: string | null;
+    shelf_location?: string | null;
   }>): Promise<BookImportResponse> {
-    const response = await this.client.post<BookImportResponse>("/api/borrow/books/import/filtered", { rows });
+    const response = await this.client.post<BookImportResponse>("/api/borrow/books/import/filtered", { rows }, {
+      timeout: 120000,
+    });
     return response.data;
   }
 
-  async downloadBookTemplate(): Promise<void> {
-    const response = await this.client.get("/api/borrow/books/template", { responseType: "blob" });
+  async downloadBookTemplate(type?: "basic" | "full"): Promise<void> {
+    const filename = type === "full" ? "book_import_template_full.xlsx" : "book_import_template_basic.xlsx";
+    const response = await this.client.get("/api/borrow/books/template", {
+      params: { type: type || "basic" },
+      responseType: "blob",
+    });
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const a = document.createElement("a");
     a.href = url;
-    a.download = "book_import_template.xlsx";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1615,7 +1625,9 @@ class ApiClient {
   }
 
   async askAiChat(message: string, sessionId?: string, role?: string): Promise<AIChatResponse> {
-    const r = role || "patron";
+    const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+    const userData = storedUser ? JSON.parse(storedUser) : null;
+    const r = role || userData?.role || "staff";
     const endpoint =
       r === "patron"
         ? "/api/ai/patrons/chat"
@@ -1624,21 +1636,9 @@ class ApiClient {
           : r === "admin"
             ? "/api/ai/admin/chat"
             : "/api/ai/chat";
-    const response = await this.client.post<AIChatResponse>(endpoint, { message, session_id: sessionId });
-    return response.data;
-  }
-
-  async confirmAction(sessionId: string, action: string, role?: string): Promise<AIConfirmResponse> {
-    const r = role || "patron";
-    const endpoint =
-      r === "patron"
-        ? "/api/ai/patrons/confirm"
-        : r === "staff"
-          ? "/api/ai/staff/confirm"
-          : r === "admin"
-            ? "/api/ai/admin/confirm"
-            : "/api/ai/confirm";
-    const response = await this.client.post<AIConfirmResponse>(endpoint, { session_id: sessionId, action });
+    const body: Record<string, any> = { message };
+    if (sessionId) body.sessionId = sessionId;
+    const response = await this.client.post<AIChatResponse>(endpoint, body);
     return response.data;
   }
 

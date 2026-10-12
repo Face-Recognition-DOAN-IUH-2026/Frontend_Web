@@ -230,15 +230,6 @@ export default function GatePage() {
           student_code: mssv,
         }).then((approval) => setApprovalEventCode(approval.event_code)).catch(() => {});
       }
-      if (success) {
-        // Provisional: kiosk always challenges on a passive match — passive
-        // score alone never grants entry (phone-screen replay risk).
-        setStatusText("Kiểm tra khuôn mặt thật...");
-        setStep("challenge");
-        setLoading(false);
-        startCamera();
-        return;
-      }
       setResult({
         success: !!success,
         message: success
@@ -251,8 +242,13 @@ export default function GatePage() {
       setStep("result");
       setLoading(false);
       setStatusText("");
-      if (success && lookup?.patron?.id) {
-        api.confirmEntry(lookup.patron.id).catch(() => {});
+      if (success) {
+        playGateSound("granted");
+        if (lookup?.patron?.id && (taskResult as any)?.access_type !== "exit") {
+          api.confirmEntry(lookup.patron.id).catch(() => {});
+        }
+      } else {
+        playGateSound("denied");
       }
     } else if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
       const message = sseState.error || "Xác thực thất bại.";
@@ -260,6 +256,7 @@ export default function GatePage() {
       setStep("result");
       setLoading(false);
       setStatusText("");
+      playGateSound("denied");
       showToast("error", message);
       if (lookup?.patron?.id) {
         api.revertPending(lookup.patron.id).catch(() => {});
@@ -267,7 +264,7 @@ export default function GatePage() {
     } else if (sseState.status === "WAITING") {
       setStatusText("Đang xử lý...");
     }
-  }, [sseState.status, sseState.result, sseState.error, lookup, mssv, showToast, startCamera]);
+  }, [sseState.status, sseState.result, sseState.error, lookup, mssv, showToast]);
 
   const captureImage = useCallback((): Promise<File> => (
     new Promise((resolve, reject) => {
@@ -424,7 +421,7 @@ export default function GatePage() {
     return () => clearInterval(t);
   }, [approvalEventCode, approvalTimer]);
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setStep("idle");
     setMssv("");
     setMssvInput("");
@@ -433,7 +430,16 @@ export default function GatePage() {
     setApprovalEventCode(null);
     setApprovalTimer(300);
     stopCamera();
-  };
+  }, [stopCamera]);
+
+  useEffect(() => {
+    if (step === "result" && result?.success) {
+      const timer = setTimeout(() => {
+        reset();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [step, result?.success, reset]);
 
   useEffect(() => {
     api.getStats().then((stats) => {
@@ -732,6 +738,15 @@ export default function GatePage() {
                   useWebcam={useEntryWebcam}
                   onToggleWebcam={() => setUseEntryWebcam((p) => !p)}
                   overlay={entryOverlay}
+                  onSpoofDetected={(reason) => {
+                    setLastScanEvent({
+                      status: "spoof",
+                      type: "entry",
+                      message: reason || "CẢNH BÁO GIẢ MẠO: Phát hiện ảnh phẳng!",
+                      timestamp: Date.now(),
+                    });
+                    setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
+                  }}
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }} sx={{ animation: `${fadeInUp} 0.4s ease-out`, animationDelay: "0.1s", animationFillMode: "both" }}>
@@ -742,6 +757,15 @@ export default function GatePage() {
                   useWebcam={useExitWebcam}
                   onToggleWebcam={() => setUseExitWebcam((p) => !p)}
                   overlay={exitOverlay}
+                  onSpoofDetected={(reason) => {
+                    setLastScanEvent({
+                      status: "spoof",
+                      type: "exit",
+                      message: reason || "CẢNH BÁO GIẢ MẠO: Phát hiện ảnh phẳng!",
+                      timestamp: Date.now(),
+                    });
+                    setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
+                  }}
                 />
               </Grid>
             </Grid>
@@ -804,11 +828,11 @@ export default function GatePage() {
                       disabled={loading}
                       placeholder="Nhập MSSV..."
                       fullWidth
-                      size="small"
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 2,
                           bgcolor: "background.paper",
+                          minHeight: 48,
                           textAlign: "center",
                           "&:hover": {
                             "& fieldset": { borderColor: "primary.main" },
@@ -820,9 +844,10 @@ export default function GatePage() {
                           style: {
                             textAlign: "center",
                             fontFamily: "monospace",
-                            fontSize: 18,
+                            fontSize: 19,
                             fontWeight: 700,
-                            letterSpacing: 1,
+                            letterSpacing: 1.5,
+                            padding: "10px 14px",
                           },
                         },
                       }}
@@ -833,7 +858,9 @@ export default function GatePage() {
                       disabled={loading || !mssvInput.trim()}
                       fullWidth
                       sx={{
-                        mt: 1.25,
+                        mt: 1.5,
+                        minHeight: 48,
+                        fontSize: "0.95rem",
                         background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
                         borderRadius: 2,
                         fontWeight: 700,
@@ -897,6 +924,8 @@ export default function GatePage() {
                         disabled={loading}
                         fullWidth
                         sx={{
+                          minHeight: 48,
+                          fontSize: "0.95rem",
                           background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                           borderRadius: 2,
                           fontWeight: 700,
@@ -908,7 +937,7 @@ export default function GatePage() {
                       >
                         Xác thực
                       </Button>
-                      <Button onClick={reset} disabled={loading} fullWidth>Hủy</Button>
+                      <Button onClick={reset} disabled={loading} fullWidth sx={{ minHeight: 44, borderRadius: 2 }}>Hủy</Button>
                     </>
                   ) : (
                     <ChallengeStep
@@ -961,6 +990,8 @@ export default function GatePage() {
                     onClick={reset}
                     fullWidth
                     sx={{
+                      minHeight: 48,
+                      fontSize: "0.95rem",
                       background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
                       borderRadius: 2,
                       fontWeight: 700,
@@ -1008,6 +1039,8 @@ export default function GatePage() {
                     onClick={reset}
                     fullWidth
                     sx={{
+                      minHeight: 48,
+                      fontSize: "0.95rem",
                       background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
                       borderRadius: 2,
                       fontWeight: 700,

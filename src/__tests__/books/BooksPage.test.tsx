@@ -143,7 +143,7 @@ describe("BooksPage", () => {
     });
   });
 
-  it("calls searchBooks when typing in search", async () => {
+  it("calls listBooks with search query when typing in search", async () => {
     render(<BooksPage />);
 
     await waitFor(() => {
@@ -155,7 +155,9 @@ describe("BooksPage", () => {
     await userEvent.type(searchInput, "Harry");
 
     await waitFor(() => {
-      expect(mockApi.searchBooks).toHaveBeenCalledWith("Harry");
+      expect(mockApi.listBooks).toHaveBeenCalledWith(
+        expect.objectContaining({ search: "Harry" })
+      );
     });
   });
 
@@ -212,5 +214,23 @@ describe("BooksPage", () => {
     await userEvent.click(saveButton);
 
     expect(mockApi.updateBookQuantity).not.toHaveBeenCalled();
+  });
+
+  it("opens import choice modal when clicking 'Nhập Excel' button", async () => {
+    render(<BooksPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Nhập Excel")).toBeInTheDocument();
+    });
+
+    const importButton = screen.getByRole("button", { name: /nhập excel/i });
+    await userEvent.click(importButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Chọn phương thức nhập dữ liệu Excel")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Nhập nhanh theo ISBN")).toBeInTheDocument();
+    expect(screen.getByText("Nhập đầy đủ thông tin nội bộ")).toBeInTheDocument();
   });
 });

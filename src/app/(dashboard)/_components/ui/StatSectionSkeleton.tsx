@@ -44,7 +44,6 @@ export default function StatSectionSkeleton({
                 borderRadius: 2,
                 p: 2,
                 bgcolor: "background.paper",
-                borderLeft: "3px solid",
                 borderColor: "divider",
               }}
             >

@@ -49,15 +49,98 @@ function formatTime(value?: string) {
 }
 
 function statusChip(status?: string) {
-  if (status === "success" || status === "granted") return <Chip size="small" color="success" label="Thành công" sx={{ animation: `${successPop} 0.35s ease-out` }} />;
-  if (status === "denied") return <Chip size="small" color="error" label="Từ chối" />;
-  return <Chip size="small" color="warning" label={status || "Không rõ"} />;
+  if (status === "success" || status === "granted") {
+    return (
+      <Chip
+        size="small"
+        label="Thành công"
+        sx={{
+          height: 22,
+          fontSize: "0.7rem",
+          fontWeight: 700,
+          bgcolor: "rgba(16, 185, 129, 0.12)",
+          color: "#059669",
+          border: "1px solid rgba(16, 185, 129, 0.25)",
+          animation: `${successPop} 0.35s ease-out`,
+        }}
+      />
+    );
+  }
+  if (status === "denied") {
+    return (
+      <Chip
+        size="small"
+        label="Từ chối"
+        sx={{
+          height: 22,
+          fontSize: "0.7rem",
+          fontWeight: 700,
+          bgcolor: "rgba(239, 68, 68, 0.12)",
+          color: "#dc2626",
+          border: "1px solid rgba(239, 68, 68, 0.25)",
+        }}
+      />
+    );
+  }
+  return (
+    <Chip
+      size="small"
+      label={status || "Không rõ"}
+      sx={{
+        height: 22,
+        fontSize: "0.7rem",
+        fontWeight: 600,
+        bgcolor: "action.hover",
+        color: "text.secondary",
+      }}
+    />
+  );
 }
 
 function accessTypeChip(type?: string) {
-  if (type === "entry") return <Chip size="small" color="success" label="Vào" />;
-  if (type === "exit") return <Chip size="small" color="warning" label="Ra" />;
-  return <Chip size="small" label={type || "-"} />;
+  if (type === "entry") {
+    return (
+      <Chip
+        size="small"
+        label="Vào"
+        sx={{
+          height: 22,
+          fontSize: "0.7rem",
+          fontWeight: 800,
+          bgcolor: "rgba(16, 185, 129, 0.14)",
+          color: "#059669",
+          border: "1px solid rgba(16, 185, 129, 0.3)",
+        }}
+      />
+    );
+  }
+  if (type === "exit") {
+    return (
+      <Chip
+        size="small"
+        label="Ra"
+        sx={{
+          height: 22,
+          fontSize: "0.7rem",
+          fontWeight: 800,
+          bgcolor: "rgba(245, 158, 11, 0.14)",
+          color: "#d97706",
+          border: "1px solid rgba(245, 158, 11, 0.3)",
+        }}
+      />
+    );
+  }
+  return (
+    <Chip
+      size="small"
+      label={type || "-"}
+      sx={{
+        height: 22,
+        fontSize: "0.7rem",
+        bgcolor: "action.hover",
+      }}
+    />
+  );
 }
 
 export default function DashboardPage() {
@@ -201,7 +284,7 @@ export default function DashboardPage() {
       ) : null}
 
       {/* Hàng 2: Trọng tâm giám sát mật độ cao điểm & Tác nghiệp mượn trả */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "stretch" }}>
         <HourlyActivityChart logs={data.hourlyLogs} loading={data.loading} />
         <BorrowSummaryCard borrowStats={data.borrowStats} borrows={data.activeBorrows} loading={data.loading} />
       </Box>
@@ -210,7 +293,7 @@ export default function DashboardPage() {
       <ConditionAttentionSection />
 
       {/* Hàng 3: Giám sát chi tiết Camera & Nhật ký ra vào thời gian thực */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "stretch" }}>
         <CameraStatusGrid cameras={data.cameraStatuses} loading={data.loading} />
 
         <DashboardCard
@@ -227,40 +310,63 @@ export default function DashboardPage() {
             {data.recentLogs.length === 0 ? (
               <EmptyState title="Chưa có hoạt động nào" description="Các lượt ra/vào sẽ hiển thị ở đây" />
             ) : (
-              <TableContainer sx={{ maxHeight: 320, overflowY: "auto" }}>
+              <TableContainer sx={{ maxHeight: 340, overflowY: "auto" }}>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ "& .MuiTableCell-head": { fontWeight: 700, bgcolor: "action.hover", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: 0.5, color: "text.secondary" } }}>
-                      <TableCell>Thời gian</TableCell>
+                    <TableRow sx={{ "& .MuiTableCell-head": { fontWeight: 700, bgcolor: "action.hover", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: 0.5, color: "text.secondary", py: 1.25 } }}>
+                      <TableCell sx={{ pl: 2.5 }}>Thời gian</TableCell>
                       <TableCell>Độc giả</TableCell>
-                      <TableCell>Loại</TableCell>
-                      <TableCell>Trạng thái</TableCell>
+                      <TableCell align="center">Loại</TableCell>
+                      <TableCell align="center" sx={{ pr: 2.5 }}>Trạng thái</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {data.recentLogs.map((log, idx) => (
-                      <TableRow
-                        key={log.id}
-                        hover
-                        sx={{
-                          animation: `${slideInRight} 0.3s ease-out`,
-                          animationDelay: `${idx * 0.04}s`,
-                          animationFillMode: "both",
-                        }}
-                      >
-                        <TableCell sx={{ fontFamily: "monospace" }}>{formatTime(log.access_time)}</TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                            {log.patron_name || "Không rõ tên"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-                            {log.student_code || log.patron_id || "---"}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{accessTypeChip(log.access_type)}</TableCell>
-                        <TableCell>{statusChip(log.status)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {data.recentLogs.map((log, idx) => {
+                      const initial = (log.patron_name || "U").trim().charAt(0).toUpperCase();
+                      return (
+                        <TableRow
+                          key={log.id}
+                          hover
+                          sx={{
+                            animation: `${slideInRight} 0.3s ease-out`,
+                            animationDelay: `${idx * 0.04}s`,
+                            animationFillMode: "both",
+                            "& td": { py: 1.25 },
+                          }}
+                        >
+                          <TableCell sx={{ pl: 2.5, fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", color: "text.secondary", whiteSpace: "nowrap" }}>
+                            {formatTime(log.access_time)}
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                              <Avatar
+                                sx={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 1.5,
+                                  fontSize: "0.8rem",
+                                  fontWeight: 800,
+                                  bgcolor: "primary.main",
+                                  color: "#fff",
+                                }}
+                              >
+                                {initial}
+                              </Avatar>
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 800, fontSize: "0.84rem", lineHeight: 1.2 }}>
+                                  {log.patron_name || "Không rõ tên"}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.72rem" }}>
+                                  {log.student_code || log.patron_id || "---"}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </TableCell>
+                          <TableCell align="center">{accessTypeChip(log.access_type)}</TableCell>
+                          <TableCell align="center" sx={{ pr: 2.5 }}>{statusChip(log.status)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -269,7 +375,7 @@ export default function DashboardPage() {
         </DashboardCard>
       </Box>
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "stretch" }}>
         <TodayScheduleCard assignments={data.todaySchedule} loading={data.loading} />
         <RecentNotificationsCard notifications={data.notifications} loading={data.loading} />
       </Box>
