@@ -143,11 +143,11 @@ export default function FinanceSection() {
         </Box>
 
         {data.monthly && data.monthly.length > 0 && (
-          <Box sx={{ width: "100%", height: 300, pt: 2 }}>
+          <Box sx={{ pt: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.primary" }}>
               Doanh thu tiền phạt theo tháng
             </Typography>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={300} style={{ height: 300 }}>
               <BarChart data={data.monthly} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                 <XAxis dataKey="month" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />

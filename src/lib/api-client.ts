@@ -36,6 +36,7 @@ import type {
   StaffPatronActiveBorrowsResponse,
   StaffReturnRequest,
   FineLedgerItem,
+  PendingPaymentOrder,
   ConditionAttentionReport,
   ConditionDistribution,
   FinanceStats,
@@ -445,9 +446,15 @@ class ApiClient {
     return response.data;
   }
 
-  async requestEmailCorrection(data: { current_email: string; new_email: string }): Promise<{ message: string }> {
-    const response = await this.client.post<{ message: string }>("/api/auth/correct-email/request-otp", data);
+async requestEmailCorrection(data: { current_email: string; new_email: string }): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>("/api/auth/request-email-correction", data);
     return response.data;
+  }
+
+  async uploadCameraFrame(cameraId: string, formData: FormData): Promise<any> {
+    return this.client.post(`/api/camera/frame/${cameraId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   }
 
   async verifyEmailCorrection(data: { current_email: string; new_email: string; code: string } | { otp: string; new_email: string; current_email?: string }): Promise<{ message: string }> {
@@ -1150,6 +1157,18 @@ class ApiClient {
 
   async getPaymentOrderStatus(orderCode: string): Promise<PaymentOrderStatusResponse> {
     const response = await this.client.get<PaymentOrderStatusResponse>(`/api/borrow/payments/${orderCode}/status`);
+    return response.data;
+  }
+
+  async listPendingPaymentOrders(limit = 50): Promise<PendingPaymentOrder[]> {
+    const response = await this.client.get<PendingPaymentOrder[]>("/api/borrow/payments/pending", {
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  async confirmPaymentOrder(orderCode: string, note?: string): Promise<{ success: boolean; orderCode: string; alreadyCompleted: boolean; activatedPatrons: string[] }> {
+    const response = await this.client.post(`/api/borrow/payments/${encodeURIComponent(orderCode)}/confirm`, { note });
     return response.data;
   }
 

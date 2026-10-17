@@ -20,6 +20,7 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import OverdueGuideModal from "@/app/(dashboard)/_components/OverdueGuideModal";
 import type { BorrowRecord, StaffActiveBorrowerSummary, StaffPatronActiveBorrowsResponse } from "@/lib/types";
 import type { PaymentOrderResponse } from "@/lib/types/borrow";
+import type { PendingPaymentOrder } from "@/lib/types/borrow";
 
 import {
   ReturnMetricsBar,
@@ -31,6 +32,7 @@ import {
   ReturnReceipt,
   DynamicQrPaymentDialog,
   FinesLedger,
+  PendingPaymentOrders,
 } from "@/app/(dashboard)/_components/return";
 
 export default function ReturnPage() {
@@ -55,6 +57,9 @@ export default function ReturnPage() {
   const [receiptPatron, setReceiptPatron] = useState<{ full_name?: string | null; student_code?: string | null } | null>(null);
   const [unpaidFines, setUnpaidFines] = useState<any[]>([]);
   const [payingFineId, setPayingFineId] = useState<string | null>(null);
+  const [pendingOrders, setPendingOrders] = useState<PendingPaymentOrder[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [confirmingCode, setConfirmingCode] = useState<string | null>(null);
   const [qrSourceItem, setQrSourceItem] = useState<any | null>(null);
   const [qrOrder, setQrOrder] = useState<PaymentOrderResponse | null>(null);
   const [qrPatronInfo, setQrPatronInfo] = useState<{ name?: string; studentCode?: string }>({});
@@ -108,12 +113,25 @@ export default function ReturnPage() {
     }
   }, []);
 
+  const loadPendingOrders = useCallback(async () => {
+    setLoadingPending(true);
+    try {
+      const rows = await api.listPendingPaymentOrders(50);
+      setPendingOrders(rows);
+    } catch {
+      setPendingOrders([]);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
+
   useEffect(() => {
     api.getBorrowConfig()
       .then((cfg) => setFineConfig(cfg.fine ?? null))
       .catch(() => setFineConfig(null));
     void loadUnpaidFines();
-  }, [loadUnpaidFines]);
+    void loadPendingOrders();
+  }, [loadUnpaidFines, loadPendingOrders]);
 
   useEffect(() => {
     loadBorrowers();
@@ -164,6 +182,7 @@ export default function ReturnPage() {
         showNoticeRef.current("success", "Đã thu phí thành công.");
       }
       void loadUnpaidFines();
+      void loadPendingOrders();
       await loadBorrowers();
       if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
     } catch (err: any) {
@@ -174,8 +193,13 @@ export default function ReturnPage() {
   };
 
   const handleOpenQrPayment = async (item: any) => {
+    if (!item?.patron?.id) {
+      showNoticeRef.current("error", "Thiếu thông tin độc giả, không thể tạo mã VietQR");
+      return;
+    }
     try {
       const order = await api.createPaymentOrder({
+        patron_id: item.patron?.id,
         record_ids: [item.record_id],
         payment_method: "vietqr",
       });
@@ -195,8 +219,29 @@ export default function ReturnPage() {
     setQrSourceItem(null);
     showNoticeRef.current("success", `Thanh toán VietQR thành công! (Mã GD: ${orderCode})`);
     void loadUnpaidFines();
+    void loadPendingOrders();
     await loadBorrowers();
     if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
+  };
+
+  const handleConfirmOrder = async (orderCode: string) => {
+    setConfirmingCode(orderCode);
+    try {
+      const res = await api.confirmPaymentOrder(orderCode);
+      if (res.activatedPatrons && res.activatedPatrons.length > 0) {
+        showNoticeRef.current("success", `Đã xác nhận nhận tiền đơn ${orderCode}. Thẻ độc giả đã được mở khóa!`);
+      } else {
+        showNoticeRef.current("success", `Đã xác nhận nhận tiền đơn ${orderCode}, nợ đã được gạch.`);
+      }
+      void loadUnpaidFines();
+      void loadPendingOrders();
+      await loadBorrowers();
+      if (selectedStudentCode) await loadPatronDetail(selectedStudentCode);
+    } catch (err: any) {
+      showNoticeRef.current("error", getErrorMessage(err) || "Xác nhận nhận tiền thất bại");
+    } finally {
+      setConfirmingCode(null);
+    }
   };
 
   const handleReturnRecord = async (payment?: { isPaidImmediately: boolean; paymentMethod: "cash" | "qr_code" }) => {
@@ -336,6 +381,16 @@ export default function ReturnPage() {
         onRefresh={() => void loadUnpaidFines()}
         onPayCash={(recordId) => void handlePayFine(recordId, "cash")}
         onOpenQr={(item) => void handleOpenQrPayment(item)}
+      />
+
+      {/* Đơn VietQR chờ đối soát (đã CK nhưng webhook chưa về) */}
+      <PendingPaymentOrders
+        items={pendingOrders}
+        loading={loadingPending}
+        confirmingCode={confirmingCode}
+        canUpdateBorrow={canUpdateBorrow}
+        onRefresh={() => void loadPendingOrders()}
+        onConfirm={(orderCode) => void handleConfirmOrder(orderCode)}
       />
 
       <ReturnScannerDialog

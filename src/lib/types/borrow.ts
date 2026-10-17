@@ -169,6 +169,18 @@ export interface PaymentOrderStatusResponse {
   recordIds: string[];
 }
 
+export interface PendingPaymentOrder {
+  orderCode: string;
+  patronId: string;
+  amount: number;
+  status: "pending" | "expired";
+  paymentMethod: "vietqr" | "payos" | "vnpay" | "cash";
+  recordIds: string[];
+  expiresAt: string;
+  createdAt: string;
+  patron: { id: string; full_name: string | null; student_code: string | null };
+}
+
 export interface BorrowSlipItem {
   barcode: string;
   isbn?: string;

@@ -14,6 +14,7 @@ import {
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import LaptopOutlinedIcon from "@mui/icons-material/LaptopOutlined";
 import CenterFocusWeakIcon from "@mui/icons-material/CenterFocusWeak";
+import api from "@/lib/api-client";
 
 interface CameraFeedProps {
   src: string;
@@ -192,10 +193,7 @@ export default function CameraFeed({
           if (!blob || !isMounted) return;
           const formData = new FormData();
           formData.append("file", blob, "webcam_frame.jpg");
-          fetch(`/api/camera/frame/${cameraId}`, {
-            method: "POST",
-            body: formData,
-          }).catch(() => {
+          api.uploadCameraFrame(cameraId, formData).catch(() => {
             // Ignore transient network errors
           });
         }, "image/jpeg", 0.9);
