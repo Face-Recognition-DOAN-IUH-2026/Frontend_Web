@@ -41,6 +41,9 @@ import UsersIcon from "@mui/icons-material/GroupsOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEventsOutlined";
+import AttachMoneyIcon from "@mui/icons-material/AttachMoneyOutlined";
+import MenuBookIcon from "@mui/icons-material/MenuBookOutlined";
+import VerifiedUserIcon from "@mui/icons-material/VerifiedUserOutlined";
 import api from "@/lib/api-client";
 import { slideInRight, successPop } from "@/lib/animations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
@@ -60,9 +63,7 @@ import type {
 } from "@/lib/types";
 import BookConditionCard from "@/app/(dashboard)/_components/dashboard/BookConditionCard";
 import OverdueBooksCard from "@/app/(dashboard)/_components/dashboard/OverdueBooksCard";
-import FinanceSection from "@/app/(dashboard)/_components/stats/FinanceSection";
-import InventorySection from "@/app/(dashboard)/_components/stats/InventorySection";
-import RecognitionSection from "@/app/(dashboard)/_components/stats/RecognitionSection";
+import { TabNavigation } from "./_components";
 
 type RealtimeState = "connecting" | "connected" | "disconnected";
 
@@ -319,7 +320,17 @@ export default function StatsPage() {
       {!stats ? (
         <Alert severity="info">Không có dữ liệu thống kê.</Alert>
       ) : (
-        <Stack spacing={3}>
+        <Stack spacing={3} sx={{ minHeight: 900 }}>
+          <TabNavigation
+            tabs={[
+              { label: "Tổng quan", href: "/stats" },
+              { label: "Tài chính", href: "/stats/finance" },
+              { label: "Kho sách", href: "/stats/inventory" },
+              { label: "Nhận diện", href: "/stats/recognition" },
+              { label: "Real-time", href: "/stats/realtime" },
+            ]}
+          />
+
           <PageHeader
             title="Thống kê vận hành"
             subtitle={`${todayLabel} — Theo dõi ra/vào, hiện diện và mượn trả`}
@@ -667,12 +678,131 @@ export default function StatsPage() {
             )}
           </DashboardCard>
 
-          {/* Phân tích Tài chính & Kiểm kê */}
-          <FinanceSection />
-          <InventorySection />
+{/* Links đến các trang thống kê chi tiết */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 3, mt: 3 }}>
+            <Box
+              component="a"
+              href="/stats/finance"
+              sx={{
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "divider",
+                p: 3,
+                transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
+                "&:hover": { transform: "translateY(-4px)", boxShadow: 6, borderColor: "primary.main" },
+                cursor: "pointer",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <Stack spacing={1.5} direction="column" sx={{ alignItems: "center", textAlign: "center" }}>
+                <Box
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 3,
+                    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: 28,
+                    boxShadow: "0 8px 24px rgba(5, 150, 105, 0.3)",
+                  }}
+                >
+                  <AttachMoneyIcon sx={{ fontSize: 28 }} />
+                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  Thống kê Tài chính
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Tiền phạt, thu phí, phương thức thanh toán
+                </Typography>
+              </Stack>
+            </Box>
 
-          {/* Phân tích Nhận diện Khuôn mặt (AI Face Recognition) */}
-          <RecognitionSection />
+            <Box
+              component="a"
+              href="/stats/inventory"
+              sx={{
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "divider",
+                p: 3,
+                transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
+                "&:hover": { transform: "translateY(-4px)", boxShadow: 6, borderColor: "primary.main" },
+                cursor: "pointer",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <Stack spacing={1.5} direction="column" sx={{ alignItems: "center", textAlign: "center" }}>
+                <Box
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 3,
+                    background: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: 28,
+                    boxShadow: "0 8px 24px rgba(10, 37, 64, 0.3)",
+                  }}
+                >
+                  <MenuBookIcon sx={{ fontSize: 28 }} />
+                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  Thống kê Kho sách
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Tình trạng sách, phân loại, định giá
+                </Typography>
+              </Stack>
+            </Box>
+
+            <Box
+              component="a"
+              href="/stats/recognition"
+              sx={{
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "divider",
+                p: 3,
+                transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
+                "&:hover": { transform: "translateY(-4px)", boxShadow: 6, borderColor: "primary.main" },
+                cursor: "pointer",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <Stack spacing={1.5} direction="column" sx={{ alignItems: "center", textAlign: "center" }}>
+                <Box
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 3,
+                    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: 28,
+                    boxShadow: "0 8px 24px rgba(5, 150, 105, 0.3)",
+                  }}
+                >
+                  <VerifiedUserIcon sx={{ fontSize: 28 }} />
+                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  Nhận diện Khuôn mặt
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Độ chính xác AI, anti-spoofing, xu hướng
+                </Typography>
+              </Stack>
+            </Box>
+          </Box>
 
           <DashboardCard title="Hoạt động hôm nay" subtitle="Các lượt ra/vào mới nhất từ entry_gate, exit_gate và kiosk">
             {todayLogs.length === 0 ? (

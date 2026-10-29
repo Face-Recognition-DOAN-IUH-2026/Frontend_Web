@@ -149,8 +149,8 @@ export default function RecognitionSection() {
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.primary" }}>
             Xu hướng nhận diện khuôn mặt 30 ngày qua
           </Typography>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+<ResponsiveContainer width="100%" height={320} style={{ height: 320 }}>
+              <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
               <XAxis dataKey="date" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />
               <YAxis allowDecimals={false} tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />

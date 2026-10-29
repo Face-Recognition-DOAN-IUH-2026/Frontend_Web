@@ -219,7 +219,7 @@ export default function InventorySection() {
               Phân bổ theo trạng thái
             </Typography>
             <Box sx={{ width: "100%", height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={260} style={{ height: 260 }}>
                 <BarChart data={statusChartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                   <XAxis dataKey="status" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />
@@ -251,8 +251,8 @@ export default function InventorySection() {
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: "text.primary" }}>
               Phân bổ theo Khoa / Thể loại sách
             </Typography>
-            <Box sx={{ width: "100%", height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
+<Box sx={{ width: "100%", height: 260 }}>
+              <ResponsiveContainer width="100%" height={260} style={{ height: 260 }}>
                 <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                   <XAxis dataKey="name" interval={0} tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />

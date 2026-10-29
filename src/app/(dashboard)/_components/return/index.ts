@@ -8,4 +8,5 @@ export { default as ReturnConfirmDialog } from "./ReturnConfirmDialog";
 export { default as ReturnReceipt } from "./ReturnReceipt";
 export { default as DynamicQrPaymentDialog } from "./DynamicQrPaymentDialog";
 export { default as FinesLedger } from "./FinesLedger";
+export { default as PendingPaymentOrders } from "./PendingPaymentOrders";
 

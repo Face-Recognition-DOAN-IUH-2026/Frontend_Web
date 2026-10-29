@@ -96,7 +96,7 @@
     --chat--header--border-top: none;
     --chat--header--border-right: none;
     --chat--header--border-bottom: 1px solid rgba(212,175,55,0.25);
-    --chat--header--border-left: 3px solid #8B0000;
+    --chat--header--border-left: 1px solid rgba(139,0,0,0.15);
     --chat--header--padding: 16px 20px;
     --chat--header-height: 64px;
     --chat--heading--font-size: 1rem;
@@ -695,7 +695,7 @@
 .n8n-chat .chat-window-header,
 #n8n-chat-widget-root .chat-window-header {
   background: linear-gradient(135deg, #0A2540 0%, #1a3a5c 100%) !important;
-  border-left: 3px solid #8B0000 !important;
+  border-left: 1px solid rgba(139,0,0,0.15);
 }
 
 /* Custom scrollbar inside chat messages */
