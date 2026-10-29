@@ -1498,6 +1498,22 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
     return response.data;
   }
 
+  /**
+   * Geofence của khu vực được phân công — dùng để vẽ bản đồ trước khi check-in.
+   * `configured = false` nghĩa là khu vực chưa cấu hình geofence.
+   */
+  async getAssignmentGeofence(id: string): Promise<{
+    zoneId: string | null;
+    configured: boolean;
+    latitude: number | null;
+    longitude: number | null;
+    radiusMeters: number | null;
+    toleranceMeters: number;
+  }> {
+    const response = await this.client.get(`/api/schedules/assignments/${id}/geofence`);
+    return response.data;
+  }
+
   async checkOutScheduleAssignment(id: string): Promise<any> {
     const response = await this.client.post(`/api/schedules/assignments/${id}/check-out`);
     return response.data;

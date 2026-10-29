@@ -1,0 +1,20 @@
+node_modules
+.next
+.git
+.gitignore
+*.log
+npm-debug.log*
+
+# env — chỉ truyền qua --build-arg / runtime env, không nhúng vào image
+.env
+.env.*
+!.env.example
+
+# dữ liệu dev / không cần khi build
+coverage
+playwright-report
+test-results
+repomix-output.xml
+fe_web.txt
+tsconfig.tsbuildinfo
+smart-library.png

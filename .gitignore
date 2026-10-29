@@ -45,6 +45,10 @@ AGENTS.md
 test-results/
 playwright-report/
 
+# === Repomix dumps (file rác, phình context) ===
+fe_web.txt
+fe_*.txt
+
 # === TypeScript ===
 *.tsbuildinfo
 next-env.d.ts

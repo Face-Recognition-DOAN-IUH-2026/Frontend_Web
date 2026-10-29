@@ -38,7 +38,6 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [radius, setRadius] = useState("100");
-  const [wifiSsids, setWifiSsids] = useState("");
   const [saving, setSaving] = useState(false);
 
   const loadData = async () => {
@@ -73,9 +72,8 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
         latitude: latVal,
         longitude: lngVal,
         radiusMeters: radiusVal,
-        allowedWifiSsids: wifiSsids.trim() ? wifiSsids.split(",").map(s => s.trim()).filter(Boolean) : null,
       });
-      setZoneId(""); setLat(""); setLng(""); setRadius("100"); setWifiSsids("");
+      setZoneId(""); setLat(""); setLng(""); setRadius("100");
       await loadData();
       onUpdated();
     } catch (err) {
@@ -165,13 +163,6 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
                 {saving ? <CircularProgress size={14} color="inherit" /> : "Lưu"}
               </Button>
             </Stack>
-            <TextField
-              size="small"
-              placeholder="WiFi SSID (phẩy ngăn cách)"
-              value={wifiSsids}
-              onChange={(e) => setWifiSsids(e.target.value)}
-              fullWidth
-            />
           </Stack>
 
           <Box sx={{ pt: 2, borderTop: 1, borderColor: "divider" }}>
@@ -196,7 +187,6 @@ export default function GeofenceConfigPanel({ open, onClose, zones, onUpdated }:
                     <Typography variant="caption" sx={{ fontWeight: 500 }}>{cfg.zone?.zoneName || "Khu vực"}</Typography>
                     <Typography variant="caption" sx={{ display: "block" }} color="text.secondary">
                       {cfg.latitude}, {cfg.longitude} · {cfg.radiusMeters}m
-                      {cfg.allowedWifiSsids?.length ? ` · WiFi: ${cfg.allowedWifiSsids.join(", ")}` : null}
                     </Typography>
                   </Box>
                   <IconButton size="small" color="error" onClick={() => handleDelete(cfg.zoneId)}>

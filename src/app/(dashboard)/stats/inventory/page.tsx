@@ -223,7 +223,7 @@ export default function InventoryPage() {
 
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "5fr 7fr" }, gap: 3, mt: 3 }}>
               <ChartCard title="Phân bổ theo trạng thái" subtitle="Số lượng bản sao theo trạng thái mượn trả" height={300}>
-                <ResponsiveContainer width="100%" height={300} style={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={statusChartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                     <XAxis dataKey="status" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />
@@ -246,7 +246,7 @@ export default function InventoryPage() {
 
               <Box sx={{ display: "flex", flexDirection: "column" }}>
                 <ChartCard title="Phân bổ theo Khoa / Thể loại sách" subtitle="Top 8 danh mục có nhiều đầu sách nhất" height={300}>
-                  <ResponsiveContainer width="100%" height={300} style={{ height: 300 }}>
+                  <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                       <XAxis dataKey="name" interval={0} tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />

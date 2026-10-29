@@ -25,7 +25,7 @@ import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntennaOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { CameraStatus, ActivePatron } from "@/lib/types";
-import { StatCard, SectionLayout, TabNavigation, KpiGrid } from "../_components";
+import { StatCard, SectionLayout, TabNavigation, KpiGrid, type KpiCardProps } from "../_components";
 
 const tabs = [
   { label: "Tổng quan", href: "/stats" },
@@ -68,7 +68,7 @@ export default function RealtimePage() {
   const onlineCameras = cameraStatuses.filter((c) => c.connected).length;
   const totalCameras = cameraStatuses.length;
 
-  const kpiCards = [
+  const kpiCards: KpiCardProps[] = [
     {
       label: "Camera hoạt động",
       value: `${onlineCameras}/${totalCameras}`,

@@ -19,7 +19,6 @@ import { usePermission } from "@/lib/permission-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { useScheduleData, formatDateRange } from "@/hooks/useScheduleData";
 import { useScheduleFilters } from "@/hooks/useScheduleFilters";
-import { usePendingCounts } from "@/hooks/usePendingCounts";
 import { useAutoSchedule } from "@/hooks/useAutoSchedule";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { StaffScheduleAssignment } from "@/lib/types";
@@ -37,7 +36,9 @@ import AuditLogsPanel from "@/app/(dashboard)/_components/staff-schedule/AuditLo
 import GeofenceConfigPanel from "@/app/(dashboard)/_components/staff-schedule/GeofenceConfigPanel";
 import TemplateManagementPanel from "@/app/(dashboard)/_components/staff-schedule/TemplateManagementPanel";
 import DeleteWeekDialog from "@/app/(dashboard)/_components/staff-schedule/DeleteWeekDialog";
-import ManualCheckInAdmin from "@/app/(dashboard)/_components/staff-schedule/ManualCheckInAdmin";
+import MapIcon from "@mui/icons-material/PinDropOutlined";
+import MyShiftPanel from "@/app/(dashboard)/_components/staff-schedule/MyShiftPanel";
+import CheckInMapModal from "@/app/(dashboard)/_components/staff-schedule/CheckInMapModal";
 import ScheduleFilterBar from "@/app/(dashboard)/_components/staff-schedule/ScheduleFilterBar";
 import UndoSnackbar from "@/app/_components/UndoSnackbar";
 import useUndo from "@/lib/hooks/useUndo";
@@ -74,7 +75,6 @@ export default function StaffSchedulesPage() {
     shiftList, filteredAssignments, filteredShifts, weekStats,
   } = useScheduleFilters(assignments, shifts, staff, zones);
 
-  const { pendingManualCount } = usePendingCounts(isAdmin || canUpdate, loading);
 
   const auto = useAutoSchedule(loadData, setError);
 
@@ -84,9 +84,9 @@ export default function StaffSchedulesPage() {
   const [showGeofence, setShowGeofence] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showDeleteWeek, setShowDeleteWeek] = useState(false);
-  const [showManualCheckIn, setShowManualCheckIn] = useState(false);
-
-  const handleCellClick = (date: string, shiftId: string) => {
+  const [showCheckInMap, setShowCheckInMap] = useState(false);
+  const [mapAssignmentId, setMapAssignmentId] = useState<string | null>(null);
+  const [mapZoneName, setMapZoneName] = useState("");  const handleCellClick = (date: string, shiftId: string) => {
     const shift = shifts.find((s) => s.id === shiftId);
     setAssignDialog({ date, shiftId, shiftName: shift?.name || "" });
   };
@@ -180,20 +180,6 @@ export default function StaffSchedulesPage() {
           </IconButton>
         </Tooltip>
       )}
-      {(isAdmin || canUpdate) && (
-        <Tooltip title="Check-in thủ công">
-          <IconButton onClick={() => setShowManualCheckIn(true)} size="small" sx={{ color: "primary.main", border: "1px solid", borderColor: "primary.light", "&:hover": { bgcolor: "action.hover" }, position: "relative" }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-            {pendingManualCount > 0 ? (
-              <Box sx={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: "50%", bgcolor: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Typography variant="caption" sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1 }}>{pendingManualCount > 9 ? "9+" : pendingManualCount}</Typography>
-              </Box>
-            ) : null}
-          </IconButton>
-        </Tooltip>
-      )}
       {canManage && (
         <Tooltip title="Nhật ký">
           <IconButton onClick={() => setShowAuditLogs(true)} size="small" sx={{ border: "1px solid", borderColor: "divider", color: "text.secondary", "&:hover": { bgcolor: "action.hover", color: "primary.main" } }}>
@@ -231,6 +217,19 @@ export default function StaffSchedulesPage() {
         onRefresh={loadData}
         actions={headerActions}
       />
+
+      <MyShiftPanel
+        onChanged={canManage ? loadData : undefined}
+        onOpenMap={(item) => {
+          setMapAssignmentId(item.id);
+          setMapZoneName(item.shift?.name ?? item.zone?.zoneName ?? "Khu vực");
+          setShowCheckInMap(true);
+        }}
+      />
+
+      {mapAssignmentId && (
+        <CheckInMapModal open={showCheckInMap} onClose={() => setShowCheckInMap(false)} assignmentId={mapAssignmentId} zoneName={mapZoneName} onSuccess={loadData} />
+      )}
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2 }}>
         {[
@@ -295,7 +294,6 @@ export default function StaffSchedulesPage() {
         loading={auto.autoLoading} step={auto.autoStep}
         proposals={auto.autoProposals} skippedCount={auto.autoSkipped} actualRange={auto.autoActualRange}
       />
-      <ManualCheckInAdmin open={showManualCheckIn} onClose={() => setShowManualCheckIn(false)} onUpdated={loadData} />
       <DeleteWeekDialog
         open={showDeleteWeek} onClose={() => setShowDeleteWeek(false)}
         weekFrom={from} weekTo={to}
