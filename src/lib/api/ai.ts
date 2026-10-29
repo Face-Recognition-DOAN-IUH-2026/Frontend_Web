@@ -8,6 +8,7 @@ import type {
   AIBookRecommendationResponse,
   CompanionChunk,
 } from "../types";
+import { getApiAccessToken, getCookieValue } from "./utils";
 
 export function createAIMethods(client: AxiosInstance) {
   return {
@@ -74,9 +75,14 @@ export function createAIMethods(client: AxiosInstance) {
       onChunk: (chunk: CompanionChunk) => void,
       onError?: (error: Error) => void,
     ): Promise<void> {
-      const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-      const userData = storedUser ? JSON.parse(storedUser) : null;
-      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      // Use the same token resolution order as the Axios request interceptor:
+      // in-memory token → cookie → localStorage fallbacks
+      const token =
+        getApiAccessToken() ||
+        getCookieValue("access_token") ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("access_token") || localStorage.getItem("token")
+          : null);
 
       const body: Record<string, any> = {};
       if (message) body.message = message;

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '@/lib/api-client';
-import type { CompanionChunk, CompanionState, VisemeData } from '@/lib/types/ai';
+import { createCompanionChunkHandler } from '@/lib/ai-streaming';
+import type { CompanionState, VisemeData } from '@/lib/types/ai';
 
 export interface CommandCenterSummary {
   operational_score: number;
@@ -121,45 +122,36 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
         try {
           const { chatSessionId } = get();
 
-          let accumulatedText = '';
           await api.streamCompanionChat(
             message,
             undefined,
             chatSessionId,
-            (chunk: CompanionChunk) => {
-              switch (chunk.type) {
-                case 'text':
-                  accumulatedText += chunk.data.content;
-                  set((state) => ({
-                    messages: [
-                      ...state.messages.filter((m) => m.id !== 'streaming'),
-                      {
-                        id: 'streaming',
-                        role: 'assistant',
-                        content: accumulatedText,
-                        timestamp: Date.now(),
-                      },
-                    ],
-                  }));
-                  break;
-                case 'audio':
-                  set({ currentAudio: chunk.data.audioBase64, companionState: 'speaking' });
-                  break;
-                case 'viseme':
-                  set({ visemeData: chunk.data.visemes });
-                  break;
-                case 'companion_done':
-                  set((state) => ({
-                    messages: state.messages.map((m) =>
-                      m.id === 'streaming' ? { ...m, id: `assistant-${Date.now()}` } : m
-                    ),
-                    isLoadingChat: false,
-                    companionState: 'idle',
-                    chatSessionId: chunk.data.sessionId || state.chatSessionId,
-                  }));
-                  break;
-              }
-            },
+            createCompanionChunkHandler({
+              onTextChange: (content) =>
+                set((state) => ({
+                  messages: [
+                    ...state.messages.filter((m) => m.id !== 'streaming'),
+                    {
+                      id: 'streaming',
+                      role: 'assistant',
+                      content,
+                      timestamp: Date.now(),
+                    },
+                  ],
+                })),
+              onAudio: (chunk) =>
+                set({ currentAudio: chunk.data.audioBase64, companionState: 'speaking' }),
+              onViseme: (chunk) => set({ visemeData: chunk.data.visemes }),
+              onDone: (sessionId) =>
+                set((state) => ({
+                  messages: state.messages.map((m) =>
+                    m.id === 'streaming' ? { ...m, id: `assistant-${Date.now()}` } : m
+                  ),
+                  isLoadingChat: false,
+                  companionState: 'idle',
+                  chatSessionId: sessionId || state.chatSessionId,
+                })),
+            }),
             (error) => {
               console.error('Companion stream error:', error);
               set((state) => ({
@@ -211,45 +203,36 @@ export const useAIWidgetStore = create<AIWidgetStore>()(
         try {
           const { chatSessionId } = get();
 
-          let accumulatedText = '';
           await api.streamCompanionChat(
             undefined,
             audioBase64,
             chatSessionId,
-            (chunk: CompanionChunk) => {
-              switch (chunk.type) {
-                case 'text':
-                  accumulatedText += chunk.data.content;
-                  set((state) => ({
-                    messages: [
-                      ...state.messages.filter((m) => m.id !== 'streaming'),
-                      {
-                        id: 'streaming',
-                        role: 'assistant',
-                        content: accumulatedText,
-                        timestamp: Date.now(),
-                      },
-                    ],
-                  }));
-                  break;
-                case 'audio':
-                  set({ currentAudio: chunk.data.audioBase64, companionState: 'speaking' });
-                  break;
-                case 'viseme':
-                  set({ visemeData: chunk.data.visemes });
-                  break;
-                case 'companion_done':
-                  set((state) => ({
-                    messages: state.messages.map((m) =>
-                      m.id === 'streaming' ? { ...m, id: `assistant-${Date.now()}` } : m
-                    ),
-                    isLoadingChat: false,
-                    companionState: 'idle',
-                    chatSessionId: chunk.data.sessionId || state.chatSessionId,
-                  }));
-                  break;
-              }
-            },
+            createCompanionChunkHandler({
+              onTextChange: (content) =>
+                set((state) => ({
+                  messages: [
+                    ...state.messages.filter((m) => m.id !== 'streaming'),
+                    {
+                      id: 'streaming',
+                      role: 'assistant',
+                      content,
+                      timestamp: Date.now(),
+                    },
+                  ],
+                })),
+              onAudio: (chunk) =>
+                set({ currentAudio: chunk.data.audioBase64, companionState: 'speaking' }),
+              onViseme: (chunk) => set({ visemeData: chunk.data.visemes }),
+              onDone: (sessionId) =>
+                set((state) => ({
+                  messages: state.messages.map((m) =>
+                    m.id === 'streaming' ? { ...m, id: `assistant-${Date.now()}` } : m
+                  ),
+                  isLoadingChat: false,
+                  companionState: 'idle',
+                  chatSessionId: sessionId || state.chatSessionId,
+                })),
+            }),
             (error) => {
               console.error('Companion stream error:', error);
               set((state) => ({

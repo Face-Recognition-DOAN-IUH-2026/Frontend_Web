@@ -3,7 +3,7 @@
 import { Box } from "@mui/material";
 import { ReactNode } from "react";
 
-interface KpiCardProps {
+export interface KpiCardProps {
   label: string;
   value: string | number;
   icon: ReactNode;

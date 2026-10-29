@@ -3,7 +3,7 @@
 import { Box, Typography, Avatar } from "@mui/material";
 import { alpha } from "@mui/material";
 
-interface StatCardProps {
+export interface StatCardProps {
   label: string;
   value: string | number;
   icon: React.ReactNode;

@@ -19,7 +19,7 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { FinanceStats } from "@/lib/types";
-import { StatCard, ChartCard, SectionLayout, TabNavigation, KpiGrid } from "../_components";
+import { StatCard, ChartCard, SectionLayout, TabNavigation, KpiGrid, type KpiCardProps } from "../_components";
 
 const BarChart = dynamic(() => import("recharts").then((m) => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then((m) => m.Bar), { ssr: false });
@@ -66,7 +66,7 @@ export default function FinancePage() {
 
   const isEmpty = !data || (data.collected_total === 0 && data.outstanding_total === 0);
 
-  const kpiCards = data
+  const kpiCards: KpiCardProps[] = data
     ? [
         {
           label: "Tổng tiền phạt đã thu",
@@ -149,7 +149,7 @@ export default function FinancePage() {
             subtitle="12 tháng gần nhất"
             height={350}
           >
-            <ResponsiveContainer width="100%" height={350} style={{ height: 350 }}>
+            <ResponsiveContainer width="100%" height={350}>
               <BarChart data={data.monthly} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                 <XAxis dataKey="month" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />

@@ -19,7 +19,7 @@ import PersonSearchIcon from "@mui/icons-material/PersonSearchOutlined";
 import RefreshIcon from "@mui/icons-material/RefreshOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { RecognitionStatItem } from "@/lib/types";
-import { StatCard, ChartCard, SectionLayout, TabNavigation, KpiGrid } from "../_components";
+import { StatCard, ChartCard, SectionLayout, TabNavigation, KpiGrid, type KpiCardProps } from "../_components";
 
 const BarChart = dynamic(() => import("recharts").then((m) => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then((m) => m.Bar), { ssr: false });
@@ -69,7 +69,7 @@ export default function RecognitionPage() {
   const totalEvaluated = totalGranted + totalSpoof + totalNoMatch;
   const overallAccuracy = totalEvaluated > 0 ? (totalGranted / totalEvaluated) * 100 : 0;
 
-  const kpiCards = [
+  const kpiCards: KpiCardProps[] = [
     {
       label: "Độ chính xác AI",
       value: `${overallAccuracy.toFixed(1)}%`,
@@ -144,7 +144,7 @@ export default function RecognitionPage() {
 
         {data && data.length > 0 && (
           <ChartCard title="Xu hướng nhận diện khuôn mặt 30 ngày qua" subtitle="Hợp lệ, Không khớp, Giả mạo theo từng ngày" height={380}>
-            <ResponsiveContainer width="100%" height={380} style={{ height: 380 }}>
+            <ResponsiveContainer width="100%" height={380}>
               <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} vertical={false} />
                 <XAxis dataKey="date" tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />

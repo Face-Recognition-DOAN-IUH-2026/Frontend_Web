@@ -3,7 +3,7 @@
 import { Stack, Chip, useTheme } from "@mui/material";
 import { useRouter, usePathname } from "next/navigation";
 
-interface TabItem {
+export interface TabItem {
   label: string;
   href: string;
   icon?: React.ReactElement;
