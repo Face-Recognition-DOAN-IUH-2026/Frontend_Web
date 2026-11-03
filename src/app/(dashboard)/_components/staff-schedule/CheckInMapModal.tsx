@@ -23,6 +23,9 @@ export default function CheckInMapModal({ open, onClose, assignmentId, zoneName,
   const [geofence, setGeofence] = useState<{ zoneId: string | null; configured: boolean; latitude: number | null; longitude: number | null; radiusMeters: number | null; toleranceMeters: number } | null>(null);
   const [user, setUser] = useState<{ lat: number; lng: number } | null>(null);
   const [loadingGeo, setLoadingGeo] = useState(false);
+  // Tách riêng trạng thái định vị GPS: nếu dùng chung loadingGeo thì bản đồ
+  // sẽ bị thay bằng chữ "Đang tải" mỗi lần bấm nút lấy vị trí.
+  const [locating, setLocating] = useState(false);
   const [loadingCheckIn, setLoadingCheckIn] = useState(false);
   const [evaluation, setEvaluation] = useState<{ allowed: boolean; distanceMeters: number | null; radiusMeters: number | null } | null>(null);
 
@@ -36,7 +39,7 @@ export default function CheckInMapModal({ open, onClose, assignmentId, zoneName,
     try {
       setGeofence(await api.getAssignmentGeofence(assignmentId));
     } catch (err) {
-      toast.error(getErrorMessage(err, "Không tải được khu vực kiểm tra"));
+      toast.error(getErrorMessage(err));
     } finally {
       setLoadingGeo(false);
     }
@@ -55,12 +58,12 @@ export default function CheckInMapModal({ open, onClose, assignmentId, zoneName,
       );
     });
 
-  const evaluate = () => {
-    if (!geofence || geofence?.latitude == null || geofence?.longitude == null || !user) {
+  const evaluate = (position: { lat: number; lng: number } | null = user) => {
+    if (!geofence || geofence.latitude == null || geofence.longitude == null || geofence.radiusMeters == null || !position) {
       setEvaluation(null);
       return;
     }
-    const ev = evaluateGeofence(user.lat, user.lng, { latitude: geofence.latitude, longitude: geofence.longitude, radiusMeters: geofence.radiusMeters }, geofence.toleranceMeters);
+    const ev = evaluateGeofence(position.lat, position.lng, { latitude: geofence.latitude, longitude: geofence.longitude, radiusMeters: geofence.radiusMeters }, geofence.toleranceMeters);
     setEvaluation({ allowed: ev.allowed, distanceMeters: Math.round(ev.distanceMeters), radiusMeters: geofence.radiusMeters });
   };
 
@@ -73,7 +76,7 @@ export default function CheckInMapModal({ open, onClose, assignmentId, zoneName,
       await onSuccess();
       onClose();
     } catch (err) {
-      toast.error(getErrorMessage(err, "Check-in thất bại"));
+      toast.error(getErrorMessage(err));
     } finally {
       setLoadingCheckIn(false);
     }
@@ -95,7 +98,10 @@ export default function CheckInMapModal({ open, onClose, assignmentId, zoneName,
         <IconButton color="inherit" onClick={onClose} size="small"><CloseIcon /></IconButton>
       </Stack>
 
-      <Box sx={{ flex: 1, overflow: "hidden", position: "relative" }}>
+      {/* PHẢI dùng height tường minh (không phải minHeight): height:100% của Leaflet
+          chỉ resolve khi containing block có height definite. Nếu chỉ có min-height/flex,
+          browser coi là indefinite => 100% rơi về auto => bản đồ cao 0px. */}
+      <Box sx={{ overflow: "hidden", position: "relative", height: { xs: 280, sm: 340 } }}>
         {loadingGeo ? (
           <Stack direction="row" spacing={1} sx={{ position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", bgcolor: "background.paper" }}><CircularProgress size={24} /><Typography variant="body2">Đang tải khu vực...</Typography></Stack>
         ) : center ? (
@@ -112,12 +118,12 @@ export default function CheckInMapModal({ open, onClose, assignmentId, zoneName,
           <Stack spacing={1.5}>
             {user ? (
               <Chip size="small" label={canCheckInMap ? `✅ Trong khu vực thi (${evaluation?.distanceMeters}m / ${evaluation?.radiusMeters}m)` : `❌ Ngoài khu vực thi (${evaluation?.distanceMeters}m / ${evaluation?.radiusMeters}m)`} color={canCheckInMap ? "success" : "error"} sx={{ fontWeight: 700, fontSize: "0.8rem", height: 24 }} />
-            ) : (
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                <Button size="small" variant="outlined" startIcon={<MyLocationIcon sx={{ fontSize: 16 }} />} disabled={loadingGeo} onClick={async () => { setLoadingGeo(true); const loc = await requestLocation(); setLoadingGeo(false); if (loc) { setUser(loc); evaluate(); } else { toast.error("Trình duyệt không xác định được vị trí của bạn. Vui lòng bật định vị."); } }}>{loadingGeo ? "Đang định vị..." : "Xác định vị trí của tôi"}</Button>
-                <InfoIcon sx={{ fontSize: 18 }} titleAccess="Vị trí chỉ dùng để hiển thị trên bản đồ; server sẽ tính lại khi xác nhận điểm danh" />
-              </Stack>
-            )}
+            ) : null}
+            {/* Luôn hiển thị nút lấy GPS để người dùng lấy lại vị trí bất cứ lúc nào. */}
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Button size="small" variant="outlined" startIcon={<MyLocationIcon sx={{ fontSize: 16 }} />} disabled={loadingGeo || locating} onClick={async () => { setLocating(true); const loc = await requestLocation(); setLocating(false); if (loc) { setUser(loc); evaluate(loc); } else { toast.error("Trình duyệt không xác định được vị trí của bạn. Vui lòng bật định vị."); } }}>{locating ? "Đang định vị..." : user ? "Lấy lại vị trí GPS" : "Lấy vị trí GPS"}</Button>
+              <InfoIcon sx={{ fontSize: 18 }} titleAccess="Vị trí chỉ dùng để hiển thị trên bản đồ; server sẽ tính lại khi xác nhận điểm danh" />
+            </Stack>
             <Typography variant="caption" color="text.secondary">Vị trí chỉ được hiển thị trên bản đồ. Nút xác nhận bật khi bạn nằm trong bán kính cho phép.</Typography>
             <Button size="medium" variant="contained" disabled={loadingCheckIn || !user || !canCheckInMap} fullWidth onClick={checkIn} sx={{ mt: 1, borderRadius: 2, fontWeight: 700 }}>{loadingCheckIn ? "Đang ghi nhận..." : user ? (canCheckInMap ? "Xác nhận điểm danh" : "Vui lòng di chuyển vào khu vực thi") : "Vui lòng xác định vị trí"}</Button>
           </Stack>
