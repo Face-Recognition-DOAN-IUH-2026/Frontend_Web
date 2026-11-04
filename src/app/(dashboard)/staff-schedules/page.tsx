@@ -36,7 +36,6 @@ import AuditLogsPanel from "@/app/(dashboard)/_components/staff-schedule/AuditLo
 import GeofenceConfigPanel from "@/app/(dashboard)/_components/staff-schedule/GeofenceConfigPanel";
 import TemplateManagementPanel from "@/app/(dashboard)/_components/staff-schedule/TemplateManagementPanel";
 import DeleteWeekDialog from "@/app/(dashboard)/_components/staff-schedule/DeleteWeekDialog";
-import MapIcon from "@mui/icons-material/PinDropOutlined";
 import MyShiftPanel from "@/app/(dashboard)/_components/staff-schedule/MyShiftPanel";
 import CheckInMapModal from "@/app/(dashboard)/_components/staff-schedule/CheckInMapModal";
 import ScheduleFilterBar from "@/app/(dashboard)/_components/staff-schedule/ScheduleFilterBar";

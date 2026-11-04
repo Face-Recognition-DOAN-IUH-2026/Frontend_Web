@@ -236,10 +236,10 @@ export default function MyShiftPanel({ onChanged, onOpenMap }: MyShiftPanelProps
                       variant="contained"
                       startIcon={<MyLocationIcon sx={{ fontSize: 16 }} />}
                       disabled={actionId === `${item.id}:check-in`}
-                      onClick={() => handleCheckIn(item)}
+                      onClick={() => (onOpenMap ? onOpenMap(item) : handleCheckIn(item))}
                       sx={{ borderRadius: 2, fontWeight: 700 }}
                     >
-                      {actionId === `${item.id}:check-in` ? "Đang định vị..." : "Check-in bản đồ"}
+                      {actionId === `${item.id}:check-in` ? "Đang định vị..." : onOpenMap ? "Check-in bản đồ" : "Check-in"}
                     </Button>
                   ) : null}
 
@@ -267,23 +267,6 @@ export default function MyShiftPanel({ onChanged, onOpenMap }: MyShiftPanelProps
                     </Tooltip>
                   ) : null}
                 </Stack>
-                {canCheckIn && onOpenMap ? (
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-                      Hoặc xác nhận vị trí trên bản đồ
-                    </Typography>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<MapIcon sx={{ fontSize: 16 }} />}
-                      disabled={actionId === `${item.id}:check-in`}
-                      onClick={() => onOpenMap(item)}
-                      sx={{ borderRadius: 2, width: "100%", fontWeight: 700 }}
-                    >
-                      Xem bản đồ xác nhận vị trí
-                    </Button>
-                  </Box>
-                ) : null}
               </Box>
             );
           })}
