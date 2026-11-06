@@ -1,5 +1,18 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:80';
 
+function getClientAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const fromStorage = localStorage.getItem('access_token') || localStorage.getItem('token');
+    if (fromStorage) return fromStorage;
+  } catch {}
+  if (typeof document !== 'undefined') {
+    const match = document.cookie.match(/(?:^|; )(?:access_token|token)=([^;]*)/);
+    if (match) return decodeURIComponent(match[1]);
+  }
+  return null;
+}
+
 interface ReportErrorParams {
   title: string;
   description?: string;
@@ -14,9 +27,18 @@ interface ReportErrorParams {
 
 export async function reportError(params: ReportErrorParams): Promise<void> {
   try {
+    const token = getClientAuthToken();
+    if (!token) {
+      // Bỏ qua nếu chưa đăng nhập để không gây lỗi 401 trên Gateway
+      return;
+    }
+
     await fetch(`${API_BASE}/errors/report`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
       body: JSON.stringify({
         ...params,
         service: params.service || 'frontend-web',

@@ -133,7 +133,7 @@ export default function ReturnConfirmDialog({
           </Typography>
           )}
 
-          {isPaidImmediately && hasFee && !isNormalCondition && (
+          {isPaidImmediately && hasFee && (
             <FormControl fullWidth size="small">
               <InputLabel id="payment-method-label">Phương thức thanh toán</InputLabel>
               <Select

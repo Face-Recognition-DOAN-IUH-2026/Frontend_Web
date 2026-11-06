@@ -54,11 +54,31 @@ export interface MultiAngleCaptureProps {
 }
 
 const DEFAULT_ANGLES: AngleConfig[] = [
-  { angle: "frontal", instruction: "Nhìn thẳng", tip: "Mắt nhìn thẳng vào camera", requirements: { yaw: [-12, 12], pitch: [-12, 12] } },
-  { angle: "right", instruction: "Quay mặt sang PHẢI", tip: "Xoay mặt sang phải khoảng 30 độ", requirements: { yaw: [20, 50], pitch: [-15, 15] } },
-  { angle: "left", instruction: "Quay mặt sang TRÁI", tip: "Xoay mặt sang trái khoảng 30 độ", requirements: { yaw: [-50, -20], pitch: [-15, 15] } },
-  { angle: "down", instruction: "Cúi XUỐNG", tip: "Cúi nhẹ cằm xuống", requirements: { yaw: [-15, 15], pitch: [15, 45] } },
+  { angle: "frontal", instruction: "Nhìn thẳng", tip: "Mắt nhìn thẳng vào camera", requirements: { yaw: [-15, 15], pitch: [-15, 15] } },
+  { angle: "right", instruction: "Quay mặt sang PHẢI", tip: "Xoay mặt sang phải khoảng 30 độ", requirements: { yaw: [15, 45], pitch: [-20, 20] } },
+  { angle: "left", instruction: "Quay mặt sang TRÁI", tip: "Xoay mặt sang trái khoảng 30 độ", requirements: { yaw: [-45, -15], pitch: [-20, 20] } },
+  { angle: "down", instruction: "Cúi XUỐNG", tip: "Cúi nhẹ cằm xuống", requirements: { yaw: [-18, 18], pitch: [12, 45] } },
 ];
+
+// Âm thanh phản hồi ngắn (Beep tone) qua Web Audio API khi đạt góc chuẩn
+function playBeepTone(freq = 880, durationMs = 120) {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.06, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + durationMs / 1000);
+  } catch {}
+}
 
 const ANGLE_LABELS: Record<CaptureAngle, string> = {
   frontal: "Nhìn thẳng",
@@ -321,12 +341,14 @@ export default function MultiAngleCapture({
             
             if (poseHoldStartRef.current === 0) {
               poseHoldStartRef.current = performance.now();
+              playBeepTone(660, 100);
             } else {
               const elapsed = performance.now() - poseHoldStartRef.current;
               const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
               setHoldProgress(progress);
               
               if (elapsed >= HOLD_DURATION) {
+                playBeepTone(1050, 150);
                 captureCurrentPose();
                 poseHoldStartRef.current = 0;
                 setIsHold(false);
