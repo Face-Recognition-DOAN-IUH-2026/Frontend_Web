@@ -47,6 +47,11 @@ export default function LoginFormFace({
   const lastFaceFrameRef = useRef<string | null>(null);
   const hasFaceCameraWorkedRef = useRef(false);
 
+  // Ref giữ onFaceLogin mới nhất → executeFaceLogin ổn định identity, đếm ngược
+  // auto-capture không bị reset mỗi lần parent render (tránh vòng lặp update).
+  const onFaceLoginRef = useRef(onFaceLogin);
+  onFaceLoginRef.current = onFaceLogin;
+
   const stopCamera = useCallback(() => {
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
@@ -179,11 +184,11 @@ export default function LoginFormFace({
   const executeFaceLogin = useCallback(() => {
     capturePhoto((file) => {
       stopCamera();
-      onFaceLogin(file).catch(() => {
+      onFaceLoginRef.current(file).catch(() => {
         resetFaceState();
       });
     });
-  }, [capturePhoto, onFaceLogin, stopCamera]);
+  }, [capturePhoto, stopCamera]);
 
   // Auto-capture with smooth visual countdown (2.4s)
   useEffect(() => {

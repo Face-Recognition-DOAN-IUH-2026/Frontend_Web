@@ -105,6 +105,9 @@ export default function MultiAngleCapture({
   const detectFaceRef = useRef<() => void>(() => {});
   const poseHoldStartRef = useRef<number>(0);
   const modelLoadingRef = useRef(false);
+  // Ref giữ callback mới nhất → submit ổn định identity khi parent truyền arrow inline.
+  const onFilesReadyRef = useRef(onFilesReady);
+  onFilesReadyRef.current = onFilesReady;
   // Mỗi phiên chụp dùng stream mới để tránh camera đen khi chụp lại
   const [sessionKey, setSessionKey] = useState(0);
   
@@ -373,8 +376,8 @@ export default function MultiAngleCapture({
 
   const submit = useCallback(async () => {
     if (!consent || !allCaptured) return;
-    await onFilesReady(capturedFiles);
-  }, [allCaptured, capturedFiles, consent, onFilesReady]);
+    await onFilesReadyRef.current(capturedFiles);
+  }, [allCaptured, capturedFiles, consent]);
 
   const currentConfig = currentAngleIdx >= 0 ? DEFAULT_ANGLES[currentAngleIdx] : null;
 

@@ -35,6 +35,10 @@ export function useOcrProcessor(
   });
   const preprocessWorkerRef = useRef<OcrWorker | null>(null);
   const isMounted = useRef(true);
+  // Giữ callback mới nhất trong ref: nếu parent truyền arrow inline thì runOcr
+  // (dùng trong effect/decoder) sẽ đổi identity mỗi render → khởi tạo lại decoder.
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     isMounted.current = true;
@@ -116,10 +120,10 @@ export function useOcrProcessor(
       return parsed;
     } catch (err: any) {
       setState((prev) => ({ ...prev, loading: false }));
-      onError?.("Lỗi OCR: " + (err.message || ""));
+      onErrorRef.current?.("Lỗi OCR: " + (err.message || ""));
       return null;
     }
-  }, [onError]);
+  }, []);
 
   const terminate = useCallback(() => {
     preprocessWorkerRef.current?.terminate();

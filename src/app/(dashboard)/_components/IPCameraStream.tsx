@@ -25,6 +25,11 @@ export default function IPCameraStream({ cameraUrl, onBarcodeDetected, onError }
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef(false);
 
+  // Ref giữ callback mới nhất → handleScan/scanCurrentFrame ổn định, interval
+  // quét mã không bị huỷ-tạo lại mỗi lần parent render.
+  const onBarcodeDetectedRef = useRef(onBarcodeDetected);
+  onBarcodeDetectedRef.current = onBarcodeDetected;
+
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
       clearTimeout(pollTimerRef.current);
@@ -59,16 +64,27 @@ export default function IPCameraStream({ cameraUrl, onBarcodeDetected, onError }
   }, [loadNextFrame, stopPolling]);
 
   const handleScan = useCallback((code: string) => {
-    const normalized = code.trim();
+    // Strip invisible control characters (GS1 FNC1, NUL, CR/LF, etc.)
+    const normalized = code.replace(/[\u0000-\u001f\u007f]/g, "").trim();
     if (normalized.length < 4) return;
+
+    // Validate: accept LIB copy barcodes, EAN-13, ISBN-10, glued ISBN+seq, QR
+    const clean = normalized.replace(/[-\s]/g, "");
+    const isLibCopy = /^LIB[A-Z0-9]{5,}/i.test(clean);
+    const isIsbn13 = /^\d{13}$/.test(clean) && (clean.startsWith("978") || clean.startsWith("979"));
+    const isIsbn10 = /^\d{9}[\dX]$/i.test(clean);
+    const isGlued = /^\d{14,17}$/.test(clean) && (clean.startsWith("978") || clean.startsWith("979"));
+    if (!isLibCopy && !isIsbn13 && !isIsbn10 && !isGlued) return;
+
+    // Debounce: skip if same code scanned recently
     if (normalized === lastScannedRef.current) return;
     lastScannedRef.current = normalized;
-    onBarcodeDetected(normalized);
+    onBarcodeDetectedRef.current(normalized);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       lastScannedRef.current = null;
     }, DEBOUNCE_MS);
-  }, [onBarcodeDetected]);
+  }, []);
 
   const scanCurrentFrame = useCallback(async () => {
     if (!imgRef.current || !readerRef.current) return;
@@ -94,10 +110,6 @@ export default function IPCameraStream({ cameraUrl, onBarcodeDetected, onError }
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
           BarcodeFormat.CODE_128,
           BarcodeFormat.EAN_13,
-          BarcodeFormat.CODE_39,
-          BarcodeFormat.EAN_8,
-          BarcodeFormat.UPC_A,
-          BarcodeFormat.UPC_E,
           BarcodeFormat.QR_CODE,
         ]);
         hints.set(DecodeHintType.TRY_HARDER, true);

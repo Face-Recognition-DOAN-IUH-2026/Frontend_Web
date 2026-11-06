@@ -1,4 +1,4 @@
-import React from "react";
+import React, { act } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BorrowIPCameraDialog from "@/app/(dashboard)/_components/BorrowIPCameraDialog";
@@ -9,6 +9,7 @@ jest.mock("@/lib/api-client", () => {
   const mockApi = {
     lookupBorrowSlip: jest.fn(),
     confirmBorrowSlip: jest.fn(),
+    quickSearchCopies: jest.fn().mockResolvedValue([]),
   };
   return { ...original, __esModule: true, default: mockApi, api: mockApi };
 });
@@ -128,5 +129,79 @@ describe("BorrowIPCameraDialog — success callback payload", () => {
       }),
     );
     expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ count: 1 }));
+  });
+
+  it("clears the input text after submitting barcode via Enter", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    mockApi.lookupBorrowSlip.mockResolvedValue({
+      items: [
+        {
+          barcode: "LIB-9780123456789-002",
+          isbn: "9780123456789",
+          can_borrow: true,
+          reason: null,
+          book: { id: "book-2", title: "Another Book" },
+          copy: { id: "copy-2", barcode: "LIB-9780123456789-002" },
+        },
+      ],
+      errors: [],
+      can_create: true,
+    } as any);
+
+    const input = screen.getByPlaceholderText("Nhập ISBN thủ công...") as HTMLInputElement;
+    await user.type(input, "LIB-9780123456789-002{Enter}");
+
+    expect(input.value).toBe("");
+  });
+
+  it("resets the input when dialog is closed and reopened", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <BorrowIPCameraDialog
+        open={true}
+        patronId="patron-1"
+        patronName="Test Patron"
+        cameraUrl="http://cam/stream.m3u8"
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText("Nhập ISBN thủ công...") as HTMLInputElement;
+    await user.type(input, "some-partial-code");
+    expect(input.value).toBe("some-partial-code");
+
+    // Close dialog
+    await act(async () => {
+      rerender(
+        <BorrowIPCameraDialog
+          open={false}
+          patronId="patron-1"
+          patronName="Test Patron"
+          cameraUrl="http://cam/stream.m3u8"
+          onClose={jest.fn()}
+          onSuccess={jest.fn()}
+        />,
+      );
+    });
+
+    // Reopen dialog
+    await act(async () => {
+      rerender(
+        <BorrowIPCameraDialog
+          open={true}
+          patronId="patron-1"
+          patronName="Test Patron"
+          cameraUrl="http://cam/stream.m3u8"
+          onClose={jest.fn()}
+          onSuccess={jest.fn()}
+        />,
+      );
+    });
+
+    const reopenedInput = screen.getByPlaceholderText("Nhập ISBN thủ công...") as HTMLInputElement;
+    expect(reopenedInput.value).toBe("");
   });
 });

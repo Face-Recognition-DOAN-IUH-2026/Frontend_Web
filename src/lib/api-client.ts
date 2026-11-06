@@ -53,6 +53,7 @@ import type {
   LookupBorrowSlipRequest,
   LookupBorrowSlipResponse,
   ConfirmBorrowSlipRequest,
+  QuickSearchCopy,
   LibraryZone,
   ScheduleAssignmentList,
   ScheduleStaff,
@@ -1405,6 +1406,13 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
 
   async confirmBorrowSlip(data: ConfirmBorrowSlipRequest): Promise<CreateBorrowSlipResponse> {
     const response = await this.client.post<CreateBorrowSlipResponse>("/api/borrow/slip/confirm", data);
+    return response.data;
+  }
+
+  async quickSearchCopies(q: string, limit = 10): Promise<QuickSearchCopy[]> {
+    const response = await this.client.get<QuickSearchCopy[]>("/api/borrow/copies/quick-search", {
+      params: { q, limit },
+    });
     return response.data;
   }
 

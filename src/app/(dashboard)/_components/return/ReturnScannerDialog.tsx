@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -35,9 +35,10 @@ import api from "@/lib/api-client";
 import type { BorrowRecord, StaffPatronActiveBorrowsResponse } from "@/lib/types";
 import { CONDITION_LABELS, CopyCondition, getConditionColor } from "@/lib/constants/copy";
 import { estimateOverdueFine, estimateDamageFee, FineConfigDto } from "@/lib/fee-estimate";
+import { useBarcodeOCR } from "@/lib/hooks/useBarcodeOCR";
 
-const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL || "http://192.168.1.7:8080/shot.jpg";
-const BORROW_CAM_URL = `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}`;
+const RAW_CAM_URL = process.env.NEXT_PUBLIC_BORROW_CAM_URL;
+const BORROW_CAM_URL = RAW_CAM_URL ? `/api/camera/proxy?url=${encodeURIComponent(RAW_CAM_URL)}` : undefined;
 
 export interface ScannedReturnItem {
   isbn: string;
@@ -121,12 +122,27 @@ export default function ReturnScannerDialog({
   const streamRef = useRef<MediaStream | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const readerRef = useRef<any>(null);
+
+  /**
+   * `showNotice` là callback prop: nếu parent truyền bằng arrow inline thì
+   * identity đổi mỗi lần render → các callback nội bộ (handleScanned,
+   * handleOcrRecognized) đổi identity theo → effect camera bị chạy lại và
+   * khởi động lại decoder. Giữ callback mới nhất trong ref để các callback
+   * nội bộ luôn ổn định.
+   */
+  const showNoticeRef = useRef(showNotice);
+  showNoticeRef.current = showNotice;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastScannedRef = useRef<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef(false);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // OCR fallback state
+  const [ocrMode, setOcrMode] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const ocrFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Stop camera & polling
   const stopWebcam = useCallback(() => {
@@ -198,11 +214,11 @@ export default function ReturnScannerDialog({
 
   // IP Camera frame loader
   const loadNextFrame = useCallback(() => {
-    if (!imgRef.current || loadingRef.current) return;
+    if (!imgRef.current || loadingRef.current || !BORROW_CAM_URL) return;
     loadingRef.current = true;
     const sep = BORROW_CAM_URL.includes("?") ? "&" : "?";
     imgRef.current.src = `${BORROW_CAM_URL}${sep}_t=${Date.now()}`;
-  }, []);
+  }, [BORROW_CAM_URL]);
 
   // Handle scanned barcode / ISBN
   const handleScanned = useCallback((rawCode: string) => {
@@ -211,6 +227,14 @@ export default function ReturnScannerDialog({
     if (normalized.length < 4) return;
     if (normalized === lastScannedRef.current) return;
     lastScannedRef.current = normalized;
+
+    // Hủy OCR fallback khi barcode được quét thành công
+    if (ocrFallbackTimerRef.current) {
+      clearTimeout(ocrFallbackTimerRef.current);
+      ocrFallbackTimerRef.current = null;
+      setOcrMode(false);
+      setOcrStatus("idle");
+    }
 
     let toast = "";
     let toastType: "success" | "warning" = "warning";
@@ -269,14 +293,52 @@ export default function ReturnScannerDialog({
     });
 
     if (toast) {
-      showNotice(toastType, toast, toastType === "warning" ? 3.5 : 2);
+      showNoticeRef.current(toastType, toast, toastType === "warning" ? 3.5 : 2);
     }
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       lastScannedRef.current = null;
     }, 1200);
-  }, [detail, showNotice]);
+  }, [detail]);
+
+  // OCR recognized handler (stable callback)
+  const handleOcrRecognized = useCallback(
+    (code: string, type: "copy" | "isbn") => {
+      setOcrStatus("ready");
+      setOcrMode(false);
+      if (ocrFallbackTimerRef.current) {
+        clearTimeout(ocrFallbackTimerRef.current);
+        ocrFallbackTimerRef.current = null;
+      }
+      handleScanned(code);
+      showNoticeRef.current("success", `OCR nhận diện: ${code}`, 2);
+    },
+    [handleScanned],
+  );
+
+  // OCR options (định nghĩa ổn định để tránh tạo mới mỗi render)
+  const ocrOptions = useMemo(
+    () => ({
+      lang: ["vie", "eng"] as const,
+      charWhitelist: "LIB0123456789-",
+      intervalMs: 2000,
+      onRecognized: handleOcrRecognized,
+    }),
+    [handleOcrRecognized],
+  );
+
+  const {
+    state: ocrState,
+    runOcrOnVideo,
+    init: initOcr,
+    terminate: terminateOcr,
+  } = useBarcodeOCR(ocrOptions);
+
+  // Khởi tạo OCR worker khi component mount (chạy 1 lần)
+  useEffect(() => {
+    void initOcr();
+  }, [initOcr]);
 
   // Dialog open/close lifecycle
   useEffect(() => {
@@ -287,11 +349,32 @@ export default function ReturnScannerDialog({
       setScannedReturns([]);
       setManualCode("");
       lastScannedRef.current = null;
+      setOcrMode(false);
+      setOcrStatus("idle");
+      if (ocrFallbackTimerRef.current) {
+        clearTimeout(ocrFallbackTimerRef.current);
+        ocrFallbackTimerRef.current = null;
+      }
+      terminateOcr();
       return;
     }
 
     if (camMode === "webcam") {
       startWebcam();
+
+      // Auto-fallback OCR: nếu không quét được barcode nào trong 3 giây, bật OCR
+      if (!scannedReturns.length) {
+        ocrFallbackTimerRef.current = setTimeout(() => {
+          if (videoRef.current) {
+            setOcrMode(true);
+            setOcrStatus("loading");
+            void runOcrOnVideo(videoRef.current).catch(() => {
+              setOcrStatus("error");
+              setOcrMode(false);
+            });
+          }
+        }, 3000);
+      }
     } else {
       setImgReady(false);
       setCameraError("");
@@ -300,8 +383,12 @@ export default function ReturnScannerDialog({
 
     return () => {
       stopAll();
+      if (ocrFallbackTimerRef.current) {
+        clearTimeout(ocrFallbackTimerRef.current);
+        ocrFallbackTimerRef.current = null;
+      }
     };
-  }, [open, camMode, stopAll, startWebcam, loadNextFrame]);
+  }, [open, camMode, stopAll, startWebcam, loadNextFrame, runOcrOnVideo]);
 
   // Decode barcode from Webcam video
   useEffect(() => {
@@ -317,7 +404,9 @@ export default function ReturnScannerDialog({
           const supported: string[] = await (window as any).BarcodeDetector.getSupportedFormats?.() || [];
           if (supported.includes("code_128") || supported.includes("ean_13")) {
             const detector = new (window as any).BarcodeDetector({
-              formats: supported.filter((f) => ["code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "qr_code"].includes(f)),
+              formats: supported.filter((f) => [
+                "code_128", "ean_13", "qr_code",
+              ].includes(f)),
             });
             const detectNative = async () => {
               if (!active || !videoRef.current) return;
@@ -351,10 +440,6 @@ export default function ReturnScannerDialog({
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
           BarcodeFormat.CODE_128,
           BarcodeFormat.EAN_13,
-          BarcodeFormat.CODE_39,
-          BarcodeFormat.EAN_8,
-          BarcodeFormat.UPC_A,
-          BarcodeFormat.UPC_E,
           BarcodeFormat.QR_CODE,
         ]);
         hints.set(DecodeHintType.TRY_HARDER, true);
@@ -430,7 +515,7 @@ export default function ReturnScannerDialog({
     setBatchReturning(false);
     onClose();
     setScannedReturns([]);
-    showNotice(
+    showNoticeRef.current(
       fail > 0 ? "warning" : "success",
       `Trả ${ok} sách thành công${fail > 0 ? `, ${fail} thất bại` : ""}`
     );
@@ -514,7 +599,7 @@ export default function ReturnScannerDialog({
                   <Box
                     component="img"
                     ref={imgRef}
-                    src={BORROW_CAM_URL}
+                    {...(BORROW_CAM_URL ? { src: BORROW_CAM_URL } : {})}
                     onLoad={() => {
                       loadingRef.current = false;
                       setCameraError("");
@@ -581,6 +666,32 @@ export default function ReturnScannerDialog({
                 />
               ) : null}
 
+              {/* OCR Status Indicator */}
+              {ocrMode && videoRef.current && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    bgcolor: "rgba(0,0,0,0.75)",
+                    color: ocrState.status === "loading" ? "#ffeb3b" : ocrState.status === "ready" ? "#4caf50" : "#f44336",
+                    borderRadius: 1,
+                    px: 1,
+                    py: 0.5,
+                    fontFamily: "monospace",
+                    fontSize: 11,
+                    zIndex: 10,
+                    pointerEvents: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                  }}
+                >
+                  {ocrState.status === "loading" && <CircularProgress size={14} sx={{ strokeWidth: 2 }} />}
+                  <span>{ocrState.status === "loading" ? "OCR..." : ocrState.status === "ready" ? "OCR sẵn sàng" : "OCR lỗi"}</span>
+                </Box>
+              )}
+
               {/* Badge Top Left */}
               <Box sx={{ position: "absolute", top: 10, left: 10, px: 1.2, py: 0.4, bgcolor: "rgba(0,0,0,.65)", borderRadius: 1 }}>
                 <Typography variant="caption" sx={{ color: "common.white", fontSize: 11, fontWeight: 700 }}>
@@ -622,6 +733,31 @@ export default function ReturnScannerDialog({
                 >
                   Nhận sách
                 </Button>
+                {videoRef.current && (
+                  <Button
+                    size="small"
+                    variant={ocrMode ? "contained" : "outlined"}
+                    color="primary"
+                    disabled={ocrState.status === "loading"}
+                    onClick={() => {
+                      setOcrMode((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setOcrStatus("loading");
+                          void runOcrOnVideo(videoRef.current!).catch(() => {
+                            setOcrStatus("error");
+                          });
+                        } else {
+                          setOcrStatus("idle");
+                        }
+                        return next;
+                      });
+                    }}
+                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: "6px", ml: 1 }}
+                  >
+                    {ocrMode ? "Tắt OCR" : "Bật OCR"}
+                  </Button>
+                )}
               </Stack>
             </Paper>
           </Box>

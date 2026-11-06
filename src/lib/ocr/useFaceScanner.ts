@@ -41,6 +41,19 @@ export function useFaceScanner({
   const phaseRef = useRef(phase);
   const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * Callbacks được giữ trong ref: nếu parent truyền arrow inline thì identity
+   * của prop đổi mỗi lần render → attemptAutoDetect (và startDetection) đổi
+   * identity theo → effect gọi startDetection chạy lại liên tục, camera quét
+   * lại từ đầu. Ref giữ cho callback nội bộ luôn ổn định.
+   */
+  const onPhaseChangeRef = useRef(onPhaseChange);
+  const onCaptureRef = useRef(onCapture);
+  const onErrorRef = useRef(onError);
+  onPhaseChangeRef.current = onPhaseChange;
+  onCaptureRef.current = onCapture;
+  onErrorRef.current = onError;
+
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
@@ -118,7 +131,7 @@ export function useFaceScanner({
     setDetectAttempts((prev) => {
       const next = prev + 1;
       if (next >= MAX_DETECT_ATTEMPTS && isMounted.current) {
-        onError?.("Không thể phát hiện thẻ sau nhiều lần thử. Hãy chụp thủ công hoặc tải ảnh.");
+        onErrorRef.current?.("Không thể phát hiện thẻ sau nhiều lần thử. Hãy chụp thủ công hoặc tải ảnh.");
       }
       return next;
     });
@@ -131,19 +144,19 @@ export function useFaceScanner({
       return;
     }
 
-    onPhaseChange("processing");
-    const success = await onCapture(imageSrc);
+    onPhaseChangeRef.current("processing");
+    const success = await onCaptureRef.current(imageSrc);
 
     if (!isMounted.current) return;
 
     if (success) return;
 
-    onPhaseChange("detecting");
+    onPhaseChangeRef.current("detecting");
 
     if (isMounted.current && phaseRef.current === "detecting") {
       detectTimerRef.current = setTimeout(attemptAutoDetect, DETECT_INTERVAL_MS);
     }
-  }, [onCapture, onError, captureFrame, checkImageHasContent, onPhaseChange]);
+  }, [captureFrame, checkImageHasContent]);
 
   const startDetection = useCallback(() => {
     stopDetection();

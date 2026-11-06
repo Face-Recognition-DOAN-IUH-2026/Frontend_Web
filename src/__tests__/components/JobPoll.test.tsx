@@ -127,6 +127,29 @@ describe("JobPoll Component", () => {
     });
   });
 
+  it("calls onComplete only once when parent re-renders with a new inline callback", async () => {
+    const calls: any[] = [];
+    const { rerender } = render(
+      <JobPoll jobId="stable-task" onComplete={(r) => calls.push(r)} />,
+    );
+
+    triggerSSEEvent({
+      event_type: "face_result",
+      task_id: "stable-task",
+      status: "SUCCESS",
+      result: { status: "success", is_live: true },
+    });
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+
+    // Parent re-renders with a fresh arrow function each time (unstable prop).
+    rerender(<JobPoll jobId="stable-task" onComplete={(r) => calls.push(r)} />);
+    rerender(<JobPoll jobId="stable-task" onComplete={(r) => calls.push(r)} />);
+
+    await waitFor(() => expect(screen.getByText("Thành công")).toBeInTheDocument());
+    expect(calls).toHaveLength(1);
+  });
+
   it("handles NULL confidence edge case", async () => {
     render(<JobPoll jobId="null-task" />);
 

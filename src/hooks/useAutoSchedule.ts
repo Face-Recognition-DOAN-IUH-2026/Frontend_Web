@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import api, { getErrorMessage } from "@/lib/api-client";
 
 export interface AutoScheduleState {
@@ -26,6 +26,10 @@ export function useAutoSchedule(
   const [autoProposals, setAutoProposals] = useState<any[]>([]);
   const [autoSkipped, setAutoSkipped] = useState(0);
   const [autoActualRange, setAutoActualRange] = useState<{ from: string; to: string } | null>(null);
+
+  // Ref giữ loadData mới nhất → handleAutoScheduleConfirm ổn định identity.
+  const loadDataRef = useRef(loadData);
+  loadDataRef.current = loadData;
 
   const handleAutoSchedule = useCallback(async (autoFrom: string, autoTo: string) => {
     setAutoLoading(true);
@@ -57,14 +61,14 @@ export function useAutoSchedule(
     try {
       const items = selected && selected.length > 0 ? selected : autoProposals;
       await api.createScheduleAssignmentsBulk(items);
-      await loadData();
+      await loadDataRef.current();
       setShowAutoSchedule(false);
       setAutoStep("select");
     } catch (err) {
       setError(getErrorMessage(err));
     }
     setAutoLoading(false);
-  }, [autoProposals, loadData, setError]);
+  }, [autoProposals, setError]);
 
   return {
     showAutoSchedule, setShowAutoSchedule,
