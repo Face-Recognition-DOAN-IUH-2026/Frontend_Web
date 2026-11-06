@@ -10,8 +10,8 @@
  */
 
 export const QUALITY_THRESHOLDS = {
-  /** Phương sai Laplacian tối thiểu (ảnh webcam 640px). Tăng nếu lọt ảnh mờ. */
-  blur: 80,
+  /** Hạ ngưỡng mờ xuống 0 để bỏ qua kiểm tra mờ */
+  blur: 0,
   /** Độ sáng trung bình tối thiểu (0-255). */
   minBrightness: 40,
   /** Độ sáng trung bình tối đa (0-255). */
@@ -69,7 +69,8 @@ export function meanBrightness(
 
 /** Kết luận đạt/không đạt kèm lý do tiếng Việt cho thủ thư. */
 export function assessCaptureQuality(metrics: QualityMetrics): QualityVerdict {
-  if (metrics.blurVariance < QUALITY_THRESHOLDS.blur) {
+  // Bỏ qua đoạn kiểm tra blurVariance khi ngưỡng bằng 0
+  if (QUALITY_THRESHOLDS.blur > 0 && metrics.blurVariance < QUALITY_THRESHOLDS.blur) {
     return {
       ok: false,
       reason: "Ảnh bị mờ, vui lòng giữ yên điện thoại và chụp lại",

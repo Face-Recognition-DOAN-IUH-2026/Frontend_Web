@@ -26,6 +26,8 @@ import ScheduleIcon from "@mui/icons-material/CalendarTodayOutlined";
 import SearchIcon from "@mui/icons-material/SearchOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import AddCommentOutlinedIcon from "@mui/icons-material/AddCommentOutlined";
+import CopyIcon from "@mui/icons-material/ContentCopyOutlined";
+import CheckIcon from "@mui/icons-material/CheckOutlined";
 
 import Markdown from "react-markdown";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
@@ -259,6 +261,8 @@ export default function AiAssistantPage() {
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e: any) {
       const status = e?.response?.status;
+      const detail = e?.response?.data?.message || e?.response?.data?.error;
+      const isTimeout = e?.code === "ECONNABORTED" || e?.message?.includes("timeout");
       setError(
         status === 401
           ? "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại."
@@ -268,7 +272,9 @@ export default function AiAssistantPage() {
               ? "Hệ thống đang bận. Vui lòng thử lại sau vài giây."
               : status === 503
                 ? "Dịch vụ AI tạm thời không khả dụng. Vui lòng thử lại sau."
-                : "Không thể kết nối AI. Vui lòng thử lại.",
+                : isTimeout
+                  ? "AI phản hồi quá lâu (quá 60s). Vui lòng thử lại câu hỏi ngắn hơn."
+                  : (detail || "Không thể kết nối AI. Vui lòng thử lại."),
       );
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
     } finally {
@@ -838,74 +844,215 @@ function ToolResultCards({ tr }: { tr: ToolResult }) {
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === "user";
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (typeof navigator !== "undefined" && navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(msg.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <Box sx={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", animation: `${fadeInUp} 0.3s ease-out` }}>
-      <Box sx={{ display: "flex", gap: 1.5, maxWidth: "80%", flexDirection: isUser ? "row-reverse" : "row" }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: { xs: 1, sm: 1.5 },
+          maxWidth: { xs: "96%", sm: "88%", md: "82%" },
+          flexDirection: isUser ? "row-reverse" : "row",
+          alignItems: "flex-start",
+        }}
+      >
         <Avatar
           sx={{
-            width: 36,
-            height: 36,
-            background: isUser ? "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)" : "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
+            width: { xs: 32, sm: 36 },
+            height: { xs: 32, sm: 36 },
+            background: isUser
+              ? "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)"
+              : "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
             fontSize: 14,
-            mt: 0.5,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            mt: 0.25,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            flexShrink: 0,
           }}
         >
-          {isUser ? "👤" : <AssistantIcon sx={{ fontSize: 18 }} />}
+          {isUser ? "👤" : <AssistantIcon sx={{ fontSize: { xs: 16, sm: 18 } }} />}
         </Avatar>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, flex: 1, minWidth: 0 }}>
           <Paper
             elevation={0}
             sx={{
-              px: 2,
-              py: 1.5,
-              background: isUser ? "linear-gradient(135deg, #8B0000 0%, #700000 100%)" : "background.paper",
-              color: isUser ? "white" : "text.primary",
+              px: { xs: 1.75, sm: 2.25 },
+              py: { xs: 1.25, sm: 1.75 },
+              bgcolor: isUser
+                ? "primary.main"
+                : (theme) => (theme.palette.mode === "dark" ? "#1E293B" : "#FFFFFF"),
+              background: isUser
+                ? "linear-gradient(135deg, #8B0000 0%, #700000 100%)"
+                : undefined,
+              color: isUser ? "#FFFFFF" : "text.primary",
               border: isUser ? "none" : "1px solid",
-              borderColor: isUser ? "transparent" : "divider",
-              borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+              borderColor: isUser
+                ? "transparent"
+                : (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"),
+              borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+              boxShadow: isUser
+                ? "0 3px 12px rgba(139,0,0,0.22)"
+                : (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "0 2px 8px rgba(0,0,0,0.3)"
+                      : "0 2px 8px rgba(15,23,42,0.04)",
               maxWidth: "100%",
               overflow: "hidden",
-              boxShadow: isUser ? "0 2px 12px rgba(139,0,0,0.25)" : "none",
-              "& h1, & h2, & h3, & h4": { fontWeight: 800, mt: 1.5, mb: 0.75, lineHeight: 1.3 },
-              "& h1": { fontSize: "1.25rem" },
-              "& h2": { fontSize: "1.15rem" },
-              "& h3": { fontSize: "1.05rem" },
-              "& p": { mt: 0.5, mb: 0.5, lineHeight: 1.7 },
+              wordBreak: "break-word",
+              "& h1, & h2, & h3, & h4": { fontWeight: 800, mt: 1.5, mb: 0.75, lineHeight: 1.35 },
+              "& h1": { fontSize: { xs: "1.15rem", sm: "1.25rem" } },
+              "& h2": { fontSize: { xs: "1.05rem", sm: "1.15rem" } },
+              "& h3": { fontSize: { xs: "0.95rem", sm: "1.05rem" } },
+              "& p": { mt: 0.5, mb: 0.5, lineHeight: 1.7, fontSize: { xs: "0.875rem", sm: "0.925rem" } },
               "& ul, & ol": { pl: 2.5, mt: 0.5, mb: 0.5 },
-              "& li": { mb: 0.25, lineHeight: 1.6 },
-              "& strong": { fontWeight: 800 },
+              "& li": { mb: 0.35, lineHeight: 1.6, fontSize: { xs: "0.875rem", sm: "0.925rem" } },
+              "& strong": { fontWeight: 700 },
               "& em": { fontStyle: "italic" },
-              "& code": { fontFamily: "monospace", bgcolor: isUser ? "rgba(255,255,255,0.15)" : "action.hover", px: 0.5, py: 0.25, borderRadius: 0.5, fontSize: "0.875em" },
-              "& pre": { bgcolor: isUser ? "rgba(255,255,255,0.1)" : "action.hover", p: 1.5, borderRadius: 1, overflow: "auto", mt: 1, mb: 1 },
-              "& pre code": { bgcolor: "transparent", p: 0 },
-              "& table": { width: "100%", borderCollapse: "collapse", mt: 1, mb: 1, fontSize: "0.875rem" },
-              "& th": { bgcolor: isUser ? "rgba(255,255,255,0.1)" : "action.hover", fontWeight: 800, textAlign: "left", px: 1.5, py: 1, border: "1px solid", borderColor: isUser ? "rgba(255,255,255,0.2)" : "divider" },
-              "& td": { px: 1.5, py: 0.75, border: "1px solid", borderColor: isUser ? "rgba(255,255,255,0.2)" : "divider" },
-              "& blockquote": { borderLeft: "2px solid", borderColor: isUser ? "rgba(255,255,255,0.5)" : "primary.main", pl: 1.5, ml: 0, mt: 1, mb: 1, color: isUser ? "rgba(255,255,255,0.8)" : "text.secondary" },
-              "& hr": { border: "none", borderTop: `1px solid ${isUser ? "rgba(255,255,255,0.2)" : "divider"}`, my: 1.5 },
-              "& a": { color: isUser ? "white" : "primary.main", textDecoration: "none", "&:hover": { textDecoration: "underline" } },
+              "& code": {
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                bgcolor: isUser
+                  ? "rgba(255,255,255,0.18)"
+                  : (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "#F1F5F9"),
+                color: isUser ? "#FFFFFF" : "primary.main",
+                px: 0.6,
+                py: 0.2,
+                borderRadius: 1,
+                fontSize: "0.85em",
+                fontWeight: 600,
+              },
+              "& pre": {
+                bgcolor: isUser
+                  ? "rgba(255,255,255,0.1)"
+                  : (theme) => (theme.palette.mode === "dark" ? "#0F172A" : "#F8FAFC"),
+                p: 1.5,
+                borderRadius: 2,
+                border: isUser ? "none" : "1px solid",
+                borderColor: (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "divider"),
+                overflowX: "auto",
+                maxWidth: "100%",
+                my: 1.5,
+              },
+              "& pre code": {
+                bgcolor: "transparent",
+                color: "inherit",
+                p: 0,
+                fontWeight: 400,
+              },
+              "& table": {
+                display: "block",
+                width: "100%",
+                maxWidth: "100%",
+                overflowX: "auto",
+                WebkitOverflowScrolling: "touch",
+                borderCollapse: "collapse",
+                my: 1.5,
+                fontSize: { xs: "0.8rem", sm: "0.875rem" },
+                borderRadius: 1.5,
+                border: "1px solid",
+                borderColor: "divider",
+              },
+              "& th": {
+                bgcolor: isUser
+                  ? "rgba(255,255,255,0.12)"
+                  : (theme) => (theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "#F8FAFC"),
+                fontWeight: 700,
+                textAlign: "left",
+                px: 1.5,
+                py: 1,
+                borderBottom: "1px solid",
+                borderColor: "divider",
+                whiteSpace: "nowrap",
+              },
+              "& td": {
+                px: 1.5,
+                py: 0.85,
+                borderBottom: "1px solid",
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+              },
+              "& tr:last-child td": {
+                borderBottom: "none",
+              },
+              "& blockquote": {
+                borderLeft: "3px solid",
+                borderColor: isUser ? "rgba(255,255,255,0.6)" : "primary.main",
+                pl: 1.5,
+                ml: 0,
+                my: 1,
+                color: isUser ? "rgba(255,255,255,0.85)" : "text.secondary",
+                fontStyle: "italic",
+              },
+              "& hr": {
+                border: "none",
+                borderTop: `1px solid ${isUser ? "rgba(255,255,255,0.2)" : "divider"}`,
+                my: 1.5,
+              },
+              "& a": {
+                color: isUser ? "white" : "primary.main",
+                textDecoration: "none",
+                fontWeight: 600,
+                "&:hover": { textDecoration: "underline" },
+              },
             }}
           >
             {isUser ? (
-              <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{msg.content}</Typography>
+              <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.65, fontSize: { xs: "0.875rem", sm: "0.925rem" } }}>
+                {msg.content}
+              </Typography>
             ) : (
               <MessageContent content={msg.content} />
             )}
           </Paper>
 
           {msg.toolResults && msg.toolResults.length > 0 ? (
-            <Stack spacing={0.75} sx={{ maxWidth: "100%" }}>
+            <Stack spacing={1} sx={{ maxWidth: "100%", mt: 0.5 }}>
               {msg.toolResults.map((tr, i) => (
                 <ToolResultCards key={i} tr={tr} />
               ))}
             </Stack>
           ) : null}
 
-          <Typography variant="caption" color="text.secondary" sx={{ px: 0.5, fontSize: 10 }}>
-            {msg.timestamp.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-          </Typography>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              alignItems: "center",
+              justifyContent: isUser ? "flex-end" : "space-between",
+              px: 0.75,
+              mt: 0.25,
+            }}
+          >
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.7rem" }}>
+              {msg.timestamp.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+            </Typography>
+            {!isUser && (
+              <Tooltip title={copied ? "Đã sao chép!" : "Sao chép câu trả lời"} placement="top">
+                <IconButton
+                  size="small"
+                  onClick={handleCopy}
+                  sx={{
+                    p: 0.5,
+                    color: copied ? "success.main" : "text.secondary",
+                    transition: "color 0.2s, background-color 0.2s",
+                    "&:hover": {
+                      color: copied ? "success.dark" : "primary.main",
+                      bgcolor: "action.hover",
+                    },
+                  }}
+                >
+                  {copied ? <CheckIcon sx={{ fontSize: 14 }} /> : <CopyIcon sx={{ fontSize: 14 }} />}
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
         </Box>
       </Box>
     </Box>

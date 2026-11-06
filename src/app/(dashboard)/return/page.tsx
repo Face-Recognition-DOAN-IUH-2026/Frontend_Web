@@ -4,13 +4,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   AlertTitle,
+  Badge,
+  Box,
   Button,
   Grid,
+  Paper,
   Slide,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import ReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
+import AssignmentReturnIcon from "@mui/icons-material/AssignmentReturnOutlined";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLongOutlined";
+import QrCode2Icon from "@mui/icons-material/QrCode2Outlined";
+import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { slideInRight } from "@/lib/animations";
 import { getAlertSeverity, getAlertTitle } from "@/lib/alert-utils";
@@ -63,6 +72,7 @@ export default function ReturnPage() {
   const [qrSourceItem, setQrSourceItem] = useState<any | null>(null);
   const [qrOrder, setQrOrder] = useState<PaymentOrderResponse | null>(null);
   const [qrPatronInfo, setQrPatronInfo] = useState<{ name?: string; studentCode?: string }>({});
+  const [activeTab, setActiveTab] = useState<number>(0);
 
   const showNotice = useCallback((type: "success" | "warning" | "error" | "info", msg: string, _duration?: number) => {
     toast(msg, type);
@@ -168,6 +178,23 @@ export default function ReturnPage() {
     () => borrowers.find((item) => item.patron.student_code === selectedStudentCode) ?? null,
     [borrowers, selectedStudentCode],
   );
+
+  const selectedPatronDebts = useMemo(() => {
+    if (!selectedStudentCode && !detail?.patron?.id) return [];
+    return unpaidFines.filter(
+      (f) =>
+        (selectedStudentCode && f.patron?.student_code === selectedStudentCode) ||
+        (detail?.patron?.id && f.patron_id === detail.patron.id) ||
+        (detail?.patron?.id && f.patron?.id === detail.patron.id)
+    );
+  }, [unpaidFines, selectedStudentCode, detail?.patron?.id]);
+
+  const totalPatronDebt = useMemo(() => {
+    return selectedPatronDebts.reduce((sum, item) => {
+      const fine = Number(item.total_due ?? item.total ?? ((Number(item.overdue_fine ?? item.fine_amount) || 0) + (Number(item.damage_fee) || 0))) || 0;
+      return sum + fine;
+    }, 0);
+  }, [selectedPatronDebts]);
 
   const { can } = usePermission();
   const canUpdateBorrow = can("borrows", "update");
@@ -341,57 +368,158 @@ export default function ReturnPage() {
         </Slide>
       ) : null}
 
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 5, lg: 4 }}>
-          <ReturnBorrowerList
-            filteredBorrowers={filteredBorrowers}
-            selectedStudentCode={selectedStudentCode}
-            onSelectBorrower={setSelectedStudentCode}
-            search={search}
-            onSearchChange={setSearch}
-            filter={filter}
-            onFilterChange={setFilter}
-            loading={loadingBorrowers}
-            selectedBorrower={selectedBorrower}
-            onOpenScanner={() => setScannerOpen(true)}
-            onOpenOverdueGuide={() => setOverdueGuideOpen(true)}
+      {/* Thanh Tabs phân chia chức năng: Quầy trả sách | Sổ nợ | Đơn VietQR */}
+      <Paper elevation={0} variant="outlined" sx={{ borderRadius: 2, bgcolor: "background.paper" }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, val) => setActiveTab(val)}
+          sx={{
+            px: 2,
+            "& .MuiTab-root": { textTransform: "none", fontWeight: 700, fontSize: "0.95rem", minHeight: 48 },
+          }}
+        >
+          <Tab
+            icon={<AssignmentReturnIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label="Quầy trả sách"
           />
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 7, lg: 8 }}>
-          <ReturnActiveBorrows
-            selectedBorrower={selectedBorrower}
-            detail={detail}
-            loadingDetail={loadingDetail}
-            returningId={returningId}
-            onConfirmReturn={(record) => {
-              setConfirmRecord(record);
-              setCondition(record.copy?.condition || "good");
-              setNote("");
-            }}
+          <Tab
+            icon={<ReceiptLongIcon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label={
+              <Badge badgeContent={unpaidFines.length} color="error" sx={{ "& .MuiBadge-badge": { right: -12, top: 2 } }}>
+                <span>Sổ nợ phí phạt</span>
+              </Badge>
+            }
           />
+          <Tab
+            icon={<QrCode2Icon sx={{ fontSize: 20 }} />}
+            iconPosition="start"
+            label={
+              <Badge badgeContent={pendingOrders.length} color="warning" sx={{ "& .MuiBadge-badge": { right: -12, top: 2 } }}>
+                <span>Đơn VietQR chờ xử lý</span>
+              </Badge>
+            }
+          />
+        </Tabs>
+      </Paper>
+
+      {/* TAB 0: QUẦY TRẢ SÁCH (Check-in) */}
+      {activeTab === 0 && (
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 5, lg: 4 }}>
+            <ReturnBorrowerList
+              filteredBorrowers={filteredBorrowers}
+              selectedStudentCode={selectedStudentCode}
+              onSelectBorrower={setSelectedStudentCode}
+              search={search}
+              onSearchChange={setSearch}
+              filter={filter}
+              onFilterChange={setFilter}
+              loading={loadingBorrowers}
+              selectedBorrower={selectedBorrower}
+              onOpenScanner={() => setScannerOpen(true)}
+              onOpenOverdueGuide={() => setOverdueGuideOpen(true)}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 7, lg: 8 }}>
+            <Stack spacing={2}>
+              {/* Cảnh báo nợ nếu độc giả đang chọn có phí phạt chưa nộp */}
+              {selectedPatronDebts.length > 0 && (
+                <Alert
+                  severity="error"
+                  variant="filled"
+                  icon={<WarningAmberIcon />}
+                  sx={{
+                    borderRadius: 2,
+                    alignItems: "center",
+                    boxShadow: "0 4px 12px rgba(211,47,47,0.25)",
+                    "& .MuiAlert-message": { flex: 1 },
+                  }}
+                  action={
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => void handlePayFine(selectedPatronDebts[0].record_id || selectedPatronDebts[0].id, "cash")}
+                        disabled={!canUpdateBorrow || !!payingFineId}
+                        sx={{
+                          color: "error.main",
+                          fontWeight: 800,
+                          textTransform: "none",
+                          bgcolor: "white",
+                          "&:hover": { bgcolor: "#f5f5f5" },
+                        }}
+                      >
+                        Thu tiền mặt ({totalPatronDebt.toLocaleString("vi-VN")} đ)
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => void handleOpenQrPayment(selectedPatronDebts[0])}
+                        disabled={!canUpdateBorrow}
+                        sx={{
+                          color: "white",
+                          fontWeight: 700,
+                          textTransform: "none",
+                          borderColor: "rgba(255,255,255,0.7)",
+                          "&:hover": { borderColor: "white", bgcolor: "rgba(255,255,255,0.1)" },
+                        }}
+                      >
+                        Tạo VietQR
+                      </Button>
+                    </Stack>
+                  }
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Độc giả đang có {selectedPatronDebts.length} khoản nợ chưa thanh toán (Tổng: {totalPatronDebt.toLocaleString("vi-VN")} đ)
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.9, display: "block" }}>
+                    Chính sách: Độc giả phải thanh toán 100% nợ trước khi có thể mượn sách mới.
+                  </Typography>
+                </Alert>
+              )}
+
+              <ReturnActiveBorrows
+                selectedBorrower={selectedBorrower}
+                detail={detail}
+                loadingDetail={loadingDetail}
+                returningId={returningId}
+                onConfirmReturn={(record) => {
+                  setConfirmRecord(record);
+                  setCondition(record.copy?.condition || "good");
+                  setNote("");
+                }}
+              />
+            </Stack>
+          </Grid>
         </Grid>
-      </Grid>
+      )}
 
-      {/* Sổ nợ phí phạt (Khoản phí chưa thu) */}
-      <FinesLedger
-        items={unpaidFines}
-        payingFineId={payingFineId}
-        canUpdateBorrow={canUpdateBorrow}
-        onRefresh={() => void loadUnpaidFines()}
-        onPayCash={(recordId) => void handlePayFine(recordId, "cash")}
-        onOpenQr={(item) => void handleOpenQrPayment(item)}
-      />
+      {/* TAB 1: SỔ NỢ PHÍ PHẠT TOÀN THƯ VIỆN */}
+      {activeTab === 1 && (
+        <FinesLedger
+          items={unpaidFines}
+          payingFineId={payingFineId}
+          canUpdateBorrow={canUpdateBorrow}
+          onRefresh={() => void loadUnpaidFines()}
+          onPayCash={(recordId) => void handlePayFine(recordId, "cash")}
+          onOpenQr={(item) => void handleOpenQrPayment(item)}
+        />
+      )}
 
-      {/* Đơn VietQR chờ đối soát (đã CK nhưng webhook chưa về) */}
-      <PendingPaymentOrders
-        items={pendingOrders}
-        loading={loadingPending}
-        confirmingCode={confirmingCode}
-        canUpdateBorrow={canUpdateBorrow}
-        onRefresh={() => void loadPendingOrders()}
-        onConfirm={(orderCode) => void handleConfirmOrder(orderCode)}
-      />
+      {/* TAB 2: ĐƠN VIETQR CHỜ XỬ LÝ / ĐỐI SOÁT */}
+      {activeTab === 2 && (
+        <PendingPaymentOrders
+          items={pendingOrders}
+          loading={loadingPending}
+          confirmingCode={confirmingCode}
+          canUpdateBorrow={canUpdateBorrow}
+          onRefresh={() => void loadPendingOrders()}
+          onConfirm={(orderCode) => void handleConfirmOrder(orderCode)}
+        />
+      )}
 
       <ReturnScannerDialog
         open={scannerOpen}

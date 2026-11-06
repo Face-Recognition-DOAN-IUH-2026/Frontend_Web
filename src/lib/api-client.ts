@@ -1663,7 +1663,7 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
   }
 
   async askAiCommandCenter(question: string): Promise<AIChatResponse> {
-    const response = await this.client.post<AIChatResponse>("/api/ai/command-center/chat", { question });
+    const response = await this.client.post<AIChatResponse>("/api/ai/command-center/chat", { question }, { timeout: 60000 });
     return response.data;
   }
 
@@ -1681,7 +1681,7 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
             : "/api/ai/chat";
     const body: Record<string, any> = { message };
     if (sessionId) body.sessionId = sessionId;
-    const response = await this.client.post<AIChatResponse>(endpoint, body);
+    const response = await this.client.post<AIChatResponse>(endpoint, body, { timeout: 60000 });
     return response.data;
   }
 

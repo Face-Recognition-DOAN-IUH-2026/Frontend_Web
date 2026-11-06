@@ -39,6 +39,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import MailIcon from "@mui/icons-material/MailOutlined";
 import PhoneIcon from "@mui/icons-material/PhoneOutlined";
 import SchoolIcon from "@mui/icons-material/SchoolOutlined";
@@ -299,15 +300,15 @@ export default function PatronDetailPage() {
         <Button variant="outlined" startIcon={<UpdateOutlinedIcon />} onClick={handleRenew}>
           Gia hạn
         </Button>
-        {!patron.has_face ? (
-          <Button variant="contained" startIcon={<FaceRetouchingNaturalOutlinedIcon />} onClick={() => setShowEnroll(true)}>
-            Đăng ký khuôn mặt
-          </Button>
-        ) : (
-          <Button variant="outlined" startIcon={<FaceRetouchingNaturalOutlinedIcon />} onClick={() => setShowEnroll(true)}>
-            Cập nhật khuôn mặt
-          </Button>
-        )}
+        <Button
+          variant={patron.has_face ? "outlined" : "contained"}
+          color={patron.has_face ? "primary" : "success"}
+          startIcon={<PhotoCameraOutlinedIcon />}
+          onClick={() => setShowEnroll(true)}
+          sx={{ fontWeight: 700 }}
+        >
+          {patron.has_face ? "📸 Cập nhật khuôn mặt" : "📸 Đăng ký khuôn mặt"}
+        </Button>
         <Button color="error" variant="outlined" startIcon={<DeleteOutlineOutlinedIcon />} onClick={() => setShowDelete(true)}>
           Xóa
         </Button>
@@ -379,6 +380,20 @@ export default function PatronDetailPage() {
                       variant="outlined"
                     />
                   </Stack>
+
+                  <Box sx={{ mt: 1.5 }}>
+                    <Button
+                      fullWidth
+                      size="small"
+                      variant={patron.has_face ? "outlined" : "contained"}
+                      color={patron.has_face ? "primary" : "success"}
+                      startIcon={<PhotoCameraOutlinedIcon />}
+                      onClick={() => setShowEnroll(true)}
+                      sx={{ fontWeight: 700, borderRadius: 2 }}
+                    >
+                      {patron.has_face ? "📸 Chụp lại khuôn mặt" : "📸 Đăng ký khuôn mặt"}
+                    </Button>
+                  </Box>
 
                   <Divider sx={{ my: 2 }} />
 

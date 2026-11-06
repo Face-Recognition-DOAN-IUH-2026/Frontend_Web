@@ -142,7 +142,7 @@ describe('ReturnConfirmDialog payment flow', () => {
     });
   });
 
-  it('hides the payment method select when the condition is normal (good)', () => {
+  it('shows the payment method select when there is an overdue fee even if condition is normal (good)', () => {
     const onConfirm = jest.fn();
 
     render(
@@ -157,9 +157,9 @@ describe('ReturnConfirmDialog payment flow', () => {
       />
     );
 
-    // Checkbox stays (still relevant for overdue fines), method select is hidden
+    // Method select is visible so staff can choose cash or QR code for overdue fines
     expect(screen.getByLabelText('Đã thu phí ngay')).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: /phương thức thanh toán/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /phương thức thanh toán/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Xác nhận trả' }));
     expect(onConfirm).toHaveBeenCalledWith({
