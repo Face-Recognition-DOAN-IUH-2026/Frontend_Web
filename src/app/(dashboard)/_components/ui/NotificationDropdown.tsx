@@ -70,6 +70,11 @@ export default function NotificationDropdown({ anchorEl, open, onClose }: Notifi
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Ref giữ onClose mới nhất → effect gắn listener click-outside/Escape không
+  // tháo-lắp lại mỗi khi parent render với arrow inline.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   const fetchNotifications = useCallback(async () => {
     if (!open) return;
     try {
@@ -98,13 +103,13 @@ export default function NotificationDropdown({ anchorEl, open, onClose }: Notifi
         anchorEl &&
         !anchorEl.contains(event.target as Node)
       ) {
-        onClose();
+        onCloseRef.current();
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open, onClose, anchorEl]);
+  }, [open, anchorEl]);
 
   // Close on Escape
   useEffect(() => {
@@ -112,13 +117,13 @@ export default function NotificationDropdown({ anchorEl, open, onClose }: Notifi
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
       }
     };
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [open, onClose]);
+  }, [open]);
 
   const handleMarkAllRead = async () => {
     try {

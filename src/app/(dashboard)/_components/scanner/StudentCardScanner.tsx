@@ -30,12 +30,17 @@ export function StudentCardScanner({
   const [error, setError] = useState("");
   const autoDetectStarted = useRef(false);
 
-  const { state: ocrState, runOcr } = useOcrProcessor(
-    useCallback((msg: string) => {
-      onError?.(msg);
-      setError(msg);
-    }, [onError]),
-  );
+  // onError thường được truyền dạng arrow inline → giữ trong ref để callback
+  // bên dưới có identity ổn định.
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  const handleOcrError = useCallback((msg: string) => {
+    onErrorRef.current?.(msg);
+    setError(msg);
+  }, []);
+
+  const { state: ocrState, runOcr } = useOcrProcessor(handleOcrError);
 
   const handleCapture = useCallback(async (imageData: string): Promise<boolean> => {
     const parsed = await runOcr(imageData);

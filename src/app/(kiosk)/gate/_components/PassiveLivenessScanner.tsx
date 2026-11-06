@@ -89,6 +89,13 @@ export default function PassiveLivenessScanner({
   const consecutiveLiveCountRef = useRef<number>(0);
   const lastCaptureTimeRef = useRef<number>(0);
 
+  // Ref giữ callback mới nhất → vòng lặp rAF không bị khởi động lại chỉ vì
+  // parent truyền arrow inline.
+  const onLivenessVerifiedRef = useRef(onLivenessVerified);
+  const onSpoofDetectedRef = useRef(onSpoofDetected);
+  onLivenessVerifiedRef.current = onLivenessVerified;
+  onSpoofDetectedRef.current = onSpoofDetected;
+
   const captureVideoBlob = useCallback(async (): Promise<Blob | null> => {
     const video = videoRef.current;
     if (!video || video.readyState < 2) return null;
@@ -153,7 +160,7 @@ export default function PassiveLivenessScanner({
                   ? "Phát hiện ảnh chụp tĩnh (Print Attack)"
                   : "Phát hiện màn hình 2D (Planar Spoof)";
               setSpoofReason(reasonText);
-              onSpoofDetected?.(reasonText);
+              onSpoofDetectedRef.current?.(reasonText);
             } else if (verdict.verdict === "live") {
               consecutiveLiveCountRef.current += 1;
               setStatus("live");
@@ -165,7 +172,7 @@ export default function PassiveLivenessScanner({
                 lastCaptureTimeRef.current = nowMs;
                 captureVideoBlob().then((blob) => {
                   if (blob && isMounted) {
-                    onLivenessVerified?.(blob);
+                    onLivenessVerifiedRef.current?.(blob);
                   }
                 });
               }
@@ -198,7 +205,7 @@ export default function PassiveLivenessScanner({
       isMounted = false;
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [active, videoRef, status, captureVideoBlob, onLivenessVerified, onSpoofDetected]);
+  }, [active, videoRef, status, captureVideoBlob]);
 
   return (
     <Box

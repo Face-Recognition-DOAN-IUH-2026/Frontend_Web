@@ -64,4 +64,34 @@ describe('useUndo', () => {
     act(() => { jest.advanceTimersByTime(1000); });
     expect(result.current.countdown).toBe(2);
   });
+
+  it('keeps markForDelete identity stable when the callback prop changes', () => {
+    const { result, rerender } = renderHook<
+      ReturnType<typeof useUndo<string>>,
+      { cb: jest.Mock }
+    >(
+      ({ cb }) => useUndo<string>({ onConfirm: cb }),
+      { initialProps: { cb: jest.fn() } },
+    );
+    const firstMark = result.current.markForDelete;
+    rerender({ cb: jest.fn() });
+    expect(result.current.markForDelete).toBe(firstMark);
+  });
+
+  it('invokes the latest callback after the prop changes', () => {
+    const firstCb = jest.fn();
+    const secondCb = jest.fn();
+    const { result, rerender } = renderHook<
+      ReturnType<typeof useUndo<string>>,
+      { cb: jest.Mock }
+    >(
+      ({ cb }) => useUndo<string>({ onConfirm: cb }),
+      { initialProps: { cb: firstCb } },
+    );
+    rerender({ cb: secondCb });
+    act(() => result.current.markForDelete('item-1'));
+    act(() => { jest.advanceTimersByTime(5000); });
+    expect(firstCb).not.toHaveBeenCalled();
+    expect(secondCb).toHaveBeenCalledWith('item-1');
+  });
 });

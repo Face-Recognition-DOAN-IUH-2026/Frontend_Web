@@ -1,12 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
-  CircularProgress,
   Divider,
   Grid,
   IconButton,
@@ -24,11 +24,14 @@ import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScannerOutlined";
 import VideocamIcon from "@mui/icons-material/VideocamOutlined";
 
+import { api } from "@/lib/api-client";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import BookRecommendations from "@/app/(dashboard)/_components/BookRecommendations";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { CONDITION_LABELS, getConditionColor, type CopyCondition } from "@/lib/constants/copy";
+import type { QuickSearchCopy } from "@/lib/types/borrow";
 import type { BorrowCartItem } from "./types";
+import SelectBookCopyModal from "./SelectBookCopyModal";
 
 export interface BorrowStepScanBooksProps {
   manualIsbn: string;
@@ -59,6 +62,47 @@ export function BorrowStepScanBooks({
   setCurrentStep,
   patronCode,
 }: BorrowStepScanBooksProps) {
+  // Quick search state (autocomplete dropdown when barcode scan fails / manual entry)
+  const [inputVal, setInputVal] = useState("");
+  const [suggestions, setSuggestions] = useState<QuickSearchCopy[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [pendingIsbn, setPendingIsbn] = useState<string | null>(null);
+  const searchAnchorRef = useRef<HTMLInputElement | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync with parent when manualIsbn is reset
+  useEffect(() => {
+    if (!manualIsbn) {
+      setInputVal("");
+    }
+  }, [manualIsbn]);
+
+  const handleSearchChange = useCallback((val: string) => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!val.trim()) {
+      setSuggestions([]);
+      setIsSearching(false);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const data = await api.quickSearchCopies(val.trim(), 10);
+        setSuggestions(data);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
+
   return (
     <Grid container spacing={2} sx={{ flex: 1, minHeight: 0 }}>
       {/* Left Column: Scanner Tools & Manual Input */}
@@ -68,34 +112,125 @@ export function BorrowStepScanBooks({
           actions={<QrCodeScannerIcon color="primary" />}
         >
           <Stack spacing={2.5}>
-            {/* Manual Barcode / ISBN Entry */}
+            {/* Manual Barcode / ISBN Entry + Quick Search suggestions */}
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
                 Nhập mã vạch bản sao (Barcode) hoặc mã ISBN:
               </Typography>
-              <Stack direction="row" spacing={1}>
-                <TextField
-                  size="small"
-                  fullWidth
-                  label="Mã sách (Barcode / ISBN)"
-                  placeholder="Quét hoặc nhập mã bản sao (VD: LIB-9780140328721-001) hoặc ISBN..."
-                  value={manualIsbn}
-                  onChange={(e) => setManualIsbn(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAddBookToCart(manualIsbn);
+              <Box sx={{ position: "relative", width: "100%" }}>
+                <Autocomplete<QuickSearchCopy, false, false, true>
+                  freeSolo
+                  forcePopupIcon={false}
+                  options={suggestions}
+                  loading={isSearching}
+                  filterOptions={(options) => options}
+                  getOptionLabel={(option) =>
+                    typeof option === "string" ? option : option.barcode
+                  }
+                  isOptionEqualToValue={(option, value) =>
+                    typeof value === "string"
+                      ? option.barcode === value
+                      : option.id === value.id
+                  }
+                  value={null}
+                  inputValue={inputVal}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === "input") {
+                      setInputVal(value);
+                      handleSearchChange(value);
+                    } else if (reason === "reset" || reason === "clear") {
+                      setInputVal("");
+                      setSuggestions([]);
+                    }
                   }}
+                  onChange={(_, value) => {
+                    if (value && typeof value !== "string") {
+                      if (!value.is_available) return;
+                      setManualIsbn(value.barcode);
+                      handleAddBookToCart(value.barcode);
+                      setInputVal("");
+                      setSuggestions([]);
+                      setTimeout(() => searchAnchorRef.current?.focus(), 50);
+                    } else if (typeof value === "string") {
+                      const code = value.trim();
+                      if (!code) return;
+                      setManualIsbn(code);
+                      setInputVal("");
+                      setSuggestions([]);
+                      const isCopy = /^LIB/i.test(code.replace(/[-\s]/g, ""));
+                      if (isCopy) {
+                        handleAddBookToCart(code);
+                      } else if (/^\d{10,13}$/.test(code.replace(/[-\s]/g, ""))) {
+                        setPendingIsbn(code);
+                      } else {
+                        handleAddBookToCart(code);
+                      }
+                      setTimeout(() => searchAnchorRef.current?.focus(), 50);
+                    }
+                  }}
+                  getOptionDisabled={(option) =>
+                    typeof option !== "string" && !option.is_available
+                  }
                   disabled={isLookingUpBook || cartItems.length >= remaining}
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
+                  loadingText="Đang tìm..."
+                  noOptionsText="Không tìm thấy sách phù hợp"
+                  slotProps={{
+                    popper: {
+                      placement: "bottom-start",
+                      sx: { zIndex: 1200 },
+                    },
+                    paper: {
+                      sx: {
+                        mt: 0.5,
+                        borderRadius: 3,
+                        border: 1,
+                        borderColor: "divider",
+                        boxShadow: 2,
+                        maxHeight: 260,
+                      },
+                    },
+                  }}
+                  renderOption={(props, option) => {
+                    const { key, ...optionProps } = props;
+                    return (
+                      <Box
+                        component="li"
+                        key={key}
+                        {...optionProps}
+                        sx={{ display: "flex", alignItems: "center", gap: 1, px: 2, py: 1.2 }}
+                      >
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25, minWidth: 0, flex: 1 }}>
+                          <Typography component="span" variant="body2" sx={{ fontWeight: 700, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                            {option.book?.title || option.barcode}
+                          </Typography>
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                            {option.barcode} | {option.book?.author || "—"} | {option.book?.isbn || "—"}
+                          </Typography>
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                            Kệ: {option.shelf_location || "Chưa xếp"}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          size="small"
+                          label={option.is_available ? "Sẵn sàng" : "Đã mượn / Bảo trì"}
+                          color={option.is_available ? "success" : "default"}
+                          sx={{ fontSize: "0.68rem", height: 20, fontWeight: 600, minWidth: 70 }}
+                        />
+                      </Box>
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      label="Mã sách (Barcode / ISBN)"
+                      placeholder="Quét hoặc nhập mã bản sao (VD: LIB-9780140328721-001) hoặc ISBN..."
+                      inputRef={searchAnchorRef}
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
+                    />
+                  )}
                 />
-                <Button
-                  variant="contained"
-                  onClick={() => handleAddBookToCart(manualIsbn)}
-                  disabled={isLookingUpBook || !manualIsbn.trim() || cartItems.length >= remaining}
-                  sx={{ textTransform: "none", fontWeight: 700, whiteSpace: "nowrap", borderRadius: "4px" }}
-                >
-                  {isLookingUpBook ? <CircularProgress size={20} color="inherit" /> : "Thêm sách"}
-                </Button>
-              </Stack>
+              </Box>
             </Box>
 
             <Divider />
@@ -288,6 +423,16 @@ export function BorrowStepScanBooks({
           <BookRecommendations studentCode={patronCode.trim()} />
         ) : null}
       </Grid>
+
+      <SelectBookCopyModal
+        open={Boolean(pendingIsbn)}
+        isbn={pendingIsbn}
+        onSelectCopy={(barcode) => {
+          handleAddBookToCart(barcode);
+          setPendingIsbn(null);
+        }}
+        onClose={() => setPendingIsbn(null)}
+      />
     </Grid>
   );
 }

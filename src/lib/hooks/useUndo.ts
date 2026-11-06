@@ -9,6 +9,9 @@ export default function useUndo<T>({ onConfirm, undoDuration = 5 }: UseUndoOptio
   const [pendingDelete, setPendingDelete] = useState<T | null>(null);
   const [countdown, setCountdown] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ref giữ callback mới nhất → markForDelete ổn định dù parent truyền arrow inline.
+  const onConfirmRef = useRef(onConfirm);
+  onConfirmRef.current = onConfirm;
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -28,13 +31,13 @@ export default function useUndo<T>({ onConfirm, undoDuration = 5 }: UseUndoOptio
           clearTimer();
           setPendingDelete(null);
           setCountdown(0);
-          onConfirm(item);
+          onConfirmRef.current(item);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  }, [clearTimer, onConfirm, undoDuration]);
+  }, [clearTimer, undoDuration]);
 
   const undo = useCallback(() => {
     clearTimer();

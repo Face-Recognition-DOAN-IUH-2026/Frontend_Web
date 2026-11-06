@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -45,6 +45,11 @@ export default function PatronDebtSection({
   const [paying, setPaying] = useState(false);
   const [qrOrder, setQrOrder] = useState<PaymentOrderResponse | null>(null);
 
+  // Ref giữ onNotice mới nhất → loadFines ổn định identity, effect tải phí nợ
+  // không chạy lại mỗi lần parent render với arrow inline.
+  const onNoticeRef = useRef(onNotice);
+  onNoticeRef.current = onNotice;
+
   const loadFines = useCallback(async () => {
     setLoading(true);
     try {
@@ -52,11 +57,11 @@ export default function PatronDebtSection({
       setFines(data);
     } catch (err: any) {
       // Best-effort load
-      onNotice?.("error", getErrorMessage(err) || "Không thể tải danh sách phí nợ");
+      onNoticeRef.current?.("error", getErrorMessage(err) || "Không thể tải danh sách phí nợ");
     } finally {
       setLoading(false);
     }
-  }, [onNotice]);
+  }, []);
 
   useEffect(() => {
     void loadFines();
@@ -74,7 +79,7 @@ export default function PatronDebtSection({
       });
       setQrOrder(order);
     } catch (err: any) {
-      onNotice?.("error", getErrorMessage(err) || "Không thể tạo mã VietQR thanh toán");
+      onNoticeRef.current?.("error", getErrorMessage(err) || "Không thể tạo mã VietQR thanh toán");
     } finally {
       setPaying(false);
     }
@@ -82,7 +87,7 @@ export default function PatronDebtSection({
 
   const handlePaymentSuccess = async (orderCode: string) => {
     setQrOrder(null);
-    onNotice?.("success", `Thanh toán VietQR thành công! (Mã GD: ${orderCode}). Thẻ thư viện đã được mở khóa.`);
+    onNoticeRef.current?.("success", `Thanh toán VietQR thành công! (Mã GD: ${orderCode}). Thẻ thư viện đã được mở khóa.`);
     await loadFines();
   };
 

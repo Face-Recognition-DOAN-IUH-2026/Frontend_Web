@@ -122,11 +122,16 @@ export default function CameraFeed({
   const lastUploadTimeRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Ref giữ callback mới nhất → effect báo trạng thái camera không chạy lại
+  // chỉ vì parent truyền arrow inline.
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
+
   const isStream = src.includes("/video") || src.includes("/mjpeg");
 
   useEffect(() => {
-    onStatusChange?.(ok === true);
-  }, [ok, onStatusChange]);
+    onStatusChangeRef.current?.(ok === true);
+  }, [ok]);
 
   // Webcam stream lifecycle (shares 1 hardware stream across both Cổng vào and Cổng ra)
   useEffect(() => {

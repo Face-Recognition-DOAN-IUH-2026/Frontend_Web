@@ -45,6 +45,13 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
   const [cameraReady, setCameraReady] = useState(false);
   const { state: sseState, start: startSSE, reset: resetSSE } = useTaskSSE(30000);
 
+  // Ref giữ callback mới nhất → effect xử lý kết quả SSE không chạy lại chỉ vì
+  // parent truyền arrow inline (tránh vòng lặp update vô hạn).
+  const onVerifiedRef = useRef(onVerified);
+  const onCloseRef = useRef(onClose);
+  onVerifiedRef.current = onVerified;
+  onCloseRef.current = onClose;
+
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -79,8 +86,8 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
   const handleClose = useCallback(() => {
     stopCamera();
     setOpen(false);
-    onClose?.();
-  }, [stopCamera, onClose]);
+    onCloseRef.current?.();
+  }, [stopCamera]);
 
   useEffect(() => {
     return () => resetSSE();
@@ -97,7 +104,7 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
       };
       stopCamera();
       setOpen(false);
-      onVerified(patronResult);
+      onVerifiedRef.current(patronResult);
       return;
     }
     if (sseState.status === "FAILURE" || sseState.status === "ERROR" || sseState.status === "TIMEOUT") {
@@ -106,7 +113,7 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
       setVerifying(false);
       return;
     }
-  }, [sseState, studentCode, stopCamera, onVerified]);
+  }, [sseState.status, sseState.result, sseState.error, studentCode, stopCamera]);
 
   const captureAndVerify = useCallback(async () => {
     if (!videoRef.current || !studentCode.trim()) return;
@@ -145,7 +152,7 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
         };
         stopCamera();
         setOpen(false);
-        onVerified(patronResult);
+        onVerifiedRef.current(patronResult);
         return;
       } else {
         setError(result.message || "Không nhận diện được khuôn mặt");
@@ -156,7 +163,7 @@ export default function PatronFaceVerify({ onVerified, onClose }: Props) {
       setCapturing(false);
       setVerifying(false);
     }
-  }, [studentCode, stopCamera, onVerified, startSSE]);
+  }, [studentCode, stopCamera, startSSE]);
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>

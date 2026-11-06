@@ -10,6 +10,9 @@ export default function useHold({ onHoldComplete, duration = 1000 }: UseHoldOpti
   const [progress, setProgress] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const completedRef = useRef(false);
+  // Ref giữ callback mới nhất → onStart không đổi identity khi parent truyền arrow inline.
+  const onHoldCompleteRef = useRef(onHoldComplete);
+  onHoldCompleteRef.current = onHoldComplete;
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -37,10 +40,10 @@ export default function useHold({ onHoldComplete, duration = 1000 }: UseHoldOpti
         clearTimer();
         setHolding(false);
         setProgress(0);
-        onHoldComplete();
+        onHoldCompleteRef.current();
       }
     }, interval);
-  }, [clearTimer, duration, onHoldComplete]);
+  }, [clearTimer, duration]);
 
   const onEnd = useCallback(() => {
     if (!completedRef.current) {

@@ -51,4 +51,34 @@ describe('useHold', () => {
     expect(result.current.holding).toBe(false);
     expect(result.current.progress).toBe(0);
   });
+
+  it('keeps onStart identity stable when the callback prop changes', () => {
+    const { result, rerender } = renderHook<
+      ReturnType<typeof useHold>,
+      { cb: jest.Mock }
+    >(
+      ({ cb }) => useHold({ duration: 1000, onHoldComplete: cb }),
+      { initialProps: { cb: jest.fn() } },
+    );
+    const firstOnStart = result.current.onStart;
+    rerender({ cb: jest.fn() });
+    expect(result.current.onStart).toBe(firstOnStart);
+  });
+
+  it('invokes the latest callback after the prop changes', () => {
+    const firstCb = jest.fn();
+    const secondCb = jest.fn();
+    const { result, rerender } = renderHook<
+      ReturnType<typeof useHold>,
+      { cb: jest.Mock }
+    >(
+      ({ cb }) => useHold({ duration: 1000, onHoldComplete: cb }),
+      { initialProps: { cb: firstCb } },
+    );
+    rerender({ cb: secondCb });
+    act(() => result.current.onStart());
+    act(() => { jest.advanceTimersByTime(1000); });
+    expect(firstCb).not.toHaveBeenCalled();
+    expect(secondCb).toHaveBeenCalledTimes(1);
+  });
 });

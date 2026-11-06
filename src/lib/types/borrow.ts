@@ -280,3 +280,20 @@ export interface InventoryStats {
   };
   imports_last_30d: number;
 }
+
+export interface QuickSearchCopy {
+  id: string;
+  book_id: string;
+  barcode: string;
+  is_available: boolean;
+  shelf_location: string | null;
+  condition: string;
+  status: string;
+  book: {
+    id: string;
+    isbn: string;
+    title: string;
+    author: string | null;
+    shelf_location: string | null;
+  } | null;
+}

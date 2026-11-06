@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Alert,
   Box,
@@ -35,17 +35,38 @@ function resultSummary(result: any) {
 export default function JobPoll({ jobId, onComplete, onError }: JobPollProps) {
   const { state, start } = useTaskSSE();
 
+  // Callback thường được truyền dạng arrow inline → ref giữ bản mới nhất để
+  // effect báo kết quả không chạy lại chỉ vì parent render lại.
+  const onCompleteRef = useRef(onComplete);
+  const onErrorRef = useRef(onError);
+  onCompleteRef.current = onComplete;
+  onErrorRef.current = onError;
+
+  // Mỗi trạng thái kết thúc chỉ báo một lần cho mỗi job (SSE có thể phát lại).
+  const reportedRef = useRef<string | null>(null);
+
   useEffect(() => {
     start(jobId);
   }, [jobId, start]);
 
   useEffect(() => {
+    const isTerminal =
+      state.status === "SUCCESS" ||
+      state.status === "FAILURE" ||
+      state.status === "ERROR" ||
+      state.status === "TIMEOUT";
+    if (!isTerminal) return;
+
+    const signature = `${jobId}:${state.status}`;
+    if (reportedRef.current === signature) return;
+    reportedRef.current = signature;
+
     if (state.status === "SUCCESS") {
-      onComplete?.(state.result);
-    } else if (state.status === "FAILURE" || state.status === "ERROR" || state.status === "TIMEOUT") {
-      onError?.(state.error || "Tác vụ thất bại.");
+      onCompleteRef.current?.(state.result);
+    } else {
+      onErrorRef.current?.(state.error || "Tác vụ thất bại.");
     }
-  }, [state.status, state.result, state.error, onComplete, onError]);
+  }, [jobId, state.status, state.result, state.error]);
 
   if (state.status === "FAILURE" || state.status === "ERROR" || state.status === "TIMEOUT") {
     return (

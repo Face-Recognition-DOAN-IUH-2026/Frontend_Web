@@ -126,4 +126,79 @@ describe('PatronDebtSection', () => {
       });
     });
   });
+
+  it('does not refetch fines when parent re-renders with a new inline onNotice', async () => {
+    (api.getMyUnpaidFines as jest.Mock).mockResolvedValue(mockFines);
+
+    const { rerender } = render(
+      <PatronDebtSection
+        patronName="Nguyen Van A"
+        studentCode="20012345"
+        onNotice={() => undefined}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(api.getMyUnpaidFines).toHaveBeenCalledTimes(1);
+    });
+
+    // Parent renders again with a fresh arrow function each time.
+    rerender(
+      <PatronDebtSection
+        patronName="Nguyen Van A"
+        studentCode="20012345"
+        onNotice={() => undefined}
+      />,
+    );
+    rerender(
+      <PatronDebtSection
+        patronName="Nguyen Van A"
+        studentCode="20012345"
+        onNotice={() => undefined}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lập trình TypeScript')).toBeInTheDocument();
+    });
+    expect(api.getMyUnpaidFines).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports load errors through the latest onNotice callback', async () => {
+    (api.getMyUnpaidFines as jest.Mock).mockRejectedValue(new Error('Network down'));
+    const firstNotice = jest.fn();
+    const secondNotice = jest.fn();
+
+    const { container, rerender } = render(
+      <PatronDebtSection
+        patronName="Nguyen Van A"
+        studentCode="20012345"
+        onNotice={firstNotice}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(firstNotice).toHaveBeenCalledWith('error', 'Network down');
+    });
+
+    rerender(
+      <PatronDebtSection
+        patronName="Nguyen Van A"
+        studentCode="20012345"
+        onNotice={secondNotice}
+      />,
+    );
+
+    const refreshButton = Array.from(
+      container.querySelectorAll('button'),
+    ).find((btn) => btn.querySelector('svg')) as HTMLButtonElement | undefined;
+    expect(refreshButton).toBeDefined();
+
+    fireEvent.click(refreshButton!);
+
+    await waitFor(() => {
+      expect(secondNotice).toHaveBeenCalledWith('error', 'Network down');
+    });
+    expect(firstNotice).toHaveBeenCalledTimes(1);
+  });
 });

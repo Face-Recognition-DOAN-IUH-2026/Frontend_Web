@@ -45,6 +45,11 @@ export default function DynamicQrPaymentDialog({
   const [checking, setChecking] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Ref giữ onSuccess mới nhất → checkStatus ổn định identity, interval polling
+  // không bị huỷ-tạo lại mỗi lần parent render.
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
+
   // Calculate initial time left from order.expiresAt
   useEffect(() => {
     if (order?.expiresAt) {
@@ -86,7 +91,7 @@ export default function DynamicQrPaymentDialog({
         setStatus("completed");
         if (pollingRef.current) clearInterval(pollingRef.current);
         setTimeout(() => {
-          onSuccess(order.orderCode);
+          onSuccessRef.current(order.orderCode);
         }, 1500);
       } else if (res.status === "expired") {
         setStatus("expired");
@@ -97,7 +102,7 @@ export default function DynamicQrPaymentDialog({
     } finally {
       setChecking(false);
     }
-  }, [order?.orderCode, status, onSuccess]);
+  }, [order?.orderCode, status]);
 
   useEffect(() => {
     if (!open || !order?.orderCode || status !== "pending") {
