@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   Avatar,
@@ -8,13 +9,23 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
   IconButton,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
   Paper,
   Stack,
   TextField,
   Tooltip,
   Typography,
   alpha,
+  useTheme,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/SendOutlined";
 import AssistantIcon from "@mui/icons-material/SupportAgentOutlined";
@@ -28,6 +39,9 @@ import SmartToyIcon from "@mui/icons-material/SmartToyOutlined";
 import AddCommentOutlinedIcon from "@mui/icons-material/AddCommentOutlined";
 import CopyIcon from "@mui/icons-material/ContentCopyOutlined";
 import CheckIcon from "@mui/icons-material/CheckOutlined";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
+import AutoStoriesOutlinedIcon from "@mui/icons-material/AutoStoriesOutlined";
+import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
 
 import Markdown from "react-markdown";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
@@ -40,6 +54,7 @@ import { useAuth } from "@/lib/auth-context";
 import BookCard, { parseBookCard } from "@/app/(dashboard)/_components/BookCard";
 import LibraryHoursCard, { type LibraryScheduleData } from "@/app/(dashboard)/_components/AIWidget/cards/LibraryHoursCard";
 import { fadeInUp } from "@/lib/animations";
+import type { AIToolSummary } from "@/lib/types";
 
 interface Message {
   id: string;
@@ -163,15 +178,52 @@ function MessageContent({ content }: { content: string }) {
 }
 
 export default function AiAssistantPage() {
+  const theme = useTheme();
+  const router = useRouter();
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState<string>("");
   const [mounted, setMounted] = useState(false);
+  const [tools, setTools] = useState<AIToolSummary[]>([]);
+  const [toolsModalOpen, setToolsModalOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    api.getAiTools().then(setTools).catch(() => {});
+  }, [user?.role]);
+
+  const roleSuggestions = useMemo(() => {
+    const role = user?.role || "patron";
+    if (role === "admin") {
+      return [
+        { label: "Tất cả ca trực hôm nay", icon: <ScheduleIcon sx={{ fontSize: 16 }} />, color: "#8B0000", prompt: "Xem tất cả lịch trực của nhân viên hôm nay" },
+        { label: "Sách quá hạn", icon: <WarningIcon sx={{ fontSize: 16 }} />, color: "#DC2626", prompt: "Danh sách sách đang mượn quá hạn" },
+        { label: "Độc giả trong thư viện", icon: <GroupsIcon sx={{ fontSize: 16 }} />, color: "#0F3C5C", prompt: "Hiện có bao nhiêu bạn đọc đang ở trong thư viện?" },
+        { label: "Tìm sách AI", icon: <SearchIcon sx={{ fontSize: 16 }} />, color: "#0A2540", prompt: "Tìm sách về Trí tuệ nhân tạo và Machine Learning" },
+        { label: "Quy định mượn trả", icon: <RuleIcon sx={{ fontSize: 16 }} />, color: "#D97706", prompt: "Cho tôi biết quy định mượn trả sách và thời hạn tối đa" },
+      ];
+    }
+    if (role === "staff") {
+      return [
+        { label: "Lịch trực của tôi hôm nay", icon: <ScheduleIcon sx={{ fontSize: 16 }} />, color: "#8B0000", prompt: "Xem lịch trực của tôi hôm nay" },
+        { label: "Sách quá hạn", icon: <WarningIcon sx={{ fontSize: 16 }} />, color: "#DC2626", prompt: "Danh sách sách đang mượn quá hạn" },
+        { label: "Giờ mở cửa", icon: <AccessTimeIcon sx={{ fontSize: 16 }} />, color: "#059669", prompt: "Giờ mở cửa phục vụ của thư viện hôm nay" },
+        { label: "Độc giả trong thư viện", icon: <GroupsIcon sx={{ fontSize: 16 }} />, color: "#0F3C5C", prompt: "Hiện có bao nhiêu bạn đọc đang ở trong thư viện?" },
+        { label: "Tìm giáo trình CNTT", icon: <SearchIcon sx={{ fontSize: 16 }} />, color: "#0A2540", prompt: "Tìm sách giáo trình Công nghệ thông tin" },
+      ];
+    }
+    return [
+      { label: "Tìm sách Lập trình & AI", icon: <SearchIcon sx={{ fontSize: 16 }} />, color: "#0A2540", prompt: "Tìm cho tôi sách về Lập trình và Trí tuệ nhân tạo" },
+      { label: "Giờ mở cửa thư viện", icon: <AccessTimeIcon sx={{ fontSize: 16 }} />, color: "#059669", prompt: "Thư viện mở cửa vào những khung giờ nào?" },
+      { label: "Quy định mượn sách", icon: <RuleIcon sx={{ fontSize: 16 }} />, color: "#D97706", prompt: "Sinh viên được mượn tối đa bao nhiêu cuốn sách và trong bao lâu?" },
+      { label: "Vị trí phòng đọc", icon: <GroupsIcon sx={{ fontSize: 16 }} />, color: "#0F3C5C", prompt: "Phòng đọc và các khu vực tự học nằm ở tầng mấy?" },
+    ];
+  }, [user?.role]);
 
   // Dynamic storage key isolated per user
   const currentStorageKey = useMemo(() => {
@@ -317,32 +369,6 @@ export default function AiAssistantPage() {
     .map((s) => `${s.label}: ${typeof s.value === "number" ? s.value.toLocaleString("vi-VN") : s.value}`)
     .join(" • ");
 
-  // Trang nay chi danh cho staff/admin. Doc gia (patron) dung chatbot n8n
-  // (bong bong chat goc man hinh), khong dung kenh chat noi bo nay.
-  if (user?.role === "patron") {
-    return (
-      <Stack spacing={3}>
-        <PageHeader title="AI Trợ lý" icon={SmartToyIcon} />
-        <DashboardCard>
-          <EmptyState
-            icon={
-              <Avatar sx={{ width: 72, height: 72, bgcolor: "rgba(139,0,0,0.12)", border: "2px solid rgba(139,0,0,0.25)" }}>
-                <SmartToyIcon sx={{ fontSize: 36, color: "primary.main" }} />
-              </Avatar>
-            }
-            title="Kênh chat này dành cho thủ thư"
-            description="Độc giả vui lòng dùng chatbot Trợ lý AI (biểu tượng chat ở góc màn hình) để tra cứu sách và hỏi đáp."
-            action={
-              <Button variant="contained" href="/dashboard" sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
-                Quay lại Bảng điều khiển
-              </Button>
-            }
-          />
-        </DashboardCard>
-      </Stack>
-    );
-  }
-
   return (
     <Stack spacing={3} sx={{ height: "100%", overflow: "hidden" }}>
       <PageHeader
@@ -352,6 +378,42 @@ export default function AiAssistantPage() {
         onRefresh={clearChat}
         actions={
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<BuildOutlinedIcon />}
+              onClick={() => setToolsModalOpen(true)}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                borderRadius: 1.5,
+              }}
+            >
+              Công cụ AI ({tools.length})
+            </Button>
+
+            {isAdmin && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AutoStoriesOutlinedIcon />}
+                onClick={() => router.push("/knowledge-base")}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderRadius: 1.5,
+                  borderColor: "#0A2540",
+                  color: "#0A2540",
+                  bgcolor: alpha("#0A2540", 0.04),
+                  "&:hover": {
+                    bgcolor: alpha("#0A2540", 0.1),
+                  },
+                }}
+              >
+                Kho tri thức RAG
+              </Button>
+            )}
+
             <Button
               variant="outlined"
               size="small"
@@ -396,16 +458,16 @@ export default function AiAssistantPage() {
                   </Avatar>
                 }
                 title="Trợ lý AI Thư viện IUH"
-                description="Hỏi tôi về sách, lịch trực, quy định thư viện..."
+                description="Hỏi tôi về sách, lịch trực, quy định thư viện, vị trí phòng đọc..."
                 action={
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, justifyContent: "center", maxWidth: 600, mx: "auto" }}>
-                    {SUGGESTIONS.map((s) => (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, justifyContent: "center", maxWidth: 640, mx: "auto" }}>
+                    {roleSuggestions.map((s) => (
                       <Button
                         key={s.label}
                         startIcon={s.icon}
                         variant="outlined"
                         size="small"
-                        onClick={() => sendMessage(s.label)}
+                        onClick={() => sendMessage(s.prompt || s.label)}
                         sx={{
                           borderRadius: 99,
                           borderColor: alpha(s.color, 0.4),
@@ -441,6 +503,44 @@ export default function AiAssistantPage() {
               {error}
             </Alert>
           ) : null}
+
+          {/* Quick Suggestions Chips Bar */}
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1,
+              overflowX: "auto",
+              pb: 1.25,
+              mb: 1,
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
+            {roleSuggestions.map((s) => (
+              <Chip
+                key={s.label}
+                icon={s.icon}
+                label={s.label}
+                size="small"
+                onClick={() => sendMessage(s.prompt || s.label)}
+                clickable
+                sx={{
+                  borderRadius: 99,
+                  borderColor: alpha(s.color, 0.35),
+                  color: s.color,
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  bgcolor: alpha(s.color, 0.04),
+                  flexShrink: 0,
+                  "&:hover": {
+                    borderColor: s.color,
+                    bgcolor: alpha(s.color, 0.1),
+                  },
+                }}
+              />
+            ))}
+          </Box>
+
           <Paper
             variant="outlined"
             sx={{
@@ -454,7 +554,7 @@ export default function AiAssistantPage() {
             <Stack direction="row" spacing={1} sx={{ alignItems: "flex-end" }}>
               <TextField
                 inputRef={inputRef}
-                placeholder="Hỏi tôi về thư viện, sách, lịch trực..."
+                placeholder="Hỏi tôi về thư viện, sách, lịch trực, chính sách..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -505,6 +605,80 @@ export default function AiAssistantPage() {
         </Box>
       </DashboardCard>
       </Box>
+
+      {/* AI Tools Dialog */}
+      <Dialog
+        open={toolsModalOpen}
+        onClose={() => setToolsModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1.5 }}>
+          <BuildOutlinedIcon color="primary" />
+          Công Cụ AI Khả Dụng ({user?.role?.toUpperCase() || "PATRON"})
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Dưới đây là các công cụ mà Trợ lý AI có thể tự động gọi để hỗ trợ bạn dựa trên quyền hạn tài khoản:
+          </Typography>
+
+          <List sx={{ pt: 0 }}>
+            {tools.map((t, idx) => (
+              <Paper
+                key={t.name}
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  mb: 1.5,
+                  borderRadius: 2,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 1.5,
+                  bgcolor: alpha(theme.palette.primary.main, 0.02),
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 1.5,
+                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                    color: "primary.main",
+                    display: "grid",
+                    placeItems: "center",
+                    flexShrink: 0,
+                    mt: 0.5,
+                  }}
+                >
+                  <SmartToyIcon sx={{ fontSize: 18 }} />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      {t.name}
+                    </Typography>
+                    <Chip label={`#${idx + 1}`} size="small" sx={{ height: 20, fontSize: "0.68rem" }} />
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    {t.description}
+                  </Typography>
+                </Box>
+              </Paper>
+            ))}
+
+            {tools.length === 0 && (
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 3 }}>
+                Đang tải danh sách công cụ...
+              </Typography>
+            )}
+          </List>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 1.5 }}>
+          <Button onClick={() => setToolsModalOpen(false)} sx={{ textTransform: "none", fontWeight: 700 }}>
+            Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

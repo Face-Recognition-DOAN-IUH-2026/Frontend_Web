@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Avatar, Box, LinearProgress, Paper, Stack, Typography } from "@mui/material";
+import { Avatar, Box, LinearProgress, Paper, Stack, Typography, alpha } from "@mui/material";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { fadeInUp } from "@/lib/animations";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
@@ -9,9 +9,12 @@ import PersonIcon from "@mui/icons-material/PersonOutlined";
 import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import FaceIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import type { PatronPublic } from "@/lib/types";
+import type { FilterValue } from "@/app/(dashboard)/patrons/page";
 
 interface PatronStatCardsProps {
   patrons: PatronPublic[];
+  selectedFilter?: FilterValue;
+  onSelectFilter?: (filter: FilterValue) => void;
 }
 
 const STAT_GRADIENT = {
@@ -48,7 +51,7 @@ function Sparkline({ data, color, id }: { data: number[]; color: string; id: str
   );
 }
 
-export default function PatronStatCards({ patrons }: PatronStatCardsProps) {
+export default function PatronStatCards({ patrons, selectedFilter, onSelectFilter }: PatronStatCardsProps) {
   const stats = useMemo(() => {
     const activeCount = patrons.filter((p) => p.status === "active").length;
     const expiredCount = patrons.filter((p) => p.status === "inactive" || (!!p.membership_expiry && new Date(p.membership_expiry) < new Date())).length;
@@ -67,29 +70,54 @@ export default function PatronStatCards({ patrons }: PatronStatCardsProps) {
     return { activeCount, expiredCount, faceCount, dailyData };
   }, [patrons]);
 
-  const items = [
-    { label: "Tổng độc giả", value: patrons.length, gradient: STAT_GRADIENT.total, icon: PeopleIcon, pct: 100, sparkColor: "#0A2540" },
-    { label: "Hoạt động", value: stats.activeCount, gradient: STAT_GRADIENT.active, icon: PersonIcon, pct: patrons.length ? Math.round((stats.activeCount / patrons.length) * 100) : 0, sparkColor: "#059669" },
-    { label: "Hết hạn / Khóa", value: stats.expiredCount, gradient: STAT_GRADIENT.expired, icon: UpdateIcon, pct: patrons.length ? Math.round((stats.expiredCount / patrons.length) * 100) : 0, sparkColor: "#D97706" },
-    { label: "Có khuôn mặt", value: stats.faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((stats.faceCount / patrons.length) * 100) : 0, sparkColor: "#8B0000" },
+  const items: {
+    label: string;
+    value: number;
+    gradient: string;
+    icon: any;
+    pct: number;
+    sparkColor: string;
+    filterKey: FilterValue;
+  }[] = [
+    { label: "Tổng độc giả", value: patrons.length, gradient: STAT_GRADIENT.total, icon: PeopleIcon, pct: 100, sparkColor: "#0A2540", filterKey: "all" },
+    { label: "Hoạt động", value: stats.activeCount, gradient: STAT_GRADIENT.active, icon: PersonIcon, pct: patrons.length ? Math.round((stats.activeCount / patrons.length) * 100) : 0, sparkColor: "#059669", filterKey: "active" },
+    { label: "Hết hạn / Khóa", value: stats.expiredCount, gradient: STAT_GRADIENT.expired, icon: UpdateIcon, pct: patrons.length ? Math.round((stats.expiredCount / patrons.length) * 100) : 0, sparkColor: "#D97706", filterKey: "expired" },
+    { label: "Có khuôn mặt", value: stats.faceCount, gradient: STAT_GRADIENT.face, icon: FaceIcon, pct: patrons.length ? Math.round((stats.faceCount / patrons.length) * 100) : 0, sparkColor: "#8B0000", filterKey: "has_face" },
   ];
 
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
-      {items.map((item, idx) => (
-        <Paper
-          key={item.label}
-          variant="outlined"
-          sx={{
-            borderRadius: 3, position: "relative", overflow: "hidden", p: 2.5,
-            transition: "all 0.25s ease",
-            animation: `${fadeInUp} 0.5s ease-out`,
-            animationDelay: `${idx * 0.07}s`,
-            animationFillMode: "both",
-            "&:hover": { transform: "translateY(-2px)", boxShadow: 4 },
-          }}
-        >
-          <Box sx={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: item.gradient, opacity: 0.12, pointerEvents: "none" }} />
+      {items.map((item, idx) => {
+        const isSelected = selectedFilter === item.filterKey;
+        return (
+          <Paper
+            key={item.label}
+            variant="outlined"
+            onClick={() => onSelectFilter?.(item.filterKey)}
+            sx={{
+              borderRadius: 3,
+              position: "relative",
+              overflow: "hidden",
+              p: 2.25,
+              cursor: onSelectFilter ? "pointer" : "default",
+              transition: "all 0.25s ease",
+              animation: `${fadeInUp} 0.5s ease-out`,
+              animationDelay: `${idx * 0.07}s`,
+              animationFillMode: "both",
+              borderColor: isSelected ? item.sparkColor : "divider",
+              borderWidth: isSelected ? 2 : 1,
+              bgcolor: isSelected ? alpha(item.sparkColor, 0.04) : "background.paper",
+              boxShadow: isSelected
+                ? `0 4px 16px ${alpha(item.sparkColor, 0.2)}`
+                : "none",
+              "&:hover": {
+                transform: "translateY(-3px)",
+                boxShadow: `0 8px 24px ${alpha(item.sparkColor, 0.18)}`,
+                borderColor: item.sparkColor,
+              },
+            }}
+          >
+            <Box sx={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: item.gradient, opacity: isSelected ? 0.2 : 0.12, pointerEvents: "none" }} />
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 1 }}>
             <Avatar sx={{ background: item.gradient, width: 44, height: 44 }}>
               <item.icon sx={{ color: "#fff", fontSize: 22 }} />
@@ -111,7 +139,8 @@ export default function PatronStatCards({ patrons }: PatronStatCardsProps) {
           />
           <Sparkline data={stats.dailyData} color={item.sparkColor} id={`card-${idx}`} />
         </Paper>
-      ))}
+      );
+    })}
     </Box>
   );
 }

@@ -86,6 +86,21 @@ export function EffectiveInspectorTab({
     return map;
   }, [effectivePermissionsPreview.allowedPages]);
 
+  // Count granted CRUD operations
+  const crudStats = React.useMemo(() => {
+    let granted = 0;
+    const total = ALL_RESOURCES.length * ALL_ACTIONS.length;
+    ALL_RESOURCES.forEach((res) => {
+      const perms = effectivePermissionsPreview.crud?.[res];
+      if (perms) {
+        ALL_ACTIONS.forEach((act) => {
+          if (perms[act]) granted++;
+        });
+      }
+    });
+    return { granted, total };
+  }, [effectivePermissionsPreview.crud]);
+
   return (
     <Stack spacing={2.5}>
       {/* ── TOP BANNER: Nhân viên đang kiểm tra & Trạng thái ─────────────────── */}
@@ -139,6 +154,86 @@ export function EffectiveInspectorTab({
           sx={{ fontWeight: 700, borderRadius: 1, py: 0.5 }}
         />
       </Paper>
+
+      {/* ── KPI METRICS SUMMARY CARDS ───────────────────────────────────────── */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+          gap: 2,
+        }}
+      >
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: "uppercase" }}>
+            Màn hình được phép mở
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mt: 0.5 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#059669" }}>
+              {effectivePermissionsPreview.allowedPages.length}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              / {ALL_ROUTES.length} màn hình
+            </Typography>
+          </Stack>
+        </Paper>
+
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: "uppercase" }}>
+            Thao tác nghiệp vụ được cấp
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "baseline", mt: 0.5 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: "#0284C7" }}>
+              {crudStats.granted}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              / {crudStats.total} tác vụ (6 thao tác x 7 phân hệ)
+            </Typography>
+          </Stack>
+        </Paper>
+
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: "uppercase" }}>
+            Phương thức cấp quyền
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 1 }}>
+            <Chip
+              size="small"
+              icon={effectivePermissionsPreview.isCustom ? <CheckCircleOutlineOutlinedIcon /> : undefined}
+              label={
+                effectivePermissionsPreview.isCustom
+                  ? "Đặc quyền riêng (User Override)"
+                  : "Bộ quyền chuẩn theo chức vụ"
+              }
+              color={effectivePermissionsPreview.isCustom ? "primary" : "default"}
+              sx={{ fontWeight: 700, borderRadius: 1 }}
+            />
+          </Stack>
+        </Paper>
+      </Box>
 
       {/* ── 2 COLUMN SUMMARY: Quyền mở màn hình & Quyền thao tác dữ liệu ─────── */}
       <Box
@@ -243,8 +338,29 @@ export function EffectiveInspectorTab({
                 <TableRow sx={{ bgcolor: isDark ? alpha("#FFFFFF", 0.02) : "#F1F5F9" }}>
                   <TableCell sx={{ fontWeight: 700, width: "25%" }}>Phân hệ</TableCell>
                   {ALL_ACTIONS.map((act) => (
-                    <TableCell key={act} align="center" sx={{ fontWeight: 700, width: "12.5%" }}>
+                    <TableCell
+                      key={act}
+                      align="center"
+                      sx={{
+                        fontWeight: 700,
+                        width: "12.5%",
+                        color:
+                          act === "approve"
+                            ? "#7C3AED"
+                            : act === "print"
+                            ? "#0284C7"
+                            : act === "create"
+                            ? "#16A34A"
+                            : act === "update"
+                            ? "#D97706"
+                            : act === "delete"
+                            ? "#DC2626"
+                            : "text.primary",
+                      }}
+                    >
                       {ACTION_LABELS[act] || act}
+                      {act === "approve" && " ✦"}
+                      {act === "print" && " 🖨️"}
                     </TableCell>
                   ))}
                 </TableRow>

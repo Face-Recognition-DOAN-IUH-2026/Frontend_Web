@@ -1,6 +1,8 @@
 "use client";
 
-import { Avatar, Box, Chip, Paper, Stack, Typography, useTheme } from "@mui/material";
+import Link from "next/link";
+import { Avatar, Box, Button, Chip, Paper, Stack, Typography, useTheme } from "@mui/material";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckCircleIcon from "@mui/icons-material/CheckCircleOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import CameraIcon from "@mui/icons-material/PhotoCameraOutlined";
@@ -37,12 +39,17 @@ export default function CameraStatusGrid({ cameras, loading }: CameraStatusGridP
       title="Hệ thống Camera"
       subtitle={`${onlineCount}/${cameras.length} thiết bị đang hoạt động`}
       actions={
-        <Chip
-          label={`${onlineCount}/${cameras.length} Online`}
-          size="small"
-          color={onlineCount === cameras.length && cameras.length > 0 ? "success" : "warning"}
-          sx={{ fontWeight: 700, fontSize: "0.75rem" }}
-        />
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <Chip
+            label={`${onlineCount}/${cameras.length} Online`}
+            size="small"
+            color={onlineCount === cameras.length && cameras.length > 0 ? "success" : "warning"}
+            sx={{ fontWeight: 700, fontSize: "0.75rem" }}
+          />
+          <Button component={Link} href="/gate" endIcon={<ArrowForwardIcon />} size="small" sx={{ fontWeight: 700 }}>
+            Cổng Kiosk
+          </Button>
+        </Stack>
       }
     >
       {cameras.length === 0 ? (
@@ -51,7 +58,7 @@ export default function CameraStatusGrid({ cameras, loading }: CameraStatusGridP
           title="Không tìm thấy camera nào"
         />
       ) : (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, gap: 2, pt: 0.5 }}>
+        <Stack spacing={1.5} sx={{ pt: 0.5 }}>
           {cameras.map((cam) => {
             const isOnline = cam.connected && cam.running;
             return (
@@ -155,7 +162,7 @@ export default function CameraStatusGrid({ cameras, loading }: CameraStatusGridP
               </Paper>
             );
           })}
-        </Box>
+        </Stack>
       )}
     </DashboardCard>
   );

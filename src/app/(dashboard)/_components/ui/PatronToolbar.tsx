@@ -3,6 +3,7 @@
 import { Box, Button, Divider, Stack, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
 import FileDownloadIcon from "@mui/icons-material/FileDownloadOutlined";
 import FileUploadIcon from "@mui/icons-material/FileUploadOutlined";
+import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import SearchField from "./SearchField";
 import type { FilterValue } from "@/app/(dashboard)/patrons/page";
@@ -15,6 +16,7 @@ interface PatronToolbarProps {
   onFilterChange: (f: FilterValue) => void;
   onImportExcel?: () => void;
   onDownloadTemplate?: () => void;
+  onCreatePatron?: () => void;
 }
 
 const FILTERS: { value: FilterValue; label: string }[] = [
@@ -34,6 +36,7 @@ export default function PatronToolbar({
   onFilterChange,
   onImportExcel,
   onDownloadTemplate,
+  onCreatePatron,
 }: PatronToolbarProps) {
   const { can } = usePermission();
   const canCreate = can("patrons", "create");
@@ -145,6 +148,42 @@ export default function PatronToolbar({
                   }}
                 >
                   Import Excel
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+
+          {onCreatePatron && (
+            <Tooltip
+              title={
+                !canCreate
+                  ? getPermissionDeniedReason("patrons", "create")
+                  : "Đăng ký thêm tài khoản độc giả mới"
+              }
+            >
+              <span>
+                <Button
+                  variant="contained"
+                  disabled={!canCreate}
+                  startIcon={<PersonAddOutlinedIcon />}
+                  onClick={onCreatePatron}
+                  sx={{
+                    borderRadius: 2,
+                    fontWeight: 700,
+                    px: 2.25,
+                    py: 0.85,
+                    fontSize: "0.85rem",
+                    textTransform: "none",
+                    whiteSpace: "nowrap",
+                    bgcolor: "#8B0000",
+                    boxShadow: "0 2px 8px rgba(139, 0, 0, 0.25)",
+                    "&:hover": {
+                      bgcolor: "#700000",
+                      boxShadow: "0 4px 12px rgba(139, 0, 0, 0.35)",
+                    },
+                  }}
+                >
+                  Thêm độc giả
                 </Button>
               </span>
             </Tooltip>

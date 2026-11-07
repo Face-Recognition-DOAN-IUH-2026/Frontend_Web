@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Avatar, Box, Chip, LinearProgress, Paper, Stack, Typography, alpha, useTheme } from "@mui/material";
 import { fadeInUp } from "@/lib/animations";
 import type { SvgIconComponent } from "@mui/icons-material";
@@ -13,6 +14,8 @@ interface MuiStatCardProps {
   /** Optional: delta / trend text (e.g. "+12 hôm nay") */
   delta?: string;
   deltaColor?: "success" | "warning" | "error" | "default";
+  /** Optional: navigation link */
+  href?: string;
 }
 
 /**
@@ -28,6 +31,7 @@ export default function MuiStatCard({
   index = 0,
   delta,
   deltaColor = "default",
+  href,
 }: MuiStatCardProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -56,12 +60,17 @@ export default function MuiStatCard({
 
   return (
     <Paper
+      component={href ? Link : "div"}
+      href={href}
       variant="outlined"
       sx={{
         borderRadius: 2.5,
         p: 2.25,
         position: "relative",
         overflow: "hidden",
+        textDecoration: "none",
+        display: "block",
+        cursor: href ? "pointer" : "default",
         bgcolor: isDark ? alpha(theme.palette.background.paper, 0.8) : "background.paper",
         backdropFilter: "blur(10px)",
         borderColor: alpha(accentColor, isDark ? 0.2 : 0.15),

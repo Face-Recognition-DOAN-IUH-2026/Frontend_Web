@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Alert, Box, Button, Divider, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Divider, IconButton, MenuItem, Paper, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
 import TodayIcon from "@mui/icons-material/TodayOutlined";
@@ -236,9 +236,7 @@ export default function StaffSchedulesPage() {
           { key: "active", label: "Đang trực", value: weekStats.active, icon: ActiveIcon, gradient: STAT_GRADIENT.active, pct: weekStats.total ? (weekStats.active / weekStats.total) * 100 : 0 },
           { key: "staff", label: "Nhân viên", value: weekStats.staffCount, icon: StaffIcon, gradient: STAT_GRADIENT.staff, pct: 100 },
         ].map((s, idx) => (
-          <Box key={s.key} sx={staggerSx(idx)}>
-            <MuiStatCard label={s.label} value={s.value} icon={s.icon} gradient={s.gradient} pct={s.pct} index={idx} />
-          </Box>
+          <MuiStatCard key={s.key} label={s.label} value={s.value} icon={s.icon} gradient={s.gradient} pct={s.pct} index={idx} />
         ))}
       </Box>
 
@@ -258,18 +256,43 @@ export default function StaffSchedulesPage() {
       ) : null}
 
       <LoadingOverlay loading={loading} message="Đang tải lịch trực...">
-        <DashboardCard noPadding>
-          <TimetableGrid
-            days={days} shifts={filteredShifts} assignments={filteredAssignmentsWithUndo}
-            filter={filter} isAdmin={canManage}
-            onCellClick={canCreate ? handleCellClick : undefined}
-            onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
-          />
+        <Paper
+          variant="outlined"
+          sx={{
+            borderRadius: 3,
+            bgcolor: "background.paper",
+            borderColor: "divider",
+            overflow: "hidden",
+            height: "auto",
+            display: "block",
+            boxShadow: (theme) =>
+              theme.palette.mode === "dark"
+                ? "0 4px 20px rgba(0, 0, 0, 0.25)"
+                : "0 2px 10px rgba(0, 0, 0, 0.03)",
+          }}
+        >
+          <Box sx={{ px: 2.5, pt: 2, pb: 1.5 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              Bảng phân công trực theo tuần
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {formatDateRange(days)}
+            </Typography>
+          </Box>
+          <Divider sx={{ borderColor: "divider" }} />
+          <Box sx={{ width: "100%" }}>
+            <TimetableGrid
+              days={days} shifts={filteredShifts} assignments={filteredAssignmentsWithUndo}
+              filter={filter} isAdmin={canManage}
+              onCellClick={canCreate ? handleCellClick : undefined}
+              onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
+            />
+          </Box>
           <Divider sx={{ borderColor: "divider" }} />
           <Box sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(15, 23, 42, 0.4)" : "rgba(248, 250, 252, 0.6)" }}>
             <TimetableLegend />
           </Box>
-        </DashboardCard>
+        </Paper>
       </LoadingOverlay>
 
       <AssignStaffDialog

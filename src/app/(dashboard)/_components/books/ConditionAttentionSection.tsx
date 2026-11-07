@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -8,6 +8,7 @@ import {
   Button,
   Checkbox,
   Chip,
+  Collapse,
   LinearProgress,
   Paper,
   Stack,
@@ -25,6 +26,8 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import HandymanOutlinedIcon from "@mui/icons-material/HandymanOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { ConditionAttentionItem, ConditionAttentionReport } from "@/lib/types";
 import { CONDITION_LABELS, type CopyCondition } from "@/lib/constants/copy";
@@ -85,6 +88,7 @@ export default function ConditionAttentionSection() {
   const [acting, setActing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -174,13 +178,13 @@ export default function ConditionAttentionSection() {
 
   return (
     <Stack spacing={2}>
-      {/* Gradient header */}
+      {/* IUH brand styled header */}
       <Box sx={{
-        p: 3,
+        p: 2.5,
         borderRadius: 3,
-        background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)",
+        background: "linear-gradient(135deg, #0A2540 0%, #173859 55%, #8B0000 120%)",
         border: "1px solid",
-        borderColor: "rgba(99,102,241,0.3)",
+        borderColor: "rgba(212, 175, 55, 0.3)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -188,32 +192,42 @@ export default function ConditionAttentionSection() {
         gap: 2,
         position: "relative",
         overflow: "hidden",
+        boxShadow: "0 4px 20px rgba(10, 37, 64, 0.15)",
       }}>
-        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.08)", pointerEvents: "none" }} />
-        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(99,102,241,0.05)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%", bgcolor: "rgba(212,175,55,0.06)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: -60, left: 200, width: 220, height: 220, borderRadius: "50%", bgcolor: "rgba(139,0,0,0.08)", pointerEvents: "none" }} />
         <Stack direction="row" spacing={2} sx={{ zIndex: 1, alignItems: "center" }}>
-          <Avatar sx={{ bgcolor: "rgba(99,102,241,0.3)", width: 52, height: 52, border: "1px solid rgba(99,102,241,0.5)" }}>
-            <WarningAmberOutlinedIcon sx={{ color: "#a5b4fc", fontSize: 28 }} />
+          <Avatar sx={{ bgcolor: "rgba(212, 175, 55, 0.2)", width: 48, height: 48, border: "1px solid rgba(212, 175, 55, 0.4)" }}>
+            <WarningAmberOutlinedIcon sx={{ color: "#D4AF37", fontSize: 26 }} />
           </Avatar>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: "#e0e7ff" }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: "#FFFFFF", display: "flex", alignItems: "center" }}>
               Sách cần xử lý
-              <Chip label={`${report.summary.total} bản`} size="small" sx={{ ml: 1.5, fontWeight: 700, bgcolor: "rgba(99,102,241,0.3)", color: "#e0e7ff" }} />
+              <Chip label={`${report.summary.total} bản`} size="small" sx={{ ml: 1.5, fontWeight: 700, bgcolor: "rgba(212, 175, 55, 0.25)", color: "#FDE68A" }} />
             </Typography>
-            <Typography variant="body2" sx={{ color: "rgba(199,210,254,0.7)", mt: 0.3 }}>
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", mt: 0.3, fontSize: "0.82rem" }}>
               Theo dõi bản hư hỏng / mất để sửa chữa, thanh lý kịp thời
             </Typography>
           </Box>
         </Stack>
-        <Stack direction="row" spacing={1.5} sx={{ zIndex: 1 }}>
+        <Stack direction="row" spacing={1.25} sx={{ zIndex: 1, alignItems: "center" }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={isCollapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            sx={{ color: "#FFFFFF", borderColor: "rgba(255,255,255,0.3)", borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+          >
+            {isCollapsed ? "Mở rộng chi tiết" : "Thu gọn"}
+          </Button>
           <Button
             component="a"
             href="/books"
             variant="outlined"
             size="small"
-            sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)" }}
+            sx={{ color: "rgba(255,255,255,0.9)", borderColor: "rgba(255,255,255,0.25)", borderRadius: 1.5, textTransform: "none" }}
           >
-            Quản lý sách
+            Kho sách
           </Button>
           <Button
             variant="outlined"
@@ -221,12 +235,15 @@ export default function ConditionAttentionSection() {
             startIcon={<RefreshOutlinedIcon />}
             onClick={() => void load()}
             disabled={refreshing}
-            sx={{ color: "#a5b4fc", borderColor: "rgba(165,180,252,0.4)" }}
+            sx={{ color: "rgba(255,255,255,0.9)", borderColor: "rgba(255,255,255,0.25)", borderRadius: 1.5, textTransform: "none" }}
           >
             Tải lại
           </Button>
         </Stack>
       </Box>
+
+      <Collapse in={!isCollapsed}>
+        <Stack spacing={2} sx={{ pt: 1 }}>
 
       {/* Stat cards */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(5, 1fr)" }, gap: 2 }}>
@@ -396,6 +413,8 @@ export default function ConditionAttentionSection() {
           </Table>
         </TableContainer>
       </Paper>
+      </Stack>
+      </Collapse>
 
       <ConfirmDialog
         open={Boolean(pendingAction)}

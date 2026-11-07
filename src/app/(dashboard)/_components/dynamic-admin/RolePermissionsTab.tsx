@@ -41,6 +41,10 @@ import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 
 import {
   ALL_RESOURCES,
@@ -155,6 +159,29 @@ export function RolePermissionsTab({
 
   const roleKeys = useMemo(() => Object.keys(roles), [roles]);
 
+  // State to expand/collapse categories in Section 2 (Default: all expanded)
+  const [collapsedCategories, setCollapsedCategories] = React.useState<Record<string, boolean>>({});
+
+  const toggleCategoryCollapse = (cat: string) => {
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [cat]: !prev[cat],
+    }));
+  };
+
+  const areAllCollapsed = useMemo(() => {
+    return CATEGORY_ORDER.every((c) => Boolean(collapsedCategories[c]));
+  }, [collapsedCategories]);
+
+  const handleToggleAllCollapse = () => {
+    const nextVal = !areAllCollapsed;
+    const next: Record<string, boolean> = {};
+    CATEGORY_ORDER.forEach((c) => {
+      next[c] = nextVal;
+    });
+    setCollapsedCategories(next);
+  };
+
   return (
     <Box
       sx={{
@@ -164,7 +191,7 @@ export function RolePermissionsTab({
         alignItems: "start",
       }}
     >
-      {/* ── LEFT PANEL: Role Master Selector ──────────────────────────────── */}
+      {/* ── LEFT PANEL: Role Master Selector (Sticky on desktop) ────────────── */}
       <Paper
         variant="outlined"
         sx={{
@@ -172,6 +199,9 @@ export function RolePermissionsTab({
           borderColor: "divider",
           bgcolor: "background.paper",
           overflow: "hidden",
+          position: { xs: "static", lg: "sticky" },
+          top: 84,
+          zIndex: 2,
         }}
       >
         <Box
@@ -214,6 +244,9 @@ export function RolePermissionsTab({
                   borderColor: isSelected
                     ? primaryColor
                     : "transparent",
+                  borderLeft: isSelected
+                    ? `4px solid ${primaryColor}`
+                    : "4px solid transparent",
                   transition: "all 0.15s ease",
                   "&:hover": {
                     bgcolor: isSelected
@@ -582,15 +615,21 @@ export function RolePermissionsTab({
                 <TableRow sx={{ bgcolor: isDark ? alpha("#FFFFFF", 0.02) : "#F1F5F9" }}>
                   <TableCell sx={{ fontWeight: 700, width: "30%", py: 1.25 }}>Phân hệ nghiệp vụ & Các màn hình liên quan</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700, width: "8.5%", py: 1.25 }}>Xem</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "8.5%", py: 1.25 }}>Thêm</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "8.5%", py: 1.25 }}>Sửa</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, width: "8.5%", py: 1.25, color: "#16A34A" }}>
+                    Thêm +
+                  </TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, width: "8.5%", py: 1.25, color: "#D97706" }}>
+                    Sửa ✎
+                  </TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700, width: "10%", py: 1.25, color: "#7C3AED" }}>
                     Duyệt ✦
                   </TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700, width: "10%", py: 1.25, color: "#0284C7" }}>
                     In ấn 🖨️
                   </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, width: "8.5%", py: 1.25 }}>Xóa</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, width: "8.5%", py: 1.25, color: "#DC2626" }}>
+                    Xóa ✕
+                  </TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700, width: "16%", py: 1.25 }}>Cài đặt nhanh</TableCell>
                 </TableRow>
               </TableHead>
@@ -732,23 +771,35 @@ export function RolePermissionsTab({
                           <Chip size="small" label="Toàn quyền" color="primary" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700 }} />
                         ) : (
                           <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
-                            <Button
+                            <Chip
+                              label="Đầy đủ"
                               size="small"
-                              variant="text"
+                              clickable
                               onClick={() => handleSetResourcePresetForRole(res, "full")}
-                              sx={{ fontSize: "0.72rem", py: 0.2, px: 0.75, minWidth: 0, textTransform: "none", fontWeight: 600 }}
-                            >
-                              Đầy đủ
-                            </Button>
-                            <Button
+                              sx={{
+                                height: 22,
+                                fontSize: "0.72rem",
+                                fontWeight: 700,
+                                bgcolor: alpha(primaryColor, 0.08),
+                                color: "primary.main",
+                                "&:hover": { bgcolor: alpha(primaryColor, 0.16) },
+                              }}
+                            />
+                            <Chip
+                              label="Chỉ xem"
                               size="small"
-                              variant="text"
-                              color="inherit"
+                              variant="outlined"
+                              clickable
                               onClick={() => handleSetResourcePresetForRole(res, "readonly")}
-                              sx={{ fontSize: "0.72rem", py: 0.2, px: 0.75, minWidth: 0, textTransform: "none", color: "text.secondary" }}
-                            >
-                              Chỉ xem
-                            </Button>
+                              sx={{
+                                height: 22,
+                                fontSize: "0.72rem",
+                                fontWeight: 600,
+                                borderColor: "divider",
+                                color: "text.secondary",
+                                "&:hover": { bgcolor: "action.hover" },
+                              }}
+                            />
                           </Stack>
                         )}
                       </TableCell>
@@ -853,6 +904,17 @@ export function RolePermissionsTab({
                   </Button>
                 </>
               )}
+
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={areAllCollapsed ? <UnfoldMoreIcon sx={{ fontSize: 14 }} /> : <UnfoldLessIcon sx={{ fontSize: 14 }} />}
+                onClick={handleToggleAllCollapse}
+                sx={{ fontSize: "0.72rem", textTransform: "none", borderRadius: 1.5, px: 1.25, height: 32, flexShrink: 0 }}
+              >
+                {areAllCollapsed ? "Mở rộng tất cả" : "Thu gọn tất cả"}
+              </Button>
             </Stack>
           </Box>
 
@@ -873,19 +935,38 @@ export function RolePermissionsTab({
                   const allowedInCat = routesInCat.filter(
                     (r) => isAdmin || (activeRoleConfig.allowedPages || []).includes(r.path)
                   ).length;
+                  const isCollapsed = Boolean(collapsedCategories[category]);
 
                   return (
                     <React.Fragment key={category}>
-                      {/* Category Header Row (Bulk Toggle Support) */}
+                      {/* Category Header Row (Bulk Toggle Support & Accordion Collapse) */}
                       <TableRow
                         sx={{
                           bgcolor: isDark ? alpha("#FFFFFF", 0.04) : "#F1F5F9",
                           borderTop: 2,
                           borderColor: "divider",
+                          userSelect: "none",
                         }}
                       >
-                        <TableCell colSpan={2} sx={{ py: 1 }}>
+                        <TableCell
+                          colSpan={2}
+                          sx={{
+                            py: 1,
+                            cursor: "pointer",
+                            "&:hover": {
+                              bgcolor: isDark ? alpha("#FFFFFF", 0.07) : "#E2E8F0",
+                            },
+                          }}
+                          onClick={() => toggleCategoryCollapse(category)}
+                        >
                           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                            <Box sx={{ color: "text.secondary", display: "flex", alignItems: "center" }}>
+                              {isCollapsed ? (
+                                <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
+                              ) : (
+                                <KeyboardArrowUpIcon sx={{ fontSize: 18 }} />
+                              )}
+                            </Box>
                             <Box sx={{ color: "primary.main", display: "flex", alignItems: "center" }}>
                               {CATEGORY_ICONS[category]}
                             </Box>
@@ -903,6 +984,11 @@ export function RolePermissionsTab({
                                 color: allowedInCat > 0 ? "#059669" : "text.secondary",
                               }}
                             />
+                            {isCollapsed && (
+                              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", fontStyle: "italic", ml: 1 }}>
+                                (Đang thu gọn • Bấm để xem chi tiết)
+                              </Typography>
+                            )}
                           </Stack>
                         </TableCell>
                         <TableCell align="center" sx={{ py: 1 }}>
@@ -911,7 +997,10 @@ export function RolePermissionsTab({
                               <Button
                                 size="small"
                                 variant="text"
-                                onClick={() => handleToggleCategoryRoutesForRole(category, true)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleCategoryRoutesForRole(category, true);
+                                }}
                                 sx={{ fontSize: "0.68rem", py: 0.1, px: 0.75, minWidth: 0, textTransform: "none", fontWeight: 700 }}
                               >
                                 Mở cả nhóm
@@ -920,7 +1009,10 @@ export function RolePermissionsTab({
                                 size="small"
                                 variant="text"
                                 color="inherit"
-                                onClick={() => handleToggleCategoryRoutesForRole(category, false)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleCategoryRoutesForRole(category, false);
+                                }}
                                 sx={{ fontSize: "0.68rem", py: 0.1, px: 0.75, minWidth: 0, textTransform: "none", color: "text.secondary" }}
                               >
                                 Khóa nhóm
@@ -930,8 +1022,8 @@ export function RolePermissionsTab({
                         </TableCell>
                       </TableRow>
 
-                      {/* Routes inside Category */}
-                      {routesInCat.map((route) => {
+                      {/* Routes inside Category (shown if not collapsed) */}
+                      {!isCollapsed && routesInCat.map((route) => {
                         const isAllowed =
                           isAdmin || (activeRoleConfig.allowedPages || []).includes(route.path);
                         const isDashboard = route.path === "/dashboard";
@@ -991,15 +1083,23 @@ export function RolePermissionsTab({
           </TableContainer>
         </Paper>
 
-        {/* ── BOTTOM SAVE BAR FOR ROLE CONFIG ────────────────────────────── */}
+        {/* ── STICKY FLOATING SAVE BAR FOR ROLE CONFIG ────────────────────────────── */}
         {!isAdmin && handleSaveRoleConfig && (
           <Paper
-            elevation={2}
+            elevation={4}
             sx={{
               p: 2,
-              borderRadius: 2,
-              borderColor: "divider",
-              bgcolor: isDark ? "background.paper" : "#FFFFFF",
+              borderRadius: 2.5,
+              border: "1px solid",
+              borderColor: alpha(primaryColor, 0.25),
+              bgcolor: isDark ? alpha("#1E293B", 0.95) : alpha("#FFFFFF", 0.95),
+              backdropFilter: "blur(12px)",
+              position: "sticky",
+              bottom: 16,
+              zIndex: 10,
+              boxShadow: isDark
+                ? "0 8px 32px rgba(0,0,0,0.6)"
+                : "0 8px 30px rgba(139,0,0,0.12)",
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
               justifyContent: "space-between",
@@ -1008,7 +1108,7 @@ export function RolePermissionsTab({
             }}
           >
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                 Lưu cấu hình phân quyền cho chức vụ [{activeRoleConfig.label}]
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -1028,6 +1128,7 @@ export function RolePermissionsTab({
                 fontWeight: 700,
                 px: 3,
                 whiteSpace: "nowrap",
+                boxShadow: "0 2px 8px rgba(139,0,0,0.3)",
               }}
             >
               {saving ? "Đang lưu..." : `Lưu quyền [${activeRoleConfig.label}]`}

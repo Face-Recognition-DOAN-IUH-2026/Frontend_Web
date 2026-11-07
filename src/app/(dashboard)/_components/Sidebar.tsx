@@ -77,7 +77,7 @@ const aiItems = [
 ];
 
 const staffAiItems = [
-  { href: "/ai-assistant", label: "Trợ lý AI Thủ thư", icon: AssistantIcon },
+  { href: "/ai-assistant", label: "Trợ lý AI Thư viện", icon: AssistantIcon },
 ];
 
 interface SidebarNavItem {
@@ -90,6 +90,7 @@ interface SidebarNavItem {
 const adminItems: SidebarNavItem[] = [
   { href: "/dashboard/admin", label: "Quản trị người dùng", icon: ShieldIcon, permission: "admin:users" },
   { href: "/dynamic-admin", label: "Phân quyền & Vai trò", icon: DynamicFormOutlinedIcon, permission: "admin:settings" },
+  { href: "/knowledge-base", label: "Kho tri thức RAG (AI)", icon: BookIcon, permission: "admin:settings" },
   { href: "/settings", label: "Cài đặt hệ thống", icon: SettingsIcon, permission: "admin:settings" },
   { href: "/stats", label: "Báo cáo & Thống kê", icon: BarChartIcon, permission: "admin:stats" },
 ];

@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Collapse, IconButton, Paper, Stack, Tooltip, Typography } from "@mui/material";
 import LoginIcon from "@mui/icons-material/LoginOutlined";
 import LogoutIcon from "@mui/icons-material/LogoutOutlined";
 import MyLocationIcon from "@mui/icons-material/MyLocationOutlined";
 import RefreshIcon from "@mui/icons-material/RefreshOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import api, { getErrorMessage } from "@/lib/api-client";
 import type { StaffScheduleAssignment } from "@/lib/types";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
@@ -66,6 +68,7 @@ export default function MyShiftPanel({ onChanged, onOpenMap }: MyShiftPanelProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,37 +135,121 @@ export default function MyShiftPanel({ onChanged, onOpenMap }: MyShiftPanelProps
   const currentMinutes = nowMinutes();
 
   return (
-    <DashboardCard
-      title="Ca trực của tôi hôm nay"
-      subtitle="Check-in bằng vị trí GPS, đối chiếu với geofence của khu vực được phân công"
-      actions={
-        <Tooltip title="Tải lại">
-          <IconButton size="small" onClick={load} disabled={loading}>
-            <RefreshIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      }
+    <Paper
+      variant="outlined"
+      sx={{
+        borderRadius: 2.5,
+        p: 2,
+        bgcolor: "background.paper",
+        borderColor: "divider",
+        height: "auto",
+        flex: "none",
+        boxShadow: (t) =>
+          t.palette.mode === "dark"
+            ? "0 4px 20px rgba(0, 0, 0, 0.25)"
+            : "0 2px 10px rgba(0, 0, 0, 0.03)",
+      }}
     >
-      {error ? (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2, mb: 2 }}>
-          {error}
-        </Alert>
-      ) : null}
-
-      {loading ? (
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", py: 2 }}>
-          <CircularProgress size={16} />
-          <Typography variant="body2" color="text.secondary">
-            Đang tải ca trực...
-          </Typography>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1.5}
+        sx={{
+          alignItems: { xs: "flex-start", sm: "center" },
+          justifyContent: "space-between",
+          mb: collapsed ? 0 : 1.5,
+        }}
+      >
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: 2,
+              bgcolor: "rgba(139, 0, 0, 0.08)",
+              color: "#8B0000",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <LoginIcon sx={{ fontSize: 20 }} />
+          </Box>
+          <Box>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                Ca trực hôm nay của tôi
+              </Typography>
+              <Chip
+                size="small"
+                label={
+                  items.length > 0
+                    ? `${items.length} ca trực`
+                    : "Không có ca trực"
+                }
+                sx={{
+                  height: 20,
+                  fontSize: "0.68rem",
+                  fontWeight: 700,
+                  bgcolor: items.length > 0 ? "rgba(139, 0, 0, 0.1)" : "action.hover",
+                  color: items.length > 0 ? "#8B0000" : "text.secondary",
+                  border: "1px solid",
+                  borderColor: items.length > 0 ? "rgba(139, 0, 0, 0.2)" : "transparent",
+                }}
+              />
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+              Điểm danh GPS và đối chiếu geofence khu vực phân công
+            </Typography>
+          </Box>
         </Stack>
-      ) : items.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-          Hôm nay bạn không có ca trực nào.
-        </Typography>
-      ) : (
-        <Stack spacing={1.5}>
-          {items.map((item) => {
+
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", alignSelf: { xs: "flex-end", sm: "center" } }}>
+          <Tooltip title={collapsed ? "Mở rộng ca trực" : "Thu gọn"}>
+            <IconButton size="small" onClick={() => setCollapsed(!collapsed)}>
+              {collapsed ? <KeyboardArrowDownIcon fontSize="small" /> : <KeyboardArrowUpIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Tải lại ca trực">
+            <IconButton size="small" onClick={load} disabled={loading}>
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Stack>
+
+      <Collapse in={!collapsed}>
+        {error ? (
+          <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2, mb: 1.5 }}>
+            {error}
+          </Alert>
+        ) : null}
+
+        {loading ? (
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", py: 1.5 }}>
+            <CircularProgress size={16} />
+            <Typography variant="body2" color="text.secondary">
+              Đang tải ca trực...
+            </Typography>
+          </Stack>
+        ) : items.length === 0 ? (
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)"),
+              border: "1px dashed",
+              borderColor: "divider",
+              textAlign: "center",
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              Hôm nay bạn không có ca trực nào được phân công.
+            </Typography>
+          </Box>
+        ) : (
+          <Stack spacing={1.25} sx={{ pt: 0.5 }}>
+            {items.map((item) => {
             const startMin = toMinutes(item.shift?.startTime);
             const checkInOpenAt = startMin === null ? null : startMin - CHECK_IN_OPEN_MINUTES_BEFORE_SHIFT;
             const checkInOpened = checkInOpenAt === null ? true : currentMinutes >= checkInOpenAt;
@@ -272,6 +359,7 @@ export default function MyShiftPanel({ onChanged, onOpenMap }: MyShiftPanelProps
           })}
         </Stack>
       )}
-    </DashboardCard>
+      </Collapse>
+    </Paper>
   );
 }

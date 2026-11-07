@@ -369,13 +369,52 @@ export default function ReturnPage() {
       ) : null}
 
       {/* Thanh Tabs phân chia chức năng: Quầy trả sách | Sổ nợ | Đơn VietQR */}
-      <Paper elevation={0} variant="outlined" sx={{ borderRadius: 2, bgcolor: "background.paper" }}>
+      <Paper
+        elevation={0}
+        variant="outlined"
+        sx={{
+          borderRadius: 2,
+          bgcolor: "background.paper",
+          overflow: "visible",
+        }}
+      >
         <Tabs
           value={activeTab}
           onChange={(_, val) => setActiveTab(val)}
           sx={{
             px: 2,
-            "& .MuiTab-root": { textTransform: "none", fontWeight: 700, fontSize: "0.95rem", minHeight: 48 },
+            minHeight: 52,
+            overflow: "visible",
+            "& .MuiTabs-scroller": {
+              overflow: "visible !important",
+            },
+            "& .MuiTabs-indicator": {
+              bgcolor: "#8B0000",
+              height: 3,
+              borderRadius: "3px 3px 0 0",
+            },
+            "& .MuiTab-root": {
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: "0.95rem",
+              minHeight: 52,
+              py: 1.25,
+              px: 2.5,
+              overflow: "visible",
+              color: "text.secondary",
+              transition: "all 0.2s ease-in-out",
+              "&:hover": {
+                color: "#8B0000",
+                bgcolor: "rgba(139, 0, 0, 0.04)",
+              },
+              "&.Mui-selected": {
+                color: "#8B0000",
+                fontWeight: 800,
+                "& .MuiSvgIcon-root": {
+                  color: "#8B0000",
+                },
+              },
+            },
           }}
         >
           <Tab
@@ -387,18 +426,60 @@ export default function ReturnPage() {
             icon={<ReceiptLongIcon sx={{ fontSize: 20 }} />}
             iconPosition="start"
             label={
-              <Badge badgeContent={unpaidFines.length} color="error" sx={{ "& .MuiBadge-badge": { right: -12, top: 2 } }}>
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
                 <span>Sổ nợ phí phạt</span>
-              </Badge>
+                {unpaidFines.length > 0 && (
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      bgcolor: "#8B0000",
+                      color: "#ffffff",
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      height: 18,
+                      minWidth: 18,
+                      px: 0.6,
+                      borderRadius: "9px",
+                      boxShadow: "0 2px 4px rgba(139, 0, 0, 0.25)",
+                    }}
+                  >
+                    {unpaidFines.length > 99 ? "99+" : unpaidFines.length}
+                  </Box>
+                )}
+              </Box>
             }
           />
           <Tab
             icon={<QrCode2Icon sx={{ fontSize: 20 }} />}
             iconPosition="start"
             label={
-              <Badge badgeContent={pendingOrders.length} color="warning" sx={{ "& .MuiBadge-badge": { right: -12, top: 2 } }}>
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
                 <span>Đơn VietQR chờ xử lý</span>
-              </Badge>
+                {pendingOrders.length > 0 && (
+                  <Box
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      bgcolor: "#E65100",
+                      color: "#ffffff",
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      height: 18,
+                      minWidth: 18,
+                      px: 0.6,
+                      borderRadius: "9px",
+                      boxShadow: "0 2px 4px rgba(230, 81, 0, 0.25)",
+                    }}
+                  >
+                    {pendingOrders.length > 99 ? "99+" : pendingOrders.length}
+                  </Box>
+                )}
+              </Box>
             }
           />
         </Tabs>
