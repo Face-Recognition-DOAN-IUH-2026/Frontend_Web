@@ -118,3 +118,17 @@ export interface VisemeData {
 }
 
 export type CompanionState = 'idle' | 'listening' | 'speaking' | 'thinking' | 'error';
+
+export interface AIToolSummary {
+  name: string;
+  description: string;
+}
+
+export interface AIRagDocument {
+  source: string;
+  docTitle?: string;
+  audience?: 'public' | 'staff_only';
+  chunksCount: number;
+  fileSize?: string;
+  createdAt?: string;
+}

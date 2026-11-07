@@ -34,6 +34,7 @@ import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import GreetingBar from "@/app/(dashboard)/_components/dashboard/GreetingBar";
+import QuickActionBar from "@/app/(dashboard)/_components/dashboard/QuickActionBar";
 import HourlyActivityChart from "@/app/(dashboard)/_components/dashboard/HourlyActivityChart";
 import CameraStatusGrid from "@/app/(dashboard)/_components/dashboard/CameraStatusGrid";
 import BorrowSummaryCard from "@/app/(dashboard)/_components/dashboard/BorrowSummaryCard";
@@ -197,7 +198,10 @@ export default function DashboardPage() {
         liveConnected={!!stats}
       />
 
-      {/* Dãy chỉ số KPI tuân thủ quy tắc 5 giây */}
+      {/* Lối tắt tác nghiệp 1-chạm cho Thủ thư */}
+      <QuickActionBar />
+
+      {/* Dãy chỉ số KPI tuân thủ quy tắc 5 giây (Bấm để mở trang chi tiết) */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2 }}>
         {/* Card 1 (Top-Left): Chỉ số sinh mạng tức thì - Đang có mặt & Sức chứa */}
         <MuiStatCard
@@ -208,6 +212,7 @@ export default function DashboardPage() {
           pct={occupancyPct}
           delta={occupancyPct != null ? `${occupancyPct}% sức chứa (${activeCount}/${LIBRARY_CAPACITY} chỗ)` : undefined}
           deltaColor={occupancyPct && occupancyPct >= 90 ? "error" : occupancyPct && occupancyPct >= 75 ? "warning" : "default"}
+          href="/active"
           index={0}
         />
 
@@ -220,6 +225,7 @@ export default function DashboardPage() {
           pct={entryPct}
           delta={stats ? `Đã check-out: ${todayExits} lượt` : undefined}
           deltaColor="default"
+          href="/history"
           index={1}
         />
 
@@ -232,6 +238,7 @@ export default function DashboardPage() {
           pct={borrowPct}
           delta={borrowStats ? (hasOverdue ? `⚠ ${overdueBorrows} cuốn quá hạn cần thu hồi` : "✓ 0 quá hạn (Đúng hạn)") : undefined}
           deltaColor={hasOverdue ? "error" : "success"}
+          href={hasOverdue ? "/return" : "/books"}
           index={2}
         />
 
@@ -244,6 +251,7 @@ export default function DashboardPage() {
           pct={totalCams > 0 ? Math.round((onlineCams / totalCams) * 100) : undefined}
           delta={totalCams > 0 ? (allCamsOnline ? "● 100% thiết bị hoạt động bình thường" : `⚠ ${totalCams - onlineCams} thiết bị mất kết nối`) : "Chưa có thiết bị"}
           deltaColor={allCamsOnline ? "success" : hasOfflineCams ? "error" : "default"}
+          href="/gate"
           index={3}
         />
       </Box>
@@ -254,31 +262,40 @@ export default function DashboardPage() {
           variant="outlined"
           sx={{
             p: 2,
-            borderRadius: 3,
-            borderColor: "error.main",
-            borderWidth: 1,
+            borderRadius: 2.5,
+            borderColor: "rgba(139, 0, 0, 0.35)",
+            bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(139, 0, 0, 0.15)" : "rgba(254, 242, 242, 0.8)",
+            borderWidth: 1.5,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: 1.5,
+            boxShadow: "0 4px 16px rgba(139, 0, 0, 0.08)",
           }}
         >
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-            <Avatar sx={{ bgcolor: "error.main", width: 40, height: 40 }}>
-              <HistoryIcon sx={{ fontSize: 22 }} />
+            <Avatar sx={{ bgcolor: "#8B0000", width: 42, height: 42, boxShadow: "0 2px 8px rgba(139, 0, 0, 0.35)" }}>
+              <HistoryIcon sx={{ fontSize: 24, color: "#fff" }} />
             </Avatar>
             <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "error.main" }}>
-                {overdueBorrows} cuốn quá hạn cần thu hồi
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#8B0000" }}>
+                {overdueBorrows} cuốn sách đã quá hạn mượn cần thu hồi
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Liên hệ độc giả và xử lý tại trang trả sách
+                Kiểm tra thông tin độc giả và tiếp nhận tại quầy trả sách
               </Typography>
             </Box>
           </Stack>
-          <Button component={Link} href="/return" variant="contained" color="error" endIcon={<ArrowForwardIcon />}>
-            Đi đến trang trả sách
+          <Button
+            component={Link}
+            href="/return"
+            variant="contained"
+            color="error"
+            endIcon={<ArrowForwardIcon />}
+            sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+          >
+            Đến quầy trả sách
           </Button>
         </Paper>
       ) : null}
@@ -289,9 +306,6 @@ export default function DashboardPage() {
         <BorrowSummaryCard borrowStats={data.borrowStats} borrows={data.activeBorrows} loading={data.loading} />
       </Box>
 
-      {/* Sách cần xử lý: sửa chữa / thanh lý */}
-      <ConditionAttentionSection />
-
       {/* Hàng 3: Giám sát chi tiết Camera & Nhật ký ra vào thời gian thực */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "stretch" }}>
         <CameraStatusGrid cameras={data.cameraStatuses} loading={data.loading} />
@@ -300,7 +314,7 @@ export default function DashboardPage() {
           title="Hoạt động gần đây"
           subtitle="Các lượt ra/vào mới nhất"
           actions={
-            <Button component={Link} href="/history" endIcon={<ArrowForwardIcon />} size="small">
+            <Button component={Link} href="/history" endIcon={<ArrowForwardIcon />} size="small" sx={{ fontWeight: 700 }}>
               Xem tất cả
             </Button>
           }
@@ -379,6 +393,9 @@ export default function DashboardPage() {
         <TodayScheduleCard assignments={data.todaySchedule} loading={data.loading} />
         <RecentNotificationsCard notifications={data.notifications} loading={data.loading} />
       </Box>
+
+      {/* Sách cần xử lý: sửa chữa / thanh lý (Bảo trì kho) */}
+      <ConditionAttentionSection />
     </Stack>
   );
 }

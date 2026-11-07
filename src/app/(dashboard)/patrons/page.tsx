@@ -24,6 +24,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import PeopleIcon from "@mui/icons-material/PeopleOutlined";
+import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
 import UpdateIcon from "@mui/icons-material/UpdateOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { usePermission, getPermissionDeniedReason } from "@/lib/permission-context";
@@ -37,6 +38,7 @@ import PatronStatCards from "@/app/(dashboard)/_components/ui/PatronStatCards";
 import PatronToolbar from "@/app/(dashboard)/_components/ui/PatronToolbar";
 import PatronListView from "@/app/(dashboard)/_components/ui/PatronListView";
 import PatronImportWizard from "@/app/(dashboard)/_components/ui/PatronImportWizard";
+import CreatePatronDialog from "@/app/(dashboard)/_components/ui/CreatePatronDialog";
 import type { PatronCreate, PatronPublic, PatronUpdate } from "@/lib/types";
 
 export type FilterValue = "all" | "active" | "inactive" | "expired" | "has_face" | "no_face" | "deleted";
@@ -52,6 +54,7 @@ export default function PatronsPage() {
   const router = useRouter();
   const { can } = usePermission();
   const { toast } = useToast();
+  const canCreatePatron = can("patrons", "create");
   const canUpdatePatron = can("patrons", "update");
   const canDeletePatron = can("patrons", "delete");
 
@@ -69,6 +72,7 @@ export default function PatronsPage() {
   }, [query]);
 
   const [showImport, setShowImport] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
   const [editTarget, setEditTarget] = useState<PatronPublic | null>(null);
   const [editForm, setEditForm] = useState<PatronUpdate>({});
@@ -211,9 +215,33 @@ export default function PatronsPage() {
         icon={PeopleIcon}
         statBadges={statBadges}
         onRefresh={load}
+        actions={
+          canCreatePatron ? (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<PersonAddOutlinedIcon />}
+              onClick={() => setShowCreate(true)}
+              sx={{
+                bgcolor: "#8B0000",
+                fontWeight: 700,
+                borderRadius: 2,
+                textTransform: "none",
+                boxShadow: "0 2px 8px rgba(139, 0, 0, 0.25)",
+                "&:hover": { bgcolor: "#700000" },
+              }}
+            >
+              Thêm độc giả
+            </Button>
+          ) : null
+        }
       />
 
-      <PatronStatCards patrons={patrons} />
+      <PatronStatCards
+        patrons={patrons}
+        selectedFilter={filter}
+        onSelectFilter={setFilter}
+      />
 
       <PatronToolbar
         query={query}
@@ -222,6 +250,7 @@ export default function PatronsPage() {
         onFilterChange={setFilter}
         onImportExcel={() => setShowImport(true)}
         onDownloadTemplate={handleDownloadTemplate}
+        onCreatePatron={() => setShowCreate(true)}
       />
 
       {loading && filtered.length === 0 ? (
@@ -243,6 +272,7 @@ export default function PatronsPage() {
       )}
 
       <PatronImportWizard open={showImport} onClose={() => setShowImport(false)} onSuccess={load} />
+      <CreatePatronDialog open={showCreate} onClose={() => setShowCreate(false)} onSuccess={load} />
 
       <Drawer
         anchor="right"

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -320,17 +321,7 @@ export default function StatsPage() {
       {!stats ? (
         <Alert severity="info">Không có dữ liệu thống kê.</Alert>
       ) : (
-        <Stack spacing={3} sx={{ minHeight: 900 }}>
-          <TabNavigation
-            tabs={[
-              { label: "Tổng quan", href: "/stats" },
-              { label: "Tài chính", href: "/stats/finance" },
-              { label: "Kho sách", href: "/stats/inventory" },
-              { label: "Nhận diện", href: "/stats/recognition" },
-              { label: "Real-time", href: "/stats/realtime" },
-            ]}
-          />
-
+        <Stack spacing={3}>
           <PageHeader
             title="Thống kê vận hành"
             subtitle={`${todayLabel} — Theo dõi ra/vào, hiện diện và mượn trả`}
@@ -350,6 +341,16 @@ export default function StatsPage() {
                 />
               </Stack>
             }
+          />
+
+          <TabNavigation
+            tabs={[
+              { label: "Tổng quan", href: "/stats" },
+              { label: "Tài chính", href: "/stats/finance" },
+              { label: "Kho sách", href: "/stats/inventory" },
+              { label: "Nhận diện", href: "/stats/recognition" },
+              { label: "Real-time", href: "/stats/realtime" },
+            ]}
           />
 
           {/* Dãy KPI chuẩn 5 giây */}
@@ -678,15 +679,16 @@ export default function StatsPage() {
             )}
           </DashboardCard>
 
-{/* Links đến các trang thống kê chi tiết */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 3, mt: 3 }}>
+          {/* Links đến các chuyên mục thống kê chuyên sâu */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }, gap: 2.5 }}>
             <Box
-              component="a"
+              component={Link}
               href="/stats/finance"
               sx={{
                 borderRadius: 3,
                 border: "1px solid",
                 borderColor: "divider",
+                bgcolor: "background.paper",
                 p: 3,
                 transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
                 "&:hover": { transform: "translateY(-4px)", boxShadow: 6, borderColor: "primary.main" },
@@ -698,15 +700,14 @@ export default function StatsPage() {
               <Stack spacing={1.5} direction="column" sx={{ alignItems: "center", textAlign: "center" }}>
                 <Box
                   sx={{
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     borderRadius: 3,
                     background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "white",
-                    fontSize: 28,
                     boxShadow: "0 8px 24px rgba(5, 150, 105, 0.3)",
                   }}
                 >
@@ -722,12 +723,13 @@ export default function StatsPage() {
             </Box>
 
             <Box
-              component="a"
+              component={Link}
               href="/stats/inventory"
               sx={{
                 borderRadius: 3,
                 border: "1px solid",
                 borderColor: "divider",
+                bgcolor: "background.paper",
                 p: 3,
                 transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
                 "&:hover": { transform: "translateY(-4px)", boxShadow: 6, borderColor: "primary.main" },
@@ -739,15 +741,14 @@ export default function StatsPage() {
               <Stack spacing={1.5} direction="column" sx={{ alignItems: "center", textAlign: "center" }}>
                 <Box
                   sx={{
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     borderRadius: 3,
                     background: "linear-gradient(135deg, #0A2540 0%, #0F3C5C 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "white",
-                    fontSize: 28,
                     boxShadow: "0 8px 24px rgba(10, 37, 64, 0.3)",
                   }}
                 >
@@ -763,12 +764,13 @@ export default function StatsPage() {
             </Box>
 
             <Box
-              component="a"
+              component={Link}
               href="/stats/recognition"
               sx={{
                 borderRadius: 3,
                 border: "1px solid",
                 borderColor: "divider",
+                bgcolor: "background.paper",
                 p: 3,
                 transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
                 "&:hover": { transform: "translateY(-4px)", boxShadow: 6, borderColor: "primary.main" },
@@ -780,16 +782,15 @@ export default function StatsPage() {
               <Stack spacing={1.5} direction="column" sx={{ alignItems: "center", textAlign: "center" }}>
                 <Box
                   sx={{
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     borderRadius: 3,
-                    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    background: "linear-gradient(135deg, #8B0000 0%, #700000 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "white",
-                    fontSize: 28,
-                    boxShadow: "0 8px 24px rgba(5, 150, 105, 0.3)",
+                    boxShadow: "0 8px 24px rgba(139, 0, 0, 0.3)",
                   }}
                 >
                   <VerifiedUserIcon sx={{ fontSize: 28 }} />
@@ -799,6 +800,47 @@ export default function StatsPage() {
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Độ chính xác AI, anti-spoofing, xu hướng
+                </Typography>
+              </Stack>
+            </Box>
+
+            <Box
+              component={Link}
+              href="/stats/realtime"
+              sx={{
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "divider",
+                bgcolor: "background.paper",
+                p: 3,
+                transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
+                "&:hover": { transform: "translateY(-4px)", boxShadow: 6, borderColor: "primary.main" },
+                cursor: "pointer",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <Stack spacing={1.5} direction="column" sx={{ alignItems: "center", textAlign: "center" }}>
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 3,
+                    background: "linear-gradient(135deg, #D4AF37 0%, #B89628 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    boxShadow: "0 8px 24px rgba(212, 175, 55, 0.3)",
+                  }}
+                >
+                  <RadioIcon sx={{ fontSize: 28 }} />
+                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  Giám sát Real-time
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Camera cổng, hiện diện, luồng sự kiện
                 </Typography>
               </Stack>
             </Box>
@@ -944,14 +986,14 @@ export default function StatsPage() {
               </TableContainer>
             )}
           </DashboardCard>
+
+          {/* Tình trạng sách & Sách quá hạn cần thu hồi */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", xl: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
+            <BookConditionCard />
+            <OverdueBooksCard borrows={activeBorrows} />
+          </Box>
         </Stack>
       )}
-
-      {/* Tình trạng sách & Sách quá hạn cần thu hồi */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", xl: "1fr 1fr" }, gap: 3, alignItems: "start" }}>
-        <BookConditionCard />
-        <OverdueBooksCard borrows={activeBorrows} />
-      </Box>
     </LoadingOverlay>
   );
 }

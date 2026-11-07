@@ -2,7 +2,7 @@
 
 import React, { Suspense, useState, useEffect, useRef } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Html, useTexture } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { libraryTourData, Room, NavigationArrowData } from '@/lib/vr/tourData';
 import { 
@@ -19,9 +19,12 @@ import {
   Minimize2, 
   ChevronLeft,
   ChevronRight,
-  Plus, // Thêm mới
-  Minus // Thêm mới
+  Plus,
+  Minus,
+  Settings,
 } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
+import AdminTourModal from './AdminTourModal';
 
 // Subcomponent: Perspective Camera Manager to handle smooth zoom (FOV changes)
 function CameraManager({ fov }: { fov: number }) {
@@ -66,7 +69,6 @@ function NavigationArrow({
                     alt={label} 
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      // Nếu không tải được ảnh preview, tự động chuyển sang hình nền xám có chữ
                       (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/400x300/1e293b/ffffff?text=Image+Not+Found';
                     }}
                   />
@@ -205,7 +207,7 @@ function VRScene({ room, onNavigate, gyroEnabled, resetTrigger, hotspotsVisible,
   useEffect(() => {
     if (texture && materialRef.current) {
       materialRef.current.map = texture;
-      materialRef.current.needsUpdate = true; // Crucial to update three.js shader definitions
+      materialRef.current.needsUpdate = true;
     }
   }, [texture]);
 
@@ -257,7 +259,7 @@ function VRScene({ room, onNavigate, gyroEnabled, resetTrigger, hotspotsVisible,
       )}
 
       {/* Loop and render separate NavigationArrow components */}
-      {hotspotsVisible && texture && !hideHotspots && room.navigationArrows.map((arrow) => (
+      {hotspotsVisible && texture && !hideHotspots && room.navigationArrows?.map((arrow) => (
         <NavigationArrow 
           key={arrow.id}
           {...arrow}
@@ -284,7 +286,14 @@ function CanvasLoader() {
 
 // Main Component
 export default function VRViewer() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'staff';
+
+  const [tourRooms, setTourRooms] = useState<Record<string, Room>>(libraryTourData);
+  const [availableImages, setAvailableImages] = useState<string[]>([]);
   const [currentRoomId, setCurrentRoomId] = useState<string>('room1');
+  const [adminModalOpen, setAdminModalOpen] = useState<boolean>(false);
+
   const [isWebView, setIsWebView] = useState<boolean>(false);
   const [gyroEnabled, setGyroEnabled] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -298,7 +307,27 @@ export default function VRViewer() {
   const [mapVisible, setMapVisible] = useState<boolean>(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const currentRoom = libraryTourData[currentRoomId] || libraryTourData.room1;
+
+  // Load dynamic rooms from backend API on mount
+  const loadTourConfig = () => {
+    fetch('/api/vr/rooms')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.rooms) {
+          setTourRooms(data.rooms);
+          if (data.availableImages) {
+            setAvailableImages(data.availableImages);
+          }
+        }
+      })
+      .catch((err) => console.warn('Could not load dynamic VR rooms:', err));
+  };
+
+  useEffect(() => {
+    loadTourConfig();
+  }, []);
+
+  const currentRoom = tourRooms[currentRoomId] || Object.values(tourRooms)[0] || libraryTourData.room1;
 
   useEffect(() => {
     const isUAWebView = typeof window !== 'undefined' && 
@@ -316,17 +345,49 @@ export default function VRViewer() {
       (window as any).ReactNativeWebView.postMessage(
         JSON.stringify({
           type: 'ROOM_CHANGE',
-          payload: { roomId, roomName: libraryTourData[roomId]?.name }
+          payload: { roomId, roomName: tourRooms[roomId]?.name }
         })
       );
     }
   };
 
-  const handlePrevRoom = () => {
-    const roomKeys = Object.keys(libraryTourData);
-    const currentIndex = roomKeys.indexOf(currentRoomId);
-    if (currentIndex > 0) {
-      handleRoomChange(roomKeys[currentIndex - 1]);
+  const handleSaveRooms = async (newRooms: Record<string, Room>): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/vr/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rooms: newRooms }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Lỗi khi lưu phòng');
+      }
+      setTourRooms(newRooms);
+      if (!newRooms[currentRoomId]) {
+        setCurrentRoomId(Object.keys(newRooms)[0] || 'room1');
+      }
+      return true;
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi lưu phòng');
+      return false;
+    }
+  };
+
+  const handleResetDefault = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/vr/rooms', {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Lỗi khi khôi phục');
+      }
+      setTourRooms(libraryTourData);
+      setCurrentRoomId('room1');
+      return true;
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi khôi phục mặc định');
+      return false;
     }
   };
 
@@ -354,35 +415,6 @@ export default function VRViewer() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const requestGyroPermission = async () => {
-    if (gyroEnabled) {
-      setGyroEnabled(false);
-      return;
-    }
-
-    if (
-      typeof window !== 'undefined' &&
-      typeof (DeviceOrientationEvent as any).requestPermission === 'function'
-    ) {
-      try {
-        const permission = await (DeviceOrientationEvent as any).requestPermission();
-        if (permission === 'granted') {
-          setGyroEnabled(true);
-        } else {
-          alert('Quyền truy cập cảm biến bị từ chối.');
-        }
-      } catch (err) {
-        console.error('Error requesting gyro permission:', err);
-      }
-    } else {
-      if (typeof window !== 'undefined' && 'ondeviceorientation' in window) {
-        setGyroEnabled(true);
-      } else {
-        alert('Thiết bị của bạn không hỗ trợ xoay bằng cảm biến hoặc trình duyệt bị chặn.');
-      }
-    }
-  };
-
   return (
     <div 
       ref={containerRef}
@@ -398,7 +430,7 @@ export default function VRViewer() {
             gyroEnabled={gyroEnabled}
             resetTrigger={resetTrigger}
             hotspotsVisible={hotspotsVisible}
-            hideHotspots={mapVisible || infoVisible}
+            hideHotspots={mapVisible || infoVisible || adminModalOpen}
           />
         </Suspense>
         
@@ -410,10 +442,29 @@ export default function VRViewer() {
         />
       </Canvas>
 
-      {/* Top Left Library Badge */}
-      <div className="absolute top-4 left-4 z-10 px-4 py-2 bg-blue-800 border border-blue-700 text-white rounded-lg font-bold text-sm shadow-xl animate-fade-in pointer-events-auto">
-        Thư viện
+      {/* Top Left: Library Badge & Current Room Title */}
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2.5 pointer-events-auto">
+        <div className="px-3.5 py-2 bg-blue-800 border border-blue-700 text-white rounded-lg font-bold text-sm shadow-xl animate-fade-in flex items-center gap-2">
+          <span>Thư viện IUH</span>
+        </div>
+        <div className="hidden sm:flex items-center px-3.5 py-2 bg-slate-900/85 backdrop-blur-md border border-slate-700/60 text-amber-300 rounded-lg font-bold text-xs shadow-lg uppercase tracking-wider">
+          {currentRoom.name}
+        </div>
       </div>
+
+      {/* Top Right: Admin Management Button (Always visible when admin/staff) */}
+      {isAdmin && (
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 pointer-events-auto">
+          <button
+            onClick={() => setAdminModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 bg-red-800/90 hover:bg-red-700 text-white border border-red-600/60 rounded-xl font-bold text-xs shadow-xl transition-all duration-200 cursor-pointer backdrop-blur-md"
+            title="Cài đặt & Quản lý khu vực VR 360°"
+          >
+            <Settings className="w-4 h-4" />
+            <span>Quản trị VR Tour</span>
+          </button>
+        </div>
+      )}
 
       {/* Bottom Center Toolbar - Chuẩn UI IUH */}
       <div 
@@ -446,7 +497,7 @@ export default function VRViewer() {
             {/* CỤM GIỮA: Các tính năng chính */}
             <div className="flex items-center gap-2.5">
               <button
-                onClick={() => handleRoomChange('room1')}
+                onClick={() => handleRoomChange(Object.keys(tourRooms)[0] || 'room1')}
                 className="w-9 h-9 shrink-0 rounded-full border-[1.5px] border-white flex items-center justify-center text-white hover:bg-white/30 transition-colors"
                 title="Về cổng vào"
               >
@@ -500,6 +551,17 @@ export default function VRViewer() {
               >
                 <Info className="w-4 h-4" />
               </button>
+
+              {/* Nút Admin Settings trên toolbar nếu là admin */}
+              {isAdmin && (
+                <button
+                  onClick={() => setAdminModalOpen(true)}
+                  className="w-9 h-9 shrink-0 rounded-full border-[1.5px] border-amber-300 bg-red-800 flex items-center justify-center text-white hover:bg-red-700 transition-colors"
+                  title="Cài đặt khu vực VR (Admin)"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {/* CỤM PHẢI: Fullscreen */}
@@ -540,13 +602,16 @@ export default function VRViewer() {
         <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent">
           
           {/* Tiêu đề danh sách */}
-          <div className="w-full px-5 py-3 bg-[#1e347b] border-b border-white/20 text-white font-bold text-[13px] uppercase tracking-wide sticky top-0 z-10 shadow-sm">
-            Hệ thống phòng thư viện
+          <div className="w-full px-5 py-3 bg-[#1e347b] border-b border-white/20 text-white font-bold text-[13px] uppercase tracking-wide sticky top-0 z-10 shadow-sm flex items-center justify-between">
+            <span>Hệ thống phòng thư viện</span>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/20 text-white">
+              {Object.keys(tourRooms).length} phòng
+            </span>
           </div>
 
           {/* Danh sách các phòng lấy từ Data */}
           <div className="flex flex-col w-full pb-6">
-            {Object.values(libraryTourData).map((room) => (
+            {Object.values(tourRooms).map((room) => (
               <button
                 key={room.id}
                 onClick={() => {
@@ -567,6 +632,22 @@ export default function VRViewer() {
             ))}
           </div>
         </div>
+
+        {/* Footer Admin Button in Drawer */}
+        {isAdmin && (
+          <div className="p-3 bg-[#1e347b] border-t border-white/20 shrink-0">
+            <button
+              onClick={() => {
+                setAdminModalOpen(true);
+                setIsDrawerOpen(false);
+              }}
+              className="w-full py-2.5 px-3 bg-red-800 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all border border-red-600/40 cursor-pointer shadow-md"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Quản trị khu vực VR (Admin)</span>
+            </button>
+          </div>
+        )}
 
         {/* Nút Đóng/Mở Sidebar (Nằm lồi ra ngoài viền phải) */}
         <button 
@@ -647,6 +728,18 @@ export default function VRViewer() {
           </div>
         </div>
       )}
+
+      {/* Admin VR Tour Management Modal */}
+      <AdminTourModal
+        open={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+        rooms={tourRooms}
+        currentRoomId={currentRoomId}
+        onSelectRoom={(id) => handleRoomChange(id)}
+        onSaveRooms={handleSaveRooms}
+        onResetDefault={handleResetDefault}
+        availableImages={availableImages}
+      />
     </div>
   );
 }

@@ -69,6 +69,8 @@ import type {
   AIInsightList,
   AIChatResponse,
   AIBookRecommendationResponse,
+  AIToolSummary,
+  AIRagDocument,
   Notification,
   NotificationListResponse,
   RolePermissionConfig,
@@ -434,6 +436,11 @@ class ApiClient {
     if (response.data.access_token) {
       setStoredAccessToken(response.data.access_token, response.data.refresh_token);
     }
+    return response.data;
+  }
+
+  async adminCreateUser(data: RegisterRequest & { skip_verification?: boolean; phone?: string }): Promise<any> {
+    const response = await this.client.post("/api/auth/register", data);
     return response.data;
   }
 
@@ -1687,6 +1694,48 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
 
   async getBookRecommendations(studentCode: string): Promise<AIBookRecommendationResponse> {
     const response = await this.client.get<AIBookRecommendationResponse>(`/api/ai/recommendations/patron/${studentCode}`);
+    return response.data;
+  }
+
+  async getAiTools(): Promise<AIToolSummary[]> {
+    const response = await this.client.get<AIToolSummary[]>("/api/ai/tools");
+    return response.data;
+  }
+
+  async getRagDocuments(): Promise<AIRagDocument[]> {
+    const response = await this.client.get<{ success: boolean; data: AIRagDocument[] }>("/api/ai/rag/documents");
+    return response.data?.data || [];
+  }
+
+  async uploadRagDocument(formData: FormData): Promise<{ success: boolean; message: string; data: AIRagDocument }> {
+    const response = await this.client.post<{ success: boolean; message: string; data: AIRagDocument }>(
+      "/api/ai/rag/upload",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  }
+
+  async uploadRagText(
+    title: string,
+    text: string,
+    audience: "public" | "staff_only" = "public"
+  ): Promise<{ success: boolean; message: string; data: AIRagDocument }> {
+    const response = await this.client.post<{ success: boolean; message: string; data: AIRagDocument }>(
+      "/api/ai/rag/upload",
+      { title, text, audience }
+    );
+    return response.data;
+  }
+
+  async deleteRagDocument(source: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.delete<{ success: boolean; message: string }>(
+      `/api/ai/rag/documents/${encodeURIComponent(source)}`
+    );
     return response.data;
   }
 

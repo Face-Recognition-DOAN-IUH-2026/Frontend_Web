@@ -2,10 +2,13 @@
 
 import React, { useMemo } from "react";
 import {
+  Avatar,
   Box,
   Button,
   Chip,
+  CircularProgress,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
@@ -34,6 +37,10 @@ import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import RemoveOutlinedIcon from "@mui/icons-material/RemoveOutlined";
 import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
 import TouchAppOutlinedIcon from "@mui/icons-material/TouchAppOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import { RESOURCE_RELATED_ROUTES } from "./RolePermissionsTab";
 
 import {
@@ -112,6 +119,28 @@ export function UserOverridesTab({
   const handleSetCategoryRouteState = (cat: RouteCategory, state: "inherit" | "grant" | "revoke") => {
     const catRoutes = routesByCategory[cat] || [];
     catRoutes.forEach((r) => handleSetUserRouteState(r.path, state));
+  };
+
+  const [collapsedCategories, setCollapsedCategories] = React.useState<Record<string, boolean>>({});
+
+  const toggleCategoryCollapse = (cat: string) => {
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [cat]: !prev[cat],
+    }));
+  };
+
+  const areAllCollapsed = useMemo(() => {
+    return (Object.keys(routesByCategory) as RouteCategory[]).every((c) => Boolean(collapsedCategories[c]));
+  }, [collapsedCategories, routesByCategory]);
+
+  const handleToggleAllCollapse = () => {
+    const nextVal = !areAllCollapsed;
+    const next: Record<string, boolean> = {};
+    (Object.keys(routesByCategory) as RouteCategory[]).forEach((c) => {
+      next[c] = nextVal;
+    });
+    setCollapsedCategories(next);
   };
 
   return (
@@ -302,8 +331,29 @@ export function UserOverridesTab({
                   <TableRow sx={{ bgcolor: isDark ? alpha("#FFFFFF", 0.02) : "#F1F5F9" }}>
                     <TableCell sx={{ fontWeight: 700, width: "26%" }}>Phân hệ nghiệp vụ & Các màn hình</TableCell>
                     {ALL_ACTIONS.map((act) => (
-                      <TableCell key={act} align="center" sx={{ fontWeight: 700, width: "12.3%" }}>
+                      <TableCell
+                        key={act}
+                        align="center"
+                        sx={{
+                          fontWeight: 700,
+                          width: "12.3%",
+                          color:
+                            act === "approve"
+                              ? "#7C3AED"
+                              : act === "print"
+                              ? "#0284C7"
+                              : act === "create"
+                              ? "#16A34A"
+                              : act === "update"
+                              ? "#D97706"
+                              : act === "delete"
+                              ? "#DC2626"
+                              : "text.primary",
+                        }}
+                      >
                         {ACTION_LABELS[act] || act}
+                        {act === "approve" && " ✦"}
+                        {act === "print" && " 🖨️"}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -523,14 +573,32 @@ export function UserOverridesTab({
                 borderBottom: 1,
                 borderColor: "divider",
                 bgcolor: isDark ? "background.default" : "#F8FAFC",
+                display: "flex",
+                flexDirection: { xs: "column", sm: "row" },
+                justifyContent: "space-between",
+                alignItems: { xs: "flex-start", sm: "center" },
+                gap: 1.5,
               }}
             >
-              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                2. Tùy chỉnh quyền mở màn hình chức năng (Theo 5 nhóm hệ thống)
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Mở thêm hoặc tạm ẩn các mục trên menu làm việc riêng của nhân viên này
-              </Typography>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  2. Tùy chỉnh quyền mở màn hình chức năng (Theo 5 nhóm hệ thống)
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Mở thêm hoặc tạm ẩn các mục trên menu làm việc riêng của nhân viên này
+                </Typography>
+              </Box>
+
+              <Button
+                size="small"
+                variant="outlined"
+                color="inherit"
+                startIcon={areAllCollapsed ? <UnfoldMoreIcon sx={{ fontSize: 14 }} /> : <UnfoldLessIcon sx={{ fontSize: 14 }} />}
+                onClick={handleToggleAllCollapse}
+                sx={{ fontSize: "0.72rem", textTransform: "none", borderRadius: 1.5, px: 1.25, height: 32, flexShrink: 0 }}
+              >
+                {areAllCollapsed ? "Mở rộng tất cả" : "Thu gọn tất cả"}
+              </Button>
             </Box>
 
             <TableContainer sx={{ maxHeight: 520 }}>
@@ -546,6 +614,7 @@ export function UserOverridesTab({
                   {(Object.keys(routesByCategory) as RouteCategory[]).map((categoryKey) => {
                     const categoryRoutes = routesByCategory[categoryKey] || [];
                     if (categoryRoutes.length === 0) return null;
+                    const isCollapsed = Boolean(collapsedCategories[categoryKey]);
 
                     return (
                       <React.Fragment key={categoryKey}>
@@ -553,11 +622,30 @@ export function UserOverridesTab({
                         <TableRow
                           sx={{
                             bgcolor: isDark ? alpha("#38BDF8", 0.08) : alpha("#0284C7", 0.05),
+                            userSelect: "none",
                           }}
                         >
-                          <TableCell colSpan={3} sx={{ py: 1, px: 2.5 }}>
+                          <TableCell
+                            colSpan={3}
+                            sx={{
+                              py: 1,
+                              px: 2.5,
+                              cursor: "pointer",
+                              "&:hover": {
+                                bgcolor: isDark ? alpha("#38BDF8", 0.12) : alpha("#0284C7", 0.09),
+                              },
+                            }}
+                            onClick={() => toggleCategoryCollapse(categoryKey)}
+                          >
                             <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
                               <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                                <Box sx={{ color: "text.secondary", display: "flex", alignItems: "center" }}>
+                                  {isCollapsed ? (
+                                    <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
+                                  ) : (
+                                    <KeyboardArrowUpIcon sx={{ fontSize: 18 }} />
+                                  )}
+                                </Box>
                                 <Typography variant="caption" sx={{ fontWeight: 800, color: "primary.main", textTransform: "uppercase", letterSpacing: 0.6 }}>
                                   {CATEGORY_LABELS[categoryKey]}
                                 </Typography>
@@ -566,10 +654,19 @@ export function UserOverridesTab({
                                   label={`${categoryRoutes.length} màn hình`}
                                   sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700 }}
                                 />
+                                {isCollapsed && (
+                                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem", fontStyle: "italic", ml: 1 }}>
+                                    (Bấm để xem chi tiết)
+                                  </Typography>
+                                )}
                               </Stack>
 
                               {/* Batch Actions for Category */}
-                              <Stack direction="row" spacing={0.75}>
+                              <Stack
+                                direction="row"
+                                spacing={0.75}
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <Button
                                   size="small"
                                   variant="outlined"
@@ -602,7 +699,8 @@ export function UserOverridesTab({
                         </TableRow>
 
                         {/* Individual Route Rows */}
-                        {categoryRoutes.map((route) => {
+                        {!isCollapsed &&
+                          categoryRoutes.map((route) => {
                           const isGranted = (userOverride.grantedPages || []).includes(route.path);
                           const isRevoked = (userOverride.revokedPages || []).includes(route.path);
                           const currentVal: "inherit" | "grant" | "revoke" = isGranted
@@ -692,14 +790,22 @@ export function UserOverridesTab({
             </TableContainer>
           </Paper>
 
-          {/* Guide & Bottom Save Bar */}
+          {/* Guide & Sticky Floating Save Bar */}
           <Paper
-            variant="outlined"
+            elevation={4}
             sx={{
-              p: 2.5,
-              borderRadius: 2,
-              borderColor: "divider",
-              bgcolor: isDark ? alpha("#0284C7", 0.06) : "#F0F9FF",
+              p: 2,
+              borderRadius: 2.5,
+              border: "1px solid",
+              borderColor: alpha(primaryColor, 0.25),
+              bgcolor: isDark ? alpha("#1E293B", 0.95) : alpha("#FFFFFF", 0.95),
+              backdropFilter: "blur(12px)",
+              position: "sticky",
+              bottom: 16,
+              zIndex: 10,
+              boxShadow: isDark
+                ? "0 8px 32px rgba(0,0,0,0.6)"
+                : "0 8px 30px rgba(139,0,0,0.12)",
               display: "flex",
               flexDirection: { xs: "column", sm: "row" },
               justifyContent: "space-between",
@@ -724,12 +830,20 @@ export function UserOverridesTab({
               size="medium"
               variant="contained"
               color="primary"
-              startIcon={<SaveOutlinedIcon />}
+              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveOutlinedIcon />}
               onClick={handleSaveUserOverride}
               disabled={saving}
-              sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5, px: 3, flexShrink: 0 }}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                borderRadius: 1.5,
+                px: 3,
+                flexShrink: 0,
+                boxShadow: "0 2px 8px rgba(139,0,0,0.3)",
+                whiteSpace: "nowrap",
+              }}
             >
-              {saving ? "Đang lưu..." : `Lưu quyền riêng cho ${selectedStaffMember?.fullName || "nhân viên"}`}
+              {saving ? "Đang lưu..." : `Lưu quyền riêng [${selectedStaffMember?.fullName || "nhân viên"}]`}
             </Button>
           </Paper>
         </Stack>

@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Paper,
   Skeleton,
@@ -13,6 +14,7 @@ import {
   alpha,
   useTheme,
 } from "@mui/material";
+import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import { useToast } from "@/lib/toast-context";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
@@ -692,160 +694,137 @@ export default function DynamicAdminPage() {
   return (
     <Box sx={{ width: "100%", maxWidth: 1440, mx: "auto", pb: 5 }}>
       {/* ── TOP OPERATIONAL ACTION HEADER ─────────────────────────────────── */}
-      <Box
+      <PageHeader
+        icon={ShieldOutlinedIcon}
+        title="Phân Quyền & Quản Lý Vai Trò"
+        subtitle="Cấu hình ma trận phân quyền theo chức vụ (Role-based) và cấp đặc quyền cá nhân (User Overrides)"
+        onRefresh={loadData}
+        actions={
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            {activeTab === 0 ? (
+              <Button
+                size="medium"
+                variant="contained"
+                startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveOutlinedIcon />}
+                onClick={handleSaveRoleConfig}
+                disabled={saving || selectedRole === "admin"}
+                sx={{
+                  borderRadius: 1.5,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  px: 2.5,
+                }}
+              >
+                {saving ? "Đang lưu..." : `Lưu quyền [${activeRoleConfig.label}]`}
+              </Button>
+            ) : activeTab === 1 ? (
+              <Button
+                size="medium"
+                variant="contained"
+                startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveOutlinedIcon />}
+                onClick={handleSaveUserOverride}
+                disabled={saving || !userOverride.enabled}
+                sx={{
+                  borderRadius: 1.5,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  px: 2.5,
+                }}
+              >
+                {saving ? "Đang lưu..." : "Lưu quyền riêng nhân viên"}
+              </Button>
+            ) : null}
+          </Stack>
+        }
+      />
+
+      {/* ── WORKSPACE TABS SELECTOR (DATA-FIRST SEGMENTED PILLS) ───────── */}
+      <Paper
+        variant="outlined"
         sx={{
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          justifyContent: "space-between",
-          alignItems: { xs: "flex-start", sm: "center" },
-          gap: 2,
-          pb: 2.5,
-          borderBottom: 1,
+          p: 0.75,
+          borderRadius: 2.5,
           borderColor: "divider",
-          mb: 2.5,
-        }}
-      >
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 1.5,
-              bgcolor: alpha(primaryColor, 0.1),
-              border: `1px solid ${alpha(primaryColor, 0.25)}`,
-              display: "grid",
-              placeItems: "center",
-              color: primaryColor,
-              flexShrink: 0,
-            }}
-          >
-            <ShieldOutlinedIcon sx={{ fontSize: 24 }} />
-          </Box>
-          <Box>
-            <Typography
-              variant="h5"
-              sx={{
-                fontFamily: "Space Grotesk, sans-serif",
-                fontWeight: 800,
-                fontSize: { xs: "1.2rem", sm: "1.4rem" },
-                color: "text.primary",
-                lineHeight: 1.2,
-              }}
-            >
-              Phân Quyền & Quản Lý Nhân Sự Thư Viện
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                color: "text.secondary",
-                fontSize: "0.85rem",
-                mt: 0.25,
-              }}
-            >
-              Thiết lập quyền mở màn hình chức năng và các thao tác nghiệp vụ cho từng vị trí và nhân viên
-            </Typography>
-          </Box>
-        </Stack>
-
-        {/* Global Actions */}
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", alignSelf: { xs: "stretch", sm: "auto" } }}>
-          <Button
-            size="medium"
-            variant="outlined"
-            startIcon={<RefreshOutlinedIcon />}
-            onClick={loadData}
-            disabled={loading}
-            sx={{
-              borderRadius: 1.5,
-              textTransform: "none",
-              fontWeight: 600,
-              borderColor: "divider",
-              color: "text.primary",
-              "&:hover": { borderColor: "primary.main", bgcolor: "action.hover" },
-            }}
-          >
-            Làm mới
-          </Button>
-
-          {activeTab === 0 ? (
-            <Button
-              size="medium"
-              variant="contained"
-              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveOutlinedIcon />}
-              onClick={handleSaveRoleConfig}
-              disabled={saving || selectedRole === "admin"}
-              sx={{
-                borderRadius: 1.5,
-                textTransform: "none",
-                fontWeight: 700,
-                px: 2.5,
-              }}
-            >
-              {saving ? "Đang lưu..." : `Lưu quyền chức vụ [${activeRoleConfig.label}]`}
-            </Button>
-          ) : activeTab === 1 ? (
-            <Button
-              size="medium"
-              variant="contained"
-              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveOutlinedIcon />}
-              onClick={handleSaveUserOverride}
-              disabled={saving || !userOverride.enabled}
-              sx={{
-                borderRadius: 1.5,
-                textTransform: "none",
-                fontWeight: 700,
-                px: 2.5,
-              }}
-            >
-              {saving ? "Đang lưu..." : "Lưu quyền riêng nhân viên"}
-            </Button>
-          ) : null}
-        </Stack>
-      </Box>
-
-      {/* ── WORKSPACE TABS SELECTOR (DATA-FIRST, NO BULKY KPI BARS) ───────── */}
-      <Box
-        sx={{
+          bgcolor: isDark ? "background.paper" : "#F8FAFC",
           display: "flex",
-          borderBottom: 1,
-          borderColor: "divider",
-          mb: 3,
+          alignItems: "center",
           gap: 1,
+          mb: 3,
           overflowX: "auto",
         }}
       >
         {[
-          { label: "Phân quyền theo Chức vụ", icon: <RuleOutlinedIcon fontSize="small" /> },
-          { label: "Đặc quyền riêng Nhân viên", icon: <KeyOutlinedIcon fontSize="small" /> },
-          { label: "Kiểm tra Quyền hạn Thực tế", icon: <CodeOutlinedIcon fontSize="small" /> },
+          {
+            label: "Phân quyền theo Chức vụ",
+            icon: <RuleOutlinedIcon fontSize="small" />,
+            badge: `${Object.keys(roles).length} vị trí`,
+          },
+          {
+            label: "Đặc quyền riêng Nhân viên",
+            icon: <KeyOutlinedIcon fontSize="small" />,
+            badge: `${staffList.length} nhân sự`,
+          },
+          {
+            label: "Kiểm tra Quyền Thực tế",
+            icon: <CodeOutlinedIcon fontSize="small" />,
+            badge: userOverride.enabled ? "Đặc quyền bật" : "Chuẩn chức vụ",
+          },
         ].map((tab, idx) => {
           const isSelected = activeTab === idx;
           return (
             <Button
               key={idx}
+              variant={isSelected ? "contained" : "text"}
+              color={isSelected ? "primary" : "inherit"}
               startIcon={tab.icon}
               onClick={() => setActiveTab(idx)}
               sx={{
-                borderRadius: "6px 6px 0 0",
+                flex: { xs: "none", sm: 1 },
+                minWidth: { xs: 200, sm: 0 },
+                py: 1.2,
+                px: 2,
+                borderRadius: 2,
                 textTransform: "none",
-                fontWeight: isSelected ? 700 : 600,
-                fontSize: "0.88rem",
-                px: 2.5,
-                py: 1.25,
-                color: isSelected ? "primary.main" : "text.secondary",
-                borderBottom: isSelected ? `2px solid ${primaryColor}` : "2px solid transparent",
-                bgcolor: isSelected ? alpha(primaryColor, 0.08) : "transparent",
+                fontWeight: isSelected ? 800 : 600,
+                fontSize: "0.86rem",
+                boxShadow: isSelected
+                  ? isDark
+                    ? "0 2px 8px rgba(0,0,0,0.4)"
+                    : "0 2px 8px rgba(139,0,0,0.2)"
+                  : "none",
+                bgcolor: isSelected ? primaryColor : "transparent",
+                color: isSelected ? "#FFFFFF" : "text.secondary",
                 "&:hover": {
-                  color: "primary.main",
-                  bgcolor: alpha(primaryColor, 0.05),
+                  bgcolor: isSelected ? primaryColor : alpha(primaryColor, 0.08),
+                  color: isSelected ? "#FFFFFF" : "text.primary",
                 },
+                transition: "all 0.2s ease",
+                justifyContent: "center",
               }}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              <Chip
+                size="small"
+                label={tab.badge}
+                sx={{
+                  ml: 1,
+                  height: 20,
+                  fontSize: "0.68rem",
+                  fontWeight: 700,
+                  bgcolor: isSelected
+                    ? alpha("#FFFFFF", 0.22)
+                    : isDark
+                    ? alpha("#FFFFFF", 0.08)
+                    : "#E2E8F0",
+                  color: isSelected ? "#FFFFFF" : "text.secondary",
+                  borderRadius: 1,
+                  pointerEvents: "none",
+                }}
+              />
             </Button>
           );
         })}
-      </Box>
+      </Paper>
 
       {/* ── TAB CONTENT ───────────────────────────────────────────────────── */}
       {loading ? (

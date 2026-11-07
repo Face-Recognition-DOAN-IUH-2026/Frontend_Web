@@ -7,6 +7,8 @@ import Badge from "antd/es/badge";
 import Tooltip from "antd/es/tooltip";
 import type { ColumnsType } from "antd/es/table";
 import type { StaffScheduleAssignment, StaffShift } from "@/lib/types";
+import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
+import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import TimetableCell from "./TimetableCell";
 
 interface TimetableGridProps {
@@ -163,12 +165,24 @@ export default function TimetableGrid({
     return [shiftCol, ...dayCols];
   }, [days, dayCounts, isAdmin, onCellClick, onDeleteAssignment, theme, isDark]);
 
+  if (shifts.length === 0) {
+    return (
+      <Box sx={{ p: 4, textAlign: "center" }}>
+        <EmptyState
+          icon={<ScheduleOutlined sx={{ fontSize: 48, color: "text.disabled" }} />}
+          title="Chưa có ca trực nào được cấu hình"
+          description="Hiện tại hệ thống chưa có ca trực nào. Quản trị viên có thể vào mục Cài đặt hoặc Quản lý ca để thêm ca trực mới."
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{
       width: "100%",
-      overflowX: "auto",
-      border: `1px solid ${theme.palette.divider}`,
-      borderRadius: 1,
+      "& .ant-table-wrapper": {
+        width: "100%",
+      },
       "& .ant-table": {
         background: theme.palette.background.paper,
       },
@@ -183,6 +197,7 @@ export default function TimetableGrid({
         borderBottom: `1px solid ${theme.palette.divider}`,
         background: theme.palette.background.paper,
         color: theme.palette.text.primary,
+        verticalAlign: "top",
       },
       "& .ant-table-tbody > tr:hover > td": {
         background: isDark ? "rgba(99,102,241,0.04)" : "rgba(99,102,241,0.02)",
@@ -190,13 +205,19 @@ export default function TimetableGrid({
       "& .ant-table-cell": {
         padding: "8px",
       },
-      "& .ant-table-fixed-left": {
-        "& .ant-table-thead > tr > th": {
-          background: isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.06)",
-        },
-        "& .ant-table-tbody > tr > td": {
-          background: isDark ? "rgba(99,102,241,0.04)" : "rgba(99,102,241,0.02)",
-        },
+      // Fixed / sticky left column styling for Ant Design v5
+      "& .ant-table-cell-fix-left, & .ant-table-cell-fix-left-last": {
+        background: `${theme.palette.background.paper} !important`,
+        zIndex: 2,
+      },
+      "& .ant-table-thead th.ant-table-cell-fix-left, & .ant-table-thead th.ant-table-cell-fix-left-last": {
+        background: isDark ? "#1E293B !important" : "#F8FAFC !important",
+        zIndex: 3,
+      },
+      "& .ant-table-cell-fix-left-last::after": {
+        boxShadow: isDark
+          ? "inset -10px 0 8px -8px rgba(0, 0, 0, 0.5) !important"
+          : "inset -10px 0 8px -8px rgba(0, 0, 0, 0.12) !important",
       },
       "& .ant-table-bordered .ant-table-thead > tr > th": {
         borderInlineEnd: `1px solid ${theme.palette.divider}`,

@@ -106,7 +106,7 @@ export default function FinancePage() {
     : [];
 
   return (
-    <Stack spacing={3} sx={{ minHeight: 900 }}>
+    <Stack spacing={3} >
       <TabNavigation tabs={tabs} />
 
       <SectionLayout

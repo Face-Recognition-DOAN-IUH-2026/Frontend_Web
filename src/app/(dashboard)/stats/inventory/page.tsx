@@ -128,7 +128,7 @@ export default function InventoryPage() {
   const isDark = theme.palette.mode === "dark";
 
   return (
-    <Stack spacing={3} sx={{ minHeight: 900 }}>
+    <Stack spacing={3} >
       <TabNavigation tabs={tabs} />
 
       <SectionLayout
