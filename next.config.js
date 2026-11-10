@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://3.105.105.215:80').replace(/\/api\/?$/, '').replace(/\/$/, '');
+
 const nextConfig = {
   experimental: {
     optimizePackageImports: [
@@ -23,11 +25,11 @@ const nextConfig = {
       fallback: [
         {
           source: '/api/:path*',
-          destination: 'http://127.0.0.1:80/api/:path*',
+          destination: `${BACKEND_URL}/api/:path*`,
         },
         {
           source: '/users/:path*',
-          destination: 'http://127.0.0.1:80/users/:path*',
+          destination: `${BACKEND_URL}/users/:path*`,
         },
       ],
     };
