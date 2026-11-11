@@ -107,7 +107,7 @@ export function createScheduleMethods(client: AxiosInstance) {
       return response.data;
     },
 
-    async setGeofenceConfig(data: { zoneId: string; latitude: number; longitude: number; radiusMeters?: number; addressHint?: string | null; allowedWifiSsids?: string[] | null }): Promise<any> {
+    async setGeofenceConfig(data: { zoneId?: string | null; latitude: number; longitude: number; radiusMeters?: number; addressHint?: string | null; allowedWifiSsids?: string[] | null; isGlobal?: boolean }): Promise<any> {
       const response = await client.put("/api/schedules/geofence", data);
       return response.data;
     },
