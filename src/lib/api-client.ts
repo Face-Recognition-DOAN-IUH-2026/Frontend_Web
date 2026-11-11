@@ -288,7 +288,14 @@ function getApiAccessToken(): string | null {
   if (cookieVal) return cookieVal;
   if (typeof window !== "undefined") {
     try {
-      return localStorage.getItem("token") || localStorage.getItem("access_token");
+      return (
+        localStorage.getItem("token") ||
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("accessToken") ||
+        sessionStorage.getItem("token") ||
+        sessionStorage.getItem("access_token") ||
+        sessionStorage.getItem("accessToken")
+      );
     } catch {}
   }
   return null;

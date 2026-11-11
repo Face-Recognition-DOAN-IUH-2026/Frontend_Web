@@ -62,7 +62,13 @@ export function createAccessMethods(client: AxiosInstance) {
       let token: string | null = null;
       if (typeof window !== 'undefined') {
         try {
-          token = localStorage.getItem('token') || localStorage.getItem('access_token');
+          token =
+            localStorage.getItem('token') ||
+            localStorage.getItem('access_token') ||
+            localStorage.getItem('accessToken') ||
+            sessionStorage.getItem('token') ||
+            sessionStorage.getItem('access_token') ||
+            sessionStorage.getItem('accessToken');
         } catch {}
       }
       const url = token
@@ -87,7 +93,13 @@ export function createAccessMethods(client: AxiosInstance) {
       let token: string | null = null;
       if (typeof window !== 'undefined') {
         try {
-          token = localStorage.getItem('token') || localStorage.getItem('access_token');
+          token =
+            localStorage.getItem('token') ||
+            localStorage.getItem('access_token') ||
+            localStorage.getItem('accessToken') ||
+            sessionStorage.getItem('token') ||
+            sessionStorage.getItem('access_token') ||
+            sessionStorage.getItem('accessToken');
         } catch {}
       }
       const url = token
