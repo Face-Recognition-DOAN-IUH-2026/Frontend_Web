@@ -30,14 +30,28 @@ export default function CheckInMapModal({ open, onClose, assignmentId, zoneName,
   const [evaluation, setEvaluation] = useState<{ allowed: boolean; distanceMeters: number | null; radiusMeters: number | null } | null>(null);
 
   useEffect(() => {
-    if (open) loadGeofence();
+    if (open) {
+      loadGeofence();
+      setLocating(true);
+      requestLocation().then((loc) => {
+        setLocating(false);
+        if (loc) setUser(loc);
+      });
+    }
   }, [open]);
+
+  useEffect(() => {
+    if (user && geofence) {
+      evaluate(user);
+    }
+  }, [user, geofence]);
 
   const loadGeofence = async () => {
     setLoadingGeo(true);
     setEvaluation(null);
     try {
-      setGeofence(await api.getAssignmentGeofence(assignmentId));
+      const g = await api.getAssignmentGeofence(assignmentId);
+      setGeofence(g);
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -120,8 +134,13 @@ export default function CheckInMapModal({ open, onClose, assignmentId, zoneName,
               <Chip size="small" label={canCheckInMap ? `✅ Trong khu vực thi (${evaluation?.distanceMeters}m / ${evaluation?.radiusMeters}m)` : `❌ Ngoài khu vực thi (${evaluation?.distanceMeters}m / ${evaluation?.radiusMeters}m)`} color={canCheckInMap ? "success" : "error"} sx={{ fontWeight: 700, fontSize: "0.8rem", height: 24 }} />
             ) : null}
             {/* Luôn hiển thị nút lấy GPS để người dùng lấy lại vị trí bất cứ lúc nào. */}
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
               <Button size="small" variant="outlined" startIcon={<MyLocationIcon sx={{ fontSize: 16 }} />} disabled={loadingGeo || locating} onClick={async () => { setLocating(true); const loc = await requestLocation(); setLocating(false); if (loc) { setUser(loc); evaluate(loc); } else { toast.error("Trình duyệt không xác định được vị trí của bạn. Vui lòng bật định vị."); } }}>{locating ? "Đang định vị..." : user ? "Lấy lại vị trí GPS" : "Lấy vị trí GPS"}</Button>
+              {center && (
+                <Button size="small" variant="text" color="info" onClick={() => { setUser(center); evaluate(center); }} sx={{ fontSize: "0.75rem", textTransform: "none" }}>
+                  📍 Đặt vị trí tại trường IUH (Test)
+                </Button>
+              )}
               <InfoIcon sx={{ fontSize: 18 }} titleAccess="Vị trí chỉ dùng để hiển thị trên bản đồ; server sẽ tính lại khi xác nhận điểm danh" />
             </Stack>
             <Typography variant="caption" color="text.secondary">Vị trí chỉ được hiển thị trên bản đồ. Nút xác nhận bật khi bạn nằm trong bán kính cho phép.</Typography>
