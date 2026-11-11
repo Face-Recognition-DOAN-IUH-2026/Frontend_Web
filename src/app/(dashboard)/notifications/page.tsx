@@ -886,23 +886,25 @@ export default function NotificationsPage() {
               placeholder="Tìm kiếm thông báo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                  </InputAdornment>
-                ),
-                endAdornment: searchQuery ? (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setSearchQuery("")} edge="end">
-                      <ClearOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </InputAdornment>
-                ) : null,
-                sx: {
-                  borderRadius: 2,
-                  fontSize: "0.82rem",
-                  bgcolor: isDark ? "background.paper" : "#FFFFFF",
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchQuery ? (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setSearchQuery("")} edge="end">
+                        <ClearOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ) : null,
+                  sx: {
+                    borderRadius: 2,
+                    fontSize: "0.82rem",
+                    bgcolor: isDark ? "background.paper" : "#FFFFFF",
+                  },
                 },
               }}
             />
