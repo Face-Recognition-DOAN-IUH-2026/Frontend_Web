@@ -143,7 +143,7 @@ export interface PayFinesResponse {
 export interface CreatePaymentOrderRequest {
   patron_id?: string;
   record_ids: string[];
-  payment_method?: "vietqr" | "payos" | "vnpay";
+  payment_method?: "vietqr" | "sepay" | "payos" | "vnpay";
 }
 
 export interface PaymentOrderResponse {
@@ -152,7 +152,7 @@ export interface PaymentOrderResponse {
   patronId: string;
   amount: number;
   status: "pending" | "completed" | "expired" | "cancelled";
-  paymentMethod: "vietqr" | "payos" | "vnpay" | "cash";
+  paymentMethod: "vietqr" | "sepay" | "payos" | "vnpay" | "cash";
   qrUrl: string | null;
   qrData: string | null;
   expiresAt: string;

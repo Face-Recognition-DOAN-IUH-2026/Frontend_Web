@@ -55,7 +55,7 @@ export default function PendingPaymentOrders({
         <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
           <PendingActionsIcon color="info" />
           <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            Đơn VietQR chờ đối soát
+            Đơn SePay chờ đối soát
           </Typography>
           <Chip
             label={`${items.length} đơn`}
@@ -86,7 +86,7 @@ export default function PendingPaymentOrders({
       {items.length === 0 ? (
         <Box sx={{ py: 3, textAlign: "center" }}>
           <Typography variant="body2" color="text.secondary">
-            Không có đơn VietQR nào đang chờ đối soát.
+            Không có đơn SePay nào đang chờ đối soát.
           </Typography>
         </Box>
       ) : (
