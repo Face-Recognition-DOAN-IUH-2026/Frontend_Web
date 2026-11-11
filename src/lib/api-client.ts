@@ -1203,6 +1203,11 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
     return response.data;
   }
 
+  async simulatePaymentOrder(orderCode: string): Promise<{ success: boolean; orderCode: string; alreadyCompleted: boolean; activatedPatrons: string[] }> {
+    const response = await this.client.post(`/api/borrow/payments/${encodeURIComponent(orderCode)}/simulate`);
+    return response.data;
+  }
+
   async getBookCopies(bookId: string): Promise<import("./types").BookCopyData[]> {
     const response = await this.client.get<any>(`/api/borrow/books/${bookId}/copies`);
     const data = response.data;
