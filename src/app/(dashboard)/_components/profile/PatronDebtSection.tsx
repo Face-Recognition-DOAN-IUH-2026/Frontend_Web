@@ -75,11 +75,11 @@ export default function PatronDebtSection({
     try {
       const order = await api.createPaymentOrder({
         record_ids: recordIds,
-        payment_method: "vietqr",
+        payment_method: "sepay",
       });
       setQrOrder(order);
     } catch (err: any) {
-      onNoticeRef.current?.("error", getErrorMessage(err) || "Không thể tạo mã VietQR thanh toán");
+      onNoticeRef.current?.("error", getErrorMessage(err) || "Không thể tạo mã SePay thanh toán");
     } finally {
       setPaying(false);
     }
@@ -87,7 +87,7 @@ export default function PatronDebtSection({
 
   const handlePaymentSuccess = async (orderCode: string) => {
     setQrOrder(null);
-    onNoticeRef.current?.("success", `Thanh toán VietQR thành công! (Mã GD: ${orderCode}). Thẻ thư viện đã được mở khóa.`);
+    onNoticeRef.current?.("success", `Thanh toán SePay thành công! (Mã GD: ${orderCode}). Thẻ thư viện đã được mở khóa.`);
     await loadFines();
   };
 
@@ -148,7 +148,7 @@ export default function PatronDebtSection({
               <Box component="span" sx={{ color: "error.main", fontWeight: 800 }}>
                 {totalDebt.toLocaleString("vi-VN")} đ
               </Box>
-              . Vui lòng thanh toán trực tuyến qua VietQR để thẻ thư viện không bị gián đoạn.
+              . Vui lòng thanh toán trực tuyến qua SePay để thẻ thư viện không bị gián đoạn.
             </Typography>
           </Alert>
 
@@ -207,7 +207,7 @@ export default function PatronDebtSection({
                         onClick={() => handlePay([item.record_id])}
                         sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5, py: 0.5 }}
                       >
-                        Quét VietQR
+                        Quét SePay
                       </Button>
                     </TableCell>
                   </TableRow>

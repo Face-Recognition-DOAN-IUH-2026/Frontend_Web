@@ -174,7 +174,7 @@ export default function FinesLedger({
             if (target) onOpenQr(target);
           }}
         >
-          <QrCode2Icon fontSize="small" sx={{ mr: 1 }} /> Mã VietQR
+          <QrCode2Icon fontSize="small" sx={{ mr: 1 }} /> Quét mã SePay
         </MenuItem>
       </Menu>
 

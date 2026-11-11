@@ -221,14 +221,14 @@ export default function ReturnPage() {
 
   const handleOpenQrPayment = async (item: any) => {
     if (!item?.patron?.id) {
-      showNoticeRef.current("error", "Thiếu thông tin độc giả, không thể tạo mã VietQR");
+      showNoticeRef.current("error", "Thiếu thông tin độc giả, không thể tạo mã thanh toán SePay");
       return;
     }
     try {
       const order = await api.createPaymentOrder({
         patron_id: item.patron?.id,
         record_ids: [item.record_id],
-        payment_method: "vietqr",
+        payment_method: "sepay",
       });
       setQrPatronInfo({
         name: item.patron?.full_name || undefined,
@@ -237,14 +237,14 @@ export default function ReturnPage() {
       setQrOrder(order);
       setQrSourceItem(item);
     } catch (err: any) {
-      showNoticeRef.current("error", getErrorMessage(err) || "Không thể tạo mã thanh toán VietQR");
+      showNoticeRef.current("error", getErrorMessage(err) || "Không thể tạo mã thanh toán SePay");
     }
   };
 
   const handleQrPaymentSuccess = async (orderCode: string) => {
     setQrOrder(null);
     setQrSourceItem(null);
-    showNoticeRef.current("success", `Thanh toán VietQR thành công! (Mã GD: ${orderCode})`);
+    showNoticeRef.current("success", `Thanh toán SePay thành công! (Mã GD: ${orderCode})`);
     void loadUnpaidFines();
     void loadPendingOrders();
     await loadBorrowers();
@@ -294,7 +294,7 @@ export default function ReturnPage() {
           const order = await api.createPaymentOrder({
             patron_id: returnedRec.patron_id,
             record_ids: [returnedRec.id],
-            payment_method: "vietqr",
+            payment_method: "sepay",
           });
           setQrPatronInfo({
             name: detail?.patron.full_name || detail?.patron.student_code || undefined,
@@ -368,7 +368,7 @@ export default function ReturnPage() {
         </Slide>
       ) : null}
 
-      {/* Thanh Tabs phân chia chức năng: Quầy trả sách | Sổ nợ | Đơn VietQR */}
+      {/* Thanh Tabs phân chia chức năng: Quầy trả sách | Sổ nợ | Đơn SePay */}
       <Paper
         elevation={0}
         variant="outlined"
@@ -457,7 +457,7 @@ export default function ReturnPage() {
             iconPosition="start"
             label={
               <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-                <span>Đơn VietQR chờ xử lý</span>
+                <span>Đơn SePay chờ đối soát</span>
                 {pendingOrders.length > 0 && (
                   <Box
                     component="span"
@@ -548,7 +548,7 @@ export default function ReturnPage() {
                           "&:hover": { borderColor: "white", bgcolor: "rgba(255,255,255,0.1)" },
                         }}
                       >
-                        Tạo VietQR
+                        Tạo mã SePay
                       </Button>
                     </Stack>
                   }
@@ -590,7 +590,7 @@ export default function ReturnPage() {
         />
       )}
 
-      {/* TAB 2: ĐƠN VIETQR CHỜ XỬ LÝ / ĐỐI SOÁT */}
+      {/* TAB 2: ĐƠN SEPAY CHỜ XỬ LÝ / ĐỐI SOÁT */}
       {activeTab === 2 && (
         <PendingPaymentOrders
           items={pendingOrders}

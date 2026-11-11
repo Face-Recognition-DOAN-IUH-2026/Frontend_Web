@@ -34,8 +34,8 @@ export default function ReturnReceipt({ record, patron, onClose }: ReturnReceipt
 
   const isPaid = Boolean(record.fine_paid || record.payment_ref || totalDue === 0);
   const paymentMethodLabel =
-    record.payment_method === "qr_code" || record.payment_method === "vietqr"
-      ? "Chuyển khoản VietQR"
+    record.payment_method === "qr_code" || record.payment_method === "vietqr" || record.payment_method === "sepay"
+      ? "Chuyển khoản Ngân hàng (SePay)"
       : record.payment_method === "cash"
       ? "Tiền mặt"
       : totalDue > 0
@@ -165,7 +165,7 @@ export default function ReturnReceipt({ record, patron, onClose }: ReturnReceipt
         </Stack>
         ) : (
         <Typography variant="body2" color="text.secondary" align="center" sx={{ my: 1 }}>
-          Chưa thanh toán — vui lòng thanh toán sau tại quầy hoặc qua VietQR ở sổ nợ.
+          Chưa thanh toán — vui lòng thanh toán sau tại quầy hoặc qua SePay ở sổ nợ.
         </Typography>
         )}
 
