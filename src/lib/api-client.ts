@@ -1567,7 +1567,7 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
     return response.data;
   }
 
-  async setGeofenceConfig(data: { zoneId: string; latitude: number; longitude: number; radiusMeters?: number; addressHint?: string | null; allowedWifiSsids?: string[] | null }): Promise<any> {
+  async setGeofenceConfig(data: { zoneId?: string | null; isGlobal?: boolean; latitude: number; longitude: number; radiusMeters?: number; addressHint?: string | null; allowedWifiSsids?: string[] | null }): Promise<any> {
     const response = await this.client.put("/api/schedules/geofence", data);
     return response.data;
   }
