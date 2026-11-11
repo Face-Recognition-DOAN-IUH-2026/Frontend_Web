@@ -59,7 +59,16 @@ export function createAccessMethods(client: AxiosInstance) {
       onEvent: (event: CameraEvent) => void,
       onConnectionChange?: (connected: boolean) => void,
     ): () => void {
-      const es = new EventSource(`${API_BASE_URL}/api/access/events`, { withCredentials: true });
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        try {
+          token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        } catch {}
+      }
+      const url = token
+        ? `${API_BASE_URL}/api/access/events?token=${encodeURIComponent(token)}`
+        : `${API_BASE_URL}/api/access/events`;
+      const es = new EventSource(url, { withCredentials: true });
       es.addEventListener("open", () => onConnectionChange?.(true));
       es.addEventListener("camera_event", (msg: MessageEvent) => {
         try {
@@ -75,7 +84,16 @@ export function createAccessMethods(client: AxiosInstance) {
       onEvent: (event: FaceResultEvent) => void,
       onConnectionChange?: (connected: boolean) => void,
     ): () => void {
-      const es = new EventSource(`${API_BASE_URL}/api/access/events`, { withCredentials: true });
+      let token: string | null = null;
+      if (typeof window !== 'undefined') {
+        try {
+          token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        } catch {}
+      }
+      const url = token
+        ? `${API_BASE_URL}/api/access/events?token=${encodeURIComponent(token)}`
+        : `${API_BASE_URL}/api/access/events`;
+      const es = new EventSource(url, { withCredentials: true });
       es.addEventListener("open", () => onConnectionChange?.(true));
       es.addEventListener("face_result", (msg: MessageEvent) => {
         try {

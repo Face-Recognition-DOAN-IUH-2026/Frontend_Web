@@ -283,7 +283,15 @@ function setApiAccessToken(token: string | null, refreshToken?: string | null) {
 }
 
 function getApiAccessToken(): string | null {
-  return _accessToken;
+  if (_accessToken) return _accessToken;
+  const cookieVal = getCookieValue("access_token");
+  if (cookieVal) return cookieVal;
+  if (typeof window !== "undefined") {
+    try {
+      return localStorage.getItem("token") || localStorage.getItem("access_token");
+    } catch {}
+  }
+  return null;
 }
 
 function getApiRefreshToken(): string | null {
@@ -858,7 +866,11 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
     onEvent: (event: CameraEvent) => void,
     onConnectionChange?: (connected: boolean) => void,
   ): () => void {
-    const es = new EventSource(`${API_BASE_URL}/api/access/events`, { withCredentials: true });
+    const token = getApiAccessToken();
+    const url = token
+      ? `${API_BASE_URL}/api/access/events?token=${encodeURIComponent(token)}`
+      : `${API_BASE_URL}/api/access/events`;
+    const es = new EventSource(url, { withCredentials: true });
     es.addEventListener("open", () => onConnectionChange?.(true));
     es.addEventListener("camera_event", (msg: MessageEvent) => {
       try {
@@ -874,7 +886,11 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
     onEvent: (event: FaceResultEvent) => void,
     onConnectionChange?: (connected: boolean) => void,
   ): () => void {
-    const es = new EventSource(`${API_BASE_URL}/api/access/events`, { withCredentials: true });
+    const token = getApiAccessToken();
+    const url = token
+      ? `${API_BASE_URL}/api/access/events?token=${encodeURIComponent(token)}`
+      : `${API_BASE_URL}/api/access/events`;
+    const es = new EventSource(url, { withCredentials: true });
     es.addEventListener("open", () => onConnectionChange?.(true));
     es.addEventListener("face_result", (msg: MessageEvent) => {
       try {
