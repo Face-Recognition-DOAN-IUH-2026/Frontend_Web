@@ -68,8 +68,8 @@ interface TodayCounts {
 
 type Step = "idle" | "verify" | "challenge" | "result";
 
-const ENTRY_CAM: string = process.env.NEXT_PUBLIC_ENTRY_CAM || "http://192.168.1.102:8080/video";
-const EXIT_CAM: string = process.env.NEXT_PUBLIC_EXIT_CAM || "http://192.168.1.102:8080/video";
+const ENTRY_CAM: string = process.env.NEXT_PUBLIC_ENTRY_CAM || "";
+const EXIT_CAM: string = process.env.NEXT_PUBLIC_EXIT_CAM || "";
 const ENTRY_CAM_ID = process.env.NEXT_PUBLIC_ENTRY_CAM_ID || "entry_gate";
 const EXIT_CAM_ID = process.env.NEXT_PUBLIC_EXIT_CAM_ID || "exit_gate";
 const HISTORY_LIMIT = 10;

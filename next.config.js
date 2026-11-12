@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://3.105.105.215:80').replace(/\/api\/?$/, '').replace(/\/$/, '');
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://iuhlib-api.duckdns.org').replace(/\/api\/?$/, '').replace(/\/$/, '');
 
 const nextConfig = {
   experimental: {
