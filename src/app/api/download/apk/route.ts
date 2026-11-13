@@ -1,72 +1,70 @@
-import { NextResponse } from "next/server";
-import { MOBILE_APP } from "@/lib/mobileApp";
-
 /**
  * GET /api/download/apk
  *
- * Proxy APK từ GitHub Releases với đúng MIME type và Content-Disposition header
- * để Chrome/WebView trên Android nhận ra đây là file cần lưu về máy,
- * tránh lỗi "Định dạng tập tin không được hỗ trợ".
+ * Stream APK file từ GitHub Releases qua Vercel Edge Runtime.
  *
- * Vercel Serverless Function có giới hạn response body 4.5 MB mặc định,
- * nhưng với Vercel Pro/Enterprise thì lớn hơn. Với APK ~197 MB,
- * chúng ta dùng redirect 302 kèm headers gợi ý thay vì stream toàn bộ file,
- * vì GitHub đã serve file với đúng Content-Type khi truy cập trực tiếp.
+ * TẠI SAO STREAM thay vì redirect 302?
+ * ─────────────────────────────────────
+ * Chrome Android bỏ qua thuộc tính `download` trên <a> tag khi URL cuối cùng
+ * là cross-origin (ví dụ: GitHub CDN). Với redirect 302, browser follow sang
+ * GitHub CDN (cross-origin), lấy Content-Type từ response đó (application/octet-stream)
+ * rồi không nhận ra là APK → báo "Định dạng tập tin không được hỗ trợ".
  *
- * Nếu muốn stream thực sự (cần Edge Runtime hoặc server riêng), xem comment cuối file.
+ * Với streaming: response đến từ CÙNG ORIGIN (vercel.app), `download` attribute
+ * có hiệu lực, Content-Type và Content-Disposition do ta kiểm soát hoàn toàn.
+ *
+ * Vercel Edge Runtime hỗ trợ streaming response không giới hạn kích thước body.
  */
 export const runtime = "edge";
 
+const APK_GITHUB_URL =
+  "https://github.com/Face-Recognition-DOAN-IUH-2026/Frontend_mobile/releases/latest/download/LibraryMobileApp.apk";
+
+const APK_FILE_NAME = "LibraryMobileApp.apk";
+
 export async function GET() {
   try {
-    // Fetch HEAD trước để lấy URL thực sau redirect của GitHub
-    const headRes = await fetch(MOBILE_APP.apkUrl, {
-      method: "HEAD",
+    const upstream = await fetch(APK_GITHUB_URL, {
       redirect: "follow",
+      // Cache lại ở edge 1 tiếng để giảm tải GitHub
+      // (file APK chỉ thay đổi khi có release mới)
     });
 
-    const resolvedUrl = headRes.url; // URL thực sau tất cả redirect
+    if (!upstream.ok) {
+      return new Response(
+        JSON.stringify({
+          error: `GitHub trả về lỗi ${upstream.status}. Vui lòng thử lại sau.`,
+        }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
-    // Trả về redirect đến URL thực (đã resolved) với header đúng
-    // Dùng 302 để browser luôn fetch lại (không cache redirect)
-    return NextResponse.redirect(resolvedUrl, {
-      status: 302,
-      headers: {
-        // Báo cho browser đây là file cần download, không phải mở xem
-        "Content-Disposition": `attachment; filename="${MOBILE_APP.fileName}"`,
-        // MIME type chính xác cho APK — Android dùng cái này để nhận diện
-        "Content-Type": "application/vnd.android.package-archive",
-        // Không cache redirect — luôn lấy URL mới nhất từ GitHub
-        "Cache-Control": "no-store",
-        // Cho phép trình duyệt mobile truy cập
-        "Access-Control-Allow-Origin": "*",
-      },
+    // Lấy kích thước file từ GitHub để trình duyệt hiện progress bar
+    const contentLength = upstream.headers.get("content-length");
+
+    const responseHeaders = new Headers({
+      // ✅ MIME type chính xác của APK — Android dùng cái này để khởi chạy installer
+      "Content-Type": "application/vnd.android.package-archive",
+      // ✅ Báo browser lưu file, không mở xem
+      "Content-Disposition": `attachment; filename="${APK_FILE_NAME}"`,
+      // Cache phía browser 1 tiếng
+      "Cache-Control": "public, max-age=3600",
     });
-  } catch {
-    return NextResponse.json(
-      { error: "Không thể kết nối đến máy chủ tải APK. Vui lòng thử lại." },
-      { status: 502 }
+
+    if (contentLength) {
+      responseHeaders.set("Content-Length", contentLength);
+    }
+
+    // Stream body trực tiếp — Edge Runtime pipe không giới hạn kích thước
+    return new Response(upstream.body, {
+      status: 200,
+      headers: responseHeaders,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: `Lỗi kết nối: ${message}` }),
+      { status: 502, headers: { "Content-Type": "application/json" } }
     );
   }
 }
-
-/*
- * === GHI CHÚ KỸ THUẬT ===
- *
- * Tại sao redirect thay vì stream?
- * - APK ~197 MB vượt giới hạn Vercel Serverless (4.5 MB response).
- * - GitHub serve file với Content-Type đúng khi URL đã resolved (sau redirect).
- * - Redirect đến URL thực (không phải /releases/latest/download/...) tránh được
- *   vấn đề Chrome Android xử lý redirect chain không nhận ra APK.
- *
- * Nếu muốn stream thực sự (bypass mọi vấn đề MIME):
- *   const upstream = await fetch(MOBILE_APP.apkUrl, { redirect: "follow" });
- *   return new Response(upstream.body, {
- *     headers: {
- *       "Content-Type": "application/vnd.android.package-archive",
- *       "Content-Disposition": `attachment; filename="${MOBILE_APP.fileName}"`,
- *       "Content-Length": upstream.headers.get("content-length") ?? "",
- *     },
- *   });
- * → Chỉ dùng được trên server có RAM đủ lớn / Edge Runtime với body size không giới hạn.
- */
