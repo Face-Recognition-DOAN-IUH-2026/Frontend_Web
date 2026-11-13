@@ -90,17 +90,17 @@ describe('PatronDebtSection', () => {
       expect(screen.getByText('Lập trình TypeScript')).toBeInTheDocument();
     });
 
-    const singlePayButtons = screen.getAllByRole('button', { name: /Quét VietQR/i });
+    const singlePayButtons = screen.getAllByRole('button', { name: /Quét SePay/i });
     fireEvent.click(singlePayButtons[0]);
 
     await waitFor(() => {
       expect(api.createPaymentOrder).toHaveBeenCalledWith({
         record_ids: ['rec-1'],
-        payment_method: 'vietqr',
+        payment_method: 'sepay',
       });
     });
 
-    expect(screen.getByText('Thanh toán Phí phạt qua VietQR')).toBeInTheDocument();
+    expect(screen.getByText('Thanh toán Chuyển khoản (SePay)')).toBeInTheDocument();
   });
 
   it('handles bulk payment for all debt records', async () => {
@@ -122,7 +122,7 @@ describe('PatronDebtSection', () => {
     await waitFor(() => {
       expect(api.createPaymentOrder).toHaveBeenCalledWith({
         record_ids: ['rec-1', 'rec-2'],
-        payment_method: 'vietqr',
+        payment_method: 'sepay',
       });
     });
   });
