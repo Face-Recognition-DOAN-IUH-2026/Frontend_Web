@@ -1,10 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Chip,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
   Paper,
   Stack,
   Typography,
@@ -15,6 +22,9 @@ import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import HelpOutlineIcon from "@mui/icons-material/HelpCenter";
 import { QRCodeSVG } from "qrcode.react";
 import { MOBILE_APP } from "@/lib/mobileApp";
 
@@ -25,9 +35,44 @@ const perks = [
   "Đăng nhập bằng mã sinh viên hoặc nhận diện khuôn mặt",
 ];
 
+const installSteps = [
+  {
+    title: "Tải file về máy",
+    body: `Bấm "Tải APK về máy". Trình duyệt tự tải file ${MOBILE_APP.fileName} (${MOBILE_APP.sizeLabel}) vào thư mục Tải về.`,
+  },
+  {
+    title: "Mở thư mục Tải về — đừng bấm file trong trình duyệt",
+    body: "Mở ứng dụng Tệp (Files) của máy rồi vào thư mục Tải về (Downloads). Bấm file ngay trên thanh tải về của trình duyệt sẽ bị báo \"Định dạng tệp tin không được hỗ trợ\" vì APK cần được cài đặt chứ không phải mở xem.",
+  },
+  {
+    title: "Cho phép cài đặt từ nguồn không xác định (chỉ làm một lần)",
+    body: "Vào Cài đặt → Bảo mật → Cài đặt từ nguồn không xác định, rồi bật cho ứng dụng Tệp hoặc trình duyệt bạn dùng.",
+  },
+  {
+    title: "Cài đặt và mở ứng dụng",
+    body: `Bấm ${MOBILE_APP.fileName} trong thư mục Tải về → Cài đặt → Mở. Ứng dụng yêu cầu Android ${MOBILE_APP.minAndroid} trở lên.`,
+  },
+];
+
+/** Mở thẳng thư mục Downloads của Android (chỉ hoạt động trên Android). */
+const ANDROID_DOWNLOADS_INTENT =
+  "intent://openDownloads#Intent;scheme=android.intent.action.VIEW;package=com.android.documentsui;end";
+
+function useIsAndroid(): boolean {
+  const [isAndroid, setIsAndroid] = useState(false);
+
+  useEffect(() => {
+    setIsAndroid(/Android/i.test(navigator.userAgent));
+  }, []);
+
+  return isAndroid;
+}
+
 export default function MobileAppDownload() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const isAndroid = useIsAndroid();
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const cardBg = isDark ? "rgba(15, 23, 42, 0.7)" : "rgba(255, 255, 255, 0.78)";
   const cardBorder = isDark
@@ -112,6 +157,7 @@ export default function MobileAppDownload() {
               <Button
                 component="a"
                 href={MOBILE_APP.apkUrl}
+                download={MOBILE_APP.fileName}
                 variant="contained"
                 size="large"
                 startIcon={<DownloadRoundedIcon />}
@@ -123,7 +169,16 @@ export default function MobileAppDownload() {
                   boxShadow: "0 4px 16px rgba(30,96,145,0.3)",
                 }}
               >
-                Tải APK cho Android
+                Tải APK về máy
+              </Button>
+              <Button
+                onClick={() => setGuideOpen(true)}
+                variant="outlined"
+                size="large"
+                startIcon={<HelpOutlineIcon />}
+                sx={{ fontWeight: 600, textTransform: "none" }}
+              >
+                Hướng dẫn cài đặt
               </Button>
               <Button
                 component="a"
@@ -138,6 +193,25 @@ export default function MobileAppDownload() {
                 Xem tất cả phiên bản
               </Button>
             </Stack>
+
+            {/* Android: mở thẳng thư mục Tải về để cài, tránh lỗi "định dạng không hỗ trợ" */}
+            {isAndroid ? (
+              <Button
+                component="a"
+                href={ANDROID_DOWNLOADS_INTENT}
+                variant="text"
+                size="small"
+                startIcon={<FolderOpenIcon />}
+                sx={{ alignSelf: "flex-start", fontWeight: 600, textTransform: "none" }}
+              >
+                Đã tải xong? Mở thư mục Tải về
+              </Button>
+            ) : null}
+
+            <Alert severity="warning" sx={{ alignSelf: "flex-start" }}>
+              File APK không mở xem được trong trình duyệt. Tải xong, hãy mở
+              file từ thư mục <b>Tải về</b> rồi bấm cài đặt.
+            </Alert>
 
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
               v{MOBILE_APP.version} · {MOBILE_APP.sizeLabel} · Android{" "}
@@ -198,6 +272,79 @@ export default function MobileAppDownload() {
           </Stack>
         </Paper>
       </Container>
+
+      <Dialog
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        aria-labelledby="install-guide-title"
+      >
+        <DialogTitle id="install-guide-title" sx={{ fontWeight: 800, pr: 6 }}>
+          Cài đặt ứng dụng trên Android
+          <IconButton
+            onClick={() => setGuideOpen(false)}
+            aria-label="Đóng"
+            sx={{ position: "absolute", right: 12, top: 12 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5}>
+            <Alert severity="info">
+              Trình duyệt không mở được file APK. Nhấn vào file trong thanh tải
+              về sẽ báo &ldquo;Định dạng tệp tin không được hỗ trợ&rdquo; — đây là
+              hành vi bình thường, không phải lỗi tải.
+            </Alert>
+
+            {installSteps.map((step, i) => (
+              <Stack key={step.title} direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    bgcolor: "rgba(30, 96, 145, 0.12)",
+                    color: accent,
+                    fontWeight: 800,
+                    fontSize: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {i + 1}
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                    {step.title}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.65 }}>
+                    {step.body}
+                  </Typography>
+                </Box>
+              </Stack>
+            ))}
+
+            {isAndroid ? (
+              <Button
+                component="a"
+                href={ANDROID_DOWNLOADS_INTENT}
+                variant="outlined"
+                startIcon={<FolderOpenIcon />}
+                sx={{ alignSelf: "flex-start", fontWeight: 600, textTransform: "none" }}
+              >
+                Mở thư mục Tải về ngay
+              </Button>
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setGuideOpen(false)}>Đã hiểu</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
