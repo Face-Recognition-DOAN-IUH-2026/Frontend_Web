@@ -1725,6 +1725,20 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
     return response.data;
   }
 
+  async parseBookText(raw_text: string): Promise<{
+    title: string | null;
+    author: string | null;
+    isbn: string | null;
+    publisher: string | null;
+    publish_year: number | null;
+    categories: string | null;
+    ddc_code: string | null;
+    summary: string | null;
+  }> {
+    const response = await this.client.post("/api/ai/parse-book-text", { raw_text });
+    return response.data;
+  }
+
   async getAiTools(): Promise<AIToolSummary[]> {
     const response = await this.client.get<AIToolSummary[]>("/api/ai/tools");
     return response.data;
