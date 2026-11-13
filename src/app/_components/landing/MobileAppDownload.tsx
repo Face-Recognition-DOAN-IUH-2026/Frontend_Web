@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -11,9 +10,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   IconButton,
   Paper,
   Stack,
+  Step,
+  StepContent,
+  StepLabel,
+  Stepper,
   Typography,
   useTheme,
 } from "@mui/material";
@@ -21,12 +25,16 @@ import AndroidIcon from "@mui/icons-material/Android";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
-import HelpOutlineIcon from "@mui/icons-material/HelpCenter";
+import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
+import QrCode2Icon from "@mui/icons-material/QrCode2";
+import SecurityIcon from "@mui/icons-material/Security";
+import SystemUpdateIcon from "@mui/icons-material/SystemUpdate";
 import { QRCodeSVG } from "qrcode.react";
 import { MOBILE_APP } from "@/lib/mobileApp";
+
+/* ─── data ──────────────────────────────────────────────────────────────── */
 
 const perks = [
   "Quét mã vạch để mượn và trả sách nhanh tại quầy",
@@ -37,36 +45,280 @@ const perks = [
 
 const installSteps = [
   {
-    title: "Tải file về máy",
-    body: `Bấm "Tải APK về máy". Trình duyệt tự tải file ${MOBILE_APP.fileName} (${MOBILE_APP.sizeLabel}) vào thư mục Tải về.`,
+    icon: <DownloadRoundedIcon fontSize="small" />,
+    label: "Tải file APK",
+    description: `Nhấn nút "Tải APK cho Android". File ${MOBILE_APP.fileName} (${MOBILE_APP.sizeLabel}) sẽ được lưu vào thư mục Tải về.`,
   },
   {
-    title: "Mở thư mục Tải về — đừng bấm file trong trình duyệt",
-    body: "Mở ứng dụng Tệp (Files) của máy rồi vào thư mục Tải về (Downloads). Bấm file ngay trên thanh tải về của trình duyệt sẽ bị báo \"Định dạng tệp tin không được hỗ trợ\" vì APK cần được cài đặt chứ không phải mở xem.",
+    icon: <FolderOpenIcon fontSize="small" />,
+    label: "Mở từ ứng dụng Tệp",
+    description:
+      'Mở ứng dụng Tệp (Files) → thư mục Tải về → nhấn file APK. Không nhấn trực tiếp trên thanh tải của trình duyệt — Android sẽ báo "định dạng không hỗ trợ".',
   },
   {
-    title: "Cho phép cài đặt từ nguồn không xác định (chỉ làm một lần)",
-    body: "Vào Cài đặt → Bảo mật → Cài đặt từ nguồn không xác định, rồi bật cho ứng dụng Tệp hoặc trình duyệt bạn dùng.",
+    icon: <SecurityIcon fontSize="small" />,
+    label: "Cho phép cài từ nguồn không xác định",
+    description:
+      "Vào Cài đặt → Bảo mật → Cài đặt từ nguồn không xác định, bật cho ứng dụng Tệp hoặc trình duyệt bạn đang dùng. Chỉ cần làm một lần.",
   },
   {
-    title: "Cài đặt và mở ứng dụng",
-    body: `Bấm ${MOBILE_APP.fileName} trong thư mục Tải về → Cài đặt → Mở. Ứng dụng yêu cầu Android ${MOBILE_APP.minAndroid} trở lên.`,
+    icon: <SystemUpdateIcon fontSize="small" />,
+    label: "Cài đặt và mở",
+    description: `Nhấn Cài đặt → Mở. Yêu cầu Android ${MOBILE_APP.minAndroid}+.`,
   },
 ];
 
-/** Mở thẳng thư mục Downloads của Android (chỉ hoạt động trên Android). */
+/** Mở thư mục Downloads trên Android */
 const ANDROID_DOWNLOADS_INTENT =
   "intent://openDownloads#Intent;scheme=android.intent.action.VIEW;package=com.android.documentsui;end";
 
-function useIsAndroid(): boolean {
-  const [isAndroid, setIsAndroid] = useState(false);
+/* ─── hooks ─────────────────────────────────────────────────────────────── */
 
-  useEffect(() => {
-    setIsAndroid(/Android/i.test(navigator.userAgent));
-  }, []);
-
-  return isAndroid;
+function useIsAndroid() {
+  const [v, setV] = useState(false);
+  useEffect(() => setV(/Android/i.test(navigator.userAgent)), []);
+  return v;
 }
+
+/* ─── sub-components ────────────────────────────────────────────────────── */
+
+/** Thẻ thông tin nhỏ: icon + label + giá trị */
+function InfoBadge({
+  icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <Stack
+      spacing={0.5}
+      sx={{
+        px: 2,
+        py: 1.25,
+        borderRadius: 2,
+        border: "1px solid",
+        borderColor: "divider",
+        bgcolor: "action.hover",
+        minWidth: 90,
+        alignItems: "center",
+      }}
+    >
+      <Box sx={{ color: accent, lineHeight: 0 }}>{icon}</Box>
+      <Typography variant="caption" sx={{ color: "text.disabled", lineHeight: 1 }}>
+        {label}
+      </Typography>
+      <Typography variant="subtitle2" sx={{ fontWeight: 800, lineHeight: 1 }}>
+        {value}
+      </Typography>
+    </Stack>
+  );
+}
+
+/* ─── install guide dialog ──────────────────────────────────────────────── */
+
+function InstallGuideDialog({
+  open,
+  onClose,
+  isAndroid,
+  accent,
+}: {
+  open: boolean;
+  onClose: () => void;
+  isAndroid: boolean;
+  accent: string;
+}) {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      aria-labelledby="install-guide-title"
+      sx={{ "& .MuiDialog-paper": { borderRadius: 3 } }}
+    >
+      <DialogTitle
+        id="install-guide-title"
+        sx={{ fontWeight: 800, pr: 6, pb: 1.5 }}
+      >
+        Hướng dẫn cài đặt APK trên Android
+        <IconButton
+          onClick={onClose}
+          aria-label="Đóng"
+          size="small"
+          sx={{ position: "absolute", right: 12, top: 12 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+
+      <Divider />
+
+      <DialogContent sx={{ pt: 2.5 }}>
+        <Stepper orientation="vertical" nonLinear activeStep={-1}>
+          {installSteps.map((step) => (
+            <Step key={step.label} active>
+              <StepLabel
+                icon={
+                  <Box
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      bgcolor: `${accent}18`,
+                      color: accent,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {step.icon}
+                  </Box>
+                }
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  {step.label}
+                </Typography>
+              </StepLabel>
+              <StepContent>
+                <Typography
+                  variant="body2"
+                  sx={{ color: "text.secondary", lineHeight: 1.65, pb: 1 }}
+                >
+                  {step.description}
+                </Typography>
+              </StepContent>
+            </Step>
+          ))}
+        </Stepper>
+
+        {isAndroid && (
+          <Box sx={{ mt: 2 }}>
+            <Button
+              component="a"
+              href={ANDROID_DOWNLOADS_INTENT}
+              variant="outlined"
+              size="small"
+              startIcon={<FolderOpenIcon />}
+              sx={{ fontWeight: 600, textTransform: "none", borderRadius: 2 }}
+            >
+              Mở thư mục Tải về ngay
+            </Button>
+          </Box>
+        )}
+      </DialogContent>
+
+      <Divider />
+      <DialogActions sx={{ px: 3, py: 1.5 }}>
+        <Button onClick={onClose} variant="contained" sx={{ borderRadius: 2, fontWeight: 700 }}>
+          Đã hiểu
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/* ─── QR panel ──────────────────────────────────────────────────────────── */
+
+function QrPanel({ isDark }: { isDark: boolean }) {
+  return (
+    <Stack spacing={2.5} sx={{ alignItems: "center" }}>
+      {/* QR frame */}
+      <Box
+        sx={{
+          position: "relative",
+          p: 0.75,
+          borderRadius: 3.5,
+          background: isDark
+            ? "linear-gradient(135deg,#9CC9E8 0%,#1E6091 100%)"
+            : "linear-gradient(135deg,#1E6091 0%,#0A2540 100%)",
+          boxShadow: isDark
+            ? "0 12px 40px rgba(0,0,0,0.5)"
+            : "0 12px 40px rgba(10,37,64,0.18)",
+        }}
+      >
+        <Box
+          sx={{
+            p: 2,
+            bgcolor: "#fff",
+            borderRadius: 2.75,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <QRCodeSVG
+            value={MOBILE_APP.apkUrl}
+            size={168}
+            level="M"
+            bgColor="#FFFFFF"
+            fgColor="#0A2540"
+            role="img"
+            aria-label="Mã QR tải ứng dụng Thư viện IUH cho Android"
+            title="Mã QR tải ứng dụng Thư viện IUH cho Android"
+          />
+        </Box>
+        {/* Android logo badge */}
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: -12,
+            right: -12,
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            bgcolor: "#3DDC84",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 4px 12px rgba(61,220,132,0.4)",
+          }}
+        >
+          <AndroidIcon sx={{ fontSize: 20, color: "#fff" }} />
+        </Box>
+      </Box>
+
+      <Stack spacing={0.75} sx={{ textAlign: "center" }}>
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", justifyContent: "center" }}>
+          <QrCode2Icon sx={{ fontSize: 16, color: "text.disabled" }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+            Quét mã để tải ngay
+          </Typography>
+        </Stack>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+          Mở camera điện thoại và hướng vào mã QR
+        </Typography>
+      </Stack>
+
+      {/* Direct link */}
+      <Button
+        component="a"
+        href={MOBILE_APP.releasesUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        variant="text"
+        size="small"
+        endIcon={<OpenInNewIcon sx={{ fontSize: 13 }} />}
+        sx={{
+          fontSize: 12,
+          fontWeight: 600,
+          textTransform: "none",
+          color: "text.secondary",
+          "&:hover": { color: "primary.main" },
+        }}
+      >
+        Xem tất cả phiên bản
+      </Button>
+    </Stack>
+  );
+}
+
+/* ─── main component ────────────────────────────────────────────────────── */
 
 export default function MobileAppDownload() {
   const theme = useTheme();
@@ -74,277 +326,266 @@ export default function MobileAppDownload() {
   const isAndroid = useIsAndroid();
   const [guideOpen, setGuideOpen] = useState(false);
 
-  const cardBg = isDark ? "rgba(15, 23, 42, 0.7)" : "rgba(255, 255, 255, 0.78)";
-  const cardBorder = isDark
-    ? "rgba(255, 255, 255, 0.08)"
-    : "rgba(255, 255, 255, 0.7)";
   const accent = isDark ? "#9CC9E8" : "#1E6091";
+
+  /* gradient band behind the card */
+  const bandBg = isDark
+    ? "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(30,96,145,0.18) 0%, transparent 70%)"
+    : "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(30,96,145,0.07) 0%, transparent 70%)";
 
   return (
     <Box
       component="section"
       id="tai-app"
-      sx={{ py: { xs: 8, md: 12 }, scrollMarginTop: { xs: 72, md: 88 } }}
+      sx={{
+        py: { xs: 8, md: 12 },
+        scrollMarginTop: { xs: 72, md: 88 },
+        background: bandBg,
+      }}
     >
       <Container maxWidth="lg">
+        {/* Section label */}
+        <Stack sx={{ alignItems: "center", mb: 5 }}>
+          <Chip
+            icon={<PhoneAndroidIcon sx={{ fontSize: 15 }} />}
+            label="ỨNG DỤNG DI ĐỘNG"
+            size="small"
+            sx={{
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              bgcolor: isDark ? "rgba(30,96,145,0.18)" : "rgba(30,96,145,0.1)",
+              color: accent,
+              mb: 2,
+            }}
+          />
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 850,
+              letterSpacing: "-0.02em",
+              textAlign: "center",
+            }}
+          >
+            Thư Viện IUH Trong Tầm Tay Bạn
+          </Typography>
+          <Typography
+            variant="body1"
+            sx={{
+              color: "text.secondary",
+              textAlign: "center",
+              mt: 1,
+              maxWidth: 480,
+              lineHeight: 1.7,
+            }}
+          >
+            Ứng dụng Android đồng bộ trực tiếp với hệ thống quản lý thư viện
+            thông minh.
+          </Typography>
+        </Stack>
+
+        {/* Main card */}
         <Paper
           elevation={0}
           sx={{
-            p: { xs: 3, sm: 4, md: 5 },
-            borderRadius: 3.5,
-            bgcolor: cardBg,
-            backdropFilter: "blur(16px)",
+            borderRadius: 4,
             border: "1px solid",
-            borderColor: cardBorder,
+            borderColor: isDark
+              ? "rgba(255,255,255,0.08)"
+              : "rgba(30,96,145,0.1)",
+            overflow: "hidden",
             boxShadow: isDark
-              ? "0 8px 32px rgba(0,0,0,0.3)"
-              : "0 8px 32px rgba(10, 37, 64, 0.05)",
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1.15fr 0.85fr" },
-            gap: { xs: 4, md: 5 },
-            alignItems: "center",
+              ? "0 24px 60px rgba(0,0,0,0.35)"
+              : "0 24px 60px rgba(10,37,64,0.08)",
           }}
         >
-          {/* Left: copy + download actions */}
-          <Stack spacing={2.5}>
-            <Box>
-              <Chip
-                icon={<AndroidIcon sx={{ fontSize: 16 }} />}
-                label="ỨNG DỤNG DI ĐỘNG"
-                size="small"
-                sx={{
-                  fontWeight: 800,
-                  letterSpacing: "0.08em",
-                  bgcolor: "rgba(30, 96, 145, 0.12)",
-                  color: accent,
-                }}
-              />
-            </Box>
-
-            <Typography
-              variant="h4"
-              sx={{ fontWeight: 850, letterSpacing: "-0.015em" }}
-            >
-              Thư Viện IUH Trong Tầm Tay Bạn
-            </Typography>
-
-            <Typography variant="body1" sx={{ color: "text.secondary", lineHeight: 1.7 }}>
-              Ứng dụng Thư viện IUH cho Android, đồng bộ trực tiếp với hệ thống
-              quản lý thư viện thông minh.
-            </Typography>
-
-            <Stack spacing={1.2} sx={{ pt: 0.5 }}>
-              {perks.map((perk) => (
-                <Stack key={perk} direction="row" spacing={1.2} sx={{ alignItems: "flex-start" }}>
-                  <CheckCircleIcon
-                    sx={{ fontSize: 18, color: "#059669", mt: "2px", flexShrink: 0 }}
-                  />
-                  <Typography
-                    variant="body2"
-                    sx={{ color: "text.secondary", lineHeight: 1.6 }}
-                  >
-                    {perk}
-                  </Typography>
-                </Stack>
-              ))}
-            </Stack>
-
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1px 320px" },
+            }}
+          >
+            {/* ── Left: perks + download ── */}
             <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={1.5}
-              sx={{ pt: 1, alignItems: { sm: "center" } }}
-            >
-              <Button
-                component="a"
-                href={MOBILE_APP.apkUrl}
-                download={MOBILE_APP.fileName}
-                variant="contained"
-                size="large"
-                startIcon={<DownloadRoundedIcon />}
-                sx={{
-                  px: 3,
-                  py: 1.25,
-                  borderRadius: 2.5,
-                  fontWeight: 700,
-                  boxShadow: "0 4px 16px rgba(30,96,145,0.3)",
-                }}
-              >
-                Tải APK về máy
-              </Button>
-              <Button
-                onClick={() => setGuideOpen(true)}
-                variant="outlined"
-                size="large"
-                startIcon={<HelpOutlineIcon />}
-                sx={{ fontWeight: 600, textTransform: "none" }}
-              >
-                Hướng dẫn cài đặt
-              </Button>
-              <Button
-                component="a"
-                href={MOBILE_APP.releasesUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="text"
-                size="large"
-                endIcon={<OpenInNewIcon />}
-                sx={{ fontWeight: 600, textTransform: "none" }}
-              >
-                Xem tất cả phiên bản
-              </Button>
-            </Stack>
-
-            {/* Android: mở thẳng thư mục Tải về để cài, tránh lỗi "định dạng không hỗ trợ" */}
-            {isAndroid ? (
-              <Button
-                component="a"
-                href={ANDROID_DOWNLOADS_INTENT}
-                variant="text"
-                size="small"
-                startIcon={<FolderOpenIcon />}
-                sx={{ alignSelf: "flex-start", fontWeight: 600, textTransform: "none" }}
-              >
-                Đã tải xong? Mở thư mục Tải về
-              </Button>
-            ) : null}
-
-            <Alert severity="warning" sx={{ alignSelf: "flex-start" }}>
-              File APK không mở xem được trong trình duyệt. Tải xong, hãy mở
-              file từ thư mục <b>Tải về</b> rồi bấm cài đặt.
-            </Alert>
-
-            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
-              v{MOBILE_APP.version} · {MOBILE_APP.sizeLabel} · Android{" "}
-              {MOBILE_APP.minAndroid}+
-            </Typography>
-
-            <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
-              <InfoOutlinedIcon
-                sx={{ fontSize: 16, color: "#D97706", mt: "2px", flexShrink: 0 }}
-              />
-              <Typography
-                variant="caption"
-                sx={{ color: "text.secondary", lineHeight: 1.5 }}
-              >
-                Sau khi tải, bật &ldquo;Cài đặt từ nguồn không xác định&rdquo; trong
-                phần cài đặt Android để hoàn tất.
-              </Typography>
-            </Stack>
-          </Stack>
-
-          {/* Right: QR code */}
-          <Stack spacing={2} sx={{ alignItems: "center" }}>
-            <Paper
-              elevation={0}
+              spacing={3.5}
               sx={{
-                p: 2.5,
-                borderRadius: 3,
-                bgcolor: "#FFFFFF",
-                border: "1px solid",
-                borderColor: isDark
-                  ? "rgba(255, 255, 255, 0.15)"
-                  : "rgba(30, 96, 145, 0.12)",
-                boxShadow: isDark
-                  ? "0 10px 30px rgba(0,0,0,0.35)"
-                  : "0 10px 30px rgba(10, 37, 64, 0.08)",
+                p: { xs: 3, sm: 4, md: 5 },
+                bgcolor: isDark ? "rgba(15,23,42,0.6)" : "rgba(255,255,255,0.9)",
+                backdropFilter: "blur(16px)",
               }}
             >
-              <QRCodeSVG
-                value={MOBILE_APP.apkUrl}
-                size={176}
-                level="M"
-                bgColor="#FFFFFF"
-                fgColor="#0A2540"
-                role="img"
-                aria-label="Mã QR tải ứng dụng Thư viện IUH cho Android"
-                title="Mã QR tải ứng dụng Thư viện IUH cho Android"
-              />
-            </Paper>
+              {/* Feature list */}
+              <Stack spacing={1.5}>
+                {perks.map((perk) => (
+                  <Stack
+                    key={perk}
+                    direction="row"
+                    spacing={1.5}
+                    sx={{ alignItems: "flex-start" }}
+                  >
+                    <CheckCircleIcon
+                      sx={{ fontSize: 18, color: "#059669", mt: "2px", flexShrink: 0 }}
+                    />
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary", lineHeight: 1.65 }}
+                    >
+                      {perk}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
 
-            <Stack spacing={0.5} sx={{ textAlign: "center" }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                Quét mã bằng camera điện thoại
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                Mở bằng trình duyệt trên Android để tải trực tiếp
-              </Typography>
+              <Divider />
+
+              {/* Meta badges */}
+              <Stack direction="row" spacing={1.5} sx={{ flexWrap: "wrap", gap: 1.5 }}>
+                <InfoBadge
+                  icon={<AndroidIcon sx={{ fontSize: 18 }} />}
+                  label="Nền tảng"
+                  value="Android"
+                  accent={accent}
+                />
+                <InfoBadge
+                  icon={<SystemUpdateIcon sx={{ fontSize: 18 }} />}
+                  label="Phiên bản"
+                  value={`v${MOBILE_APP.version}`}
+                  accent={accent}
+                />
+                <InfoBadge
+                  icon={<DownloadRoundedIcon sx={{ fontSize: 18 }} />}
+                  label="Dung lượng"
+                  value={MOBILE_APP.sizeLabel}
+                  accent={accent}
+                />
+                <InfoBadge
+                  icon={<PhoneAndroidIcon sx={{ fontSize: 18 }} />}
+                  label="Yêu cầu"
+                  value={`Android ${MOBILE_APP.minAndroid}+`}
+                  accent={accent}
+                />
+              </Stack>
+
+              <Divider />
+
+              {/* Download CTA */}
+              <Stack spacing={2}>
+                {/* Primary button */}
+                <Button
+                  component="a"
+                  href={MOBILE_APP.apkDownloadUrl}
+                  download={MOBILE_APP.fileName}
+                  variant="contained"
+                  size="large"
+                  startIcon={<DownloadRoundedIcon />}
+                  sx={{
+                    alignSelf: { xs: "stretch", sm: "flex-start" },
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: 2.5,
+                    fontWeight: 700,
+                    fontSize: "1rem",
+                    background: "linear-gradient(135deg, #1E6091 0%, #0A2540 100%)",
+                    boxShadow: "0 6px 20px rgba(30,96,145,0.35)",
+                    "&:hover": {
+                      background: "linear-gradient(135deg, #1a5580 0%, #081e34 100%)",
+                      boxShadow: "0 8px 24px rgba(30,96,145,0.45)",
+                      transform: "translateY(-1px)",
+                    },
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  Tải APK cho Android
+                </Button>
+
+                {/* Secondary actions */}
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+                  <Button
+                    onClick={() => setGuideOpen(true)}
+                    variant="outlined"
+                    size="medium"
+                    sx={{
+                      fontWeight: 600,
+                      textTransform: "none",
+                      borderRadius: 2,
+                      borderColor: "divider",
+                      color: "text.secondary",
+                      "&:hover": { borderColor: accent, color: accent },
+                    }}
+                  >
+                    Hướng dẫn cài đặt
+                  </Button>
+
+                  {isAndroid && (
+                    <Button
+                      component="a"
+                      href={ANDROID_DOWNLOADS_INTENT}
+                      variant="outlined"
+                      size="medium"
+                      startIcon={<FolderOpenIcon />}
+                      sx={{
+                        fontWeight: 600,
+                        textTransform: "none",
+                        borderRadius: 2,
+                        borderColor: "divider",
+                        color: "text.secondary",
+                        "&:hover": { borderColor: "#059669", color: "#059669" },
+                      }}
+                    >
+                      Mở thư mục Tải về
+                    </Button>
+                  )}
+                </Stack>
+
+                {/* Tip */}
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "text.disabled",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                  }}
+                >
+                  <SecurityIcon sx={{ fontSize: 13 }} />
+                  Sau khi tải, bật &ldquo;Cài đặt từ nguồn không xác định&rdquo; trong
+                  Cài đặt Android để hoàn tất.
+                </Typography>
+              </Stack>
             </Stack>
-          </Stack>
+
+            {/* ── Divider (desktop only) ── */}
+            <Box
+              sx={{
+                display: { xs: "none", md: "block" },
+                bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(30,96,145,0.08)",
+              }}
+            />
+
+            {/* ── Right: QR code ── */}
+            <Stack
+              sx={{
+                p: { xs: 3, sm: 4, md: 5 },
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: isDark
+                  ? "rgba(10,18,32,0.5)"
+                  : "rgba(248,251,255,0.9)",
+                backdropFilter: "blur(16px)",
+              }}
+            >
+              <QrPanel isDark={isDark} />
+            </Stack>
+          </Box>
         </Paper>
       </Container>
 
-      <Dialog
+      {/* Install guide dialog */}
+      <InstallGuideDialog
         open={guideOpen}
         onClose={() => setGuideOpen(false)}
-        fullWidth
-        maxWidth="sm"
-        aria-labelledby="install-guide-title"
-      >
-        <DialogTitle id="install-guide-title" sx={{ fontWeight: 800, pr: 6 }}>
-          Cài đặt ứng dụng trên Android
-          <IconButton
-            onClick={() => setGuideOpen(false)}
-            aria-label="Đóng"
-            sx={{ position: "absolute", right: 12, top: 12 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2.5}>
-            <Alert severity="info">
-              Trình duyệt không mở được file APK. Nhấn vào file trong thanh tải
-              về sẽ báo &ldquo;Định dạng tệp tin không được hỗ trợ&rdquo; — đây là
-              hành vi bình thường, không phải lỗi tải.
-            </Alert>
-
-            {installSteps.map((step, i) => (
-              <Stack key={step.title} direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                <Box
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "50%",
-                    bgcolor: "rgba(30, 96, 145, 0.12)",
-                    color: accent,
-                    fontWeight: 800,
-                    fontSize: 14,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  {i + 1}
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                    {step.title}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.65 }}>
-                    {step.body}
-                  </Typography>
-                </Box>
-              </Stack>
-            ))}
-
-            {isAndroid ? (
-              <Button
-                component="a"
-                href={ANDROID_DOWNLOADS_INTENT}
-                variant="outlined"
-                startIcon={<FolderOpenIcon />}
-                sx={{ alignSelf: "flex-start", fontWeight: 600, textTransform: "none" }}
-              >
-                Mở thư mục Tải về ngay
-              </Button>
-            ) : null}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setGuideOpen(false)}>Đã hiểu</Button>
-        </DialogActions>
-      </Dialog>
+        isAndroid={isAndroid}
+        accent={accent}
+      />
     </Box>
   );
 }
