@@ -38,7 +38,9 @@ import EmailIcon from "@mui/icons-material/Email";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import SecurityIcon from "@mui/icons-material/Security";
 import DoorFrontIcon from "@mui/icons-material/DoorFront";
+import AndroidIcon from "@mui/icons-material/Android";
 import { motion } from "framer-motion";
+import MobileAppDownload from "./MobileAppDownload";
 
 const features = [
   {
@@ -163,6 +165,9 @@ export default function LandingOverlay() {
               </Button>
               <Button component={Link} href="/gate" startIcon={<DoorFrontIcon />} sx={{ textTransform: "none", fontWeight: 600, display: { xs: "none", sm: "inline-flex" } }}>
                 Cổng Kiosk
+              </Button>
+              <Button component={Link} href="#tai-app" startIcon={<AndroidIcon />} sx={{ textTransform: "none", fontWeight: 600, display: { xs: "none", md: "inline-flex" } }}>
+                Tải app
               </Button>
 
               <Button
@@ -532,6 +537,9 @@ export default function LandingOverlay() {
         </Box>
       </Container>
 
+      {/* ── Mobile App Download ─────────────────────────────────────── */}
+      <MobileAppDownload />
+
       {/* ── Footer ─────────────────────────────────────────────────── */}
       <Box
         component="footer"
@@ -598,6 +606,9 @@ export default function LandingOverlay() {
               </Typography>
               <Typography component={Link} href="/library/vr-tour" variant="body2" sx={{ color: "rgba(255,255,255,0.75)", textDecoration: "none", "&:hover": { color: "#FFFFFF" } }}>
                 Tham quan thực tế ảo 3D
+              </Typography>
+              <Typography component={Link} href="#tai-app" variant="body2" sx={{ color: "rgba(255,255,255,0.75)", textDecoration: "none", "&:hover": { color: "#FFFFFF" } }}>
+                Tải ứng dụng di động (APK)
               </Typography>
 
             </Stack>
