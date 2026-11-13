@@ -166,7 +166,7 @@ export default function DynamicQrPaymentDialog({
       <DialogTitle sx={{ fontWeight: 800, textAlign: "center", pb: 1 }}>
         <Stack direction="row" sx={{ alignItems: "center", justifyContent: "center" }} spacing={1}>
           <QrCode2Icon color="primary" />
-          <span>Thanh toán Chuyển khoản (SePay / VietQR)</span>
+          <span>Thanh toán Chuyển khoản (SePay)</span>
         </Stack>
       </DialogTitle>
 
@@ -212,14 +212,14 @@ export default function DynamicQrPaymentDialog({
                 <Box
                   component="img"
                   src={order.qrUrl}
-                  alt={`VietQR ${order.orderCode}`}
+                  alt={`SePay QR ${order.orderCode}`}
                   sx={{ width: 220, height: 220, objectFit: "contain", borderRadius: 1 }}
                 />
               ) : (
                 <QRCodeSVG value={order.qrData || order.orderCode} size={200} />
               )}
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, fontWeight: 600 }}>
-                Chuẩn Napas 247 · SePay / VietQR
+                Chuẩn Napas 247 · Tự động gạch nợ qua SePay
               </Typography>
             </Paper>
 

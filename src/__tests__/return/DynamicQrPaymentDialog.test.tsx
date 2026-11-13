@@ -46,7 +46,7 @@ describe('DynamicQrPaymentDialog', () => {
       />
     );
 
-    expect(screen.getByText('Thanh toán Phí phạt qua VietQR')).toBeInTheDocument();
+    expect(screen.getByText('Thanh toán Chuyển khoản (SePay)')).toBeInTheDocument();
     expect(screen.getByText('55.000 đ')).toBeInTheDocument();
     expect(screen.getByText(/Nguyễn Văn A/)).toBeInTheDocument();
     expect(screen.getByText(/20012345/)).toBeInTheDocument();

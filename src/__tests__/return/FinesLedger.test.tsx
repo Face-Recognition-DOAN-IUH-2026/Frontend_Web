@@ -69,13 +69,13 @@ describe("FinesLedger", () => {
     expect(onPayCash).toHaveBeenCalledWith("rec-1");
   });
 
-  it("opens the VietQR flow directly without a confirm step", async () => {
+  it("opens the SePay flow directly without a confirm step", async () => {
     const user = userEvent.setup();
     const onOpenQr = jest.fn();
     render(<FinesLedger {...baseProps} onOpenQr={onOpenQr} />);
 
     await user.click(screen.getByRole("button", { name: "Thu phí" }));
-    await user.click(screen.getByRole("menuitem", { name: /Mã VietQR/ }));
+    await user.click(screen.getByRole("menuitem", { name: /Quét mã SePay/ }));
 
     expect(onOpenQr).toHaveBeenCalledWith(items[0]);
   });
