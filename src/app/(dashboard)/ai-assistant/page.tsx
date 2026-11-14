@@ -52,7 +52,7 @@ import { staggerSx } from "@/lib/useStaggeredAnimation";
 import api from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import BookCard, { parseBookCard } from "@/app/(dashboard)/_components/BookCard";
-import LibraryHoursCard, { type LibraryScheduleData } from "@/app/(dashboard)/_components/AIWidget/cards/LibraryHoursCard";
+import LibraryHoursCard, { type LibraryScheduleData } from "@/app/(dashboard)/_components/LibraryHoursCard";
 import { fadeInUp } from "@/lib/animations";
 import type { AIToolSummary } from "@/lib/types";
 

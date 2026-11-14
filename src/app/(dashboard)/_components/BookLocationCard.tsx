@@ -18,7 +18,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
 import MapIcon from "@mui/icons-material/MapOutlined";
 import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import dynamic from "next/dynamic";
-import type { BookCardData } from "../../BookCard";
+import type { BookCardData } from "./BookCard";
 
 const VRViewer = dynamic(
   () => import("@/app/library/vr-tour/_components/VRViewer"),
