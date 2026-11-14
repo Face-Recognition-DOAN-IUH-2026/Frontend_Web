@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import api, { getErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
@@ -36,7 +36,7 @@ export function formatDateRange(days: Date[]) {
   return `${from} — ${to}`;
 }
 
-interface ScheduleDataResult {
+export interface ScheduleDataResult {
   staff: ScheduleStaff[];
   zones: LibraryZone[];
   shifts: StaffShift[];
@@ -49,6 +49,7 @@ export interface ScheduleData {
   shifts: StaffShift[];
   assignments: StaffScheduleAssignment[];
   loading: boolean;
+  assignmentsLoading?: boolean;
   error: string | null;
   weekStart: Date;
   days: Date[];
@@ -61,7 +62,7 @@ export interface ScheduleData {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
-const fetchScheduleData = async (from: string, to: string, isAdmin: boolean): Promise<ScheduleDataResult> => {
+export const fetchScheduleData = async (from: string, to: string, isAdmin: boolean): Promise<ScheduleDataResult> => {
   if (isAdmin) {
     const [staffResult, zoneResult, shiftResult, assignmentResult] = await Promise.all([
       api.getScheduleStaffOptions(),
@@ -98,80 +99,158 @@ export function useScheduleData(canViewAllOverride?: boolean): ScheduleData {
   const canManageAll = isAdmin || (canViewAllOverride !== undefined ? canViewAllOverride : (can("schedules", "create") || can("schedules", "update")));
   const isStaff = !!user;
   const [weekStart, setWeekStart] = useState(startOfWeek);
-  const [staff, setStaff] = useState<ScheduleStaff[]>([]);
-  const [zones, setZones] = useState<LibraryZone[]>([]);
-  const [shifts, setShifts] = useState<StaffShift[]>([]);
-  const [assignments, setAssignments] = useState<StaffScheduleAssignment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
   const from = toDateInput(days[0]);
   const to = toDateInput(days[6]);
 
-  const cacheKey = `schedule:${from}:${to}:${canManageAll ? "all" : "my"}`;
-  const mountedRef = useRef(true);
+  // 1. Staff options metadata (rarely changes, 60s cache TTL)
+  const {
+    data: staffData,
+    mutate: mutateStaff,
+    isLoading: isStaffLoading,
+  } = useSWR<ScheduleStaff[]>(
+    isStaff ? "schedule:staff-options" : null,
+    async () => {
+      const res = await api.getScheduleStaffOptions();
+      return res.filter((s) => s.role === "admin" || s.role === "staff");
+    },
+    {
+      dedupingInterval: 60000,
+      revalidateOnFocus: false,
+    }
+  );
 
-  const { data: cachedData, mutate } = useSWR<ScheduleDataResult>(
-    isStaff ? cacheKey : null,
-    () => fetchScheduleData(from, to, canManageAll),
+  // 2. Zones metadata (rarely changes, 60s cache TTL)
+  const {
+    data: zonesData,
+    mutate: mutateZones,
+    isLoading: isZonesLoading,
+  } = useSWR<LibraryZone[]>(
+    isStaff ? "schedule:zones" : null,
+    async () => {
+      const res = await api.getScheduleZones();
+      return res.filter((z) => z.isActive);
+    },
+    {
+      dedupingInterval: 60000,
+      revalidateOnFocus: false,
+    }
+  );
+
+  // 3. Shifts metadata (rarely changes, 60s cache TTL)
+  const {
+    data: shiftsData,
+    mutate: mutateShifts,
+    isLoading: isShiftsLoading,
+  } = useSWR<StaffShift[]>(
+    isStaff ? "schedule:shifts" : null,
+    async () => {
+      const res = await api.getScheduleShifts();
+      return res.filter((s) => s.isActive);
+    },
+    {
+      dedupingInterval: 60000,
+      revalidateOnFocus: false,
+    }
+  );
+
+  // 4. Assignments for selected week (dynamic, keepPreviousData preserves UI during week changes)
+  const assignmentKey = isStaff
+    ? ["schedule:assignments", from, to, canManageAll ? "all" : "my"]
+    : null;
+
+  const {
+    data: assignmentsData,
+    mutate: mutateAssignments,
+    isLoading: isAssignmentsLoading,
+    isValidating: isAssignmentsValidating,
+  } = useSWR<StaffScheduleAssignment[]>(
+    assignmentKey,
+    async () => {
+      if (canManageAll) {
+        const res = await api.getScheduleAssignments({ from, to });
+        return res.items;
+      } else {
+        const res = await api.getMySchedules({ from, to });
+        return res.items;
+      }
+    },
     {
       dedupingInterval: 10000,
+      keepPreviousData: true,
       revalidateOnFocus: true,
-      onSuccess: (data) => {
-        if (mountedRef.current && data) {
-          setStaff(data.staff);
-          setZones(data.zones);
-          setShifts(data.shifts);
-          setAssignments(data.assignments);
-          setLoading(false);
-        }
-      },
       onError: (err) => {
-        if (mountedRef.current) {
-          setError(getErrorMessage(err));
-          setLoading(false);
-        }
+        setError(getErrorMessage(err));
       },
     }
   );
 
+  const staff = staffData ?? [];
+  const zones = zonesData ?? [];
+  const shifts = shiftsData ?? [];
+  const assignments = assignmentsData ?? [];
+
+  // Page is only in full loading state on initial mount when core data is not yet available
+  const loading =
+    (!assignmentsData && isAssignmentsLoading) ||
+    (!zonesData && isZonesLoading) ||
+    (!shiftsData && isShiftsLoading);
+
+  const assignmentsLoading = isAssignmentsLoading || isAssignmentsValidating;
+
   const loadData = useCallback(async () => {
     if (!isStaff) return;
-    // Only show loading spinner when there is no cached data to display
-    if (!cachedData) {
-      setLoading(true);
-    }
     setError(null);
     try {
-      await mutate();
+      await Promise.allSettled([
+        mutateAssignments(),
+        mutateStaff(),
+        mutateZones(),
+        mutateShifts(),
+      ]);
     } catch (err) {
       setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
     }
-  }, [isStaff, mutate, cachedData]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    // If SWR already has cached data on mount, don't show loading spinner
-    if (cachedData) setLoading(false);
-    return () => { mountedRef.current = false; };
-  }, []);
+  }, [isStaff, mutateAssignments, mutateStaff, mutateZones, mutateShifts]);
 
   const goPrevWeek = useCallback(() => {
-    setWeekStart((prev) => { const d = new Date(prev); d.setDate(d.getDate() - 7); return d; });
+    setWeekStart((prev) => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() - 7);
+      return d;
+    });
   }, []);
 
   const goNextWeek = useCallback(() => {
-    setWeekStart((prev) => { const d = new Date(prev); d.setDate(d.getDate() + 7); return d; });
+    setWeekStart((prev) => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + 7);
+      return d;
+    });
   }, []);
 
-  const goToday = useCallback(() => { setWeekStart(startOfWeek()); }, []);
+  const goToday = useCallback(() => {
+    setWeekStart(startOfWeek());
+  }, []);
 
   return {
-    staff, zones, shifts, assignments, loading, error,
-    weekStart, days, from, to,
-    goPrevWeek, goNextWeek, goToday, loadData, setError,
+    staff,
+    zones,
+    shifts,
+    assignments,
+    loading,
+    assignmentsLoading,
+    error,
+    weekStart,
+    days,
+    from,
+    to,
+    goPrevWeek,
+    goNextWeek,
+    goToday,
+    loadData,
+    setError,
   };
 }

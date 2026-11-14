@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Alert, Box, Button, Divider, IconButton, MenuItem, Paper, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Divider, IconButton, LinearProgress, MenuItem, Paper, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
 import TodayIcon from "@mui/icons-material/TodayOutlined";
@@ -63,7 +63,7 @@ export default function StaffSchedulesPage() {
   const canManage = isAdmin || canCreate || canUpdate || canDelete;
 
   const {
-    staff, zones, shifts, assignments, loading, error, setError,
+    staff, zones, shifts, assignments, loading, assignmentsLoading, error, setError,
     weekStart, days, from, to,
     goPrevWeek, goNextWeek, goToday, loadData,
   } = useScheduleData(canManage);
@@ -271,6 +271,9 @@ export default function StaffSchedulesPage() {
                 : "0 2px 10px rgba(0, 0, 0, 0.03)",
           }}
         >
+          {assignmentsLoading && !loading && (
+            <LinearProgress sx={{ height: 3 }} />
+          )}
           <Box sx={{ px: 2.5, pt: 2, pb: 1.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
               Bảng phân công trực theo tuần

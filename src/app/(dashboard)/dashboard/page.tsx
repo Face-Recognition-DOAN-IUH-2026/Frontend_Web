@@ -302,13 +302,13 @@ export default function DashboardPage() {
 
       {/* Hàng 2: Trọng tâm giám sát mật độ cao điểm & Tác nghiệp mượn trả */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "stretch" }}>
-        <HourlyActivityChart logs={data.hourlyLogs} loading={data.loading} />
-        <BorrowSummaryCard borrowStats={data.borrowStats} borrows={data.activeBorrows} loading={data.loading} />
+        <HourlyActivityChart logs={data.hourlyLogs} loading={data.hourlyLoading ?? data.loading} />
+        <BorrowSummaryCard borrowStats={data.borrowStats} borrows={data.activeBorrows} loading={data.borrowsLoading ?? data.loading} />
       </Box>
 
       {/* Hàng 3: Giám sát chi tiết Camera & Nhật ký ra vào thời gian thực */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "stretch" }}>
-        <CameraStatusGrid cameras={data.cameraStatuses} loading={data.loading} />
+        <CameraStatusGrid cameras={data.cameraStatuses} loading={data.camerasLoading ?? data.loading} />
 
         <DashboardCard
           title="Hoạt động gần đây"
@@ -320,7 +320,7 @@ export default function DashboardPage() {
           }
           noPadding
         >
-          <LoadingOverlay loading={data.loading} message="Đang tải...">
+          <LoadingOverlay loading={data.logsLoading ?? data.loading} message="Đang tải...">
             {data.recentLogs.length === 0 ? (
               <EmptyState title="Chưa có hoạt động nào" description="Các lượt ra/vào sẽ hiển thị ở đây" />
             ) : (
@@ -390,8 +390,8 @@ export default function DashboardPage() {
       </Box>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, alignItems: "stretch" }}>
-        <TodayScheduleCard assignments={data.todaySchedule} loading={data.loading} />
-        <RecentNotificationsCard notifications={data.notifications} loading={data.loading} />
+        <TodayScheduleCard assignments={data.todaySchedule} loading={data.scheduleLoading ?? data.loading} />
+        <RecentNotificationsCard notifications={data.notifications} loading={data.notifsLoading ?? data.loading} />
       </Box>
 
       {/* Sách cần xử lý: sửa chữa / thanh lý (Bảo trì kho) */}
