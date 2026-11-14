@@ -40,6 +40,42 @@ describe("AssignmentCard", () => {
 
     expect(screen.queryByRole("button", { name: "Xóa ca trực" })).not.toBeInTheDocument();
   });
+
+  it("renders check-in time when attendance is present", () => {
+    const checkedInAssignment = {
+      ...assignment,
+      attendance: {
+        id: "att-1",
+        scheduleId: "a1",
+        staffId: "s1",
+        checkInAt: "2026-10-06T08:15:00Z",
+        checkOutAt: null,
+        status: "present",
+        method: "web",
+      },
+    } as any;
+
+    render(<AssignmentCard assignment={checkedInAssignment} />);
+    expect(screen.getByText(/Vào \d{2}:\d{2}/)).toBeInTheDocument();
+  });
+
+  it("renders check-out time when attendance has completed check-out", () => {
+    const checkedOutAssignment = {
+      ...assignment,
+      attendance: {
+        id: "att-2",
+        scheduleId: "a1",
+        staffId: "s1",
+        checkInAt: "2026-10-06T08:00:00Z",
+        checkOutAt: "2026-10-06T12:00:00Z",
+        status: "completed",
+        method: "mobile",
+      },
+    } as any;
+
+    render(<AssignmentCard assignment={checkedOutAssignment} />);
+    expect(screen.getByText(/Ra ca \d{2}:\d{2}/)).toBeInTheDocument();
+  });
 });
 
 describe("TimetableCell context menu", () => {

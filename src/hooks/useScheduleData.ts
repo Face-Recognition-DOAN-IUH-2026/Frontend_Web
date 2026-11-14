@@ -58,6 +58,7 @@ export interface ScheduleData {
   goPrevWeek: () => void;
   goNextWeek: () => void;
   goToday: () => void;
+  jumpToDate: (targetDate: Date) => void;
   loadData: () => Promise<void>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
@@ -235,6 +236,10 @@ export function useScheduleData(canViewAllOverride?: boolean): ScheduleData {
     setWeekStart(startOfWeek());
   }, []);
 
+  const jumpToDate = useCallback((targetDate: Date) => {
+    setWeekStart(startOfWeek(targetDate));
+  }, []);
+
   return {
     staff,
     zones,
@@ -250,6 +255,7 @@ export function useScheduleData(canViewAllOverride?: boolean): ScheduleData {
     goPrevWeek,
     goNextWeek,
     goToday,
+    jumpToDate,
     loadData,
     setError,
   };

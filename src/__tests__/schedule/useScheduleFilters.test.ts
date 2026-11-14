@@ -70,4 +70,22 @@ describe("useScheduleFilters", () => {
     act(() => { result.current.setFilter("active"); });
     expect(result.current.filter).toBe("active");
   });
+
+  it("filters assignments by myShiftsOnly", () => {
+    const { result } = renderHook(() => useScheduleFilters(mockAssignments, mockShifts, mockStaff, mockZones, "u1"));
+    act(() => { result.current.setMyShiftsOnly(true); });
+    expect(result.current.filteredAssignments).toHaveLength(1);
+    expect(result.current.filteredAssignments[0].staffId).toBe("u1");
+  });
+
+  it("filters assignments by staffSearch query", () => {
+    const assignmentsWithStaff: StaffScheduleAssignment[] = [
+      { id: "a1", staffId: "u1", shiftId: "s1", zoneId: "z1", workDate: "2026-07-01", status: "scheduled", staff: { id: "u1", fullName: "Nguyễn Văn An", email: "an@test.com", role: "staff", status: "active" } } as any,
+      { id: "a2", staffId: "u2", shiftId: "s2", zoneId: "z2", workDate: "2026-07-01", status: "scheduled", staff: { id: "u2", fullName: "Trần Thị Bình", email: "binh@test.com", role: "staff", status: "active" } } as any,
+    ];
+    const { result } = renderHook(() => useScheduleFilters(assignmentsWithStaff, mockShifts, mockStaff, mockZones));
+    act(() => { result.current.setStaffSearch("Bình"); });
+    expect(result.current.filteredAssignments).toHaveLength(1);
+    expect(result.current.filteredAssignments[0].staffId).toBe("u2");
+  });
 });
