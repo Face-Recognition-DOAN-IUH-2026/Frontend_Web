@@ -46,6 +46,7 @@ import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import DashboardCard from "@/app/(dashboard)/_components/ui/DashboardCard";
 import MuiStatCard from "@/app/(dashboard)/_components/ui/MuiStatCard";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
+import PageErrorState from "@/app/(dashboard)/_components/ui/PageErrorState";
 import SearchField from "@/app/(dashboard)/_components/ui/SearchField";
 import IsbnScannerDialog from "@/app/(dashboard)/_components/IsbnScannerDialog";
 import type { BookImportPreviewRow, BookImportResultRow, BookWithStats } from "@/lib/types";
@@ -75,6 +76,7 @@ export default function BooksPage() {
   const [total, setTotal] = useState(0);
   const [aggregateStats, setAggregateStats] = useState<{ totalCopies: number; availableCopies: number; borrowedCopies: number; outOfStockBooks?: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [previewFile, setPreviewFile] = useState<File | null>(null);
@@ -120,6 +122,7 @@ export default function BooksPage() {
 
   const loadBooks = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await api.listBooks({
         skip: page * rowsPerPage,
@@ -141,7 +144,9 @@ export default function BooksPage() {
       if (err?.name === "CanceledError" || err?.name === "AbortError" || err?.code === "ERR_CANCELED") {
         return;
       }
-      showNoticeRef.current("error", getErrorMessage(err) || "Không thể tải danh sách sách");
+      const msg = getErrorMessage(err) || "Không thể tải danh sách sách";
+      setFetchError(msg);
+      showNoticeRef.current("error", msg);
     } finally {
       setLoading(false);
     }
@@ -700,6 +705,16 @@ export default function BooksPage() {
                     </TableCell>
                   </TableRow>
                 ))
+              ) : fetchError && sortedBooks.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} sx={{ py: 4, textAlign: "center" }}>
+                    <PageErrorState
+                      title="Không thể tải danh sách sách"
+                      message={fetchError}
+                      onRetry={() => loadBooks()}
+                    />
+                  </TableCell>
+                </TableRow>
               ) : sortedBooks.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} sx={{ py: 6, textAlign: "center" }}>

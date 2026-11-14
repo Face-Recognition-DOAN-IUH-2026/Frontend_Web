@@ -1,9 +1,33 @@
 import type { Metadata } from "next";
+import { Space_Grotesk, Source_Sans_3, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/lib/toast-context";
 import { MuiThemeProvider } from "@/lib/mui-theme";
 import ClientLayout from "@/app/_components/ClientLayout";
 import "./globals.css";
+
+// IUH Library Fonts: self-hosted via next/font (no render-blocking network request)
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-heading",
+  display: "swap",
+});
+
+const sourceSans3 = Source_Sans_3({
+  subsets: ["latin", "vietnamese"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  style: ["normal", "italic"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Thư Viện IUH - Hệ thống Quản lý Thư viện Thông minh",
@@ -16,16 +40,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" suppressHydrationWarning data-scroll-behavior="smooth">
-      <head>
-        {/* IUH Library Fonts: Space Grotesk (KPI & Headings), Source Sans 3 (Body), JetBrains Mono (Codes) */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Space+Grotesk:wght@500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang="vi"
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
+      className={`${spaceGrotesk.variable} ${sourceSans3.variable} ${jetbrainsMono.variable}`}
+    >
       <body suppressHydrationWarning>
         <MuiThemeProvider>
           <AuthProvider>

@@ -33,6 +33,8 @@ import { useToast } from "@/lib/toast-context";
 import PageHeader from "@/app/(dashboard)/_components/ui/PageHeader";
 import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
+import TableSkeleton from "@/app/(dashboard)/_components/ui/TableSkeleton";
+import PageErrorState from "@/app/(dashboard)/_components/ui/PageErrorState";
 import ConfirmDialog from "@/app/(dashboard)/_components/ui/ConfirmDialog";
 import PatronStatCards from "@/app/(dashboard)/_components/ui/PatronStatCards";
 import PatronToolbar from "@/app/(dashboard)/_components/ui/PatronToolbar";
@@ -63,6 +65,7 @@ export default function PatronsPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [filter, setFilter] = useState<FilterValue>("all");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -89,11 +92,14 @@ export default function PatronsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const { items } = await api.searchPatrons(debouncedQuery || undefined, undefined, 0, 1000);
       setPatrons(items);
     } catch (err) {
-      toast.error(getErrorMessage(err) || "Không thể tải danh sách độc giả");
+      const msg = getErrorMessage(err) || "Không thể tải danh sách độc giả";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -254,7 +260,13 @@ export default function PatronsPage() {
       />
 
       {loading && filtered.length === 0 ? (
-        <LoadingOverlay loading message="Đang tải danh sách độc giả..." />
+        <TableSkeleton columns={6} rows={8} />
+      ) : error && filtered.length === 0 ? (
+        <PageErrorState
+          title="Không thể tải danh sách độc giả"
+          message={error}
+          onRetry={load}
+        />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<PeopleIcon sx={{ fontSize: 32 }} />}

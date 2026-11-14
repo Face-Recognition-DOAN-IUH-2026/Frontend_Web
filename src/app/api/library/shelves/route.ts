@@ -12,7 +12,11 @@ export async function GET(_request: NextRequest) {
     clearTimeout(timeout);
     if (!res.ok) throw new Error(`Backend returned ${res.status}`);
     const data = await res.json();
-    return Response.json(data);
+    return Response.json(data, {
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
   } catch {
     return Response.json({ error: "Không thể kết nối backend" }, { status: 502 });
   }

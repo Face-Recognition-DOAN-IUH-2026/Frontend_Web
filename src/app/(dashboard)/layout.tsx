@@ -29,6 +29,7 @@ import Sidebar from "@/app/(dashboard)/_components/Sidebar";
 import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationDropdown";
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import BreadcrumbsNav from "@/app/(dashboard)/_components/ui/BreadcrumbsNav";
+import ScrollToTop from "@/app/_components/ScrollToTop";
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();
@@ -275,6 +276,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <DashboardGuard>{children}</DashboardGuard>
           </Box>
         </Box>
+        <ScrollToTop />
       </Box>
     </PermissionProvider>
   );
