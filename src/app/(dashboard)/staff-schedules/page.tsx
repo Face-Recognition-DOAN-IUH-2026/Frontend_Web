@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Alert, Box, Button, Divider, IconButton, MenuItem, Paper, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Divider, IconButton, LinearProgress, MenuItem, Paper, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import PrevIcon from "@mui/icons-material/ArrowBack";
 import NextIcon from "@mui/icons-material/ArrowForward";
 import TodayIcon from "@mui/icons-material/TodayOutlined";
@@ -14,6 +14,10 @@ import HistoryIcon from "@mui/icons-material/HistoryOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import SettingsIcon from "@mui/icons-material/SettingsOutlined";
 import ScheduleOutlined from "@mui/icons-material/ScheduleOutlined";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
+import ViewAgendaRoundedIcon from "@mui/icons-material/ViewAgendaRounded";
 import { useAuth } from "@/lib/auth-context";
 import { usePermission } from "@/lib/permission-context";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
@@ -29,6 +33,8 @@ import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import TimetableGrid from "@/app/(dashboard)/_components/staff-schedule/TimetableGrid";
 import TimetableLegend from "@/app/(dashboard)/_components/staff-schedule/TimetableLegend";
+import DayAgendaView from "@/app/(dashboard)/_components/staff-schedule/DayAgendaView";
+import CopyWeekDialog from "@/app/(dashboard)/_components/staff-schedule/CopyWeekDialog";
 import AssignStaffDialog from "@/app/(dashboard)/_components/staff-schedule/AssignStaffDialog";
 import ScheduleManagementPanel from "@/app/(dashboard)/_components/staff-schedule/ScheduleManagementPanel";
 import AutoScheduleDialog from "@/app/(dashboard)/_components/staff-schedule/AutoScheduleDialog";
@@ -63,20 +69,21 @@ export default function StaffSchedulesPage() {
   const canManage = isAdmin || canCreate || canUpdate || canDelete;
 
   const {
-    staff, zones, shifts, assignments, loading, error, setError,
+    staff, zones, shifts, assignments, loading, assignmentsLoading, error, setError,
     weekStart, days, from, to,
-    goPrevWeek, goNextWeek, goToday, loadData,
+    goPrevWeek, goNextWeek, goToday, jumpToDate, loadData,
   } = useScheduleData(canManage);
 
   const {
-    filter, zoneFilter, shiftFilter,
-    setFilter, setZoneFilter, setShiftFilter,
+    filter, zoneFilter, shiftFilter, staffSearch, myShiftsOnly,
+    setFilter, setZoneFilter, setShiftFilter, setStaffSearch, setMyShiftsOnly,
     shiftList, filteredAssignments, filteredShifts, weekStats,
-  } = useScheduleFilters(assignments, shifts, staff, zones);
-
+  } = useScheduleFilters(assignments, shifts, staff, zones, user?.id);
 
   const auto = useAutoSchedule(loadData, setError);
 
+  const [viewMode, setViewMode] = useState<"grid" | "agenda">("grid");
+  const [showCopyWeek, setShowCopyWeek] = useState(false);
   const [showManagement, setShowManagement] = useState(false);
   const [assignDialog, setAssignDialog] = useState<{ date: string; shiftId: string; shiftName: string } | null>(null);
   const [showAuditLogs, setShowAuditLogs] = useState(false);
@@ -146,11 +153,65 @@ export default function StaffSchedulesPage() {
       >
         Hôm nay
       </Button>
+      <Tooltip title="Chọn ngày để nhảy nhanh đến tuần đó">
+        <Box
+          component="label"
+          sx={{
+            position: "relative",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 2,
+            width: 32,
+            height: 32,
+            color: "text.secondary",
+            "&:hover": { bgcolor: "action.hover", color: "primary.main", borderColor: "primary.main" },
+          }}
+        >
+          <CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => {
+              if (e.target.value) {
+                jumpToDate(new Date(`${e.target.value}T00:00:00`));
+              }
+            }}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0,
+              cursor: "pointer",
+            }}
+          />
+        </Box>
+      </Tooltip>
       <Tooltip title="Tuần sau">
         <IconButton onClick={goNextWeek} size="small" sx={{ border: "1px solid", borderColor: "divider", color: "text.secondary", "&:hover": { bgcolor: "action.hover", color: "primary.main" } }}>
           <NextIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+      {canCreate && (
+        <Tooltip title="Sao chép lịch tuần trước">
+          <IconButton
+            onClick={() => setShowCopyWeek(true)}
+            size="small"
+            sx={{
+              color: "#6366f1",
+              border: "1px solid rgba(99,102,241,0.35)",
+              "&:hover": { bgcolor: "rgba(99,102,241,0.1)" },
+            }}
+          >
+            <ContentCopyRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
       {canCreate && (
         <Tooltip title="Gợi ý lịch tự động">
           <IconButton onClick={() => auto.setShowAutoSchedule(true)} size="small" sx={{ color: "#D4AF37", border: "1px solid rgba(212,175,55,0.4)", "&:hover": { bgcolor: "rgba(212,175,55,0.1)" } }}>
@@ -247,6 +308,10 @@ export default function StaffSchedulesPage() {
         setZoneFilter={setZoneFilter}
         shiftFilter={shiftFilter}
         setShiftFilter={setShiftFilter}
+        staffSearch={staffSearch}
+        setStaffSearch={setStaffSearch}
+        myShiftsOnly={myShiftsOnly}
+        setMyShiftsOnly={setMyShiftsOnly}
         zones={zones}
         shiftList={shiftList}
       />
@@ -271,27 +336,85 @@ export default function StaffSchedulesPage() {
                 : "0 2px 10px rgba(0, 0, 0, 0.03)",
           }}
         >
-          <Box sx={{ px: 2.5, pt: 2, pb: 1.5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Bảng phân công trực theo tuần
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {formatDateRange(days)}
-            </Typography>
-          </Box>
+          {assignmentsLoading && !loading && (
+            <LinearProgress sx={{ height: 3 }} />
+          )}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            sx={{
+              px: 2.5,
+              pt: 2,
+              pb: 1.5,
+              alignItems: { xs: "flex-start", sm: "center" },
+              justifyContent: "space-between",
+            }}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                {viewMode === "grid" ? "Bảng phân công trực theo tuần" : "Nhật ký phân công trực theo ngày"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {formatDateRange(days)}
+              </Typography>
+            </Box>
+
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={(_, val) => {
+                if (val) setViewMode(val);
+              }}
+              size="small"
+              sx={{
+                borderRadius: 2,
+                "& .MuiToggleButtonGroup-grouped": {
+                  textTransform: "none",
+                  fontWeight: 600,
+                  fontSize: "0.78rem",
+                  px: 1.5,
+                  py: 0.5,
+                  gap: 0.75,
+                },
+              }}
+            >
+              <ToggleButton value="grid">
+                <ViewModuleRoundedIcon sx={{ fontSize: 16 }} />
+                Lưới tuần
+              </ToggleButton>
+              <ToggleButton value="agenda">
+                <ViewAgendaRoundedIcon sx={{ fontSize: 16 }} />
+                Nhật ký ngày
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+
           <Divider sx={{ borderColor: "divider" }} />
-          <Box sx={{ width: "100%" }}>
-            <TimetableGrid
-              days={days} shifts={filteredShifts} assignments={filteredAssignmentsWithUndo}
-              filter={filter} isAdmin={canManage}
-              onCellClick={canCreate ? handleCellClick : undefined}
-              onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
-            />
+          <Box sx={{ width: "100%", p: viewMode === "agenda" ? 2.5 : 0 }}>
+            {viewMode === "grid" ? (
+              <TimetableGrid
+                days={days} shifts={filteredShifts} assignments={filteredAssignmentsWithUndo}
+                filter={filter} isAdmin={canManage}
+                onCellClick={canCreate ? handleCellClick : undefined}
+                onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
+              />
+            ) : (
+              <DayAgendaView
+                days={days} shifts={filteredShifts} assignments={filteredAssignmentsWithUndo}
+                filter={filter} isAdmin={canManage}
+                onCellClick={canCreate ? handleCellClick : undefined}
+                onDeleteAssignment={canDelete ? handleDeleteAssignment : undefined}
+              />
+            )}
           </Box>
-          <Divider sx={{ borderColor: "divider" }} />
-          <Box sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(15, 23, 42, 0.4)" : "rgba(248, 250, 252, 0.6)" }}>
-            <TimetableLegend />
-          </Box>
+          {viewMode === "grid" && (
+            <>
+              <Divider sx={{ borderColor: "divider" }} />
+              <Box sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(15, 23, 42, 0.4)" : "rgba(248, 250, 252, 0.6)" }}>
+                <TimetableLegend />
+              </Box>
+            </>
+          )}
         </Paper>
       </LoadingOverlay>
 
@@ -323,11 +446,35 @@ export default function StaffSchedulesPage() {
         onDeleted={loadData}
       />
 
+      <CopyWeekDialog
+        open={showCopyWeek}
+        onClose={() => setShowCopyWeek(false)}
+        currentWeekFrom={from}
+        currentWeekTo={to}
+        onCopied={loadData}
+      />
+
       <UndoSnackbar
         open={!!pendingDelete}
         message="Đã xóa lịch trực"
         countdown={countdown}
         onUndo={undo}
+      />
+
+      <Box
+        component="style"
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              @page { size: landscape; margin: 8mm; }
+              header, nav, aside, .MuiBreadcrumbs-root, button, .no-print {
+                display: none !important;
+              }
+              body { background: #fff !important; color: #000 !important; }
+              .MuiPaper-root { box-shadow: none !important; border: 1px solid #ccc !important; }
+            }
+          `,
+        }}
       />
     </Stack>
   );

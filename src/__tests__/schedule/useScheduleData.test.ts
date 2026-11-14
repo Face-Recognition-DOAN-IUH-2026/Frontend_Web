@@ -1,6 +1,12 @@
-import { startOfWeek, getWeekDays, toDateInput, formatDateRange } from "@/hooks/useScheduleData";
+import { startOfWeek, getWeekDays, toDateInput, formatDateRange, fetchScheduleData } from "@/hooks/useScheduleData";
+import api from "@/lib/api-client";
+
+jest.mock("@/lib/api-client");
 
 describe("useScheduleData utilities", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
   describe("startOfWeek", () => {
     it("returns Monday for a Wednesday", () => {
       const wed = new Date(2026, 6, 1);
@@ -55,6 +61,36 @@ describe("useScheduleData utilities", () => {
       expect(result).toContain("—");
       expect(typeof result).toBe("string");
       expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("fetchScheduleData", () => {
+    it("fetches staff, zones, shifts, and assignments in parallel for admin", async () => {
+      (api.getScheduleStaffOptions as jest.Mock).mockResolvedValue([
+        { id: "s1", role: "admin" },
+        { id: "s2", role: "patron" },
+      ]);
+      (api.getScheduleZones as jest.Mock).mockResolvedValue([
+        { id: "z1", isActive: true },
+        { id: "z2", isActive: false },
+      ]);
+      (api.getScheduleShifts as jest.Mock).mockResolvedValue([
+        { id: "sh1", isActive: true },
+        { id: "sh2", isActive: false },
+      ]);
+      (api.getScheduleAssignments as jest.Mock).mockResolvedValue({
+        items: [{ id: "a1", staffId: "s1" }],
+        total: 1,
+      });
+
+      const res = await fetchScheduleData("2026-07-01", "2026-07-07", true);
+      expect(res.staff).toHaveLength(1);
+      expect(res.staff[0].id).toBe("s1");
+      expect(res.zones).toHaveLength(1);
+      expect(res.zones[0].id).toBe("z1");
+      expect(res.shifts).toHaveLength(1);
+      expect(res.shifts[0].id).toBe("sh1");
+      expect(res.assignments).toHaveLength(1);
     });
   });
 });

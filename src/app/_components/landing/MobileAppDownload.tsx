@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -46,25 +47,25 @@ const perks = [
 const installSteps = [
   {
     icon: <DownloadRoundedIcon fontSize="small" />,
-    label: "Tải file APK",
-    description: `Nhấn nút "Tải APK cho Android". File ${MOBILE_APP.fileName} (${MOBILE_APP.sizeLabel}) sẽ được lưu vào thư mục Tải về.`,
+    label: "Tải file APK về máy",
+    description: `Nhấn nút "Tải APK cho Android". File ${MOBILE_APP.fileName} (${MOBILE_APP.sizeLabel}) sẽ bắt đầu được tải xuống máy của bạn.`,
   },
   {
     icon: <FolderOpenIcon fontSize="small" />,
-    label: "Mở từ ứng dụng Tệp",
+    label: "Mở từ ứng dụng Tệp (Files) — KHÔNG bấm trên trình duyệt",
     description:
-      'Mở ứng dụng Tệp (Files) → thư mục Tải về → nhấn file APK. Không nhấn trực tiếp trên thanh tải của trình duyệt — Android sẽ báo "định dạng không hỗ trợ".',
+      'Sau khi tải xong, vào ứng dụng "Tệp" (Files / Quản lý tập tin) trên điện thoại → vào thư mục "Tải về" (Downloads) → nhấn file APK để cài. Nếu bấm trực tiếp trên thanh tải của trình duyệt, Android sẽ báo lỗi "Định dạng tập tin không được hỗ trợ".',
   },
   {
     icon: <SecurityIcon fontSize="small" />,
     label: "Cho phép cài từ nguồn không xác định",
     description:
-      "Vào Cài đặt → Bảo mật → Cài đặt từ nguồn không xác định, bật cho ứng dụng Tệp hoặc trình duyệt bạn đang dùng. Chỉ cần làm một lần.",
+      "Vào Cài đặt → Bảo mật → Cài đặt từ nguồn không xác định, gạt bật cho ứng dụng Tệp hoặc trình duyệt. Chỉ cần thiết lập một lần.",
   },
   {
     icon: <SystemUpdateIcon fontSize="small" />,
-    label: "Cài đặt và mở",
-    description: `Nhấn Cài đặt → Mở. Yêu cầu Android ${MOBILE_APP.minAndroid}+.`,
+    label: "Cài đặt và trải nghiệm",
+    description: `Nhấn Cài đặt → Mở ứng dụng. Tương thích mọi thiết bị Android ${MOBILE_APP.minAndroid}+.`,
   },
 ];
 
@@ -78,6 +79,15 @@ function useIsAndroid() {
   const [v, setV] = useState(false);
   useEffect(() => setV(/Android/i.test(navigator.userAgent)), []);
   return v;
+}
+
+function useIsInAppBrowser() {
+  const [inApp, setInApp] = useState(false);
+  useEffect(() => {
+    const ua = navigator.userAgent || "";
+    setInApp(/FBAN|FBAV|Zalo|Line|Instagram|TikTok|MicroMessenger|Snapchat/i.test(ua));
+  }, []);
+  return inApp;
 }
 
 /* ─── sub-components ────────────────────────────────────────────────────── */
@@ -324,6 +334,7 @@ export default function MobileAppDownload() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const isAndroid = useIsAndroid();
+  const isInApp = useIsInAppBrowser();
   const [guideOpen, setGuideOpen] = useState(false);
 
   const accent = isDark ? "#9CC9E8" : "#1E6091";
@@ -382,6 +393,28 @@ export default function MobileAppDownload() {
             thông minh.
           </Typography>
         </Stack>
+
+        {/* Cảnh báo trình duyệt nhúng Zalo / Facebook / TikTok */}
+        {isInApp && (
+          <Alert
+            severity="warning"
+            variant="outlined"
+            sx={{
+              mb: 3,
+              borderRadius: 3,
+              borderColor: "#F59E0B",
+              bgcolor: "rgba(245, 158, 11, 0.08)",
+              "& .MuiAlert-icon": { color: "#F59E0B" },
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5 }}>
+              Bạn đang mở trong ứng dụng (Zalo / Messenger / TikTok)
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5 }}>
+              Trình duyệt nội bộ này chặn tải và cài đặt file APK. Vui lòng nhấn vào biểu tượng <strong>⋮</strong> (3 dấu chấm ở góc trên bên phải) &rarr; chọn <strong>&ldquo;Mở bằng trình duyệt ngoài&rdquo; (Chrome)</strong> để tải và cài đặt ứng dụng thành công.
+            </Typography>
+          </Alert>
+        )}
 
         {/* Main card */}
         <Paper
@@ -474,6 +507,7 @@ export default function MobileAppDownload() {
                   component="a"
                   href={MOBILE_APP.apkDownloadUrl}
                   download={MOBILE_APP.fileName}
+                  onClick={() => setGuideOpen(true)}
                   variant="contained"
                   size="large"
                   startIcon={<DownloadRoundedIcon />}
@@ -513,6 +547,26 @@ export default function MobileAppDownload() {
                     }}
                   >
                     Hướng dẫn cài đặt
+                  </Button>
+
+                  <Button
+                    component="a"
+                    href={MOBILE_APP.releasesUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="outlined"
+                    size="medium"
+                    startIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />}
+                    sx={{
+                      fontWeight: 600,
+                      textTransform: "none",
+                      borderRadius: 2,
+                      borderColor: "divider",
+                      color: "text.secondary",
+                      "&:hover": { borderColor: accent, color: accent },
+                    }}
+                  >
+                    Tải từ GitHub Releases
                   </Button>
 
                   {isAndroid && (

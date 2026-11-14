@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import BookLocationCard from "@/app/(dashboard)/_components/AIWidget/cards/BookLocationCard";
+import BookLocationCard from "@/app/(dashboard)/_components/BookLocationCard";
 
 const baseData = {
   title: "Test Book",

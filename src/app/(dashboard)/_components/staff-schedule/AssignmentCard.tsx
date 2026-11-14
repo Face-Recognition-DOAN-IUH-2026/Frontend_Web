@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Chip, IconButton, Tooltip, Typography } from "@mui/material";
+import { Box, Chip, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import WarningAmberIcon from "@mui/icons-material/WarningAmberOutlined";
 import CancelIcon from "@mui/icons-material/CancelOutlined";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import type { StaffScheduleAssignment } from "@/lib/types";
 
 interface AssignmentCardProps {
@@ -37,6 +38,13 @@ function getStatus(assignment: StaffScheduleAssignment): StatusKey {
   const end = (assignment.shift?.endTime || "").slice(0, 5);
   if (start && end && current >= start && current <= end) return "active";
   return "today";
+}
+
+function formatAttendanceTime(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 export default function AssignmentCard({ assignment, onDelete, understaffed }: AssignmentCardProps) {
@@ -107,20 +115,88 @@ export default function AssignmentCard({ assignment, onDelete, understaffed }: A
         {displayName}
       </Typography>
 
-      <Chip
-        icon={isUnderstaffed ? <WarningAmberIcon sx={{ fontSize: 12 }} /> : isCancelled ? <CancelIcon sx={{ fontSize: 12 }} /> : undefined}
-        label={meta.label}
-        size="small"
-        color={meta.chipColor}
-        variant={isGround ? "outlined" : "filled"}
-        sx={{
-          mt: 0.5,
-          height: 18,
-          fontSize: "0.6rem",
-          fontWeight: 700,
-          "& .MuiChip-label": { px: 0.75 },
-        }}
-      />
+      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center", flexWrap: "wrap", mt: 0.5, gap: 0.5 }}>
+        <Chip
+          icon={isUnderstaffed ? <WarningAmberIcon sx={{ fontSize: 12 }} /> : isCancelled ? <CancelIcon sx={{ fontSize: 12 }} /> : undefined}
+          label={meta.label}
+          size="small"
+          color={meta.chipColor}
+          variant={isGround ? "outlined" : "filled"}
+          sx={{
+            height: 18,
+            fontSize: "0.6rem",
+            fontWeight: 700,
+            "& .MuiChip-label": { px: 0.75 },
+          }}
+        />
+
+        {assignment.attendance?.checkInAt ? (
+          <Tooltip
+            title={`Đã điểm danh qua ${assignment.attendance.method?.toUpperCase() || "HỆ THỐNG"} lúc ${formatAttendanceTime(assignment.attendance.checkInAt)}${assignment.attendance.checkOutAt ? ` · Ra ca lúc ${formatAttendanceTime(assignment.attendance.checkOutAt)}` : ""}`}
+          >
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.4,
+                px: 0.6,
+                py: 0.2,
+                borderRadius: "4px",
+                bgcolor: assignment.attendance.checkOutAt ? "action.hover" : "rgba(16, 185, 129, 0.12)",
+                color: assignment.attendance.checkOutAt ? "text.secondary" : "#059669",
+              }}
+            >
+              <Box
+                sx={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: "50%",
+                  bgcolor: assignment.attendance.checkOutAt ? "text.disabled" : "#10b981",
+                  boxShadow: assignment.attendance.checkOutAt ? "none" : "0 0 4px #10b981",
+                }}
+              />
+              <Typography variant="caption" sx={{ fontSize: "0.58rem", fontWeight: 700, lineHeight: 1 }}>
+                {assignment.attendance.checkOutAt
+                  ? `Ra ca ${formatAttendanceTime(assignment.attendance.checkOutAt)}`
+                  : `Vào ${formatAttendanceTime(assignment.attendance.checkInAt)}`}
+              </Typography>
+            </Box>
+          </Tooltip>
+        ) : baseStatus === "active" ? (
+          <Tooltip title="Đang trong ca trực nhưng chưa điểm danh GPS/Face">
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.4,
+                px: 0.6,
+                py: 0.2,
+                borderRadius: "4px",
+                bgcolor: "rgba(245, 158, 11, 0.15)",
+                color: "#d97706",
+              }}
+            >
+              <Box
+                sx={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: "50%",
+                  bgcolor: "#f59e0b",
+                  animation: "pulse 1.5s infinite",
+                  "@keyframes pulse": {
+                    "0%": { opacity: 1, transform: "scale(1)" },
+                    "50%": { opacity: 0.4, transform: "scale(1.3)" },
+                    "100%": { opacity: 1, transform: "scale(1)" },
+                  },
+                }}
+              />
+              <Typography variant="caption" sx={{ fontSize: "0.58rem", fontWeight: 700, lineHeight: 1 }}>
+                Chưa vào ca
+              </Typography>
+            </Box>
+          </Tooltip>
+        ) : null}
+      </Stack>
 
       {onDelete ? (
         <Tooltip title="Xóa ca trực">

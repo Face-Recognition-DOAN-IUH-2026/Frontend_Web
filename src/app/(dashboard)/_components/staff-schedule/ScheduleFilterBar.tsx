@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Divider,
+  IconButton,
   InputAdornment,
   MenuItem,
   Paper,
@@ -21,6 +22,9 @@ import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 import type { LibraryZone, StaffShift } from "@/lib/types";
 
 export interface ScheduleFilterBarProps {
@@ -32,6 +36,10 @@ export interface ScheduleFilterBarProps {
   setShiftFilter: (val: string) => void;
   zones: LibraryZone[];
   shiftList: StaffShift[];
+  staffSearch?: string;
+  setStaffSearch?: (val: string) => void;
+  myShiftsOnly?: boolean;
+  setMyShiftsOnly?: (val: boolean) => void;
 }
 
 const STATUS_FILTERS = [
@@ -50,16 +58,27 @@ export default function ScheduleFilterBar({
   setShiftFilter,
   zones,
   shiftList,
+  staffSearch = "",
+  setStaffSearch,
+  myShiftsOnly = false,
+  setMyShiftsOnly,
 }: ScheduleFilterBarProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  const hasActiveFilter = filter !== "all" || zoneFilter !== "" || shiftFilter !== "";
+  const hasActiveFilter =
+    filter !== "all" ||
+    zoneFilter !== "" ||
+    shiftFilter !== "" ||
+    myShiftsOnly ||
+    staffSearch.trim() !== "";
 
   const handleResetFilters = () => {
     setFilter("all");
     setZoneFilter("");
     setShiftFilter("");
+    setStaffSearch?.("");
+    setMyShiftsOnly?.(false);
   };
 
   return (
@@ -164,6 +183,44 @@ export default function ScheduleFilterBar({
               </ToggleButton>
             ))}
           </ToggleButtonGroup>
+
+          {setMyShiftsOnly && (
+            <Tooltip title="Chỉ hiển thị các ca trực của tôi trong tuần">
+              <Button
+                size="small"
+                variant={myShiftsOnly ? "contained" : "outlined"}
+                onClick={() => setMyShiftsOnly(!myShiftsOnly)}
+                startIcon={<PersonRoundedIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  borderRadius: "99px",
+                  px: 1.75,
+                  py: 0.5,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  fontSize: "0.78rem",
+                  whiteSpace: "nowrap",
+                  ...(myShiftsOnly
+                    ? {
+                        bgcolor: "secondary.main",
+                        color: "#fff",
+                        boxShadow: `0 2px 8px ${alpha(theme.palette.secondary.main, 0.35)}`,
+                        "&:hover": { bgcolor: "secondary.dark" },
+                      }
+                    : {
+                        color: "text.secondary",
+                        borderColor: "divider",
+                        "&:hover": {
+                          borderColor: "secondary.main",
+                          color: "secondary.main",
+                          bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                        },
+                      }),
+                }}
+              >
+                Ca của tôi
+              </Button>
+            </Tooltip>
+          )}
         </Stack>
 
         {/* Divider for desktop view */}
@@ -173,7 +230,7 @@ export default function ScheduleFilterBar({
           sx={{ display: { xs: "none", lg: "block" }, mx: 0.5 }}
         />
 
-        {/* Right Side: Select Dropdowns & Reset Button */}
+        {/* Right Side: Search, Select Dropdowns & Reset Button */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
@@ -183,6 +240,43 @@ export default function ScheduleFilterBar({
             gap: 1.25,
           }}
         >
+          {/* Staff Search Input */}
+          {setStaffSearch && (
+            <TextField
+              size="small"
+              placeholder="Tìm thủ thư..."
+              value={staffSearch}
+              onChange={(e) => setStaffSearch(e.target.value)}
+              sx={{
+                width: { xs: "100%", sm: 190 },
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  fontSize: "0.82rem",
+                  bgcolor: isDark ? alpha(theme.palette.background.default, 0.5) : "background.paper",
+                  "&:hover fieldset": {
+                    borderColor: "primary.main",
+                  },
+                },
+              }}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: staffSearch ? (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setStaffSearch("")} edge="end" sx={{ p: 0.25 }}>
+                        <ClearRoundedIcon sx={{ fontSize: 15 }} />
+                      </IconButton>
+                    </InputAdornment>
+                  ) : null,
+                },
+              }}
+            />
+          )}
+
           {/* Zone Select */}
           <TextField
             select

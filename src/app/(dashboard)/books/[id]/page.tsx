@@ -35,7 +35,6 @@ import LanguageIcon from "@mui/icons-material/LanguageOutlined";
 import LocationOnIcon from "@mui/icons-material/LocationOnOutlined";
 import DeleteIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import StarIcon from "@mui/icons-material/StarOutlined";
-import ViewInArIcon from "@mui/icons-material/ViewInArOutlined";
 import VerifiedIcon from "@mui/icons-material/VerifiedOutlined";
 import PaymentsIcon from "@mui/icons-material/PaymentsOutlined";
 import api, { getErrorMessage } from "@/lib/api-client";
@@ -47,11 +46,6 @@ import EmptyState from "@/app/(dashboard)/_components/ui/EmptyState";
 import LoadingOverlay from "@/app/(dashboard)/_components/ui/LoadingOverlay";
 import { BookCopiesTable } from "@/app/(dashboard)/_components/books/BookCopiesTable";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
-
-const Book3DViewer = dynamic(
-  () => import("@/app/(dashboard)/_components/Book3DViewer"),
-  { ssr: false, loading: () => <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "grey.100", borderRadius: 2 }}><CircularProgress /></Box> }
-);
 
 const VRViewer = dynamic(
   () => import("@/app/library/vr-tour/_components/VRViewer"),
@@ -119,7 +113,6 @@ export default function BookDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
-  const [show3D, setShow3D] = useState(false);
   const [showVR, setShowVR] = useState(false);
 
   const [copies, setCopies] = useState<BookCopy[]>([]);
@@ -371,26 +364,6 @@ export default function BookDetailPage() {
                   >
                     {book.is_available ? "Còn hàng" : "Hết hàng"}
                   </Box>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<ViewInArIcon />}
-                    onClick={() => setShow3D(true)}
-                    sx={{
-                      position: "absolute",
-                      bottom: 16,
-                      left: 16,
-                      right: book.shelf_location ? "calc(50% + 4px)" : 16,
-                      width: "auto",
-                      borderRadius: 2,
-                      boxShadow: 3,
-                      bgcolor: "rgba(139, 0, 0, 0.9)",
-                      backdropFilter: "blur(4px)",
-                      "&:hover": { bgcolor: "primary.dark" },
-                    }}
-                  >
-                    Góc nhìn 3D
-                  </Button>
                   {book.shelf_location ? (
                     <Button
                       variant="contained"
@@ -400,7 +373,7 @@ export default function BookDetailPage() {
                       sx={{
                         position: "absolute",
                         bottom: 16,
-                        left: "calc(50% + 4px)",
+                        left: 16,
                         right: 16,
                         width: "auto",
                         borderRadius: 2,
@@ -617,18 +590,6 @@ export default function BookDetailPage() {
               </Stack>
             </Grid>
           </Grid>
-
-          <Dialog open={show3D} onClose={() => setShow3D(false)} maxWidth="sm" fullWidth>
-            <DialogTitle sx={{ m: 0, p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Typography variant="h6">Góc nhìn 3D</Typography>
-              <IconButton onClick={() => setShow3D(false)}>
-                <CloseIcon />
-              </IconButton>
-            </DialogTitle>
-            <DialogContent dividers sx={{ p: 0, overflow: "hidden" }}>
-              {show3D ? <Book3DViewer coverUrl={book.cover_url || "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/1-2-3-go-book-cover.jpg/2560px-1-2-3-go-book-cover.jpg"} /> : null}
-            </DialogContent>
-          </Dialog>
 
           <Dialog open={showVR} onClose={() => setShowVR(false)} maxWidth="lg" fullWidth fullScreen>
             <DialogTitle sx={{ m: 0, p: 2, display: "flex", justifyContent: "space-between", alignItems: "center", bgcolor: "#0f172a", color: "white" }}>
