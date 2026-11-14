@@ -1,58 +1,50 @@
 "use client";
 
-import { Box, Paper, Skeleton, Stack } from "@mui/material";
+import { Box, Skeleton, Stack, Paper } from "@mui/material";
 
 interface TableSkeletonProps {
-  columns?: number;
   rows?: number;
-  height?: number;
+  cols?: number;
+  columns?: number;
+  showHeader?: boolean;
 }
 
-export default function TableSkeleton({
-  columns = 5,
-  rows = 6,
-  height = 40,
-}: TableSkeletonProps) {
-  const colWidths = ["20%", "30%", "15%", "15%", "20%"];
-
+export default function TableSkeleton({ rows = 8, cols, columns = 5, showHeader = true }: TableSkeletonProps) {
+  const columnCount = cols ?? columns;
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: "background.paper" }}>
-      {/* Header row */}
-      <Stack direction="row" spacing={2} sx={{ pb: 1.5, mb: 1.5, borderBottom: 1, borderColor: "divider" }}>
-        {Array.from({ length: columns }).map((_, i) => (
-          <Box key={i} sx={{ width: colWidths[i % colWidths.length], flexShrink: 0 }}>
-            <Skeleton variant="text" height={24} width="70%" />
-          </Box>
-        ))}
-      </Stack>
-
-      {/* Body rows */}
-      <Stack spacing={1.5}>
-        {Array.from({ length: rows }).map((_, rowIdx) => (
-          <Stack
-            key={rowIdx}
-            direction="row"
-            spacing={2}
-            sx={{
-              py: 0.75,
-              alignItems: "center",
-              borderBottom: rowIdx < rows - 1 ? "1px solid" : "none",
-              borderColor: "divider",
-            }}
-          >
-            {Array.from({ length: columns }).map((_, colIdx) => (
-              <Box key={colIdx} sx={{ width: colWidths[colIdx % colWidths.length], flexShrink: 0 }}>
-                <Skeleton
-                  variant="rounded"
-                  height={height - 16}
-                  width={colIdx === 0 ? "85%" : colIdx === 1 ? "95%" : "60%"}
-                  sx={{ borderRadius: 1 }}
-                />
-              </Box>
+    <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+      {showHeader && (
+        <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}>
+          <Stack direction="row" spacing={2}>
+            {Array.from({ length: columnCount }).map((_, i) => (
+              <Skeleton key={i} width={i === 0 ? 180 : 100} height={20} sx={{ borderRadius: 1 }} />
             ))}
           </Stack>
-        ))}
-      </Stack>
+        </Box>
+      )}
+      {Array.from({ length: rows }).map((_, rowIdx) => (
+        <Box
+          key={rowIdx}
+          sx={{
+            px: 2, py: 1.5,
+            borderBottom: rowIdx < rows - 1 ? "1px solid" : "none",
+            borderColor: "divider",
+            "&:hover": { bgcolor: "action.hover" },
+          }}
+        >
+          <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+            <Skeleton variant="rectangular" width={16} height={16} sx={{ borderRadius: 0.5, flexShrink: 0 }} />
+            {Array.from({ length: columnCount - 1 }).map((_, colIdx) => (
+              <Skeleton
+                key={colIdx}
+                width={colIdx === 0 ? "75%" : "45%"}
+                height={16}
+                sx={{ borderRadius: 1 }}
+              />
+            ))}
+          </Stack>
+        </Box>
+      ))}
     </Paper>
   );
 }

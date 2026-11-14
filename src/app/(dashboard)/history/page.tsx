@@ -973,7 +973,15 @@ export default function HistoryPage() {
         </Stack>
 
         {error ? (
-          <Alert severity="error" sx={{ mx: 2.5, mt: 2, borderRadius: 2 }}>
+          <Alert
+            severity="error"
+            sx={{ mx: 2.5, mt: 2, borderRadius: 2 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => load()}>
+                Thử lại
+              </Button>
+            }
+          >
             {error}
           </Alert>
         ) : null}
