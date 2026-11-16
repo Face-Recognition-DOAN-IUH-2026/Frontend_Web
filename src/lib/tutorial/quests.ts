@@ -296,7 +296,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
 
 export function getQuestsForUser(
   role?: string,
-  canFn?: (resource: string, action: string) => boolean,
+  canFn?: (resource: any, action: any) => boolean,
 ): TutorialQuest[] {
   const isAdmin = role === "admin";
   return TUTORIAL_QUESTS.filter((quest) => {
