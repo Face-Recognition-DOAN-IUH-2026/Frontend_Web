@@ -139,6 +139,7 @@ function NavSection({
               href={item.href}
               selected={selected}
               onClick={onClose}
+              data-tour={`nav-${item.href}`}
               sx={{
                 mb: 0.25,
                 borderRadius: "2px",
@@ -253,6 +254,7 @@ export default function Sidebar() {
       {/* ── Navigation ───────────────────────────────────── */}
       <Stack
         spacing={2}
+        data-tour="sidebar-nav"
         sx={{ flex: 1, px: 1, py: 1.5, overflowY: "auto" }}
       >
         {visibleLibraryItems.length > 0 && (

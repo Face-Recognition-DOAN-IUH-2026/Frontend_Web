@@ -22,6 +22,7 @@ import Brightness6Icon from "@mui/icons-material/Brightness6Outlined";
 import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeIcon from "@mui/icons-material/LightModeOutlined";
 import UserIcon from "@mui/icons-material/PersonOutlined";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import { useAuth } from "@/lib/auth-context";
 import { useColorMode } from "@/lib/mui-theme";
 import api from "@/lib/api-client";
@@ -30,13 +31,32 @@ import NotificationDropdown from "@/app/(dashboard)/_components/ui/NotificationD
 import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import BreadcrumbsNav from "@/app/(dashboard)/_components/ui/BreadcrumbsNav";
 import ScrollToTop from "@/app/_components/ScrollToTop";
+import { useTutorialStore } from "@/hooks/useTutorialStore";
+import { getQuestsForUser } from "@/lib/tutorial/quests";
+import TutorialOverlay from "@/app/(dashboard)/_components/tutorial/TutorialOverlay";
+import WelcomeQuestModal from "@/app/(dashboard)/_components/tutorial/WelcomeQuestModal";
+import QuestHubModal from "@/app/(dashboard)/_components/tutorial/QuestHubModal";
 
 function Topbar({ user }: { user: any }) {
   const theme = useTheme();
   const { mode, effectiveMode, preference, reducedMotion, toggleMode } = useColorMode();
+  const { can } = usePermission();
+  const { hydrateForUser, openQuestHub, completedQuestIds } = useTutorialStore();
   const [bellAnchorEl, setBellAnchorEl] = useState<HTMLElement | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const bellOpen = Boolean(bellAnchorEl);
+
+  useEffect(() => {
+    if (user?.id) {
+      hydrateForUser(user.id);
+    }
+  }, [user?.id, hydrateForUser]);
+
+  const remainingQuests = useMemo(() => {
+    const quests = getQuestsForUser(user?.role, can);
+    const doneSet = new Set(completedQuestIds);
+    return quests.filter((q) => !doneSet.has(q.id)).length;
+  }, [user?.role, can, completedQuestIds]);
 
   const modeIcon = useMemo(() => {
     if (preference === "auto") return <Brightness6Icon fontSize="small" />;
@@ -140,9 +160,25 @@ function Topbar({ user }: { user: any }) {
           </Stack>
 
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+            <Tooltip title="Sổ tay Nhiệm vụ & Hướng dẫn sử dụng">
+              <IconButton
+                color="inherit"
+                onClick={openQuestHub}
+                data-tour="topbar-quest-hub"
+                aria-label="Mở hướng dẫn sử dụng"
+              >
+                <Badge
+                  badgeContent={remainingQuests > 0 ? remainingQuests : 0}
+                  color="warning"
+                  invisible={remainingQuests === 0}
+                >
+                  <HelpOutlineRoundedIcon fontSize="small" />
+                </Badge>
+              </IconButton>
+            </Tooltip>
             <Box sx={{ position: "relative" }}>
             <Tooltip title="Thông báo">
-              <IconButton color="inherit" onClick={handleBellClick}>
+              <IconButton color="inherit" onClick={handleBellClick} data-tour="topbar-notifications">
                 <Badge badgeContent={unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : 0} color="error" invisible={unreadCount === 0}>
                   <BellIcon fontSize="small" />
                 </Badge>
@@ -151,7 +187,7 @@ function Topbar({ user }: { user: any }) {
             <NotificationDropdown anchorEl={bellAnchorEl} open={bellOpen} onClose={handleBellClose} />
           </Box>
           <Tooltip title={modeTooltip} arrow>
-            <IconButton color="inherit" onClick={toggleMode}>
+            <IconButton color="inherit" onClick={toggleMode} data-tour="topbar-theme">
               {modeIcon}
             </IconButton>
           </Tooltip>
@@ -277,6 +313,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Box>
         </Box>
         <ScrollToTop />
+        <TutorialOverlay />
+        <WelcomeQuestModal />
+        <QuestHubModal />
       </Box>
     </PermissionProvider>
   );
