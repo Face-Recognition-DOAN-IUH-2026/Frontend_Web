@@ -33,6 +33,7 @@ export default function PageHeader({
   return (
     <Stack
       direction="row"
+      data-tour="page-header"
       sx={{
         alignItems: "flex-start",
         justifyContent: "space-between",
