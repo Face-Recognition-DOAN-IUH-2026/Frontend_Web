@@ -96,3 +96,4 @@ describe("DayAgendaView", () => {
     expect(onDeleteAssignment).toHaveBeenCalledWith("a-1");
   });
 });
+
