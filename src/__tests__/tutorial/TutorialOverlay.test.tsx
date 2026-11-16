@@ -40,22 +40,22 @@ describe("TutorialOverlay", () => {
       </div>,
     );
 
-    expect(screen.getByText("Bản đồ Điều hướng Thư viện")).toBeInTheDocument();
+    expect(screen.getByText("Thanh Điều hướng Chức năng")).toBeInTheDocument();
     expect(screen.getByText("Bước 1 / 4")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Tiếp theo" }));
 
-    expect(screen.getByText("Trung tâm Thông báo Realtime")).toBeInTheDocument();
+    expect(screen.getByText("Thông báo Hệ thống")).toBeInTheDocument();
     expect(screen.getByText("Bước 2 / 4")).toBeInTheDocument();
   });
 
   it("closes tutorial on Escape key press", () => {
     render(<TutorialOverlay />);
-    expect(screen.getByText("Bản đồ Điều hướng Thư viện")).toBeInTheDocument();
+    expect(screen.getByText("Thanh Điều hướng Chức năng")).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Escape" });
 
     expect(useTutorialStore.getState().activeQuestId).toBeNull();
-    expect(screen.queryByText("Bản đồ Điều hướng Thư viện")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thanh Điều hướng Chức năng")).not.toBeInTheDocument();
   });
 });

@@ -11,7 +11,7 @@ import {
   Typography,
   alpha,
 } from "@mui/material";
-import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import { useAuth } from "@/lib/auth-context";
@@ -54,14 +54,15 @@ export default function WelcomeQuestModal() {
       slotProps={{
         paper: {
           sx: {
-            borderRadius: 3.5,
+            borderRadius: 3,
             overflow: "hidden",
-            border: "2px solid #D4AF37",
+            border: "1px solid",
+            borderColor: "divider",
           },
         },
       }}
     >
-      {/* Hero Banner */}
+      {/* Header Banner */}
       <Box
         sx={{
           p: 3,
@@ -72,49 +73,49 @@ export default function WelcomeQuestModal() {
       >
         <Box
           sx={{
-            width: 56,
-            height: 56,
+            width: 52,
+            height: 52,
             mx: "auto",
             mb: 1.5,
-            borderRadius: 2.5,
-            bgcolor: "rgba(212, 175, 55, 0.2)",
-            border: "2px solid #D4AF37",
-            color: "#D4AF37",
+            borderRadius: 2,
+            bgcolor: "rgba(255, 255, 255, 0.14)",
+            border: "1px solid rgba(255, 255, 255, 0.25)",
+            color: "#FFFFFF",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <SportsEsportsRoundedIcon sx={{ fontSize: 32 }} />
+          <MenuBookOutlinedIcon sx={{ fontSize: 28 }} />
         </Box>
 
         <Chip
           size="small"
-          label={isAdmin ? "Chế độ Quản trị viên" : "Chế độ Thủ thư"}
+          label={isAdmin ? "Tài khoản Quản trị viên" : "Tài khoản Thủ thư"}
           sx={{
             mb: 1,
-            bgcolor: "rgba(212, 175, 55, 0.22)",
-            color: "#FDE68A",
+            bgcolor: "rgba(255, 255, 255, 0.18)",
+            color: "#FFFFFF",
             fontWeight: 700,
             fontSize: "0.72rem",
           }}
         />
 
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-          {isAdmin ? "Chào mừng Quản trị viên!" : "Chào mừng Thủ thư mới!"}
+          {isAdmin ? "Hướng dẫn Quản trị Hệ thống" : "Hướng dẫn Sử dụng Thư viện"}
         </Typography>
         <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)" }}>
-          Hệ thống có {quests.length} nhiệm vụ hướng dẫn tương tác giúp bạn làm chủ toàn bộ thao tác chỉ trong vài phút.
+          Có {quests.length} bài hướng dẫn từng bước giúp bạn làm quen nhanh các thao tác nghiệp vụ.
         </Typography>
       </Box>
 
       <DialogContent sx={{ pt: 2.5, pb: 1.5 }}>
         <Stack spacing={1.25}>
           <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-            Nhiệm vụ khởi đầu: {firstQuest.title}
+            Bài mở đầu: {firstQuest.title}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.55 }}>
-            {firstQuest.subtitle} (~{firstQuest.estimatedMinutes} phút · +{firstQuest.xp} XP).
+            {firstQuest.subtitle} (~{firstQuest.estimatedMinutes} phút).
           </Typography>
           <Stack
             direction="row"
@@ -128,7 +129,7 @@ export default function WelcomeQuestModal() {
           >
             <HelpOutlineRoundedIcon sx={{ fontSize: 18, color: "primary.main", flexShrink: 0 }} />
             <Typography variant="caption" color="text.secondary">
-              Bạn luôn có thể mở lại Sổ tay Nhiệm vụ bất cứ lúc nào qua nút <strong>(?)</strong> trên thanh công cụ phía trên.
+              Bạn có thể mở lại danh sách hướng dẫn bất cứ lúc nào qua nút <strong>(?)</strong> trên thanh công cụ phía trên.
             </Typography>
           </Stack>
         </Stack>
@@ -157,7 +158,7 @@ export default function WelcomeQuestModal() {
             "&:hover": { bgcolor: "#700000" },
           }}
         >
-          Bắt đầu hướng dẫn
+          Xem hướng dẫn
         </Button>
       </DialogActions>
     </Dialog>

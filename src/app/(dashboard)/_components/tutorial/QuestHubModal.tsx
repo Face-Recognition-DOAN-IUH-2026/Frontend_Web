@@ -20,17 +20,16 @@ import {
   useTheme,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
-import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import { useAuth } from "@/lib/auth-context";
 import { usePermission } from "@/lib/permission-context";
 import { useTutorialStore } from "@/hooks/useTutorialStore";
-import { getQuestsForUser, getRankTitle } from "@/lib/tutorial/quests";
+import { getQuestsForUser } from "@/lib/tutorial/quests";
 
 export default function QuestHubModal() {
   const theme = useTheme();
@@ -57,17 +56,8 @@ export default function QuestHubModal() {
     () => quests.filter((q) => completedSet.has(q.id)).length,
     [quests, completedSet],
   );
-  const totalXp = useMemo(
-    () => quests.filter((q) => completedSet.has(q.id)).reduce((acc, q) => acc + q.xp, 0),
-    [quests, completedSet],
-  );
-  const maxXp = useMemo(
-    () => quests.reduce((acc, q) => acc + q.xp, 0),
-    [quests],
-  );
 
   const progressPct = quests.length > 0 ? Math.round((completedCount / quests.length) * 100) : 0;
-  const rankTitle = getRankTitle(completedCount, quests.length, user?.role);
 
   const recommendedQuests = useMemo(
     () => quests.filter((q) => q.matchRoutes.some((r) => pathname.startsWith(r))),
@@ -83,7 +73,7 @@ export default function QuestHubModal() {
       slotProps={{
         paper: {
           sx: {
-            borderRadius: 3.5,
+            borderRadius: 3,
             overflow: "hidden",
             border: "1px solid",
             borderColor: "divider",
@@ -103,26 +93,26 @@ export default function QuestHubModal() {
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
             <Box
               sx={{
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 borderRadius: 2,
-                bgcolor: "rgba(212, 175, 55, 0.2)",
-                border: "1.5px solid #D4AF37",
-                color: "#D4AF37",
+                bgcolor: "rgba(255, 255, 255, 0.14)",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+                color: "#FFFFFF",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
               }}
             >
-              <SportsEsportsRoundedIcon />
+              <MenuBookOutlinedIcon />
             </Box>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-                Sổ tay Nhiệm vụ Hướng dẫn
+                Trung tâm Hướng dẫn Sử dụng
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)" }}>
-                Chọn nhiệm vụ để xem hướng dẫn tương tác từng bước ngay trên màn hình
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)" }}>
+                Chọn chủ đề để xem hướng dẫn thao tác từng bước ngay trên giao diện
               </Typography>
             </Box>
           </Stack>
@@ -130,39 +120,36 @@ export default function QuestHubModal() {
           <IconButton
             size="small"
             onClick={closeQuestHub}
-            aria-label="Đóng sổ tay nhiệm vụ"
+            aria-label="Đóng hướng dẫn sử dụng"
             sx={{ color: "rgba(255,255,255,0.8)", "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.12)" } }}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
         </Stack>
 
-        {/* Player Progress Bar */}
+        {/* Completion Progress Bar */}
         <Box
           sx={{
             mt: 2,
             p: 1.5,
             borderRadius: 2,
-            bgcolor: "rgba(0, 0, 0, 0.25)",
+            bgcolor: "rgba(0, 0, 0, 0.22)",
             border: "1px solid rgba(255,255,255,0.12)",
           }}
         >
           <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
-            <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
-              <EmojiEventsRoundedIcon sx={{ fontSize: 18, color: "#D4AF37" }} />
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#FDE68A" }}>
-                Cấp bậc: {rankTitle}
-              </Typography>
-            </Stack>
             <Typography variant="caption" sx={{ fontWeight: 700, color: "#FFFFFF" }}>
-              {completedCount}/{quests.length} nhiệm vụ · {totalXp}/{maxXp} XP
+              Tiến độ đã xem hướng dẫn
+            </Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: "#FDE68A" }}>
+              {completedCount}/{quests.length} chủ đề ({progressPct}%)
             </Typography>
           </Stack>
           <LinearProgress
             variant="determinate"
             value={progressPct}
             sx={{
-              height: 7,
+              height: 6,
               borderRadius: 99,
               bgcolor: "rgba(255,255,255,0.15)",
               "& .MuiLinearProgress-bar": {
@@ -180,9 +167,9 @@ export default function QuestHubModal() {
           {recommendedQuests.length > 0 && (
             <Box>
               <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", mb: 1 }}>
-                <AutoAwesomeRoundedIcon sx={{ fontSize: 16, color: "#D4AF37" }} />
+                <HelpOutlineRoundedIcon sx={{ fontSize: 16, color: "primary.main" }} />
                 <Typography variant="caption" sx={{ fontWeight: 800, textTransform: "uppercase", color: "text.secondary", letterSpacing: 0.6 }}>
-                  Gợi ý cho trang bạn đang mở
+                  Hướng dẫn cho trang bạn đang mở
                 </Typography>
               </Stack>
               <Stack spacing={1.25}>
@@ -195,8 +182,8 @@ export default function QuestHubModal() {
                       sx={{
                         p: 1.75,
                         borderRadius: 2.5,
-                        borderColor: "#D4AF37",
-                        bgcolor: alpha("#D4AF37", isDark ? 0.08 : 0.06),
+                        borderColor: "primary.main",
+                        bgcolor: alpha(theme.palette.primary.main, isDark ? 0.08 : 0.04),
                       }}
                     >
                       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}>
@@ -208,7 +195,7 @@ export default function QuestHubModal() {
                             {isDone && (
                               <Chip
                                 icon={<CheckCircleRoundedIcon sx={{ fontSize: 14 }} />}
-                                label="Đã xong"
+                                label="Đã xem"
                                 size="small"
                                 color="success"
                                 sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700 }}
@@ -216,7 +203,7 @@ export default function QuestHubModal() {
                             )}
                           </Stack>
                           <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                            {quest.subtitle} · {quest.steps.length} bước · +{quest.xp} XP
+                            {quest.subtitle} · {quest.steps.length} bước
                           </Typography>
                         </Box>
 
@@ -228,13 +215,13 @@ export default function QuestHubModal() {
                           sx={{
                             borderRadius: 2,
                             textTransform: "none",
-                            fontWeight: 800,
+                            fontWeight: 700,
                             flexShrink: 0,
                             bgcolor: "#8B0000",
                             "&:hover": { bgcolor: "#700000" },
                           }}
                         >
-                          {isDone ? "Chơi lại" : "Bắt đầu"}
+                          {isDone ? "Xem lại" : "Xem hướng dẫn"}
                         </Button>
                       </Stack>
                     </Paper>
@@ -244,10 +231,10 @@ export default function QuestHubModal() {
             </Box>
           )}
 
-          {/* Full Quest List */}
+          {/* Full Guide List */}
           <Box>
             <Typography variant="caption" sx={{ fontWeight: 800, textTransform: "uppercase", color: "text.secondary", letterSpacing: 0.6, display: "block", mb: 1 }}>
-              Tất cả Nhiệm vụ ({quests.length})
+              Tất cả Chủ đề Hướng dẫn ({quests.length})
             </Typography>
 
             <Stack spacing={1.25}>
@@ -289,7 +276,7 @@ export default function QuestHubModal() {
                           {quest.subtitle}
                         </Typography>
                         <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 600 }}>
-                          {quest.steps.length} bước · ~{quest.estimatedMinutes} phút · +{quest.xp} XP · Huy hiệu: {quest.badgeLabel}
+                          {quest.steps.length} bước · ~{quest.estimatedMinutes} phút
                         </Typography>
                       </Box>
 
@@ -306,7 +293,7 @@ export default function QuestHubModal() {
                           flexShrink: 0,
                         }}
                       >
-                        {isDone ? "Xem lại" : "Bắt đầu"}
+                        {isDone ? "Xem lại" : "Xem hướng dẫn"}
                       </Button>
                     </Stack>
                   </Paper>
@@ -327,7 +314,7 @@ export default function QuestHubModal() {
           startIcon={<RestartAltRoundedIcon sx={{ fontSize: 16 }} />}
           sx={{ textTransform: "none", color: "text.secondary", fontWeight: 600 }}
         >
-          Đặt lại tiến độ
+          Đặt lại trạng thái đã xem
         </Button>
 
         <Button
