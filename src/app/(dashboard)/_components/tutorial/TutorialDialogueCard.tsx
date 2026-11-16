@@ -18,7 +18,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import TipsAndUpdatesOutlinedIcon from "@mui/icons-material/TipsAndUpdatesOutlined";
-import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import type { TutorialPlacement, TutorialQuest, TutorialStep } from "@/lib/tutorial/types";
 
 export interface TargetRect {
@@ -169,7 +169,7 @@ export default function TutorialDialogueCard({
               flexShrink: 0,
             }}
           >
-            <SportsEsportsRoundedIcon sx={{ fontSize: 17 }} />
+            <MenuBookOutlinedIcon sx={{ fontSize: 17 }} />
           </Box>
           <Box sx={{ minWidth: 0 }}>
             <Typography
@@ -228,7 +228,7 @@ export default function TutorialDialogueCard({
         {step.actionMode === "click-target" && targetRect && (
           <Chip
             size="small"
-            label="Mẹo: Nhấn trực tiếp vào vùng đang phát sáng để qua bước!"
+            label="Nhấn trực tiếp vào mục được đánh dấu để chuyển sang bước tiếp theo."
             sx={{
               mb: step.hint ? 1.25 : 0,
               height: "auto",

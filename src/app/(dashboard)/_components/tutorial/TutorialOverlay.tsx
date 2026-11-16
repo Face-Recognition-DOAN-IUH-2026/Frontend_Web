@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Alert, Box, Snackbar, Stack, Typography } from "@mui/material";
-import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import { useTutorialStore } from "@/hooks/useTutorialStore";
 import { TUTORIAL_QUESTS } from "@/lib/tutorial/quests";
 import { useColorMode } from "@/lib/mui-theme";
@@ -254,10 +254,10 @@ export default function TutorialOverlay() {
         <Alert
           onClose={clearJustCompleted}
           severity="success"
-          icon={<EmojiEventsRoundedIcon sx={{ color: "#D4AF37" }} />}
+          icon={<CheckCircleOutlineRoundedIcon sx={{ color: "#10B981" }} />}
           sx={{
-            borderRadius: 3,
-            border: "1.5px solid #D4AF37",
+            borderRadius: 2.5,
+            border: "1px solid #10B981",
             bgcolor: "#0A2540",
             color: "#FFFFFF",
             boxShadow: "0 12px 32px rgba(10,37,64,0.35)",
@@ -265,11 +265,8 @@ export default function TutorialOverlay() {
           }}
         >
           <Stack spacing={0.25}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#FDE68A" }}>
-              Hoàn thành: {completedQuest?.title} (+{completedQuest?.xp} XP)
-            </Typography>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)" }}>
-              Mở khóa danh hiệu: <strong>{completedQuest?.badgeLabel}</strong>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#FFFFFF" }}>
+              Đã hoàn thành hướng dẫn: {completedQuest?.title}
             </Typography>
           </Stack>
         </Alert>

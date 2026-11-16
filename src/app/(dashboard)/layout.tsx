@@ -160,7 +160,7 @@ function Topbar({ user }: { user: any }) {
           </Stack>
 
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-            <Tooltip title="Sổ tay Nhiệm vụ & Hướng dẫn sử dụng">
+            <Tooltip title="Hướng dẫn sử dụng">
               <IconButton
                 color="inherit"
                 onClick={openQuestHub}

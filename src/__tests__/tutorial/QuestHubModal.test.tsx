@@ -36,28 +36,28 @@ describe("QuestHubModal", () => {
     });
   });
 
-  it("renders staff quests and contextual recommendation for /staff-schedules", () => {
+  it("renders staff guides and contextual recommendation for /staff-schedules", () => {
     render(<QuestHubModal />);
 
-    expect(screen.getByText("Sổ tay Nhiệm vụ Hướng dẫn")).toBeInTheDocument();
-    expect(screen.getByText("Gợi ý cho trang bạn đang mở")).toBeInTheDocument();
-    expect(screen.getAllByText(/Nhiệm vụ 3: Lịch trực & Điểm danh GPS/).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Nhiệm vụ Admin 1/)).not.toBeInTheDocument();
+    expect(screen.getByText("Trung tâm Hướng dẫn Sử dụng")).toBeInTheDocument();
+    expect(screen.getByText("Hướng dẫn cho trang bạn đang mở")).toBeInTheDocument();
+    expect(screen.getAllByText(/3\. Xem Lịch trực & Điểm danh GPS/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Admin 1:/)).not.toBeInTheDocument();
   });
 
-  it("renders admin quests when user role is admin", () => {
+  it("renders admin guides when user role is admin", () => {
     mockRole = "admin";
     render(<QuestHubModal />);
 
-    expect(screen.getByText(/Nhiệm vụ Admin 1: Nhân sự & Sinh trắc học/)).toBeInTheDocument();
-    expect(screen.getByText(/Nhiệm vụ Admin 2: Phân quyền Động/)).toBeInTheDocument();
+    expect(screen.getByText(/Admin 1: Quản lý Nhân sự & Khuôn mặt/)).toBeInTheDocument();
+    expect(screen.getByText(/Admin 2: Phân quyền Động/)).toBeInTheDocument();
   });
 
-  it("starts selected quest when clicking Bắt đầu", async () => {
+  it("starts selected guide when clicking Xem hướng dẫn", async () => {
     const user = userEvent.setup();
     render(<QuestHubModal />);
 
-    const startButtons = screen.getAllByRole("button", { name: "Bắt đầu" });
+    const startButtons = screen.getAllByRole("button", { name: "Xem hướng dẫn" });
     await user.click(startButtons[0]);
 
     expect(useTutorialStore.getState().questHubOpen).toBe(false);

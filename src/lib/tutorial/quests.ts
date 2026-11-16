@@ -4,10 +4,10 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
   {
     id: "staff-welcome",
     role: "all",
-    title: "Nhiệm vụ 1: Khám phá Trạm Làm việc",
-    subtitle: "Làm quen thanh điều hướng, bảng điều khiển và công cụ thông báo",
-    badgeLabel: "Tân binh Thư viện",
-    xp: 100,
+    title: "1. Làm quen Giao diện Làm việc",
+    subtitle: "Tìm hiểu thanh điều hướng, bảng điều khiển và công cụ thông báo",
+    badgeLabel: "Cơ bản",
+    xp: 0,
     estimatedMinutes: 1,
     matchRoutes: ["/dashboard"],
     steps: [
@@ -15,19 +15,19 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         id: "sw-1",
         route: "/dashboard",
         targetSelector: `[data-tour="sidebar-nav"]`,
-        title: "Bản đồ Điều hướng Thư viện",
+        title: "Thanh Điều hướng Chức năng",
         content:
-          "Thanh bên trái là trung tâm điều hướng toàn bộ hệ thống: từ Quầy Mượn/Trả, Kho sách, Lịch trực đến Công cụ Nhận diện AI.",
-        hint: "Trên điện thoại, bạn có thể mở thanh này qua nút Menu ở góc trên bên trái.",
+          "Thanh bên trái chứa toàn bộ các phân hệ làm việc: Quầy Mượn/Trả, Kho sách, Lịch trực và Công cụ Nhận diện.",
+        hint: "Trên màn hình nhỏ hoặc điện thoại, bạn có thể mở thanh này qua nút Menu ở góc trên bên trái.",
         placement: "right",
       },
       {
         id: "sw-2",
         route: "/dashboard",
         targetSelector: `[data-tour="topbar-notifications"]`,
-        title: "Trung tâm Thông báo Realtime",
+        title: "Thông báo Hệ thống",
         content:
-          "Chuông thông báo cập nhật ngay các cảnh báo quá hạn, yêu cầu đặt trước và biến động ca trực.",
+          "Biểu tượng chuông hiển thị các thông báo mới về sách quá hạn, lịch đặt trước và cập nhật ca trực.",
         placement: "bottom",
       },
       {
@@ -36,16 +36,16 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         targetSelector: `[data-tour="topbar-theme"]`,
         title: "Chuyển đổi Giao diện Sáng / Tối",
         content:
-          "Nhấn vào đây để chuyển nhanh giữa chế độ Sáng, Tối hoặc Tự động theo hệ thống để bảo vệ mắt khi trực ca tối.",
+          "Nhấn vào đây để chuyển nhanh giữa chế độ Sáng, Tối hoặc Tự động theo thiết bị.",
         placement: "bottom",
       },
       {
         id: "sw-4",
         route: "/dashboard",
         targetSelector: `[data-tour="topbar-quest-hub"]`,
-        title: "Sổ tay Nhiệm vụ (Mở lại bất cứ lúc nào)",
+        title: "Mở lại Hướng dẫn bất cứ lúc nào",
         content:
-          "Bất kỳ lúc nào quên thao tác, hãy bấm nút dấu hỏi (?) tại đây để mở lại Sổ tay Nhiệm vụ hoặc xem hướng dẫn riêng của trang đang đứng!",
+          "Khi cần xem lại cách thao tác, hãy nhấn biểu tượng dấu hỏi (?) tại đây để mở danh sách hướng dẫn hoặc hướng dẫn riêng cho trang hiện tại.",
         placement: "bottom",
       },
     ],
@@ -53,10 +53,10 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
   {
     id: "staff-circulation",
     role: "staff",
-    title: "Nhiệm vụ 2: Nghiệp vụ Mượn & Trả sách",
-    subtitle: "Thành thạo quy trình quét thẻ/khuôn mặt, phát hành phiếu và thu hồi sách",
-    badgeLabel: "Thủ thư Lưu thông",
-    xp: 150,
+    title: "2. Quy trình Mượn & Trả sách",
+    subtitle: "Hướng dẫn quét thẻ/khuôn mặt bạn đọc, lập phiếu mượn và thu hồi sách",
+    badgeLabel: "Lưu thông",
+    xp: 0,
     estimatedMinutes: 2,
     matchRoutes: ["/borrow", "/return", "/books"],
     steps: [
@@ -66,8 +66,8 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         targetSelector: `[data-tour="nav-/borrow"]`,
         title: "Bước 1: Mở Quầy Mượn Sách",
         content:
-          "Khi sinh viên đến quầy mượn giáo trình, hãy chọn 'Quầy mượn sách' trên thanh điều hướng.",
-        hint: "Bạn có thể bấm trực tiếp vào mục đang sáng hoặc nhấn Tiếp theo.",
+          "Khi sinh viên đến mượn sách, chọn mục 'Quầy mượn sách' trên thanh điều hướng bên trái.",
+        hint: "Bạn có thể nhấn trực tiếp vào mục được đánh dấu hoặc bấm Tiếp theo.",
         placement: "right",
         actionMode: "click-target",
       },
@@ -77,7 +77,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         targetSelector: `[data-tour="page-header"]`,
         title: "Bước 2: Xác thực Bạn đọc & Quét Sách",
         content:
-          "Tại Quầy mượn sách, bạn có thể nhập MSSV, quét mã vạch thẻ sinh viên hoặc nhận diện khuôn mặt. Sau đó quét mã vạch từng cuốn sách để tạo phiếu mượn.",
+          "Nhập MSSV, quét mã vạch thẻ sinh viên hoặc nhận diện khuôn mặt để chọn bạn đọc. Sau đó quét mã vạch từng cuốn sách để hoàn tất phiếu mượn.",
         placement: "bottom",
       },
       {
@@ -86,7 +86,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         targetSelector: `[data-tour="page-header"]`,
         title: "Bước 3: Quầy Trả Sách & Kiểm tra Tình trạng",
         content:
-          "Khi nhận lại sách, quét mã bản sao sách tại Quầy trả. Hệ thống tự tính số ngày trễ hạn và cho phép ghi nhận mức hư hại (nếu có) trước khi hoàn tất.",
+          "Quét mã bản sao sách khi bạn đọc trả. Hệ thống tự động tính số ngày trễ hạn (nếu có) và cho phép ghi nhận tình trạng hư hỏng trước khi xác nhận.",
         placement: "bottom",
       },
       {
@@ -95,7 +95,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         targetSelector: `[data-tour="page-header"]`,
         title: "Bước 4: Tra cứu Kho Sách & Bản sao",
         content:
-          "Dùng Kho sách & Tài liệu để kiểm tra nhanh số lượng bản sao sẵn sàng, vị trí kệ hoặc in lại mã vạch sách.",
+          "Vào Kho sách & Tài liệu để kiểm tra số lượng bản sao khả dụng, vị trí kệ hoặc in mã vạch.",
         placement: "bottom",
       },
     ],
@@ -103,10 +103,10 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
   {
     id: "staff-schedule",
     role: "all",
-    title: "Nhiệm vụ 3: Lịch trực & Điểm danh GPS",
-    subtitle: "Xem lịch trực cá nhân, check-in Geofence và theo dõi Nhật ký ngày",
-    badgeLabel: "Chiến binh Đúng giờ",
-    xp: 120,
+    title: "3. Xem Lịch trực & Điểm danh GPS",
+    subtitle: "Cách xem ca trực cá nhân, check-in Geofence và chuyển chế độ Nhật ký ngày",
+    badgeLabel: "Lịch trực",
+    xp: 0,
     estimatedMinutes: 2,
     matchRoutes: ["/staff-schedules"],
     steps: [
@@ -114,18 +114,18 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         id: "ss-1",
         route: "/staff-schedules",
         targetSelector: `[data-tour="schedule-my-shift"]`,
-        title: "Bảng Điểm danh Ca của Tôi",
+        title: "Khung Điểm danh Ca trực của Tôi",
         content:
-          "Ngay đầu trang Lịch trực, khung này hiển thị ca trực hôm nay của bạn kèm nút Check-in / Check-out GPS và bản đồ vùng hợp lệ.",
+          "Hiển thị các ca trực hôm nay của bạn kèm nút Check-in / Check-out GPS và bản đồ khu vực hợp lệ.",
         placement: "bottom",
       },
       {
         id: "ss-2",
         route: "/staff-schedules",
         targetSelector: `[data-tour="schedule-filter-bar"]`,
-        title: "Tìm nhanh & Lọc 'Ca của tôi'",
+        title: "Tìm kiếm & Lọc 'Ca của tôi'",
         content:
-          "Gõ tên đồng nghiệp vào ô tìm kiếm hoặc bật nút 'Ca của tôi' để ẩn lịch người khác, tập trung vào ca trực của riêng bạn.",
+          "Nhập tên nhân viên vào ô tìm kiếm hoặc bật nút 'Ca của tôi' để chỉ hiển thị lịch trực của riêng bạn.",
         placement: "bottom",
       },
       {
@@ -134,7 +134,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         targetSelector: `[data-tour="schedule-view-toggle"]`,
         title: "Chuyển Lưới Tuần ⟷ Nhật ký Ngày",
         content:
-          "Khi xem trên điện thoại hoặc muốn nhìn gọn theo dòng thời gian, hãy chuyển sang chế độ 'Nhật ký ngày' thay cho lưới 7 cột.",
+          "Trên điện thoại hoặc khi cần xem theo dòng thời gian từng ngày, hãy chọn chế độ 'Nhật ký ngày' thay cho bảng lưới 7 cột.",
         placement: "left",
       },
     ],
@@ -142,10 +142,10 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
   {
     id: "staff-kiosk-ai",
     role: "staff",
-    title: "Nhiệm vụ 4: Giám sát Cổng & Trợ lý AI",
-    subtitle: "Theo dõi bạn đọc ra/vào realtime và tra cứu quy định bằng AI",
-    badgeLabel: "Người gác cổng Thông minh",
-    xp: 120,
+    title: "4. Giám sát Cổng & Trợ lý AI",
+    subtitle: "Theo dõi lượt ra/vào thư viện và tra cứu thông tin qua Trợ lý AI",
+    badgeLabel: "Vận hành",
+    xp: 0,
     estimatedMinutes: 1,
     matchRoutes: ["/gate", "/active", "/ai-assistant"],
     steps: [
@@ -155,16 +155,16 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         targetSelector: `[data-tour="page-header"]`,
         title: "Theo dõi Bạn đọc Đang có mặt",
         content:
-          "Trang này liệt kê danh sách sinh viên/giảng viên hiện đang ở trong thư viện theo thời gian thực từ cổng kiểm soát khuôn mặt.",
+          "Hiển thị danh sách sinh viên/giảng viên đang có mặt trong thư viện theo dữ liệu thời gian thực từ cổng kiểm soát.",
         placement: "bottom",
       },
       {
         id: "sk-2",
         route: "/ai-assistant",
         targetSelector: `[data-tour="page-header"]`,
-        title: "Hỏi Trợ lý AI Thư viện",
+        title: "Sử dụng Trợ lý AI Thư viện",
         content:
-          "Cần tra cứu nhanh nội quy thư viện, quy trình xử lý mất sách hay số liệu thống kê? Hãy đặt câu hỏi trực tiếp cho Trợ lý AI!",
+          "Đặt câu hỏi trực tiếp để tra cứu nhanh quy định mượn trả, hướng dẫn xử lý sự cố hoặc số liệu tổng hợp.",
         placement: "bottom",
       },
     ],
@@ -173,10 +173,10 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
     id: "admin-users-face",
     role: "admin",
     permission: "admin:users",
-    title: "Nhiệm vụ Admin 1: Nhân sự & Sinh trắc học",
-    subtitle: "Quản lý tài khoản nhân viên/bạn đọc và đăng ký khuôn mặt đa góc",
-    badgeLabel: "Chỉ huy Nhân sự",
-    xp: 180,
+    title: "Admin 1: Quản lý Nhân sự & Khuôn mặt",
+    subtitle: "Tạo tài khoản nhân viên/bạn đọc và đăng ký dữ liệu khuôn mặt",
+    badgeLabel: "Quản trị",
+    xp: 0,
     estimatedMinutes: 2,
     matchRoutes: ["/dashboard/admin", "/enroll"],
     steps: [
@@ -184,18 +184,18 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         id: "au-1",
         route: "/dashboard/admin",
         targetSelector: `[data-tour="page-header"]`,
-        title: "Quản trị Tài khoản & Vai trò",
+        title: "Quản trị Tài khoản Người dùng",
         content:
-          "Tại đây Admin tạo mới tài khoản Thủ thư/Sinh viên, khóa tài khoản vi phạm hoặc đặt lại mật khẩu.",
+          "Tạo mới tài khoản Thủ thư hoặc Sinh viên, cập nhật vai trò, khóa tài khoản hoặc đặt lại mật khẩu.",
         placement: "bottom",
       },
       {
         id: "au-2",
         route: "/enroll",
         targetSelector: `[data-tour="page-header"]`,
-        title: "Đăng ký Khuôn mặt Chuẩn xác",
+        title: "Đăng ký Khuôn mặt Sinh trắc học",
         content:
-          "Hướng dẫn chụp đủ các góc mặt để hệ thống Milvus trích xuất vector đặc trưng, phục vụ mở cổng Kiosk và xác thực mượn sách.",
+          "Chụp các góc khuôn mặt theo hướng dẫn trên màn hình để hệ thống trích xuất vector phục vụ mở cổng và xác thực mượn sách.",
         placement: "bottom",
       },
     ],
@@ -204,10 +204,10 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
     id: "admin-rbac",
     role: "admin",
     permission: "admin:settings",
-    title: "Nhiệm vụ Admin 2: Phân quyền Động (RBAC)",
-    subtitle: "Tùy chỉnh quyền hạn chi tiết cho từng vai trò mà không cần sửa code",
-    badgeLabel: "Kiến trúc sư Bảo mật",
-    xp: 150,
+    title: "Admin 2: Phân quyền Động (RBAC)",
+    subtitle: "Tạo vai trò và cấu hình quyền truy cập chi tiết theo từng phân hệ",
+    badgeLabel: "Phân quyền",
+    xp: 0,
     estimatedMinutes: 2,
     matchRoutes: ["/dynamic-admin"],
     steps: [
@@ -215,9 +215,9 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         id: "ar-1",
         route: "/dynamic-admin",
         targetSelector: `[data-tour="page-header"]`,
-        title: "Ma trận Phân quyền Động",
+        title: "Cấu hình Vai trò & Quyền hạn",
         content:
-          "Tạo các vai trò tùy biến (vd: Thủ thư Kho, Cộng tác viên) và gán chính xác quyền đọc/tạo/sửa/xóa cho từng phân hệ như Lịch trực, Kho sách, Bạn đọc.",
+          "Tạo vai trò tùy biến và bật/tắt chi tiết quyền xem, tạo, sửa, xóa cho từng chức năng như Lịch trực, Kho sách, Bạn đọc.",
         placement: "bottom",
       },
     ],
@@ -225,10 +225,10 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
   {
     id: "admin-schedule-ops",
     role: "admin",
-    title: "Nhiệm vụ Admin 3: Điều phối Lịch tuần & Geofence",
+    title: "Admin 3: Xếp lịch Tuần & Cấu hình Geofence",
     subtitle: "Sao chép lịch tuần trước, xếp lịch tự động và thiết lập vùng GPS",
-    badgeLabel: "Bậc thầy Điều phối",
-    xp: 200,
+    badgeLabel: "Điều phối",
+    xp: 0,
     estimatedMinutes: 2,
     matchRoutes: ["/staff-schedules"],
     steps: [
@@ -236,18 +236,18 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         id: "aso-1",
         route: "/staff-schedules",
         targetSelector: `[data-tour="schedule-copy-week"]`,
-        title: "Sao chép Lịch tuần trước (1-Click)",
+        title: "Sao chép Lịch tuần trước",
         content:
-          "Tiết kiệm 90% thời gian xếp lịch đầu tuần! Bấm nút này để nhân bản toàn bộ ca trực tuần trước sang tuần đang xem và tự động bỏ qua ca trùng.",
+          "Nhấn nút này để sao chép nhanh phân công ca trực từ tuần trước sang tuần đang xem và tự động bỏ qua các ca trùng lặp.",
         placement: "bottom",
       },
       {
         id: "aso-2",
         route: "/staff-schedules",
         targetSelector: `[data-tour="schedule-date-jump"]`,
-        title: "Nhảy nhanh tới Tuần bất kỳ",
+        title: "Chuyển nhanh tới Tuần bất kỳ",
         content:
-          "Chọn một ngày trên lịch mini để nhảy thẳng tới tuần thi cử hoặc tuần lễ cần lập kế hoạch trước.",
+          "Chọn một ngày trên lịch để nhảy thẳng tới tuần tương ứng mà không cần bấm chuyển từng tuần.",
         placement: "bottom",
       },
       {
@@ -256,7 +256,7 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         targetSelector: `[data-tour="schedule-auto-btn"]`,
         title: "Gợi ý Lịch Tự động & Geofence",
         content:
-          "Dùng nút Tia sáng (Gợi ý tự động) để hệ thống đề xuất phân công cân bằng giờ trực, và nút Bản đồ để cấu hình bán kính GPS cho từng khu vực.",
+          "Dùng nút Gợi ý tự động để phân công cân bằng ca trực, và nút Bản đồ bên cạnh để cấu hình tọa độ/bán kính điểm danh GPS cho từng khu vực.",
         placement: "bottom",
       },
     ],
@@ -265,10 +265,10 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
     id: "admin-settings-rag",
     role: "admin",
     permission: "admin:settings",
-    title: "Nhiệm vụ Admin 4: Cấu hình Hệ thống & Tri thức AI",
-    subtitle: "Thiết lập biểu phí phạt, máy chủ Email SMTP và kho tài liệu RAG",
-    badgeLabel: "Tổng quản Hệ thống",
-    xp: 180,
+    title: "Admin 4: Cấu hình Hệ thống & Kho Tri thức AI",
+    subtitle: "Thiết lập biểu phí phạt, máy chủ Email SMTP và tài liệu cho Trợ lý AI",
+    badgeLabel: "Hệ thống",
+    xp: 0,
     estimatedMinutes: 2,
     matchRoutes: ["/settings", "/knowledge-base"],
     steps: [
@@ -276,18 +276,18 @@ export const TUTORIAL_QUESTS: TutorialQuest[] = [
         id: "asr-1",
         route: "/settings",
         targetSelector: `[data-tour="page-header"]`,
-        title: "Tham số Nghiệp vụ & Biểu phí",
+        title: "Cấu hình Tham số & Biểu phí",
         content:
-          "Điều chỉnh số sách mượn tối đa, biểu phí phạt theo bậc ngày trễ hạn, tỉ lệ đền bù hư hỏng và kiểm tra kết nối SMTP gửi email tự động.",
+          "Thiết lập số sách/ngày mượn tối đa, biểu phí phạt trễ hạn, tỉ lệ đền bù hư hỏng và kiểm tra gửi Email SMTP.",
         placement: "bottom",
       },
       {
         id: "asr-2",
         route: "/knowledge-base",
         targetSelector: `[data-tour="page-header"]`,
-        title: "Kho Tri thức RAG cho AI",
+        title: "Cập nhật Kho Tri thức AI (RAG)",
         content:
-          "Tải lên hoặc cập nhật văn bản quy chế thư viện tại đây để Trợ lý AI trả lời chính xác cho cả sinh viên và thủ thư.",
+          "Tải lên các tài liệu quy chế, nội quy thư viện để Trợ lý AI trả lời chính xác cho người dùng.",
         placement: "bottom",
       },
     ],
