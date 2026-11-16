@@ -156,7 +156,6 @@ export default function StaffSchedulesPage() {
       <Tooltip title="Chọn ngày để nhảy nhanh đến tuần đó">
         <Box
           component="label"
-          data-tour="schedule-date-jump"
           sx={{
             position: "relative",
             display: "inline-flex",
@@ -203,7 +202,6 @@ export default function StaffSchedulesPage() {
           <IconButton
             onClick={() => setShowCopyWeek(true)}
             size="small"
-            data-tour="schedule-copy-week"
             sx={{
               color: "#6366f1",
               border: "1px solid rgba(99,102,241,0.35)",
@@ -216,7 +214,7 @@ export default function StaffSchedulesPage() {
       )}
       {canCreate && (
         <Tooltip title="Gợi ý lịch tự động">
-          <IconButton data-tour="schedule-auto-btn" onClick={() => auto.setShowAutoSchedule(true)} size="small" sx={{ color: "#D4AF37", border: "1px solid rgba(212,175,55,0.4)", "&:hover": { bgcolor: "rgba(212,175,55,0.1)" } }}>
+          <IconButton onClick={() => auto.setShowAutoSchedule(true)} size="small" sx={{ color: "#D4AF37", border: "1px solid rgba(212,175,55,0.4)", "&:hover": { bgcolor: "rgba(212,175,55,0.1)" } }}>
             <AutoAwesomeIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -280,16 +278,14 @@ export default function StaffSchedulesPage() {
         actions={headerActions}
       />
 
-      <Box data-tour="schedule-my-shift">
-        <MyShiftPanel
-          onChanged={canManage ? loadData : undefined}
-          onOpenMap={(item) => {
-            setMapAssignmentId(item.id);
-            setMapZoneName(item.shift?.name ?? item.zone?.zoneName ?? "Khu vực");
-            setShowCheckInMap(true);
-          }}
-        />
-      </Box>
+      <MyShiftPanel
+        onChanged={canManage ? loadData : undefined}
+        onOpenMap={(item) => {
+          setMapAssignmentId(item.id);
+          setMapZoneName(item.shift?.name ?? item.zone?.zoneName ?? "Khu vực");
+          setShowCheckInMap(true);
+        }}
+      />
 
       {mapAssignmentId && (
         <CheckInMapModal open={showCheckInMap} onClose={() => setShowCheckInMap(false)} assignmentId={mapAssignmentId} zoneName={mapZoneName} onSuccess={loadData} />
@@ -305,22 +301,20 @@ export default function StaffSchedulesPage() {
         ))}
       </Box>
 
-      <Box data-tour="schedule-filter-bar">
-        <ScheduleFilterBar
-          filter={filter}
-          setFilter={setFilter}
-          zoneFilter={zoneFilter}
-          setZoneFilter={setZoneFilter}
-          shiftFilter={shiftFilter}
-          setShiftFilter={setShiftFilter}
-          staffSearch={staffSearch}
-          setStaffSearch={setStaffSearch}
-          myShiftsOnly={myShiftsOnly}
-          setMyShiftsOnly={setMyShiftsOnly}
-          zones={zones}
-          shiftList={shiftList}
-        />
-      </Box>
+      <ScheduleFilterBar
+        filter={filter}
+        setFilter={setFilter}
+        zoneFilter={zoneFilter}
+        setZoneFilter={setZoneFilter}
+        shiftFilter={shiftFilter}
+        setShiftFilter={setShiftFilter}
+        staffSearch={staffSearch}
+        setStaffSearch={setStaffSearch}
+        myShiftsOnly={myShiftsOnly}
+        setMyShiftsOnly={setMyShiftsOnly}
+        zones={zones}
+        shiftList={shiftList}
+      />
 
       {error ? (
         <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 2 }}>{error}</Alert>
@@ -368,7 +362,6 @@ export default function StaffSchedulesPage() {
             <ToggleButtonGroup
               value={viewMode}
               exclusive
-              data-tour="schedule-view-toggle"
               onChange={(_, val) => {
                 if (val) setViewMode(val);
               }}
