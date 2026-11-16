@@ -79,22 +79,22 @@ describe("SettingsPage", () => {
     render(<SettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Không có quyền truy cập")).toBeInTheDocument();
+      expect(screen.getByText("Giới hạn quyền quản trị")).toBeInTheDocument();
     });
-    expect(screen.getByText(/Chỉ quản trị viên/i)).toBeInTheDocument();
+    expect(screen.getByText(/Quản trị viên \(Admin\)/i)).toBeInTheDocument();
     expect(mockApi.getAdminSettings).not.toHaveBeenCalled();
   });
 
   it("renders header and tabs", async () => {
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Cài đặt hệ thống")).toBeInTheDocument();
+      expect(screen.getByText("Cấu hình hệ thống")).toBeInTheDocument();
     });
-    expect(screen.getByText("Mượn trả")).toBeInTheDocument();
-    expect(screen.getByText("Phí phạt")).toBeInTheDocument();
-    expect(screen.getByText("Email SMTP")).toBeInTheDocument();
-    expect(screen.getByText("Tác vụ tự động")).toBeInTheDocument();
-    expect(screen.getByText("Ra vào")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Mượn trả/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Phí phạt & Bồi thường/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Máy chủ Email/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Tác vụ tự động/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Kiểm soát ra vào/i })).toBeInTheDocument();
   });
 
   it("loads and displays settings for default tab", async () => {
@@ -109,10 +109,10 @@ describe("SettingsPage", () => {
   it("switches tabs and shows correct fields", async () => {
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Mượn trả")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Mượn trả/i })).toBeInTheDocument();
     });
 
-    const fineTab = screen.getByText("Phí phạt");
+    const fineTab = screen.getByRole("tab", { name: /Phí phạt & Bồi thường/i });
     await userEvent.click(fineTab);
 
     await waitFor(() => {
@@ -133,20 +133,20 @@ describe("SettingsPage", () => {
     };
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Mượn trả")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Mượn trả/i })).toBeInTheDocument();
     });
 
-    await userEvent.click(screen.getByText("Phí phạt"));
+    await userEvent.click(screen.getByRole("tab", { name: /Phí phạt & Bồi thường/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Tỉ lệ phí hư hỏng (%)")).toBeInTheDocument();
     });
-    const minorInput = screen.getByLabelText(/Hư nhẹ/) as HTMLInputElement;
+    const minorInput = screen.getByDisplayValue("30") as HTMLInputElement;
     expect(minorInput.value).toBe("30");
 
     await userEvent.clear(minorInput);
     await userEvent.type(minorInput, "25");
-    await userEvent.click(screen.getByText("Lưu thay đổi"));
+    await userEvent.click(screen.getByText(/Lưu thay đổi/));
 
     await waitFor(() => {
       expect(mockApi.updateAdminSettings).toHaveBeenCalledWith("fine", {
@@ -168,7 +168,7 @@ describe("SettingsPage", () => {
     };
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText(/không bao giờ có tác dụng/i)).toBeInTheDocument();
+      expect(screen.getByText(/đang lớn hơn tổng số sách được mượn cùng lúc/i)).toBeInTheDocument();
     });
   });
 
@@ -187,7 +187,7 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Số sách mượn tối đa")).toBeInTheDocument();
     });
-    expect(screen.queryByText(/không bao giờ có tác dụng/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/đang lớn hơn tổng số sách được mượn cùng lúc/i)).not.toBeInTheDocument();
   });
 
   it("calls updateAdminSettings on save", async () => {
@@ -200,7 +200,7 @@ describe("SettingsPage", () => {
     await userEvent.clear(targetInput);
     await userEvent.type(targetInput, "21");
 
-    const saveBtn = screen.getByText("Lưu thay đổi");
+    const saveBtn = screen.getByText(/Lưu thay đổi/);
     await userEvent.click(saveBtn);
 
     await waitFor(() => {
@@ -220,17 +220,20 @@ describe("SettingsPage", () => {
     };
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Mượn trả")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Mượn trả/i })).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByText("Phí phạt"));
+    await userEvent.click(screen.getByRole("tab", { name: /Phí phạt & Bồi thường/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Biểu phí phạt theo bậc")).toBeInTheDocument();
     });
-    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
-    expect(headers.indexOf("Từ ngày")).toBeGreaterThanOrEqual(0);
-    expect(headers.indexOf("Từ ngày")).toBeLessThan(headers.indexOf("Đến ngày"));
-    expect(headers.indexOf("Đến ngày")).toBeLessThan(headers.indexOf("Số tiền (VNĐ)"));
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent || "");
+    const fromIdx = headers.findIndex((h) => h.includes("Từ ngày"));
+    const toIdx = headers.findIndex((h) => h.includes("Đến ngày"));
+    const amountIdx = headers.findIndex((h) => h.includes("Mức phạt"));
+    expect(fromIdx).toBeGreaterThanOrEqual(0);
+    expect(fromIdx).toBeLessThan(toIdx);
+    expect(toIdx).toBeLessThan(amountIdx);
   });
 
   it("blocks saving incomplete fine brackets with an error", async () => {
@@ -245,15 +248,15 @@ describe("SettingsPage", () => {
     };
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Mượn trả")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Mượn trả/i })).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByText("Phí phạt"));
+    await userEvent.click(screen.getByRole("tab", { name: /Phí phạt & Bồi thường/i }));
     await waitFor(() => {
       expect(screen.getByDisplayValue("10000")).toBeInTheDocument();
     });
 
     await userEvent.clear(screen.getByDisplayValue("10000"));
-    await userEvent.click(screen.getByText("Lưu thay đổi"));
+    await userEvent.click(screen.getByText(/Lưu thay đổi/));
 
     await waitFor(() => {
       expect(screen.getByText(/"Số tiền" phải là số từ 0 trở lên/)).toBeInTheDocument();
@@ -264,14 +267,15 @@ describe("SettingsPage", () => {
   it("warns instead of sending a masked SMTP password for test email", async () => {
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Email SMTP")).toBeInTheDocument();
+      expect(screen.getByText("Máy chủ Email")).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByText("Email SMTP"));
+    await userEvent.click(screen.getByText("Máy chủ Email"));
     await userEvent.click(screen.getByText("Gửi email test"));
 
-    const emailInput = screen.getByLabelText("Địa chỉ email nhận");
+    const emailInput = screen.getByLabelText("Địa chỉ email nhận test");
+    await userEvent.clear(emailInput);
     await userEvent.type(emailInput, "a@example.com");
-    await userEvent.click(screen.getByRole("button", { name: "Gửi" }));
+    await userEvent.click(screen.getByRole("button", { name: "Gửi thư test" }));
 
     await waitFor(() => {
       expect(screen.getByText(/nhập mật khẩu SMTP mới/i)).toBeInTheDocument();
@@ -291,16 +295,16 @@ describe("SettingsPage", () => {
     };
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Mượn trả")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Mượn trả/i })).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByText("Phí phạt"));
+    await userEvent.click(screen.getByRole("tab", { name: /Phí phạt & Bồi thường/i }));
     await waitFor(() => {
-      expect(screen.getByLabelText(/Hư nhẹ/)).toBeInTheDocument();
+      expect(screen.getByDisplayValue("30")).toBeInTheDocument();
     });
 
-    const minorInput = screen.getByLabelText(/Hư nhẹ/);
+    const minorInput = screen.getByDisplayValue("30");
     fireEvent.change(minorInput, { target: { value: "-5" } });
-    await userEvent.click(screen.getByText("Lưu thay đổi"));
+    await userEvent.click(screen.getByText(/Lưu thay đổi/));
 
     await waitFor(() => {
       expect(mockApi.updateAdminSettings).toHaveBeenCalledWith("fine", {
@@ -312,10 +316,10 @@ describe("SettingsPage", () => {
   it("shows test email dialog for SMTP tab", async () => {
     render(<SettingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Email SMTP")).toBeInTheDocument();
+      expect(screen.getByText("Máy chủ Email")).toBeInTheDocument();
     });
 
-    const smtpTab = screen.getByText("Email SMTP");
+    const smtpTab = screen.getByText("Máy chủ Email");
     await userEvent.click(smtpTab);
 
     await waitFor(() => {
@@ -327,7 +331,7 @@ describe("SettingsPage", () => {
 
     await waitFor(() => {
       const dialog = screen.getByRole("dialog");
-      expect(within(dialog).getByText("Gửi")).toBeInTheDocument();
+      expect(within(dialog).getByText("Gửi thư test")).toBeInTheDocument();
     });
   });
 
@@ -341,7 +345,7 @@ describe("SettingsPage", () => {
     await userEvent.click(autoTab);
 
     await waitFor(() => {
-      expect(screen.getByText("Chưa có cài đặt")).toBeInTheDocument();
+      expect(screen.getByText("Chưa có cấu hình cho danh mục này")).toBeInTheDocument();
     });
   });
 
