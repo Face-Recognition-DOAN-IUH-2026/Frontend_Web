@@ -4,12 +4,15 @@ import MobileAppDownload from "@/app/_components/landing/MobileAppDownload";
 import { MOBILE_APP } from "@/lib/mobileApp";
 
 describe("MobileAppDownload", () => {
-  it("trỏ nút tải tới file APK trên GitHub Release", () => {
+  it("trỏ nút tải tới route /api/download/apk và có link GitHub Releases", () => {
     render(<MobileAppDownload />);
 
-    const link = screen.getByRole("link", { name: /Tải APK về máy/i });
-    expect(link).toHaveAttribute("href", MOBILE_APP.apkUrl);
-    expect(MOBILE_APP.apkUrl).toContain("/releases/latest/download/");
+    const link = screen.getByRole("link", { name: /Tải APK cho Android/i });
+    expect(link).toHaveAttribute("href", "/api/download/apk");
+    expect(link).toHaveAttribute("download", MOBILE_APP.fileName);
+
+    const releaseLink = screen.getByRole("link", { name: /Tải từ GitHub Releases/i });
+    expect(releaseLink).toHaveAttribute("href", MOBILE_APP.releasesUrl);
   });
 
   it("render mã QR có nhãn truy cập được", () => {
@@ -36,45 +39,42 @@ describe("MobileAppDownload", () => {
     expect(link).toHaveAttribute("target", "_blank");
   });
 
-  it("cảnh báo APK không mở được trực tiếp trong trình duyệt", () => {
+  it("hiển thị hướng dẫn bật nguồn không xác định", () => {
     render(<MobileAppDownload />);
 
     expect(
-      screen.getByText(/không mở xem được trong trình duyệt/i),
+      screen.getByText(/Cài đặt từ nguồn không xác định/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Tải về/i)).toBeInTheDocument();
   });
 
   it("mở hộp thoại hướng dẫn cài đặt kèm 4 bước", () => {
     render(<MobileAppDownload />);
 
-    expect(screen.queryByText(/Cài đặt ứng dụng trên Android/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Hướng dẫn cài đặt APK trên Android/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Hướng dẫn cài đặt/i }));
 
     expect(
-      screen.getByRole("dialog", { name: /Cài đặt ứng dụng trên Android/i }),
+      screen.getByRole("dialog", { name: /Hướng dẫn cài đặt APK trên Android/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Tải file về máy/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tải file APK về máy/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Mở thư mục Tải về — đừng bấm file trong trình duyệt/i),
+      screen.getByText(/Mở từ ứng dụng Tệp \(Files\) — KHÔNG bấm trên trình duyệt/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Cài đặt từ nguồn không xác định \(chỉ làm một lần\)/i),
+      screen.getByText(/Cho phép cài từ nguồn không xác định/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Cài đặt và mở ứng dụng/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cài đặt và trải nghiệm/i)).toBeInTheDocument();
   });
 
-  it("giải thích rõ lỗi định dạng không hỗ trợ là hành vi bình thường", () => {
+  it("giải thích rõ lỗi định dạng tập tin không được hỗ trợ là hành vi bình thường", () => {
     render(<MobileAppDownload />);
 
     fireEvent.click(screen.getByRole("button", { name: /Hướng dẫn cài đặt/i }));
 
-    // Cụm từ này xuất hiện ở cả Alert của hộp thoại và bước 2
     expect(
-      screen.getAllByText(/Định dạng tệp tin không được hỗ trợ/i).length,
+      screen.getAllByText(/Định dạng tập tin không được hỗ trợ/i).length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText(/hành vi bình thường, không phải lỗi tải/i)).toBeInTheDocument();
   });
 
   it("đóng hộp thoại hướng dẫn khi bấm Đã hiểu", async () => {
@@ -82,13 +82,13 @@ describe("MobileAppDownload", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Hướng dẫn cài đặt/i }));
     expect(
-      screen.getByRole("dialog", { name: /Cài đặt ứng dụng trên Android/i }),
+      screen.getByRole("dialog", { name: /Hướng dẫn cài đặt APK trên Android/i }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Đã hiểu/i }));
     await waitFor(() => {
       expect(
-        screen.queryByRole("dialog", { name: /Cài đặt ứng dụng trên Android/i }),
+        screen.queryByRole("dialog", { name: /Hướng dẫn cài đặt APK trên Android/i }),
       ).not.toBeInTheDocument();
     });
   });
