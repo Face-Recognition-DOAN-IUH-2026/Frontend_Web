@@ -210,8 +210,8 @@ describe("Dynamic RBAC Permissions Engine", () => {
     expect(effective.crud.books.print).toBe(true);
   });
 
-  it("validates that all 21 routes have assigned valid categories", () => {
-    expect(ALL_ROUTES.length).toBe(21);
+  it("validates that all 22 routes have assigned valid categories", () => {
+    expect(ALL_ROUTES.length).toBe(22);
     const validCategories = ["library", "circulation", "personnel", "ai_vision", "admin"];
     ALL_ROUTES.forEach((route) => {
       expect((route as any).category).toBeDefined();

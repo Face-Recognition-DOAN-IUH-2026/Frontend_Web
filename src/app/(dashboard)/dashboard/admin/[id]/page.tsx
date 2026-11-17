@@ -54,7 +54,8 @@ import AvatarUser from "@/app/(dashboard)/_components/ui/AvatarUser";
 import { staggerSx } from "@/lib/useStaggeredAnimation";
 import { initials, formatDate, formatDateTime, roleLabel, statusLabel, statusColor } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import type { UserPublic } from "@/lib/types";
+import { usePermission } from "@/lib/permission-context";
+import type { RolePermissionConfig, UserPublic } from "@/lib/types";
 
 const ROLE_OPTIONS = [
   { value: "patron", label: "Độc giả (Patron)" },
@@ -89,20 +90,22 @@ export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user: currentUser, isLoading: isAuthLoading, isAuthenticated } = useAuth();
+  const { canAccessPage, loading: permLoading } = usePermission();
 
   const [user, setUser] = useState<UserPublic | null>(null);
+  const [dynamicRoles, setDynamicRoles] = useState<Record<string, RolePermissionConfig>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
 
   useEffect(() => {
-    if (!isAuthLoading) {
+    if (!isAuthLoading && !permLoading) {
       if (!isAuthenticated) {
         router.push("/login");
-      } else if (currentUser?.role !== "admin") {
+      } else if (currentUser?.role !== "admin" && !canAccessPage("/dashboard/admin")) {
         router.push("/dashboard");
       }
     }
-  }, [isAuthLoading, isAuthenticated, currentUser, router]);
+  }, [isAuthLoading, permLoading, isAuthenticated, currentUser, canAccessPage, router]);
 
   const [editForm, setEditForm] = useState({
     full_name: "",
@@ -144,10 +147,27 @@ export default function UserDetailPage() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await loadUser();
+      await Promise.all([
+        loadUser(),
+        api.getPermissionMatrix().then((m) => m?.roles && setDynamicRoles(m.roles)).catch(() => {}),
+      ]);
       setLoading(false);
     })();
   }, [loadUser]);
+
+  const roleSelectOptions = useMemo(() => {
+    const opts = new Map<string, string>();
+    ROLE_OPTIONS.forEach((o) => opts.set(o.value, o.label));
+    Object.values(dynamicRoles).forEach((cfg) => {
+      if (cfg?.role) {
+        opts.set(cfg.role, cfg.label || roleLabel(cfg.role));
+      }
+    });
+    if (user?.role && !opts.has(user.role)) {
+      opts.set(user.role, roleLabel(user.role));
+    }
+    return Array.from(opts.entries()).map(([value, label]) => ({ value, label }));
+  }, [dynamicRoles, user?.role]);
 
   const openEdit = () => {
     if (!user) return;
@@ -284,7 +304,7 @@ export default function UserDetailPage() {
 
                   <Stack direction="row" spacing={0.75} sx={{ justifyContent: "center", mt: 1.5, flexWrap: "wrap", gap: 0.5 }}>
                     <Chip
-                      label={roleLabel(user.role)}
+                      label={dynamicRoles[user.role]?.label || roleLabel(user.role)}
                       color={user.role === "admin" ? "warning" : user.role === "staff" ? "primary" : "default"}
                       size="small"
                       sx={{ fontWeight: 600 }}
@@ -430,7 +450,7 @@ export default function UserDetailPage() {
                 <TextField label="Hạn membership" type="date" value={editForm.membership_expiry} onChange={(e) => setEditForm({ ...editForm, membership_expiry: e.target.value })} fullWidth slotProps={{ inputLabel: { shrink: true } }} helperText={editForm.membership_expiry && new Date(editForm.membership_expiry) < new Date() ? "Đã hết hạn" : ""} />
 
                 <TextField select label="Vai trò" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} fullWidth>
-                  {ROLE_OPTIONS.map((o) => (
+                  {roleSelectOptions.map((o) => (
                     <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
                   ))}
                 </TextField>

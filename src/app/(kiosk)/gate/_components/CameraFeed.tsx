@@ -15,7 +15,6 @@ import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import LaptopOutlinedIcon from "@mui/icons-material/LaptopOutlined";
 import CenterFocusWeakIcon from "@mui/icons-material/CenterFocusWeak";
 import api from "@/lib/api-client";
-import PassiveLivenessScanner from "./PassiveLivenessScanner";
 
 interface CameraFeedProps {
   src: string;
@@ -119,19 +118,13 @@ export default function CameraFeed({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ts, setTs] = useState(() => Date.now());
   const [ok, setOk] = useState<boolean | null>(null);
-  const [localSpoofReason, setLocalSpoofReason] = useState<string | null>(null);
-  const [scannerReady, setScannerReady] = useState(false);
-  const [scannerFallback, setScannerFallback] = useState(false);
   const lastUploadTimeRef = useRef<number>(0);
-  const lastSpoofNotifyRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Ref giữ callback mới nhất → effect báo trạng thái camera không chạy lại
   // chỉ vì parent truyền arrow inline.
   const onStatusChangeRef = useRef(onStatusChange);
-  const onSpoofDetectedRef = useRef(onSpoofDetected);
   onStatusChangeRef.current = onStatusChange;
-  onSpoofDetectedRef.current = onSpoofDetected;
 
   const isStream = src.includes("/video") || src.includes("/mjpeg");
 
@@ -179,44 +172,9 @@ export default function CameraFeed({
     };
   }, [useWebcam]);
 
-  // If MediaPipe fails to initialize within 5s, enable fallback periodic upload (backend still enforces anti-spoofing)
+  // Direct periodic webcam frame transmission for face recognition (1.5s interval)
   useEffect(() => {
-    if (!useWebcam || !ok || scannerReady || scannerFallback) return;
-    const t = setTimeout(() => {
-      setScannerFallback(true);
-    }, 5000);
-    return () => clearTimeout(t);
-  }, [useWebcam, ok, scannerReady, scannerFallback]);
-
-  const handleLivenessVerified = useCallback(
-    (blob: Blob) => {
-      setLocalSpoofReason(null);
-      if (!cameraId) return;
-      const now = Date.now();
-      if (now - lastUploadTimeRef.current < 1500) return;
-      lastUploadTimeRef.current = now;
-
-      const formData = new FormData();
-      formData.append("file", blob, "webcam_frame.jpg");
-      api.uploadCameraFrame(cameraId, formData).catch(() => {
-        // Ignore transient network errors
-      });
-    },
-    [cameraId]
-  );
-
-  const handleLocalSpoofDetected = useCallback((reason: string) => {
-    setLocalSpoofReason(reason);
-    const now = Date.now();
-    if (now - lastSpoofNotifyRef.current >= 2500) {
-      lastSpoofNotifyRef.current = now;
-      onSpoofDetectedRef.current?.(reason);
-    }
-  }, []);
-
-  // Fallback periodic webcam frame transmission ONLY when MediaPipe is unavailable
-  useEffect(() => {
-    if (!useWebcam || !ok || !cameraId || !scannerFallback) return;
+    if (!useWebcam || !ok || !cameraId) return;
 
     let isMounted = true;
     const interval = setInterval(() => {
@@ -252,7 +210,7 @@ export default function CameraFeed({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [useWebcam, ok, cameraId, scannerFallback]);
+  }, [useWebcam, ok, cameraId]);
 
   const snapshotUrl = cameraId
     ? `/api/camera/snapshot/${cameraId}`
@@ -319,7 +277,7 @@ export default function CameraFeed({
 
   const isGranted = overlay?.status === "granted";
   const isDenied = overlay?.status === "spoof" || overlay?.status === "wrong_direction" || overlay?.status === "expired" || overlay?.status === "denied";
-  const isSpoofing = Boolean(localSpoofReason || overlay?.status === "spoof");
+  const isSpoofing = overlay?.status === "spoof";
 
   return (
     <Paper
@@ -462,17 +420,6 @@ export default function CameraFeed({
           />
         )}
         <Box component="canvas" ref={canvasRef} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
-
-        {useWebcam && ok === true && !scannerFallback && (
-          <PassiveLivenessScanner
-            videoRef={videoRef}
-            active={useWebcam && ok === true}
-            onLivenessVerified={handleLivenessVerified}
-            onSpoofDetected={handleLocalSpoofDetected}
-            onReady={() => setScannerReady(true)}
-            onUnavailable={() => setScannerFallback(true)}
-          />
-        )}
 
 
 

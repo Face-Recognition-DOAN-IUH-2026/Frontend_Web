@@ -121,6 +121,7 @@ export default function DynamicAdminPage() {
   const { refreshPermissions } = usePermission();
 
   const [activeTab, setActiveTab] = useState<number>(0);
+  const [inspectorMode, setInspectorMode] = useState<"user" | "role">("role");
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [routeSearch, setRouteSearch] = useState<string>("");
@@ -466,6 +467,14 @@ export default function DynamicAdminPage() {
     }
 
     const cleanRoleKey = newRoleName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    if (!cleanRoleKey) {
+      setToast({
+        open: true,
+        message: "Mã vai trò chỉ được chứa chữ thường, số, gạch dưới hoặc gạch ngang",
+        severity: "error",
+      });
+      return;
+    }
     if (roles[cleanRoleKey]) {
       setToast({
         open: true,
@@ -477,31 +486,74 @@ export default function DynamicAdminPage() {
 
     const baseCrud: Record<SystemResource, any> = {} as any;
     ALL_RESOURCES.forEach((r) => {
-      baseCrud[r] = { create: false, read: true, update: false, delete: false };
+      baseCrud[r] = { create: false, read: true, update: false, delete: false, approve: false, print: false };
     });
 
     const newRoleObj: RolePermissionConfig = {
       role: cleanRoleKey,
       label: newRoleLabel.trim(),
       description: "Vai trò tùy biến người dùng tạo",
-      allowedPages: ["/dashboard"],
+      allowedPages: ["/dashboard", "/profile"],
       crud: baseCrud,
     };
 
-    setRoles((prev) => ({
-      ...prev,
-      [cleanRoleKey]: newRoleObj,
-    }));
-    setSelectedRole(cleanRoleKey);
-    setOpenNewRoleModal(false);
-    setNewRoleName("");
-    setNewRoleLabel("");
+    setSaving(true);
+    try {
+      const saved = await api.updateRolePermissions(cleanRoleKey, newRoleObj);
+      setRoles((prev) => ({
+        ...prev,
+        [cleanRoleKey]: saved || newRoleObj,
+      }));
+      setSelectedRole(cleanRoleKey);
+      setOpenNewRoleModal(false);
+      setNewRoleName("");
+      setNewRoleLabel("");
+      await refreshPermissions();
+      setToast({
+        open: true,
+        message: `Đã tạo và lưu vai trò [${newRoleObj.label}] vào hệ thống!`,
+        severity: "success",
+      });
+    } catch (err: any) {
+      setToast({
+        open: true,
+        message: getErrorMessage(err) || "Không thể tạo vai trò mới",
+        severity: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    setToast({
-      open: true,
-      message: `Đã tạo vai trò [${newRoleObj.label}]. Hãy cấu hình quyền và bấm Lưu!`,
-      severity: "success",
-    });
+  const handleDeleteCustomRole = async (roleKey: string) => {
+    if (["admin", "staff", "patron", "user"].includes(roleKey)) return;
+    setSaving(true);
+    try {
+      await api.deleteRolePermissions(roleKey);
+      const removedLabel = roles[roleKey]?.label || roleKey;
+      setRoles((prev) => {
+        const next = { ...prev };
+        delete next[roleKey];
+        return next;
+      });
+      if (selectedRole === roleKey) {
+        setSelectedRole("staff");
+      }
+      await refreshPermissions();
+      setToast({
+        open: true,
+        message: `Đã xóa vai trò [${removedLabel}] khỏi hệ thống!`,
+        severity: "success",
+      });
+    } catch (err: any) {
+      setToast({
+        open: true,
+        message: getErrorMessage(err) || "Không thể xóa vai trò này",
+        severity: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // USER OVERRIDE HANDLERS
@@ -628,6 +680,24 @@ export default function DynamicAdminPage() {
 
   // LIVE EFFECTIVE PERMISSIONS CALCULATION (FOR INSPECTOR TAB)
   const effectivePermissionsPreview: EffectivePermissions = useMemo(() => {
+    if (inspectorMode === "role") {
+      const roleCfg = roles[selectedRole] || roles["staff"] || DEFAULT_FALLBACK_ROLES.staff;
+      if (selectedRole === "admin") {
+        return {
+          role: "admin",
+          isCustom: false,
+          allowedPages: ALL_ROUTES.map((r) => r.path),
+          crud: DEFAULT_FALLBACK_ROLES.admin.crud,
+        };
+      }
+      return {
+        role: selectedRole,
+        isCustom: false,
+        allowedPages: [...(roleCfg.allowedPages || [])],
+        crud: JSON.parse(JSON.stringify(roleCfg.crud)),
+      };
+    }
+
     const baseRole = selectedStaffMember?.role || selectedRole;
     const baseConfig = roles[baseRole] || roles["staff"] || DEFAULT_FALLBACK_ROLES.staff;
 
@@ -672,7 +742,7 @@ export default function DynamicAdminPage() {
       allowedPages: Array.from(pages),
       crud: finalCrud,
     };
-  }, [selectedStaffMember, selectedRole, roles, userOverride]);
+  }, [inspectorMode, selectedStaffMember, selectedRole, roles, userOverride]);
 
   // Filtered routes list for quick table review
   const filteredRoutes = useMemo(() => {
@@ -723,7 +793,7 @@ export default function DynamicAdminPage() {
                 variant="contained"
                 startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveOutlinedIcon />}
                 onClick={handleSaveUserOverride}
-                disabled={saving || !userOverride.enabled}
+                disabled={saving || !selectedUserId}
                 sx={{
                   borderRadius: 1.5,
                   textTransform: "none",
@@ -767,7 +837,12 @@ export default function DynamicAdminPage() {
           {
             label: "Kiểm tra Quyền Thực tế",
             icon: <CodeOutlinedIcon fontSize="small" />,
-            badge: userOverride.enabled ? "Đặc quyền bật" : "Chuẩn chức vụ",
+            badge:
+              inspectorMode === "role"
+                ? `Chức vụ: ${roles[selectedRole]?.label || selectedRole}`
+                : userOverride.enabled
+                ? "Đặc quyền bật"
+                : "Chuẩn chức vụ",
           },
         ].map((tab, idx) => {
           const isSelected = activeTab === idx;
@@ -777,7 +852,11 @@ export default function DynamicAdminPage() {
               variant={isSelected ? "contained" : "text"}
               color={isSelected ? "primary" : "inherit"}
               startIcon={tab.icon}
-              onClick={() => setActiveTab(idx)}
+              onClick={() => {
+                if (idx === 0) setInspectorMode("role");
+                if (idx === 1) setInspectorMode("user");
+                setActiveTab(idx);
+              }}
               sx={{
                 flex: { xs: "none", sm: 1 },
                 minWidth: { xs: 200, sm: 0 },
@@ -854,6 +933,7 @@ export default function DynamicAdminPage() {
               handleSetResourcePresetForRole={handleSetResourcePresetForRole}
               handleSaveRoleConfig={handleSaveRoleConfig}
               handleApplyRoleTemplate={handleApplyRoleTemplate}
+              handleDeleteCustomRole={handleDeleteCustomRole}
               saving={saving}
               setOpenNewRoleModal={setOpenNewRoleModal}
             />
@@ -882,6 +962,15 @@ export default function DynamicAdminPage() {
             <EffectiveInspectorTab
               effectivePermissionsPreview={effectivePermissionsPreview}
               setToast={setToast}
+              inspectorMode={inspectorMode}
+              setInspectorMode={setInspectorMode}
+              roles={roles}
+              selectedRole={selectedRole}
+              setSelectedRole={setSelectedRole}
+              staffList={staffList}
+              selectedUserId={selectedUserId}
+              setSelectedUserId={setSelectedUserId}
+              selectedStaffMember={selectedStaffMember}
             />
           )}
         </>
