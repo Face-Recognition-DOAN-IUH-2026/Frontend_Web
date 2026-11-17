@@ -965,15 +965,6 @@ export default function GatePage() {
                   useWebcam={useEntryWebcam}
                   onToggleWebcam={() => setUseEntryWebcam((p) => !p)}
                   overlay={entryOverlay}
-                  onSpoofDetected={(reason) => {
-                    setLastScanEvent({
-                      status: "spoof",
-                      type: "entry",
-                      message: reason || "CẢNH BÁO GIẢ MẠO: Phát hiện ảnh phẳng!",
-                      timestamp: Date.now(),
-                    });
-                    setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
-                  }}
                 />
               </Grid>
 
@@ -985,15 +976,6 @@ export default function GatePage() {
                   useWebcam={useExitWebcam}
                   onToggleWebcam={() => setUseExitWebcam((p) => !p)}
                   overlay={exitOverlay}
-                  onSpoofDetected={(reason) => {
-                    setLastScanEvent({
-                      status: "spoof",
-                      type: "exit",
-                      message: reason || "CẢNH BÁO GIẢ MẠO: Phát hiện ảnh phẳng!",
-                      timestamp: Date.now(),
-                    });
-                    setTodayCounts((prev) => ({ ...prev, spoof: prev.spoof + 1 }));
-                  }}
                 />
               </Grid>
             </Grid>
