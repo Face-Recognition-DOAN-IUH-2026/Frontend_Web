@@ -28,7 +28,6 @@ interface CameraFeedProps {
     status?: string;
   } | null;
   onStatusChange?: (ok: boolean) => void;
-  onSpoofDetected?: (reason: string) => void;
 }
 
 const OVERLAY_COLORS: Record<string, string> = {
@@ -111,7 +110,6 @@ export default function CameraFeed({
   onToggleWebcam,
   overlay,
   onStatusChange,
-  onSpoofDetected,
 }: CameraFeedProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
