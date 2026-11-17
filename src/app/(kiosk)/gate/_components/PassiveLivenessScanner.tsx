@@ -16,6 +16,8 @@ export interface PassiveLivenessScannerProps {
   active?: boolean;
   onLivenessVerified?: (blob: Blob) => void;
   onSpoofDetected?: (reason: string) => void;
+  onReady?: () => void;
+  onUnavailable?: () => void;
 }
 
 const pulseGlow = keyframes`
@@ -73,6 +75,8 @@ export default function PassiveLivenessScanner({
   active = true,
   onLivenessVerified,
   onSpoofDetected,
+  onReady,
+  onUnavailable,
 }: PassiveLivenessScannerProps) {
   const detectorRef = useRef<PassiveMotionDetector>(
     new PassiveMotionDetector({
@@ -82,6 +86,11 @@ export default function PassiveLivenessScanner({
   );
 
   const [status, setStatus] = useState<"initializing" | "scanning" | "live" | "spoof">("initializing");
+  const statusRef = useRef<"initializing" | "scanning" | "live" | "spoof">("initializing");
+  const updateStatus = useCallback((next: "initializing" | "scanning" | "live" | "spoof") => {
+    statusRef.current = next;
+    setStatus(next);
+  }, []);
   const [spoofReason, setSpoofReason] = useState<string>("");
   const [progress, setProgress] = useState<number>(0);
   const animFrameRef = useRef<number | null>(null);
@@ -93,8 +102,12 @@ export default function PassiveLivenessScanner({
   // parent truyền arrow inline.
   const onLivenessVerifiedRef = useRef(onLivenessVerified);
   const onSpoofDetectedRef = useRef(onSpoofDetected);
+  const onReadyRef = useRef(onReady);
+  const onUnavailableRef = useRef(onUnavailable);
   onLivenessVerifiedRef.current = onLivenessVerified;
   onSpoofDetectedRef.current = onSpoofDetected;
+  onReadyRef.current = onReady;
+  onUnavailableRef.current = onUnavailable;
 
   const captureVideoBlob = useCallback(async (): Promise<Blob | null> => {
     const video = videoRef.current;
@@ -124,7 +137,12 @@ export default function PassiveLivenessScanner({
     getFaceLandmarkerInstance().then((instance) => {
       if (!isMounted) return;
       landmarker = instance;
-      setStatus("scanning");
+      if (instance) {
+        updateStatus("scanning");
+        onReadyRef.current?.();
+      } else {
+        onUnavailableRef.current?.();
+      }
     });
 
     const processVideoLoop = () => {
@@ -154,7 +172,7 @@ export default function PassiveLivenessScanner({
 
             if (verdict.verdict === "spoof") {
               consecutiveLiveCountRef.current = 0;
-              setStatus("spoof");
+              updateStatus("spoof");
               const reasonText =
                 verdict.reasons[0] === "STATIC_PHOTO_DETECTED"
                   ? "Phát hiện ảnh chụp tĩnh (Print Attack)"
@@ -163,7 +181,7 @@ export default function PassiveLivenessScanner({
               onSpoofDetectedRef.current?.(reasonText);
             } else if (verdict.verdict === "live") {
               consecutiveLiveCountRef.current += 1;
-              setStatus("live");
+              updateStatus("live");
               setSpoofReason("");
 
               // Continuously transmit live frames every ~1200ms while live human is present
@@ -178,8 +196,8 @@ export default function PassiveLivenessScanner({
               }
             } else {
               // Inconclusive / gathering frames
-              if (status !== "spoof") {
-                setStatus("scanning");
+              if (statusRef.current !== "spoof") {
+                updateStatus("scanning");
               }
             }
           } else {
@@ -187,8 +205,8 @@ export default function PassiveLivenessScanner({
             detectorRef.current.reset();
             setProgress(0);
             consecutiveLiveCountRef.current = 0;
-            if (status !== "initializing") {
-              setStatus("scanning");
+            if (statusRef.current !== "initializing") {
+              updateStatus("scanning");
             }
           }
         } catch {
@@ -205,7 +223,7 @@ export default function PassiveLivenessScanner({
       isMounted = false;
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [active, videoRef, status, captureVideoBlob]);
+  }, [active, videoRef, captureVideoBlob, updateStatus]);
 
   return (
     <Box
