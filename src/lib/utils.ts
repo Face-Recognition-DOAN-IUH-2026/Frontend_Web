@@ -84,12 +84,20 @@ export function statusColor(status: string): "success" | "error" | "warning" | "
 
 /** Get human-readable label for user role. */
 export function roleLabel(role: string): string {
+  const normalized = (role || "").trim().toLowerCase();
   const map: Record<string, string> = {
     admin: "Quản trị viên",
     staff: "Nhân viên",
     patron: "Độc giả",
+    user: "Người dùng",
   };
-  return map[role] || role;
+  if (map[normalized]) return map[normalized];
+  if (!normalized) return "Khác";
+  return normalized
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 /** Truncate a string to a given length with ellipsis. */

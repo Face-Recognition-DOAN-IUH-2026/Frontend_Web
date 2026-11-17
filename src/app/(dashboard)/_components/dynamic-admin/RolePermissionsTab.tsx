@@ -45,6 +45,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 
 import {
   ALL_RESOURCES,
@@ -74,6 +75,7 @@ export interface RolePermissionsTabProps {
   handleSetResourcePresetForRole: (resource: SystemResource, preset: "full" | "readonly") => void;
   handleSaveRoleConfig: () => void;
   handleApplyRoleTemplate?: (template: "circulation" | "cataloging" | "assistant") => void;
+  handleDeleteCustomRole?: (roleKey: string) => void;
   saving: boolean;
   setOpenNewRoleModal: (open: boolean) => void;
 }
@@ -116,6 +118,7 @@ export const RESOURCE_RELATED_ROUTES: Record<SystemResource, { label: string; pa
   ],
   ai_tools: [
     { label: "Trợ lý AI", path: "/ai-assistant" },
+    { label: "Kho tri thức RAG", path: "/knowledge-base" },
     { label: "Đăng ký mặt", path: "/enroll" },
     { label: "Xác thực 1:1", path: "/verify" },
     { label: "Nhận diện 1:N", path: "/identify" },
@@ -149,6 +152,7 @@ export function RolePermissionsTab({
   handleSetResourcePresetForRole,
   handleSaveRoleConfig,
   handleApplyRoleTemplate,
+  handleDeleteCustomRole,
   saving,
   setOpenNewRoleModal,
 }: RolePermissionsTabProps) {
@@ -156,6 +160,8 @@ export function RolePermissionsTab({
   const isDark = theme.palette.mode === "dark";
   const primaryColor = theme.palette.primary.main;
   const isAdmin = selectedRole === "admin";
+  const isSystemRole = selectedRole === "admin" || selectedRole === "staff" || selectedRole === "patron";
+  const [confirmDeleteRole, setConfirmDeleteRole] = React.useState<string | null>(null);
 
   const roleKeys = useMemo(() => Object.keys(roles), [roles]);
 
@@ -393,9 +399,51 @@ export function RolePermissionsTab({
               sx={{ fontWeight: 700, height: 26 }}
             />
           ) : (
-            <Typography variant="caption" color="text.secondary">
-              {(activeRoleConfig.allowedPages || []).length} màn hình thao tác • 7 phân hệ dữ liệu
-            </Typography>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+              <Typography variant="caption" color="text.secondary">
+                {(activeRoleConfig.allowedPages || []).length} màn hình thao tác • 7 phân hệ dữ liệu
+              </Typography>
+              {!isSystemRole && handleDeleteCustomRole && (
+                confirmDeleteRole === selectedRole ? (
+                  <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="error"
+                      disabled={saving}
+                      onClick={() => {
+                        setConfirmDeleteRole(null);
+                        handleDeleteCustomRole(selectedRole);
+                      }}
+                      sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem", py: 0.35, px: 1.25, borderRadius: 1.5 }}
+                    >
+                      Xác nhận xóa
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="text"
+                      disabled={saving}
+                      onClick={() => setConfirmDeleteRole(null)}
+                      sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.75rem", py: 0.35, px: 1 }}
+                    >
+                      Hủy
+                    </Button>
+                  </Stack>
+                ) : (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    startIcon={<DeleteOutlineOutlinedIcon sx={{ fontSize: 16 }} />}
+                    disabled={saving}
+                    onClick={() => setConfirmDeleteRole(selectedRole)}
+                    sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.76rem", borderRadius: 1.5 }}
+                  >
+                    Xóa chức vụ
+                  </Button>
+                )
+              )}
+            </Stack>
           )}
         </Paper>
 

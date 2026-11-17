@@ -23,8 +23,9 @@ import type { AuthContextType, AuthUser, LoginRequest } from "./types";
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function assertWebRole(role: string) {
-  if (role !== "admin" && role !== "staff") {
-    throw new Error("Web quản trị chỉ dành cho admin hoặc staff. Độc giả vui lòng đăng nhập trên ứng dụng mobile.");
+  const normalized = (role || "").trim().toLowerCase();
+  if (!normalized || normalized === "patron" || normalized === "user") {
+    throw new Error("Web quản trị chỉ dành cho cán bộ thư viện (admin/staff/vai trò nghiệp vụ). Độc giả vui lòng đăng nhập trên ứng dụng mobile.");
   }
 }
 

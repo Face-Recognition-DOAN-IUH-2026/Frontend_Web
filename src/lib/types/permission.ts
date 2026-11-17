@@ -183,6 +183,12 @@ export const ALL_ROUTES: RoutePermissionInfo[] = [
     area: 'Trợ lý ảo & Tư vấn nghiệp vụ thông minh',
   },
   {
+    path: '/knowledge-base',
+    label: 'Kho tri thức RAG (AI)',
+    category: 'ai_vision',
+    area: 'Quản lý tài liệu huấn luyện & Kho tri thức AI',
+  },
+  {
     path: '/enroll',
     label: 'Đăng ký khuôn mặt',
     category: 'ai_vision',

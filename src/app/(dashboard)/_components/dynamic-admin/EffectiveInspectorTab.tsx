@@ -6,7 +6,11 @@ import {
   Button,
   Chip,
   Collapse,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -14,6 +18,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
   alpha,
@@ -36,18 +42,37 @@ import {
   ACTION_LABELS,
   CATEGORY_LABELS,
   type EffectivePermissions,
+  type RolePermissionConfig,
   type RouteCategory,
-  type SystemRoute,
+  type ScheduleStaff,
 } from "@/lib/types";
+import { roleLabel } from "@/lib/utils";
 
 export interface EffectiveInspectorTabProps {
   effectivePermissionsPreview: EffectivePermissions;
   setToast: (toast: { open: boolean; message: string; severity: "success" | "error" | "info" }) => void;
+  inspectorMode?: "user" | "role";
+  setInspectorMode?: (mode: "user" | "role") => void;
+  roles?: Record<string, RolePermissionConfig>;
+  selectedRole?: string;
+  setSelectedRole?: (role: string) => void;
+  staffList?: ScheduleStaff[];
+  selectedUserId?: string;
+  setSelectedUserId?: (userId: string) => void;
+  selectedStaffMember?: ScheduleStaff | null;
 }
 
 export function EffectiveInspectorTab({
   effectivePermissionsPreview,
   setToast,
+  inspectorMode = "user",
+  setInspectorMode,
+  roles,
+  selectedRole,
+  setSelectedRole,
+  staffList,
+  selectedUserId,
+  setSelectedUserId,
 }: EffectiveInspectorTabProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -103,6 +128,81 @@ export function EffectiveInspectorTab({
 
   return (
     <Stack spacing={2.5}>
+      {/* ── TOP TARGET SELECTOR: Kiểm tra theo Nhân viên hoặc Chức vụ ──── */}
+      {setInspectorMode && (
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            alignItems: { xs: "stretch", md: "center" },
+            justifyContent: "space-between",
+            gap: 2,
+          }}
+        >
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: "text.secondary" }}>
+              Đối tượng kiểm tra:
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={inspectorMode}
+              onChange={(_, v) => v && setInspectorMode(v)}
+            >
+              <ToggleButton value="user" sx={{ textTransform: "none", fontWeight: 700, px: 2 }}>
+                Theo Nhân viên
+              </ToggleButton>
+              <ToggleButton value="role" sx={{ textTransform: "none", fontWeight: 700, px: 2 }}>
+                Theo Chức vụ
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+
+          <Box sx={{ minWidth: { xs: "100%", md: 340 } }}>
+            {inspectorMode === "user" && staffList && setSelectedUserId ? (
+              <FormControl fullWidth size="small">
+                <InputLabel id="inspector-staff-label">Chọn nhân viên để kiểm tra</InputLabel>
+                <Select
+                  labelId="inspector-staff-label"
+                  label="Chọn nhân viên để kiểm tra"
+                  value={selectedUserId || ""}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  sx={{ borderRadius: 1.5 }}
+                >
+                  {staffList.map((st) => (
+                    <MenuItem key={st.id} value={st.id}>
+                      {st.fullName || st.email} ({roles?.[st.role]?.label || roleLabel(st.role)})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : roles && setSelectedRole ? (
+              <FormControl fullWidth size="small">
+                <InputLabel id="inspector-role-label">Chọn chức vụ để kiểm tra</InputLabel>
+                <Select
+                  labelId="inspector-role-label"
+                  label="Chọn chức vụ để kiểm tra"
+                  value={selectedRole || "staff"}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  sx={{ borderRadius: 1.5 }}
+                >
+                  {Object.keys(roles).map((rKey) => (
+                    <MenuItem key={rKey} value={rKey}>
+                      {roles[rKey]?.label || roleLabel(rKey)} ({rKey})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : null}
+          </Box>
+        </Paper>
+      )}
+
       {/* ── TOP BANNER: Nhân viên đang kiểm tra & Trạng thái ─────────────────── */}
       <Paper
         variant="outlined"

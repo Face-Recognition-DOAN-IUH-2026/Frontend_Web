@@ -61,7 +61,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePermission } from "@/lib/permission-context";
 import { shimmer } from "@/lib/animations";
 import { roleLabel } from "@/lib/utils";
-import type { UserPublic } from "@/lib/types";
+import type { RolePermissionConfig, UserPublic } from "@/lib/types";
 
 export default function AdminPage() {
   const theme = useTheme();
@@ -73,6 +73,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserPublic[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [dynamicRoles, setDynamicRoles] = useState<Record<string, RolePermissionConfig>>({});
 
   // Bộ lọc
   const [search, setSearch] = useState("");
@@ -110,9 +111,15 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.listUsers({ skip: 0, limit: 1000 });
+      const [data, matrix] = await Promise.all([
+        api.listUsers({ skip: 0, limit: 1000 }),
+        api.getPermissionMatrix().catch(() => null),
+      ]);
       setUsers(data.users || []);
       setTotal(data.total || (data.users || []).length);
+      if (matrix?.roles) {
+        setDynamicRoles(matrix.roles);
+      }
     } catch (err: any) {
       const msg = getErrorMessage(err) || "Không thể tải danh sách người dùng.";
       toast.error(msg);
@@ -134,7 +141,9 @@ export default function AdminPage() {
     let list = users;
 
     // 1. Vai trò
-    if (roleFilter !== "all") {
+    if (roleFilter === "staff") {
+      list = list.filter((u) => !["admin", "patron", "user"].includes(u.role));
+    } else if (roleFilter !== "all") {
       list = list.filter((u) => u.role === roleFilter);
     }
 
@@ -311,7 +320,7 @@ export default function AdminPage() {
                 <SchoolOutlinedIcon sx={{ fontSize: "14px !important", color: "#1E6091 !important" }} />
               )
             }
-            label={roleLabel(item.role)}
+            label={dynamicRoles[item.role]?.label || roleLabel(item.role)}
             sx={{
               fontWeight: 800,
               fontSize: "0.75rem",
@@ -434,7 +443,7 @@ export default function AdminPage() {
 
   // Thống kê nhanh
   const adminCount = users.filter((u) => u.role === "admin").length;
-  const staffCount = users.filter((u) => u.role === "staff").length;
+  const staffCount = users.filter((u) => !["admin", "patron", "user"].includes(u.role)).length;
   const patronCount = users.filter((u) => u.role === "patron").length;
   const faceCount = users.filter((u) => u.has_face).length;
   const noFaceCount = Math.max(0, total - faceCount);
@@ -986,15 +995,24 @@ export default function AdminPage() {
                 {[
                   {
                     role: "staff",
-                    label: "Nhân viên thư viện (Staff)",
-                    desc: "Xử lý thủ tục mượn/trả sách, thu phí phạt, cấp phát thẻ độc giả và điểm danh cổng kiểm soát.",
+                    label: dynamicRoles.staff?.label || "Nhân viên thư viện (Staff)",
+                    desc: dynamicRoles.staff?.description || "Xử lý thủ tục mượn/trả sách, thu phí phạt, cấp phát thẻ độc giả và điểm danh cổng kiểm soát.",
                     icon: <BadgeOutlinedIcon sx={{ fontSize: 24 }} />,
                     color: "#0A2540",
                   },
+                  ...Object.values(dynamicRoles)
+                    .filter((cfg) => !["admin", "staff", "patron", "user"].includes(cfg.role))
+                    .map((cfg) => ({
+                      role: cfg.role,
+                      label: cfg.label || roleLabel(cfg.role),
+                      desc: cfg.description || `Vai trò tùy biến (${cfg.allowedPages?.length || 0} màn hình được phép).`,
+                      icon: <ShieldOutlinedIcon sx={{ fontSize: 24 }} />,
+                      color: "#1E6091",
+                    })),
                   {
                     role: "admin",
-                    label: "Quản trị viên hệ thống (Admin)",
-                    desc: "Toàn quyền quản trị cơ sở dữ liệu, quản lý nhân sự, phân quyền vai trò và chỉnh sửa cấu hình hệ thống.",
+                    label: dynamicRoles.admin?.label || "Quản trị viên hệ thống (Admin)",
+                    desc: dynamicRoles.admin?.description || "Toàn quyền quản trị cơ sở dữ liệu, quản lý nhân sự, phân quyền vai trò và chỉnh sửa cấu hình hệ thống.",
                     icon: <SupervisorAccountOutlinedIcon sx={{ fontSize: 24 }} />,
                     color: "#8B0000",
                   },

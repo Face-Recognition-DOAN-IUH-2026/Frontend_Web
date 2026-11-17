@@ -58,6 +58,7 @@ import {
   type UserPermissionOverride,
   type ScheduleStaff,
 } from "@/lib/types";
+import { roleLabel } from "@/lib/utils";
 
 export interface UserOverridesTabProps {
   staffList: ScheduleStaff[];
@@ -187,7 +188,7 @@ export function UserOverridesTab({
               >
                 {staffList.map((st) => (
                   <MenuItem key={st.id} value={st.id}>
-                    {st.fullName || st.email} ({st.role === "admin" ? "Quản trị viên" : "Thủ thư"})
+                    {st.fullName || st.email} ({roles[st.role]?.label || roleLabel(st.role)})
                   </MenuItem>
                 ))}
               </Select>
@@ -197,7 +198,7 @@ export function UserOverridesTab({
           {selectedStaffMember && (
             <Chip
               size="small"
-              label={`Chức vụ: ${selectedStaffMember.role === "admin" ? "Quản trị viên" : "Thủ thư"}`}
+              label={`Chức vụ: ${roles[selectedStaffMember.role]?.label || roleLabel(selectedStaffMember.role)}`}
               sx={{
                 fontWeight: 700,
                 borderRadius: 1,

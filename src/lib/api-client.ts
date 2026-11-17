@@ -1943,6 +1943,13 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
     return response.data.data;
   }
 
+  async deleteRolePermissions(role: string): Promise<{ deleted: boolean; role: string }> {
+    const response = await this.client.delete<{ success: boolean; data: { deleted: boolean; role: string } }>(
+      `/api/permissions/roles/${encodeURIComponent(role)}`
+    );
+    return response.data.data;
+  }
+
   async getUserPermissionOverride(userId: string): Promise<UserPermissionOverride> {
     const response = await this.client.get<{ success: boolean; data: UserPermissionOverride }>(
       `/api/permissions/users/${encodeURIComponent(userId)}`
