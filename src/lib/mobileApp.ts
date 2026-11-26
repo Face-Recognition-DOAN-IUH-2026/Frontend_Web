@@ -14,15 +14,18 @@
  * apkUrl          — URL GitHub gốc (dùng cho QR code và fallback).
  */
 export const MOBILE_APP = {
-  /** URL proxy nội bộ — dùng cho nút Tải APK để fix lỗi MIME trên Android */
+  /** URL proxy nội bộ — tự động redirect sang APK mới nhất từ latest_android.json */
   apkDownloadUrl: "/api/download/apk",
-  /** URL GitHub gốc — dùng cho QR code và link dự phòng */
+  /** Manifest OTA chuẩn trên GitHub Releases */
+  manifestUrl:
+    "https://github.com/Face-Recognition-DOAN-IUH-2026/Frontend_mobile/releases/download/latest-android/latest_android.json",
+  /** URL GitHub fallback — dùng cho QR code khi chưa tải được manifest */
   apkUrl:
-    "https://github.com/Face-Recognition-DOAN-IUH-2026/Frontend_mobile/releases/latest/download/LibraryMobileApp.apk",
+    "https://github.com/Face-Recognition-DOAN-IUH-2026/Frontend_mobile/releases/download/latest-android/ThuVien-v1.0.0.1.apk",
   releasesUrl:
     "https://github.com/Face-Recognition-DOAN-IUH-2026/Frontend_mobile/releases",
-  fileName: "LibraryMobileApp.apk",
-  version: "1.0.0",
+  fileName: "ThuVien-v1.0.0.1.apk",
+  version: "1.0.0.1",
   sizeLabel: "197 MB",
   minAndroid: "7.0",
 } as const;
