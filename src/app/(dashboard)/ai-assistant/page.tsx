@@ -325,7 +325,7 @@ export default function AiAssistantPage() {
               : status === 503
                 ? "Dịch vụ AI tạm thời không khả dụng. Vui lòng thử lại sau."
                 : isTimeout
-                  ? "AI phản hồi quá lâu (quá 60s). Vui lòng thử lại câu hỏi ngắn hơn."
+                  ? "AI phản hồi quá lâu (quá 90s). Vui lòng thử lại câu hỏi ngắn hơn."
                   : (detail || "Không thể kết nối AI. Vui lòng thử lại."),
       );
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));

@@ -1716,7 +1716,7 @@ async requestEmailCorrection(data: { current_email: string; new_email: string })
             : "/api/ai/chat";
     const body: Record<string, any> = { message };
     if (sessionId) body.sessionId = sessionId;
-    const response = await this.client.post<AIChatResponse>(endpoint, body, { timeout: 60000 });
+    const response = await this.client.post<AIChatResponse>(endpoint, body, { timeout: 90000 });
     return response.data;
   }
 
