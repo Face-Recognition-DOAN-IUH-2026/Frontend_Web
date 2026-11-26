@@ -235,7 +235,7 @@ function InstallGuideDialog({
 
 /* ─── QR panel ──────────────────────────────────────────────────────────── */
 
-function QrPanel({ isDark }: { isDark: boolean }) {
+function QrPanel({ isDark, apkUrl }: { isDark: boolean; apkUrl: string }) {
   return (
     <Stack spacing={2.5} sx={{ alignItems: "center" }}>
       {/* QR frame */}
@@ -263,7 +263,7 @@ function QrPanel({ isDark }: { isDark: boolean }) {
           }}
         >
           <QRCodeSVG
-            value={MOBILE_APP.apkUrl}
+            value={apkUrl}
             size={168}
             level="M"
             bgColor="#FFFFFF"
@@ -336,6 +336,26 @@ export default function MobileAppDownload() {
   const isAndroid = useIsAndroid();
   const isInApp = useIsInAppBrowser();
   const [guideOpen, setGuideOpen] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string>(MOBILE_APP.version);
+  const [latestApkUrl, setLatestApkUrl] = useState<string>(MOBILE_APP.apkUrl);
+  const [latestFileName, setLatestFileName] = useState<string>(MOBILE_APP.fileName);
+
+  useEffect(() => {
+    if (typeof fetch !== "function") return;
+    let cancelled = false;
+    fetch(`${MOBILE_APP.apkDownloadUrl}?meta=1`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { version?: string; downloadUrl?: string; fileName?: string } | null) => {
+        if (cancelled || !data) return;
+        if (data.version) setLatestVersion(data.version);
+        if (data.downloadUrl) setLatestApkUrl(data.downloadUrl);
+        if (data.fileName) setLatestFileName(data.fileName);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const accent = isDark ? "#9CC9E8" : "#1E6091";
 
@@ -481,7 +501,7 @@ export default function MobileAppDownload() {
                 <InfoBadge
                   icon={<SystemUpdateIcon sx={{ fontSize: 18 }} />}
                   label="Phiên bản"
-                  value={`v${MOBILE_APP.version}`}
+                  value={`v${latestVersion}`}
                   accent={accent}
                 />
                 <InfoBadge
@@ -506,7 +526,7 @@ export default function MobileAppDownload() {
                 <Button
                   component="a"
                   href={MOBILE_APP.apkDownloadUrl}
-                  download={MOBILE_APP.fileName}
+                  download={latestFileName}
                   onClick={() => setGuideOpen(true)}
                   variant="contained"
                   size="large"
@@ -627,7 +647,7 @@ export default function MobileAppDownload() {
                 backdropFilter: "blur(16px)",
               }}
             >
-              <QrPanel isDark={isDark} />
+              <QrPanel isDark={isDark} apkUrl={latestApkUrl} />
             </Stack>
           </Box>
         </Paper>

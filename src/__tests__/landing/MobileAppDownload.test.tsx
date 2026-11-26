@@ -26,7 +26,7 @@ describe("MobileAppDownload", () => {
   it("hiển thị phiên bản, dung lượng và yêu cầu Android", () => {
     render(<MobileAppDownload />);
 
-    expect(screen.getByText(/v1\.0\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/v1\.0\.0\.1/)).toBeInTheDocument();
     expect(screen.getByText(/197 MB/)).toBeInTheDocument();
     expect(screen.getByText(/Android 7\.0\+/)).toBeInTheDocument();
   });

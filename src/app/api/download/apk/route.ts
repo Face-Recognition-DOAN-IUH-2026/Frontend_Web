@@ -1,24 +1,58 @@
+import { NextRequest } from "next/server";
+import { MOBILE_APP } from "@/lib/mobileApp";
+
+interface AndroidReleaseManifest {
+  version?: string;
+  download_url?: string;
+}
+
+async function resolveLatestApk(): Promise<{
+  version: string;
+  downloadUrl: string;
+  fileName: string;
+}> {
+  try {
+    const res = await fetch(MOBILE_APP.manifestUrl, {
+      next: { revalidate: 60 },
+      headers: { Accept: "application/json" },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as AndroidReleaseManifest;
+      if (data.download_url) {
+        const version = data.version || MOBILE_APP.version;
+        const urlParts = data.download_url.split("/");
+        const fileName = urlParts[urlParts.length - 1] || `ThuVien-v${version}.apk`;
+        return {
+          version,
+          downloadUrl: data.download_url,
+          fileName,
+        };
+      }
+    }
+  } catch {
+    // Fallback to static config when GitHub manifest is temporarily unreachable
+  }
+
+  return {
+    version: MOBILE_APP.version,
+    downloadUrl: MOBILE_APP.apkUrl,
+    fileName: MOBILE_APP.fileName,
+  };
+}
+
 /**
  * GET /api/download/apk
- *
- * Redirect người dùng sang URL GitHub Release mới nhất.
- *
- * TẠI SAO REDIRECT 307 THAY VÌ STREAM QUA VERCEL?
- * ──────────────────────────────────────────────
- * File APK có dung lượng ~197 MB. Nếu proxy qua Vercel Edge:
- * - Vercel Edge có timeout thực thi (25-30 giây). Người dùng mạng 4G hoặc wifi
- *   chậm sẽ bị cắt giữa chừng, file tải về chỉ được vài chục MB (bị hỏng / corrupt).
- * - Khi mở file APK bị corrupt, Android sẽ báo: "Định dạng tập tin không được hỗ trợ".
- *
- * Chuyển hướng 307 sang GitHub Release CDN (Azure Blob Storage Singapore):
- * - Phản hồi tức thì (<50ms).
- * - CDN của GitHub hỗ trợ Range Requests (tải đa luồng, pause/resume).
- * - Trả về đầy đủ header Content-Disposition: attachment; filename=LibraryMobileApp.apk
- *   và Content-Type: application/vnd.android.package-archive.
+ * - ?meta=1: trả JSON metadata phiên bản mới nhất (tránh CORS ở client).
+ * - Mặc định: redirect 307 sang URL file APK mới nhất trên GitHub Releases CDN.
  */
-const APK_GITHUB_URL =
-  "https://github.com/Face-Recognition-DOAN-IUH-2026/Frontend_mobile/releases/latest/download/LibraryMobileApp.apk";
+export async function GET(req: NextRequest) {
+  const latest = await resolveLatestApk();
 
-export async function GET() {
-  return Response.redirect(APK_GITHUB_URL, 307);
+  if (req.nextUrl.searchParams.get("meta") === "1") {
+    return Response.json(latest, {
+      headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
+    });
+  }
+
+  return Response.redirect(latest.downloadUrl, 307);
 }
