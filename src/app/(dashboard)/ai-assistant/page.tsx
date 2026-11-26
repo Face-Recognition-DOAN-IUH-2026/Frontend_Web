@@ -69,6 +69,43 @@ interface ToolResult {
   result: { success: boolean; data?: any; error?: string };
 }
 
+const FRIENDLY_TOOL_NAMES: Record<string, string> = {
+  search_books: "Tìm kiếm sách",
+  get_shelf_location: "Tìm vị trí kệ sách",
+  lookup_book: "Tra cứu chi tiết sách",
+  get_library_hours: "Xem giờ mở cửa thư viện",
+  get_patron_info: "Tra cứu thông tin thẻ bạn đọc",
+  get_patron_borrows: "Xem sách đang mượn",
+  get_patron_history: "Xem lịch sử mượn trả",
+  recommend_books: "Gợi ý sách phù hợp",
+  get_overdue_borrows: "Kiểm tra sách quá hạn",
+  get_schedule_today: "Xem lịch trực hôm nay",
+  get_all_schedules: "Xem toàn bộ lịch trực nhân viên",
+  get_operations_summary: "Thống kê bạn đọc & hoạt động thư viện",
+};
+
+function getFriendlyToolName(name: string): string {
+  return FRIENDLY_TOOL_NAMES[name] || name.replace(/_/g, " ");
+}
+
+function getFriendlyToolDescription(name: string, fallbackDesc: string): string {
+  const map: Record<string, string> = {
+    search_books: "Tìm nhanh tên sách, tác giả hoặc chủ đề trong kho thư viện.",
+    get_shelf_location: "Chỉ dẫn tầng, dãy và vị trí kệ của cuốn sách bạn cần.",
+    lookup_book: "Xem thông tin chi tiết và tình trạng còn/hết của đầu sách.",
+    get_library_hours: "Kiểm tra khung giờ mở cửa phục vụ trong tuần.",
+    get_patron_info: "Xem thông tin tài khoản và hạn sử dụng thẻ thư viện.",
+    get_patron_borrows: "Kiểm tra danh sách các cuốn sách hiện đang mượn.",
+    get_patron_history: "Xem lại lịch sử các lần mượn và trả sách trước đây.",
+    recommend_books: "Đề xuất sách hay phù hợp với sở thích và lịch sử đọc.",
+    get_overdue_borrows: "Liệt kê các phiếu mượn đã quá hạn cần xử lý.",
+    get_schedule_today: "Xem ca trực trong ngày của nhân viên thư viện.",
+    get_all_schedules: "Xem tổng hợp lịch trực của tất cả nhân viên hôm nay.",
+    get_operations_summary: "Xem số bạn đọc đang ở trong thư viện, lượt ra vào và sách quá hạn hôm nay.",
+  };
+  return map[name] || fallbackDesc;
+}
+
 const STORAGE_KEY = "ai-assistant-session";
 
 const SUGGESTIONS = [
@@ -296,8 +333,7 @@ export default function AiAssistantPage() {
 
       let responseText = data.response || "";
       if (!responseText.trim() && data.toolResults && data.toolResults.length > 0) {
-        const toolNames = data.toolResults.map((t: any) => t.name).join(", ");
-        responseText = `Đã truy vấn xong (${toolNames}).`;
+        responseText = "Dưới đây là thông tin tôi vừa tra cứu được cho bạn:";
       }
       if (!responseText.trim()) {
         responseText = "Tôi không có phản hồi.";
@@ -389,7 +425,7 @@ export default function AiAssistantPage() {
                 borderRadius: 1.5,
               }}
             >
-              Công cụ AI ({tools.length})
+              Khả năng hỗ trợ ({tools.length})
             </Button>
 
             {isAdmin && (
@@ -410,7 +446,7 @@ export default function AiAssistantPage() {
                   },
                 }}
               >
-                Kho tri thức RAG
+                Kho tài liệu thư viện
               </Button>
             )}
 
@@ -615,11 +651,11 @@ export default function AiAssistantPage() {
       >
         <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 1.5 }}>
           <BuildOutlinedIcon color="primary" />
-          Công Cụ AI Khả Dụng ({user?.role?.toUpperCase() || "PATRON"})
+          Các Tính Năng Hỗ Trợ Của Trợ Lý
         </DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Dưới đây là các công cụ mà Trợ lý AI có thể tự động gọi để hỗ trợ bạn dựa trên quyền hạn tài khoản:
+            Trợ lý thư viện có thể tự động tra cứu giúp bạn các thông tin sau:
           </Typography>
 
           <List sx={{ pt: 0 }}>
@@ -655,12 +691,12 @@ export default function AiAssistantPage() {
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      {t.name}
+                      {getFriendlyToolName(t.name)}
                     </Typography>
                     <Chip label={`#${idx + 1}`} size="small" sx={{ height: 20, fontSize: "0.68rem" }} />
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
-                    {t.description}
+                    {getFriendlyToolDescription(t.name, t.description)}
                   </Typography>
                 </Box>
               </Paper>
@@ -668,7 +704,7 @@ export default function AiAssistantPage() {
 
             {tools.length === 0 && (
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 3 }}>
-                Đang tải danh sách công cụ...
+                Đang tải danh sách tính năng...
               </Typography>
             )}
           </List>
